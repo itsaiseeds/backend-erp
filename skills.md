@@ -34,10 +34,44 @@
 
 ### Start developing
 ```bash
-docker-compose up -d                         # start PostgreSQL + Django
-bash scripts/reload_db.sh --step all
+docker compose build                            # build the image
+docker compose up -d                            # start PostgreSQL + Django
+bash scripts/reload_db.sh --step all            # create tables + seed data
 # Django is now running at http://localhost:8000/admin/
-# Login: admin / admin
+# Login: admin / admin  or  xZist / admin@123
+```
+
+### Run the Django server
+```bash
+docker compose up -d                            # start in detached mode
+docker compose up                               # start with logs visible
+docker compose up web                           # start only Django (db must be running)
+docker compose up -d --build                    # rebuild and start
+docker compose restart                          # restart all services
+docker compose down                             # stop all services
+docker compose down -v                          # stop and destroy database data
+```
+
+### Reload the database
+```bash
+bash scripts/reload_db.sh --step all            # drop + create tables + seed data
+bash scripts/reload_db.sh --step ddl            # drop + create tables only
+bash scripts/reload_db.sh --step dml            # insert seed data only
+```
+
+### Check status and logs
+```bash
+docker compose ps                               # show container status
+docker compose logs -f                          # tail all logs
+docker compose logs -f web                      # tail Django logs only
+docker compose logs -f db                       # tail PostgreSQL logs only
+```
+
+### Run management commands
+```bash
+docker compose exec web python manage.py shell
+docker compose exec web python manage.py createsuperuser
+docker compose exec web python manage.py collectstatic
 ```
 
 ### Add a new table
@@ -51,4 +85,6 @@ bash scripts/reload_db.sh --step all
 - `sql/ddl.sql` — schema
 - `sql/dml.sql` — seed data
 - `scripts/reload_db.sh` — DB management script
+- `scripts/run.sh` — single entry point for all commands
 - `.env.dev` — local connection params
+- `docker-compose.yml` — service definitions
