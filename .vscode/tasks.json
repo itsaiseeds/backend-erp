@@ -1,0 +1,159 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "build"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "up",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "up"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "down",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "down"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "restart",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "restart"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "reload-db",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "reload-db"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "logs",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "logs"
+            ],
+            "group": "none",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true
+        },
+        {
+            "label": "status",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "status"
+            ],
+            "group": "none",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "shell",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "shell"
+            ],
+            "group": "none",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "psql",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "psql"
+            ],
+            "group": "none",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        }
+    ]
+}

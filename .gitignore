@@ -5,13 +5,11 @@ __pycache__/
 venv/
 
 .env
-.env.*
 
 db.sqlite3
 
 staticfiles/
 media/
 
-.vscode/
 .idea/
 .DS_Store
