@@ -4,7 +4,7 @@
 # =============================================================================
 # Usage:
 #   bash scripts/run.sh build        # Build Docker images
-#   bash scripts/run.sh up           # Start all services
+#   bash scripts/run.sh up           # Start all services (auto-builds Flutter if needed)
 #   bash scripts/run.sh down         # Stop all services
 #   bash scripts/run.sh restart      # Restart all services
 #   bash scripts/run.sh reload-db    # Drop + recreate tables + seed data
@@ -12,6 +12,7 @@
 #   bash scripts/run.sh status       # Show container status
 #   bash scripts/run.sh shell        # Open Django shell in web container
 #   bash scripts/run.sh psql         # Open psql in db container
+#   bash scripts/run.sh flutter      # Build Flutter web app for production
 # =============================================================================
 
 set -euo pipefail
@@ -34,11 +35,64 @@ if [[ -z "$COMMAND" ]]; then
     echo "  status      Show container status"
     echo "  shell       Open Django shell in web container"
     echo "  psql        Open psql in db container"
+    echo "  flutter     Build Flutter web app for production"
     exit 1
 fi
 
 # ---------------------------------------------------------------------------
-# Build
+# Find Flutter
+# ---------------------------------------------------------------------------
+FLUTTER_CMD=""
+
+find_flutter() {
+    if [ -n "$FLUTTER_CMD" ]; then
+        return
+    fi
+
+    if command -v flutter &>/dev/null; then
+        FLUTTER_CMD="flutter"
+        return
+    fi
+
+    # Windows common paths (check both flutter and flutter.bat)
+    for path in \
+        "C:/flutter/bin" \
+        "C:/src/flutter/bin" \
+        "$LOCALAPPDATA/flutter/bin" \
+        "$HOME/flutter/bin" \
+        "/opt/flutter/bin"; do
+        if [ -f "$path/flutter.bat" ]; then
+            FLUTTER_CMD="$path/flutter.bat"
+            echo "[flutter] Found Flutter at $path"
+            return
+        fi
+        if [ -f "$path/flutter" ]; then
+            FLUTTER_CMD="$path/flutter"
+            echo "[flutter] Found Flutter at $path"
+            return
+        fi
+    done
+
+    echo "Error: flutter not found."
+    echo "Install Flutter SDK: https://docs.flutter.dev/get-started/install"
+    exit 1
+}
+
+# ---------------------------------------------------------------------------
+# Flutter build (production)
+# ---------------------------------------------------------------------------
+cmd_flutter() {
+    find_flutter
+    echo "[flutter] Building Flutter web app ..."
+    cd "$REPO_ROOT/web"
+    "$FLUTTER_CMD" pub get
+    MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release --base-href /sales-admin/
+    cd "$REPO_ROOT"
+    echo "[flutter] Build complete: web/build/web/"
+}
+
+# ---------------------------------------------------------------------------
+# Build Docker images
 # ---------------------------------------------------------------------------
 cmd_build() {
     echo "[build] Building Docker images ..."
@@ -50,6 +104,10 @@ cmd_build() {
 # Up
 # ---------------------------------------------------------------------------
 cmd_up() {
+    # Auto-build Flutter if build output is missing
+    if [ ! -f "$REPO_ROOT/web/build/web/index.html" ]; then
+        cmd_flutter
+    fi
     echo "[up] Starting services ..."
     docker compose up -d
     echo "[up] Done."
@@ -123,6 +181,7 @@ case "$COMMAND" in
     status)     cmd_status ;;
     shell)      cmd_shell ;;
     psql)       cmd_psql ;;
+    flutter)    cmd_flutter ;;
     *)
         echo "Unknown command: $COMMAND"
         echo "Run: bash scripts/run.sh (no args) for help"

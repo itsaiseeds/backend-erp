@@ -135,6 +135,9 @@ STORAGES = {
     },
 }
 
+# Flutter build directory (served by catch-all view, not collectstatic)
+FLUTTER_BUILD_DIR = BASE_DIR / "web" / "build" / "web"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
