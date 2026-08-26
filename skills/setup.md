@@ -15,15 +15,15 @@
 
 | File | Gitignored | Used by | Purpose |
 |---|---|---|---|
-| `.env` | Yes | Docker Compose (`web` service) | Production runtime — Neon DB credentials |
-| `.env.dev` | No | `reload_db.sh` | Local dev — localhost PostgreSQL |
+| `.env` | Yes | Render deployment | Production runtime — Neon DB credentials |
+| `.env.dev` | No | `reload_db.sh` | Local dev — Docker PostgreSQL |
 
 ### `.env` (production)
 Contains Neon DB connection details, Django secrets, and debug flags.
-**Never committed to git.** Injected at deploy time.
+**Never committed to git.** Managed by Neon CLI (`neon env pull`).
 
 ### `.env.dev` (local development)
-Contains local PostgreSQL connection params. **Committed to git** with placeholder values.
+Contains local Docker PostgreSQL connection params. **Committed to git** with placeholder values.
 
 ---
 
@@ -136,6 +136,9 @@ bash scripts/reload_db.sh --step dml
 > **Important:** The `db` container must be running before running `reload_db.sh`.
 > Start it with: `docker compose up -d`
 
+> **Safety:** This script only connects to local Docker PostgreSQL.
+> It will NEVER connect to or modify the production Neon database.
+
 ---
 
 ## Quick Reference
@@ -208,10 +211,87 @@ python manage.py startapp <app_name>
 | `POSTGRES_DB` | Yes | Yes | Yes |
 | `POSTGRES_USER` | Yes | Yes | Yes |
 | `POSTGRES_PASSWORD` | Yes | Yes | Yes |
-| `POSTGRES_HOST` | Yes | Yes (`db`) | Yes (`localhost`) |
+| `POSTGRES_HOST` | Yes | Yes | Yes (`localhost`) |
 | `POSTGRES_PORT` | Yes | Yes | Yes |
 | `ALLOWED_HOSTS` | Yes | Yes | Yes |
-| `SECRET_KEY` | **No** (hardcoded) | Yes | Yes |
-| `DEBUG` | **No** (hardcoded) | Yes | Yes |
+| `SECRET_KEY` | Yes (with fallback) | Yes | Yes |
+| `DEBUG` | Yes (with fallback) | Yes | Yes |
+| `DJANGO_SUPERUSER_USERNAME` | No (command) | Required | Required |
+| `DJANGO_SUPERUSER_EMAIL` | No (command) | Required | Required |
+| `DJANGO_SUPERUSER_PASSWORD` | No (command) | Required | Required |
 
-> **Note:** `SECRET_KEY` and `DEBUG` are not read from environment in `settings.py`. This is intentional for now but may need to be addressed before production deployment.
+---
+
+## Deployment (Render + Neon)
+
+### Architecture
+
+- **Web service**: Django app running gunicorn on Render
+- **Cron service**: Pings the app every 10 minutes to prevent cold starts
+- **Database**: Neon DB (serverless PostgreSQL)
+- **Deploy trigger**: Push to `master` branch auto-deploys via Render GitHub integration
+
+### Setup (one-time)
+
+1. Create account at [render.com](https://render.com)
+2. New → Blueprint → connect this GitHub repo
+3. Render reads `render.yaml` and provisions:
+   - Web service (`backend-erp`)
+   - Cron job (`keep-alive`)
+4. Update `ALLOWED_HOSTS` in Render env vars to match your actual Render URL
+
+### Environment variables (Render)
+
+| Variable | Value | Source |
+|---|---|---|
+| `SECRET_KEY` | Auto-generated | Render |
+| `DEBUG` | `False` | Hardcoded in render.yaml |
+| `ALLOWED_HOSTS` | `backend-erp.onrender.com` | Hardcoded in render.yaml |
+| `POSTGRES_HOST` | `ep-misty-block-aya29p71-pooler.c-5.us-east-2.aws.neon.tech` | Neon |
+| `POSTGRES_PORT` | `5432` | Neon |
+| `POSTGRES_DB` | `neondb` | Neon |
+| `POSTGRES_USER` | `neondb_owner` | Neon |
+| `POSTGRES_PASSWORD` | (from Neon) | Set manually in Render dashboard |
+
+> **Note:** `POSTGRES_PASSWORD` is not in `render.yaml` for security. Set it manually in Render dashboard after first deploy.
+
+### After first deploy
+
+1. Set `POSTGRES_PASSWORD` in Render dashboard (Environment → Environment Variables)
+2. Set `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, `DJANGO_SUPERUSER_PASSWORD` in Render dashboard
+   - Example: `admin` / `admin@example.com` / `your-strong-password`
+3. Run initial schema against Neon (via Neon SQL Editor or psql):
+   ```bash
+   psql "postgresql://neondb_owner:...@ep-misty-block-aya29p71.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require" -f sql/ddl.sql
+   ```
+4. Seed initial data:
+   ```bash
+   psql "postgresql://neondb_owner:...@ep-misty-block-aya29p71.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require" -f sql/dml.sql
+   ```
+5. `createsuperuser_if_not_exists` runs automatically on every deploy (idempotent)
+
+### CI/CD flow
+
+```
+Developer pushes to feature branch
+        ↓
+Opens PR to master
+        ↓
+GitHub Actions runs pytest (must pass)
+        ↓
+PR merged to master
+        ↓
+Render auto-deploys web service
+        ↓
+Cron pings app every 10 min (prevents cold starts)
+```
+
+### Schema changes in production
+
+1. Write the `ALTER TABLE` / `CREATE TABLE` SQL
+2. Test locally against Docker PostgreSQL first
+3. Run against Neon via Neon SQL Editor or `psql`
+4. Update `sql/ddl.sql` to keep local reference in sync
+
+> **Never** use `reload_db.sh` against production.
+> **Never** run Django migrations against production.

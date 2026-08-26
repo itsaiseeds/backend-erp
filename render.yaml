@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: backend-erp
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn config.wsgi:application
+    postDeployCommand: python manage.py createsuperuser_if_not_exists
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "backend-erp.onrender.com"
+      - key: POSTGRES_HOST
+        value: "ep-misty-block-aya29p71-pooler.c-5.us-east-2.aws.neon.tech"
+      - key: POSTGRES_PORT
+        value: "5432"
+      - key: POSTGRES_DB
+        value: "neondb"
+      - key: POSTGRES_USER
+        value: "neondb_owner"
+
+  - type: cron
+    name: keep-alive
+    schedule: "*/10 * * * *"
+    startCommand: curl -s https://backend-erp.onrender.com/ > /dev/null
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14"

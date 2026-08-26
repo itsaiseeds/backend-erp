@@ -23,6 +23,30 @@ This tells Django to never look for or run migrations for any installed app. The
 
 ---
 
+## Production Safety
+
+| Rule | Details |
+|---|---|
+| `reload_db.sh` only targets Docker PostgreSQL | Reads `.env.dev` (localhost), never touches Neon |
+| DDL/DML files are dev-only reference | Never run against production |
+| Schema changes for prod | Write raw SQL, run via Neon SQL Editor or `psql` directly |
+| Migrations permanently disabled | `MIGRATION_MODULES = None` — never run `makemigrations` or `migrate` |
+| No `DATABASE_URL` in `.env.dev` | Only individual `POSTGRES_*` vars for local Docker |
+
+### How to apply schema changes to production (Neon)
+
+1. Write the `ALTER TABLE` / `CREATE TABLE` SQL
+2. Test it locally against Docker PostgreSQL first
+3. Run it against Neon via:
+   - Neon SQL Editor in the dashboard, OR
+   - `psql` with the unpooled connection string:
+     ```bash
+     psql "postgresql://neondb_owner:...@ep-misty-block-aya29p71.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+     ```
+4. Update `sql/ddl.sql` to keep the local reference in sync
+
+---
+
 ## SQL Files
 
 ### `sql/ddl.sql`
@@ -81,6 +105,9 @@ bash scripts/reload_db.sh --step dml
 > **Prerequisite:** The `db` container must be running.
 > Start it with: `docker compose up -d`
 
+> **Safety:** This script only connects to local Docker PostgreSQL (`.env.dev`).
+> It will NEVER connect to or modify the production Neon database.
+
 ### What the reload script does
 
 1. Reads connection params from `.env.dev`
@@ -106,7 +133,7 @@ bash scripts/reload_db.sh --step dml
 1. Add `CREATE TABLE` to `sql/ddl.sql` (inside the `BEGIN`/`COMMIT` block)
 2. Add any seed `INSERT` to `sql/dml.sql` (inside the `BEGIN`/`COMMIT` block)
 3. If the table has an auto-increment ID, add `SELECT setval('table_id_seq', N);` after inserts
-4. Run `bash scripts/reload_db.sh --step all`
+4. Run `bash scripts/reload_db.sh --step all` (local Docker only)
 5. Verify in DBeaver or: `docker compose exec db psql -U django -d django -c "\dt"`
 
 ---
@@ -138,12 +165,12 @@ SELECT setval('auth_permission_id_seq', 28);
 
 ## Connection Parameters
 
-| Variable | `.env.dev` (local) | `.env` (Docker/production) |
+| Variable | `.env.dev` (local Docker) | `.env` / `render.yaml` (production Neon) |
 |---|---|---|
-| `POSTGRES_DB` | `django` | `django` |
-| `POSTGRES_USER` | `django` | `django` |
-| `POSTGRES_PASSWORD` | `change-this-password` | `change-this-password` |
-| `POSTGRES_HOST` | `localhost` | `db` |
+| `POSTGRES_DB` | `django` | `neondb` |
+| `POSTGRES_USER` | `django` | `neondb_owner` |
+| `POSTGRES_PASSWORD` | `change-this-password` | (from Neon) |
+| `POSTGRES_HOST` | `localhost` | `ep-misty-block-aya29p71-pooler.c-5.us-east-2.aws.neon.tech` |
 | `POSTGRES_PORT` | `5432` | `5432` |
 
 The `reload_db.sh` script always reads from `.env.dev` (localhost).
@@ -151,6 +178,8 @@ The `reload_db.sh` script always reads from `.env.dev` (localhost).
 ---
 
 ## Connecting with DBeaver
+
+### Local Docker PostgreSQL
 
 | Field | Value |
 |---|---|
@@ -160,7 +189,16 @@ The `reload_db.sh` script always reads from `.env.dev` (localhost).
 | Username | `django` |
 | Password | `change-this-password` |
 
-> **Note:** The `db` port must be exposed in `docker-compose.yml` for DBeaver to connect.
+### Production Neon DB
+
+| Field | Value |
+|---|---|
+| Host | `ep-misty-block-aya29p71-pooler.c-5.us-east-2.aws.neon.tech` |
+| Port | `5432` |
+| Database | `neondb` |
+| Username | `neondb_owner` |
+| Password | (from `.env`) |
+| SSL | Require |
 
 ---
 
@@ -171,3 +209,5 @@ The `reload_db.sh` script always reads from `.env.dev` (localhost).
 - **Sequence resets** — after inserting rows with explicit IDs, always call `setval()` to keep sequences in sync
 - **Idempotency** — all inserts use `ON CONFLICT DO NOTHING`, all creates use `IF NOT EXISTS`
 - **DB container must be running** — `reload_db.sh` will fail if `docker compose ps db` shows the container is down
+- **Never use `reload_db.sh` against production** — it only targets Docker PostgreSQL
+- **Schema changes for Neon** — write raw SQL, test locally, then run against Neon directly

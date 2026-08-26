@@ -127,3 +127,36 @@ backend-erp/
 - Do not create tables outside of `sql/ddl.sql`
 - Do not add seed data outside of `sql/dml.sql`
 - Do not commit `.env` (production secrets)
+
+---
+
+## Testing
+
+### Framework
+- **pytest** + **pytest-django** — all tests go in `tests/`
+
+### Running tests
+```bash
+pytest              # run all tests
+pytest -v           # verbose output
+pytest tests/test_sample.py   # run a specific file
+```
+
+### Writing tests
+- Test files: `tests/test_<name>.py`
+- Test functions: `def test_<name>():`
+- Use `assert` for assertions (pytest style, not `unittest.TestCase`)
+- Keep tests simple and focused — one assertion per test when possible
+
+### CI
+- GitHub Actions runs `pytest` on every PR to `master`
+- PRs cannot merge if tests fail
+- Enable branch protection: require the `tests` status check to pass
+
+### Where to put tests
+```
+tests/
+├── __init__.py
+├── test_sample.py       # trivial sanity tests
+└── test_<app_name>.py   # app-specific tests (when apps exist)
+```
