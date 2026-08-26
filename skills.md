@@ -37,22 +37,29 @@
 
 ### Start developing
 ```bash
-docker compose build                            # build the image
-docker compose up -d                            # start PostgreSQL + Django
-bash scripts/reload_db.sh --step all            # create tables + seed data
+bash scripts/run.sh flutter                       # build Flutter web app
+docker compose build                              # build the Docker image
+docker compose up -d                              # start PostgreSQL + Django
+bash scripts/reload_db.sh --step all              # create tables + seed data
 # Django is now running at http://localhost:8000/admin/
+# Flutter app at http://localhost:8000/sales-admin/
 # Login: admin / admin  or  xZist / admin@123
+```
+
+### Build Flutter app
+```bash
+bash scripts/run.sh flutter                       # build for production
 ```
 
 ### Run the Django server
 ```bash
-docker compose up -d                            # start in detached mode
-docker compose up                               # start with logs visible
-docker compose up web                           # start only Django (db must be running)
-docker compose up -d --build                    # rebuild and start
-docker compose restart                          # restart all services
-docker compose down                             # stop all services
-docker compose down -v                          # stop and destroy database data
+docker compose up -d                              # start in detached mode
+docker compose up                                 # start with logs visible
+docker compose up web                             # start only Django (db must be running)
+docker compose up -d --build                      # rebuild and start
+docker compose restart                            # restart all services
+docker compose down                               # stop all services
+docker compose down -v                            # stop and destroy database data
 ```
 
 ### Reload the database
@@ -88,9 +95,12 @@ docker compose exec web python manage.py collectstatic
 - `sql/ddl.sql` — schema
 - `sql/dml.sql` — seed data
 - `scripts/reload_db.sh` — DB management script
-- `scripts/run.sh` — single entry point for all commands
+- `scripts/run.sh` — single entry point for all commands (including Flutter build)
+- `web/lib/` — Flutter admin app source code
+- `web/build/web/` — Flutter build output (committed to git)
 - `.env.dev` — local connection params
 - `docker-compose.yml` — service definitions
+- `Dockerfile` — container build (no Flutter SDK)
 - `render.yaml` — Render deployment blueprint
 - `tests/` — test files
 
@@ -109,8 +119,10 @@ docker compose exec web python manage.py createsuperuser                # intera
 ```
 
 ### Deploy to Render
-- Push to `master` → Render auto-deploys
+- Push to `master` → Render auto-deploys (Docker build)
+- Flutter build is committed to git — no Flutter SDK in Docker
+- If Flutter changed: run `bash scripts/run.sh flutter` and commit `web/build/web/` before pushing
 - First deploy: run initial schema against Neon via Neon SQL Editor or psql
-- Set `POSTGRES_PASSWORD` in Render dashboard (not in render.yaml)
+- Set `POSTGRES_PASSWORD` and `DJANGO_SUPERUSER_*` in Render dashboard
 - `createsuperuser_if_not_exists` runs automatically on deploy (idempotent)
 - Cron pings app every 10 min to prevent cold starts

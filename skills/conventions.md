@@ -9,14 +9,19 @@
 ```
 backend-erp/
 ├── config/             # Django project package (settings, urls, wsgi)
-├── scripts/            # Shell scripts (reload_db.sh)
+├── scripts/            # Shell scripts (reload_db.sh, run.sh, entrypoint.sh)
 ├── sql/                # Raw SQL files (ddl.sql, dml.sql)
 ├── skills/             # Project knowledge base
+├── web/                # Flutter admin web app
+│   ├── lib/            # Flutter source code
+│   └── build/web/      # Flutter build output (committed to git)
+├── tests/              # pytest tests
 ├── skills.md           # Skills index
 ├── .env                # Production env (gitignored)
 ├── .env.dev            # Local dev env (committed)
 ├── docker-compose.yml  # Service definitions
-├── Dockerfile          # Container build
+├── Dockerfile          # Container build (no Flutter SDK)
+├── render.yaml         # Render deployment blueprint
 └── manage.py           # Django CLI
 ```
 
@@ -103,6 +108,8 @@ backend-erp/
 
 - `.env` is gitignored (production secrets)
 - `.env.dev` is committed (dev connection params with placeholders)
+- `web/build/web/` is committed (Flutter build output — developer responsibility)
+- `web/.dart_tool/` is gitignored (Flutter cache)
 - Never commit real passwords or secret keys
 - Commit messages should be concise and descriptive
 
@@ -127,6 +134,8 @@ backend-erp/
 - Do not create tables outside of `sql/ddl.sql`
 - Do not add seed data outside of `sql/dml.sql`
 - Do not commit `.env` (production secrets)
+- Do not push Flutter changes without rebuilding (`bash scripts/run.sh flutter`)
+- Do not install Flutter SDK in Docker — the build output is committed to git
 
 ---
 
