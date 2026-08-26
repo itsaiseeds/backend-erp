@@ -13,6 +13,5 @@ media
 .vscode
 .idea
 
-# Flutter build (rebuilt in Dockerfile)
-web/build/
+# Flutter (rebuilt in Dockerfile if not present locally)
 web/.dart_tool/
