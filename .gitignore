@@ -20,7 +20,6 @@ media/
 .neon
 
 # Flutter
-web/build/
 web/.dart_tool/
 web/.packages
 web/.flutter-plugins
