@@ -8,6 +8,7 @@
 
 - Docker & Docker Compose
 - Python 3.14+ (for local management commands outside Docker)
+- Flutter SDK (for building the admin web app)
 
 ---
 
@@ -16,7 +17,7 @@
 | File | Gitignored | Used by | Purpose |
 |---|---|---|---|
 | `.env` | Yes | Render deployment | Production runtime — Neon DB credentials |
-| `.env.dev` | No | `reload_db.sh` | Local dev — Docker PostgreSQL |
+| `.env.dev` | No | Docker Compose | Local dev — Docker PostgreSQL |
 
 ### `.env` (production)
 Contains Neon DB connection details, Django secrets, and debug flags.
@@ -30,18 +31,56 @@ Contains local Docker PostgreSQL connection params. **Committed to git** with pl
 ## First-Time Setup
 
 ```bash
-# 1. Build the Docker image
+# 1. Build Flutter web app (required before Docker build)
+bash scripts/run.sh flutter
+
+# 2. Build the Docker image
 docker compose build
 
-# 2. Start all services (Django + PostgreSQL)
+# 3. Start all services (Django + PostgreSQL)
 docker compose up -d
 
-# 3. Create all tables + seed data
+# 4. Create all tables + seed data
 bash scripts/reload_db.sh --step all
 ```
 
-Django is now running at `http://localhost:8000/admin/`
+Django is now running at:
+- `http://localhost:8000/admin/` — Django admin
+- `http://localhost:8000/sales-admin/` — Flutter admin app
+
 Login: `admin` / `admin` or `xZist` / `admin@123`
+
+---
+
+## Flutter Admin Web App
+
+The Flutter app lives in `web/` and the build output is committed to git.
+
+### Build the Flutter app
+
+```bash
+bash scripts/run.sh flutter
+```
+
+This runs `flutter pub get` and `flutter build web --release --base-href /sales-admin/` in the `web/` directory.
+
+### After building
+
+The build output is at `web/build/web/`. This is committed to git. Docker copies it into the image.
+
+### Changing Flutter code
+
+1. Edit files in `web/lib/`
+2. Run `bash scripts/run.sh flutter` to rebuild
+3. Commit the updated `web/build/web/` directory
+4. Push — Render auto-deploys with the new build
+
+### Why commit the build?
+
+- Avoids installing Flutter SDK in Docker (saves ~100MB image size)
+- Docker builds are fast (~5s instead of ~2min)
+- Render deploys are fast (~15s instead of ~3min)
+- Developer responsibility: always rebuild before committing Flutter changes
 
 ---
 
@@ -50,7 +89,7 @@ Login: `admin` / `admin` or `xZist` / `admin@123`
 ### Via Docker Compose (recommended)
 
 ```bash
-# Start all services in detached mode (Django + PostgreSQL)
+# Start all services in detached mode
 docker compose up -d
 
 # Start services and see logs in the terminal
@@ -75,29 +114,17 @@ docker compose down -v
 ### Checking if services are running
 
 ```bash
-# Show container status
 docker compose ps
-
-# View logs from all services
 docker compose logs -f
-
-# View logs from only the web service
 docker compose logs -f web
-
-# View logs from only the db service
 docker compose logs -f db
 ```
 
 ### Running Django management commands inside Docker
 
 ```bash
-# Open a Django shell inside the running web container
 docker compose exec web python manage.py shell
-
-# Create a new superuser
 docker compose exec web python manage.py createsuperuser
-
-# Collect static files
 docker compose exec web python manage.py collectstatic
 ```
 
@@ -111,8 +138,6 @@ docker compose exec web python manage.py collectstatic
 bash scripts/reload_db.sh --step all
 ```
 
-This drops all tables, recreates them from `sql/ddl.sql`, and inserts seed data from `sql/dml.sql`.
-
 ### Schema only (drop + create tables, no seed data)
 
 ```bash
@@ -125,16 +150,7 @@ bash scripts/reload_db.sh --step ddl
 bash scripts/reload_db.sh --step dml
 ```
 
-### How the reload script works
-
-1. Reads connection params from `.env.dev`
-2. Checks that Docker and the `db` container are running
-3. `--step ddl` or `--step all`: drops all tables (reverse dependency order), then runs `ddl.sql`
-4. `--step dml` or `--step all`: runs `dml.sql` to insert seed data
-5. All SQL runs inside the Docker `db` container via `docker compose exec`
-
 > **Important:** The `db` container must be running before running `reload_db.sh`.
-> Start it with: `docker compose up -d`
 
 > **Safety:** This script only connects to local Docker PostgreSQL.
 > It will NEVER connect to or modify the production Neon database.
@@ -144,7 +160,10 @@ bash scripts/reload_db.sh --step dml
 ## Quick Reference
 
 ```bash
-# Build images
+# Build Flutter app
+bash scripts/run.sh flutter
+
+# Build Docker images
 docker compose build
 
 # Start everything
@@ -165,80 +184,23 @@ docker compose down
 
 ---
 
-## Django Management Commands
-
-Run via Docker:
-```bash
-docker compose exec web python manage.py <command>
-```
-
-Or locally (with `.env.dev` loaded):
-```bash
-python manage.py <command>
-```
-
-Useful commands:
-- `python manage.py shell` — interactive Python shell
-- `python manage.py createsuperuser` — create additional superusers
-- `python manage.py collectstatic` — collect static files (needs `STATIC_ROOT` in settings first)
-
----
-
-## Adding a New Django App
-
-```bash
-# Create the app
-python manage.py startapp <app_name>
-
-# Add to INSTALLED_APPS in config/settings.py:
-#   '<app_name>',
-
-# The existing MIGRATION_MODULES line automatically picks up new apps:
-#   MIGRATION_MODULES = {app.split(".")[-1]: None for app in INSTALLED_APPS}
-
-# Write your models, then:
-# 1. Add CREATE TABLE to sql/ddl.sql
-# 2. Add any seed data to sql/dml.sql
-# 3. Run: bash scripts/reload_db.sh --step all
-```
-
----
-
-## Environment Variables (Django settings.py)
-
-| Variable | Read by settings.py | Used in `.env` | Used in `.env.dev` |
-|---|---|---|---|
-| `POSTGRES_DB` | Yes | Yes | Yes |
-| `POSTGRES_USER` | Yes | Yes | Yes |
-| `POSTGRES_PASSWORD` | Yes | Yes | Yes |
-| `POSTGRES_HOST` | Yes | Yes | Yes (`localhost`) |
-| `POSTGRES_PORT` | Yes | Yes | Yes |
-| `ALLOWED_HOSTS` | Yes | Yes | Yes |
-| `SECRET_KEY` | Yes (with fallback) | Yes | Yes |
-| `DEBUG` | Yes (with fallback) | Yes | Yes |
-| `DJANGO_SUPERUSER_USERNAME` | No (command) | Required | Required |
-| `DJANGO_SUPERUSER_EMAIL` | No (command) | Required | Required |
-| `DJANGO_SUPERUSER_PASSWORD` | No (command) | Required | Required |
-
----
-
 ## Deployment (Render + Neon)
 
 ### Architecture
 
-- **Web service**: Django app running gunicorn on Render
+- **Web service**: Django app running gunicorn on Render (Docker-based deploy)
 - **Cron service**: Pings the app every 10 minutes to prevent cold starts
 - **Database**: Neon DB (serverless PostgreSQL)
-- **Deploy trigger**: Push to `master` branch auto-deploys via Render GitHub integration
+- **Flutter build**: Committed to git, served by Django catch-all view
 
 ### Setup (one-time)
 
 1. Create account at [render.com](https://render.com)
 2. New → Blueprint → connect this GitHub repo
 3. Render reads `render.yaml` and provisions:
-   - Web service (`backend-erp`)
+   - Web service (`backend-erp`) using Dockerfile
    - Cron job (`keep-alive`)
-4. Update `ALLOWED_HOSTS` in Render env vars to match your actual Render URL
+4. Set env vars in Render dashboard (see below)
 
 ### Environment variables (Render)
 
@@ -246,29 +208,25 @@ python manage.py startapp <app_name>
 |---|---|---|
 | `SECRET_KEY` | Auto-generated | Render |
 | `DEBUG` | `False` | Hardcoded in render.yaml |
-| `ALLOWED_HOSTS` | `backend-erp.onrender.com` | Hardcoded in render.yaml |
+| `ALLOWED_HOSTS` | `backend-erp-jlt9.onrender.com` | Hardcoded in render.yaml |
 | `POSTGRES_HOST` | `ep-misty-block-aya29p71-pooler.c-5.us-east-2.aws.neon.tech` | Neon |
 | `POSTGRES_PORT` | `5432` | Neon |
 | `POSTGRES_DB` | `neondb` | Neon |
 | `POSTGRES_USER` | `neondb_owner` | Neon |
 | `POSTGRES_PASSWORD` | (from Neon) | Set manually in Render dashboard |
+| `DJANGO_SUPERUSER_USERNAME` | (your choice) | Set manually in Render dashboard |
+| `DJANGO_SUPERUSER_EMAIL` | (your choice) | Set manually in Render dashboard |
+| `DJANGO_SUPERUSER_PASSWORD` | (your choice) | Set manually in Render dashboard |
 
-> **Note:** `POSTGRES_PASSWORD` is not in `render.yaml` for security. Set it manually in Render dashboard after first deploy.
+> **Note:** `POSTGRES_PASSWORD` and `DJANGO_SUPERUSER_*` are not in `render.yaml` for security. Set them manually in Render dashboard.
 
-### After first deploy
+### Deploy workflow
 
-1. Set `POSTGRES_PASSWORD` in Render dashboard (Environment → Environment Variables)
-2. Set `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, `DJANGO_SUPERUSER_PASSWORD` in Render dashboard
-   - Example: `admin` / `admin@example.com` / `your-strong-password`
-3. Run initial schema against Neon (via Neon SQL Editor or psql):
-   ```bash
-   psql "postgresql://neondb_owner:...@ep-misty-block-aya29p71.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require" -f sql/ddl.sql
-   ```
-4. Seed initial data:
-   ```bash
-   psql "postgresql://neondb_owner:...@ep-misty-block-aya29p71.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require" -f sql/dml.sql
-   ```
-5. `createsuperuser_if_not_exists` runs automatically on every deploy (idempotent)
+1. Make changes to Django code
+2. If Flutter changed: run `bash scripts/run.sh flutter` and commit `web/build/web/`
+3. Commit and push to `master`
+4. Render auto-deploys using the Dockerfile
+5. `createsuperuser_if_not_exists` runs automatically on deploy
 
 ### CI/CD flow
 
@@ -281,7 +239,7 @@ GitHub Actions runs pytest (must pass)
         ↓
 PR merged to master
         ↓
-Render auto-deploys web service
+Render auto-deploys web service (Docker build)
         ↓
 Cron pings app every 10 min (prevents cold starts)
 ```
@@ -295,3 +253,37 @@ Cron pings app every 10 min (prevents cold starts)
 
 > **Never** use `reload_db.sh` against production.
 > **Never** run Django migrations against production.
+
+---
+
+## Environment Variables (Django settings.py)
+
+| Variable | Read by settings.py | Used in `.env` | Used in `.env.dev` |
+|---|---|---|---|
+| `POSTGRES_DB` | Yes | Yes | Yes |
+| `POSTGRES_USER` | Yes | Yes | Yes |
+| `POSTGRES_PASSWORD` | Yes | Yes | Yes |
+| `POSTGRES_HOST` | Yes | Yes | Yes (`db` for Docker) |
+| `POSTGRES_PORT` | Yes | Yes | Yes |
+| `ALLOWED_HOSTS` | Yes | Yes | Yes |
+| `SECRET_KEY` | Yes (with fallback) | Yes | Yes |
+| `DEBUG` | Yes (with fallback) | Yes | Yes |
+| `DJANGO_SUPERUSER_USERNAME` | No (command) | Required on Render | N/A |
+| `DJANGO_SUPERUSER_EMAIL` | No (command) | Required on Render | N/A |
+| `DJANGO_SUPERUSER_PASSWORD` | No (command) | Required on Render | N/A |
+
+---
+
+## Adding a New Django App
+
+```bash
+# Create the app
+python manage.py startapp <app_name>
+
+# Add to INSTALLED_APPS in config/settings.py
+
+# Write your models, then:
+# 1. Add CREATE TABLE to sql/ddl.sql
+# 2. Add any seed data to sql/dml.sql
+# 3. Run: bash scripts/reload_db.sh --step all
+```

@@ -11,11 +11,10 @@
 | | |
 |---|---|
 | **Base image** | `python:3.14-slim` |
-| **Dev command** | `python manage.py runserver 0.0.0.0:8000` |
-| **Prod command** | `gunicorn --bind 0.0.0.0:8000 config.wsgi:application` |
+| **Dev command** | `scripts/entrypoint.sh` (gunicorn) |
 | **Port** | 8000 |
-| **Volume** | `.:/app` (bind mount for live reload) |
-| **Env file** | `.env` |
+| **Volume** | `.:/app` (bind mount) |
+| **Env file** | `.env.dev` |
 | **Depends on** | `db` (healthy) |
 
 ### `db` (PostgreSQL)
@@ -25,7 +24,7 @@
 | **Image** | `postgres:18` |
 | **Port** | 5432 (mapped to host for DBeaver access) |
 | **Volume** | `postgres_data:/var/lib/postgresql` (persistent) |
-| **Healthcheck** | `pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}` every 5s |
+| **Healthcheck** | `pg_isready -U django -d django` every 5s |
 | **Timezone** | UTC (forced via `postgres -c timezone=UTC`) |
 
 ---
@@ -54,7 +53,7 @@ Same as above but keeps the terminal attached so you can see log output.
 docker compose up web
 ```
 
-The `db` container must already be running. This is useful when you've already started the database separately.
+The `db` container must already be running.
 
 ### Rebuild after changes
 
@@ -62,7 +61,7 @@ The `db` container must already be running. This is useful when you've already s
 docker compose up -d --build
 ```
 
-Rebuilds the Docker image (after changes to `Dockerfile`, `requirements.txt`, or project code) and restarts.
+Rebuilds the Docker image and restarts. The Flutter build in `web/build/web/` is copied into the image — no Flutter SDK needed in Docker.
 
 ### Restart services
 
@@ -126,7 +125,7 @@ docker compose logs -f db
 docker compose exec web python manage.py shell
 
 # Create a superuser
-docker collect exec web python manage.py createsuperuser
+docker compose exec web python manage.py createsuperuser
 
 # Collect static files
 docker compose exec web python manage.py collectstatic
@@ -161,26 +160,32 @@ docker compose exec db psql -U django -d django
 ```dockerfile
 FROM python:3.14-slim
 WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 COPY . .
+RUN chmod +x scripts/entrypoint.sh
+ENV POSTGRES_DB=django
+ENV POSTGRES_USER=django
+ENV POSTGRES_PASSWORD=placeholder
+ENV POSTGRES_HOST=localhost
+ENV POSTGRES_PORT=5432
+RUN python manage.py collectstatic --noinput
 EXPOSE 8000
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "config.wsgi:application"]
+ENTRYPOINT ["scripts/entrypoint.sh"]
 ```
 
+- Flutter build (`web/build/web/`) is committed to git — no Flutter SDK in Docker
 - Good layer caching: `requirements.txt` copied and installed before project code
-- Production CMD uses gunicorn (overridden to `runserver` in docker-compose for dev)
+- `collectstatic` runs during build with dummy DB env vars
 
 ---
 
 ## Networking
 
-The `web` service connects to `db` via Docker's internal DNS using the service name `db` as the hostname. This is why `.env` (used by Docker Compose) has `POSTGRES_HOST=db`.
+The `web` service connects to `db` via Docker's internal DNS using the service name `db` as the hostname. This is why `.env.dev` has `POSTGRES_HOST=db`.
 
-The `db` port (5432) is mapped to the host, so you can connect from DBeaver or other tools at `localhost:5432`.
+The `db` port (5432) is mapped to the host, so you can connect from DBeaver at `localhost:5432`.
 
 ---
 
@@ -188,16 +193,16 @@ The `db` port (5432) is mapped to the host, so you can connect from DBeaver or o
 
 The `db` service uses:
 ```
-pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+pg_isready -U django -d django
 ```
 
-The `web` service waits for this via `depends_on: condition: service_healthy`. This prevents Django from starting before PostgreSQL is ready to accept connections.
+The `web` service waits for this via `depends_on: condition: service_healthy`.
 
 ---
 
 ## Gotchas
 
-- **`web` command override** — docker-compose overrides the Dockerfile CMD with `runserver` for dev. In production, use the Dockerfile's gunicorn CMD.
-- **Volume mount** — `.:/app` means local file changes are reflected immediately in the container. This is great for dev but means you must not have stale `.pyc` files (hence `PYTHONDONTWRITEBYTECODE=1`).
+- **Volume mount** — `.:/app` means local file changes are reflected immediately in the container.
 - **`postgres_data` volume** — persists even after `docker compose down`. Use `docker compose down -v` to destroy it.
-- **Timezone** — PostgreSQL is forced to UTC via `postgres -c timezone=UTC` to avoid the `Asia/Calcutta` error in DBeaver.
+- **Timezone** — PostgreSQL is forced to UTC via `postgres -c timezone=UTC`.
+- **Flutter build** — Run `bash scripts/run.sh flutter` locally before `docker compose build` if you've changed Flutter code.
