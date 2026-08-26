@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'config',
 ]
 
 MIGRATION_MODULES = {app.split(".")[-1]: None for app in INSTALLED_APPS}
