@@ -12,3 +12,7 @@ staticfiles
 media
 .vscode
 .idea
+
+# Flutter build (rebuilt in Dockerfile)
+web/build/
+web/.dart_tool/

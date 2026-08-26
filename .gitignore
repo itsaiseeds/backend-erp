@@ -18,3 +18,10 @@ media/
 .idea/
 .DS_Store
 .neon
+
+# Flutter
+web/build/
+web/.dart_tool/
+web/.packages
+web/.flutter-plugins
+web/.flutter-plugins-dependencies

@@ -3,8 +3,8 @@
 # run.sh — Single entry point for all project commands
 # =============================================================================
 # Usage:
-#   bash scripts/run.sh build        # Build Docker images (includes Flutter)
-#   bash scripts/run.sh up           # Start all services
+#   bash scripts/run.sh build        # Build Docker images
+#   bash scripts/run.sh up           # Start all services (auto-builds Flutter if needed)
 #   bash scripts/run.sh down         # Stop all services
 #   bash scripts/run.sh restart      # Restart all services
 #   bash scripts/run.sh reload-db    # Drop + recreate tables + seed data
@@ -12,7 +12,7 @@
 #   bash scripts/run.sh status       # Show container status
 #   bash scripts/run.sh shell        # Open Django shell in web container
 #   bash scripts/run.sh psql         # Open psql in db container
-#   bash scripts/run.sh flutter      # Build Flutter web app locally
+#   bash scripts/run.sh flutter      # Build Flutter web app for production
 # =============================================================================
 
 set -euo pipefail
@@ -35,39 +35,64 @@ if [[ -z "$COMMAND" ]]; then
     echo "  status      Show container status"
     echo "  shell       Open Django shell in web container"
     echo "  psql        Open psql in db container"
-    echo "  flutter     Build Flutter web app locally"
+    echo "  flutter     Build Flutter web app for production"
     exit 1
 fi
 
 # ---------------------------------------------------------------------------
-# Flutter build (local)
+# Find Flutter
 # ---------------------------------------------------------------------------
-cmd_flutter() {
-    echo "[flutter] Building Flutter web app ..."
-    cd "$REPO_ROOT/web"
+FLUTTER_CMD=""
 
-    if ! command -v flutter &>/dev/null; then
-        # Try common Flutter paths
-        if [ -d "/opt/flutter/bin" ]; then
-            export PATH="/opt/flutter/bin:$PATH"
-        elif [ -d "$HOME/flutter/bin" ]; then
-            export PATH="$HOME/flutter/bin:$PATH"
-        elif [ -d "C:/flutter/bin" ]; then
-            export PATH="C:/flutter/bin:$PATH"
-        else
-            echo "Error: flutter not found. Install Flutter SDK first."
-            exit 1
-        fi
+find_flutter() {
+    if [ -n "$FLUTTER_CMD" ]; then
+        return
     fi
 
-    flutter pub get
-    flutter build web --release --base-href /sales-admin/
+    if command -v flutter &>/dev/null; then
+        FLUTTER_CMD="flutter"
+        return
+    fi
+
+    # Windows common paths (check both flutter and flutter.bat)
+    for path in \
+        "C:/flutter/bin" \
+        "C:/src/flutter/bin" \
+        "$LOCALAPPDATA/flutter/bin" \
+        "$HOME/flutter/bin" \
+        "/opt/flutter/bin"; do
+        if [ -f "$path/flutter.bat" ]; then
+            FLUTTER_CMD="$path/flutter.bat"
+            echo "[flutter] Found Flutter at $path"
+            return
+        fi
+        if [ -f "$path/flutter" ]; then
+            FLUTTER_CMD="$path/flutter"
+            echo "[flutter] Found Flutter at $path"
+            return
+        fi
+    done
+
+    echo "Error: flutter not found."
+    echo "Install Flutter SDK: https://docs.flutter.dev/get-started/install"
+    exit 1
+}
+
+# ---------------------------------------------------------------------------
+# Flutter build (production)
+# ---------------------------------------------------------------------------
+cmd_flutter() {
+    find_flutter
+    echo "[flutter] Building Flutter web app ..."
+    cd "$REPO_ROOT/web"
+    "$FLUTTER_CMD" pub get
+    MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release --base-href /sales-admin/
     cd "$REPO_ROOT"
     echo "[flutter] Build complete: web/build/web/"
 }
 
 # ---------------------------------------------------------------------------
-# Build
+# Build Docker images
 # ---------------------------------------------------------------------------
 cmd_build() {
     echo "[build] Building Docker images ..."

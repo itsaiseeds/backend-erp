@@ -154,6 +154,23 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             }
+        },
+        {
+            "label": "flutter",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "flutter"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
         }
     ]
 }
