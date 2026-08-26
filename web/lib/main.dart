@@ -59,7 +59,7 @@ class AdminDashboard extends StatelessWidget {
                 children: const [
                   _DashboardCard(
                     icon: Icons.inventory_2,
-                    title: 'Products',
+                    title: 'Products 12',
                     subtitle: 'Manage your product catalog',
                   ),
                   _DashboardCard(
