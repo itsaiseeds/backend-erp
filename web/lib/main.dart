@@ -10,7 +10,7 @@ class AdminWebApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Saiseeds Admin',
+      title: 'Saiseeds Admin 13',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
