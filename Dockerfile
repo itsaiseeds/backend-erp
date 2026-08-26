@@ -10,8 +10,8 @@ RUN git clone https://github.com/flutter/flutter.git -b stable /opt/flutter
 ENV PATH="/opt/flutter/bin:$PATH"
 
 # Create non-root user for Flutter build (tar fails as root)
-RUN useradd -m flutter
-RUN chown -R flutter:flutter /opt/flutter
+RUN useradd -m flutter \
+    && chown -R flutter:flutter /opt/flutter
 
 WORKDIR /app
 
@@ -22,19 +22,14 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY . .
 
-# Fix ownership for Flutter build
-RUN chown -R flutter:flutter /app
-
 # Build Flutter as non-root user (if not already built locally)
 RUN if [ ! -f "web/build/web/index.html" ]; then \
-        echo "Flutter build not found, building ..." && \
-        su - flutter -c "cd /app/web && flutter pub get && flutter build web --release --base-href /sales-admin/" ; \
+        echo "Flutter build not found, building ..." \
+        && chown -R flutter:flutter /app/web \
+        && su flutter -c "cd /app/web && /opt/flutter/bin/flutter pub get && /opt/flutter/bin/flutter build web --release --base-href /sales-admin/" ; \
     else \
         echo "Flutter build found, skipping ..." ; \
     fi
-
-# Fix ownership back to root for Django
-RUN chown -R root:root /app
 
 RUN chmod +x scripts/entrypoint.sh
 
