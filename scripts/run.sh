@@ -3,7 +3,7 @@
 # run.sh — Single entry point for all project commands
 # =============================================================================
 # Usage:
-#   bash scripts/run.sh build        # Build Docker images
+#   bash scripts/run.sh build        # Build Docker images (includes Flutter)
 #   bash scripts/run.sh up           # Start all services
 #   bash scripts/run.sh down         # Stop all services
 #   bash scripts/run.sh restart      # Restart all services
@@ -12,6 +12,7 @@
 #   bash scripts/run.sh status       # Show container status
 #   bash scripts/run.sh shell        # Open Django shell in web container
 #   bash scripts/run.sh psql         # Open psql in db container
+#   bash scripts/run.sh flutter      # Build Flutter web app locally
 # =============================================================================
 
 set -euo pipefail
@@ -34,8 +35,36 @@ if [[ -z "$COMMAND" ]]; then
     echo "  status      Show container status"
     echo "  shell       Open Django shell in web container"
     echo "  psql        Open psql in db container"
+    echo "  flutter     Build Flutter web app locally"
     exit 1
 fi
+
+# ---------------------------------------------------------------------------
+# Flutter build (local)
+# ---------------------------------------------------------------------------
+cmd_flutter() {
+    echo "[flutter] Building Flutter web app ..."
+    cd "$REPO_ROOT/web"
+
+    if ! command -v flutter &>/dev/null; then
+        # Try common Flutter paths
+        if [ -d "/opt/flutter/bin" ]; then
+            export PATH="/opt/flutter/bin:$PATH"
+        elif [ -d "$HOME/flutter/bin" ]; then
+            export PATH="$HOME/flutter/bin:$PATH"
+        elif [ -d "C:/flutter/bin" ]; then
+            export PATH="C:/flutter/bin:$PATH"
+        else
+            echo "Error: flutter not found. Install Flutter SDK first."
+            exit 1
+        fi
+    fi
+
+    flutter pub get
+    flutter build web --release --base-href /sales-admin/
+    cd "$REPO_ROOT"
+    echo "[flutter] Build complete: web/build/web/"
+}
 
 # ---------------------------------------------------------------------------
 # Build
@@ -50,6 +79,10 @@ cmd_build() {
 # Up
 # ---------------------------------------------------------------------------
 cmd_up() {
+    # Auto-build Flutter if build output is missing
+    if [ ! -f "$REPO_ROOT/web/build/web/index.html" ]; then
+        cmd_flutter
+    fi
     echo "[up] Starting services ..."
     docker compose up -d
     echo "[up] Done."
@@ -123,6 +156,7 @@ case "$COMMAND" in
     status)     cmd_status ;;
     shell)      cmd_shell ;;
     psql)       cmd_psql ;;
+    flutter)    cmd_flutter ;;
     *)
         echo "Unknown command: $COMMAND"
         echo "Run: bash scripts/run.sh (no args) for help"
