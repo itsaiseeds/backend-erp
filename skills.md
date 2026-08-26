@@ -15,6 +15,9 @@
 | **Container** | Docker Compose (web + db) |
 | **Schema management** | Raw SQL (no Django migrations) |
 | **Seed data** | Raw SQL, dev-only |
+| **Testing** | pytest + pytest-django |
+| **CI/CD** | GitHub Actions → Render |
+| **Deployment** | Render (web + cron) + Neon DB (serverless PostgreSQL) |
 
 ---
 
@@ -88,3 +91,26 @@ docker compose exec web python manage.py collectstatic
 - `scripts/run.sh` — single entry point for all commands
 - `.env.dev` — local connection params
 - `docker-compose.yml` — service definitions
+- `render.yaml` — Render deployment blueprint
+- `tests/` — test files
+
+### Run tests
+```bash
+pytest                                      # run all tests
+pytest -v                                   # verbose output
+pytest tests/test_sample.py                 # run specific file
+```
+
+### Run management commands
+```bash
+docker compose exec web python manage.py createsuperuser_if_not_exists  # idempotent superuser creation
+docker compose exec web python manage.py shell                          # Django shell
+docker compose exec web python manage.py createsuperuser                # interactive superuser creation
+```
+
+### Deploy to Render
+- Push to `master` → Render auto-deploys
+- First deploy: run initial schema against Neon via Neon SQL Editor or psql
+- Set `POSTGRES_PASSWORD` in Render dashboard (not in render.yaml)
+- `createsuperuser_if_not_exists` runs automatically on deploy (idempotent)
+- Cron pings app every 10 min to prevent cold starts
