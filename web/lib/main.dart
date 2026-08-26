@@ -10,7 +10,7 @@ class AdminWebApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Saiseeds Admin 13',
+      title: 'Saiseeds Admin',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -69,7 +69,7 @@ class AdminDashboard extends StatelessWidget {
                   ),
                   _DashboardCard(
                     icon: Icons.people,
-                    title: 'Customers',
+                    title: 'Customers 16',
                     subtitle: 'Manage customer accounts',
                   ),
                 ],
