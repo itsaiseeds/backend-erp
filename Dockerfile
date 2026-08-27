@@ -23,4 +23,6 @@ ENV POSTGRES_PORT=5432
 
 EXPOSE 8000
 
-ENTRYPOINT ["scripts/entrypoint.sh"]
+# Invoke via bash so the bind-mounted scripts/entrypoint.sh needs no +x bit
+# (repo is checked out on Windows hosts and on Linux CI runners alike).
+ENTRYPOINT ["bash", "scripts/entrypoint.sh"]
