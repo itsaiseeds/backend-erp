@@ -1,7 +1,6 @@
 services:
   web:
     build: .
-    command: scripts/entrypoint.sh
     volumes:
       - .:/app
     ports:
