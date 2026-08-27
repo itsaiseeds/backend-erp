@@ -1,143 +1,228 @@
--- =============================================================================
--- DDL: Django Built-in Tables
--- Backend ERP - PostgreSQL
--- =============================================================================
--- Creates all tables required by Django's built-in apps:
---   django.contrib.admin
---   django.contrib.auth
---   django.contrib.contenttypes
---   django.contrib.sessions
---
--- Run: bash scripts/reload_db.sh --step ddl
--- =============================================================================
-
-BEGIN;
-
--- -------------------------------------------------------------------------
--- django_migrations (required by Django internals even with migrations disabled)
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS django_migrations (
-    id          BIGSERIAL    PRIMARY KEY,
-    app         VARCHAR(255) NOT NULL,
-    name        VARCHAR(255) NOT NULL,
-    applied     TIMESTAMP    NOT NULL
+CREATE TABLE public.auth_group (
+	id bigserial NOT NULL,
+	"name" varchar(150) NOT NULL,
+	CONSTRAINT auth_group_id_not_null NOT NULL id,
+	CONSTRAINT auth_group_name_key UNIQUE (name),
+	CONSTRAINT auth_group_name_not_null NOT NULL name,
+	CONSTRAINT auth_group_pkey PRIMARY KEY (id)
 );
 
-CREATE INDEX IF NOT EXISTS django_migrations_app_idx ON django_migrations (app);
-
--- -------------------------------------------------------------------------
--- django_content_type
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS django_content_type (
-    id         BIGSERIAL    PRIMARY KEY,
-    app_label  VARCHAR(100) NOT NULL,
-    model      VARCHAR(100) NOT NULL,
-    UNIQUE (app_label, model)
+CREATE TABLE public.django_content_type (
+	id bigserial NOT NULL,
+	app_label varchar(100) NOT NULL,
+	model varchar(100) NOT NULL,
+	CONSTRAINT django_content_type_app_label_model_key UNIQUE (app_label, model),
+	CONSTRAINT django_content_type_app_label_not_null NOT NULL app_label,
+	CONSTRAINT django_content_type_id_not_null NOT NULL id,
+	CONSTRAINT django_content_type_model_not_null NOT NULL model,
+	CONSTRAINT django_content_type_pkey PRIMARY KEY (id)
 );
 
--- -------------------------------------------------------------------------
--- auth_permission
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS auth_permission (
-    id              BIGSERIAL    PRIMARY KEY,
-    name            VARCHAR(255) NOT NULL,
-    content_type_id BIGINT       NOT NULL REFERENCES django_content_type (id),
-    codename        VARCHAR(100) NOT NULL,
-    UNIQUE (content_type_id, codename)
+CREATE TABLE public.django_migrations (
+	id bigserial NOT NULL,
+	app varchar(255) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	applied timestamp NOT NULL,
+	CONSTRAINT django_migrations_app_not_null NOT NULL app,
+	CONSTRAINT django_migrations_applied_not_null NOT NULL applied,
+	CONSTRAINT django_migrations_id_not_null NOT NULL id,
+	CONSTRAINT django_migrations_name_not_null NOT NULL name,
+	CONSTRAINT django_migrations_pkey PRIMARY KEY (id)
 );
+CREATE INDEX django_migrations_app_idx ON public.django_migrations USING btree (app);
 
-CREATE INDEX IF NOT EXISTS auth_permission_content_type_id_idx ON auth_permission (content_type_id);
-
--- -------------------------------------------------------------------------
--- auth_group
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS auth_group (
-    id   BIGSERIAL    PRIMARY KEY,
-    name VARCHAR(150) NOT NULL UNIQUE
+CREATE TABLE public.django_session (
+	session_key varchar(40) NOT NULL,
+	session_data text NOT NULL,
+	expire_date timestamp NOT NULL,
+	CONSTRAINT django_session_expire_date_not_null NOT NULL expire_date,
+	CONSTRAINT django_session_pkey PRIMARY KEY (session_key),
+	CONSTRAINT django_session_session_data_not_null NOT NULL session_data,
+	CONSTRAINT django_session_session_key_not_null NOT NULL session_key
 );
+CREATE INDEX django_session_expire_date_idx ON public.django_session USING btree (expire_date);
 
--- -------------------------------------------------------------------------
--- auth_group_permissions
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS auth_group_permissions (
-    id            BIGSERIAL PRIMARY KEY,
-    group_id      BIGINT    NOT NULL REFERENCES auth_group (id) ON DELETE CASCADE,
-    permission_id BIGINT    NOT NULL REFERENCES auth_permission (id) ON DELETE CASCADE,
-    UNIQUE (group_id, permission_id)
+CREATE TABLE public.auth_permission (
+	id bigserial NOT NULL,
+	"name" varchar(255) NOT NULL,
+	content_type_id int8 NOT NULL,
+	codename varchar(100) NOT NULL,
+	CONSTRAINT auth_permission_codename_not_null NOT NULL codename,
+	CONSTRAINT auth_permission_content_type_id_codename_key UNIQUE (content_type_id, codename),
+	CONSTRAINT auth_permission_content_type_id_not_null NOT NULL content_type_id,
+	CONSTRAINT auth_permission_id_not_null NOT NULL id,
+	CONSTRAINT auth_permission_name_not_null NOT NULL name,
+	CONSTRAINT auth_permission_pkey PRIMARY KEY (id),
+	CONSTRAINT auth_permission_content_type_id_fkey FOREIGN KEY (content_type_id) REFERENCES public.django_content_type(id)
 );
+CREATE INDEX auth_permission_content_type_id_idx ON public.auth_permission USING btree (content_type_id);
 
-CREATE INDEX IF NOT EXISTS auth_group_permissions_group_id_idx ON auth_group_permissions (group_id);
-CREATE INDEX IF NOT EXISTS auth_group_permissions_permission_id_idx ON auth_group_permissions (permission_id);
-
--- -------------------------------------------------------------------------
--- auth_user
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS auth_user (
-    id           BIGSERIAL     PRIMARY KEY,
-    password     VARCHAR(128)  NOT NULL,
-    last_login   TIMESTAMP     NULL,
-    is_superuser BOOLEAN       NOT NULL DEFAULT FALSE,
-    username     VARCHAR(150)  NOT NULL UNIQUE,
-    first_name   VARCHAR(150)  NOT NULL DEFAULT '',
-    last_name    VARCHAR(150)  NOT NULL DEFAULT '',
-    email        VARCHAR(254)  NOT NULL DEFAULT '',
-    is_staff     BOOLEAN       NOT NULL DEFAULT FALSE,
-    is_active    BOOLEAN       NOT NULL DEFAULT TRUE,
-    date_joined  TIMESTAMP     NOT NULL
+CREATE TABLE public.authentication_user (
+	id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,
+	"password" varchar(128) NOT NULL,
+	last_login timestamptz NULL,
+	is_superuser bool NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	phone_number varchar(10) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	email varchar(254) NULL,
+	is_verified bool NOT NULL,
+	is_staff bool NOT NULL,
+	is_active bool NOT NULL,
+	date_joined timestamptz NOT NULL,
+	created_by_id int8 NULL,
+	verified_by_id int8 NULL,
+	CONSTRAINT authentication_user_created_at_not_null NOT NULL created_at,
+	CONSTRAINT authentication_user_date_joined_not_null NOT NULL date_joined,
+	CONSTRAINT authentication_user_id_not_null NOT NULL id,
+	CONSTRAINT authentication_user_is_active_not_null NOT NULL is_active,
+	CONSTRAINT authentication_user_is_staff_not_null NOT NULL is_staff,
+	CONSTRAINT authentication_user_is_superuser_not_null NOT NULL is_superuser,
+	CONSTRAINT authentication_user_is_verified_not_null NOT NULL is_verified,
+	CONSTRAINT authentication_user_name_not_null NOT NULL name,
+	CONSTRAINT authentication_user_password_not_null NOT NULL password,
+	CONSTRAINT authentication_user_phone_number_key UNIQUE (phone_number),
+	CONSTRAINT authentication_user_phone_number_not_null NOT NULL phone_number,
+	CONSTRAINT authentication_user_pkey PRIMARY KEY (id),
+	CONSTRAINT authentication_user_updated_at_not_null NOT NULL updated_at,
+	CONSTRAINT authentication_user_created_by_id_d3f2a616_fk_authentic FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT authentication_user_verified_by_id_e9e11f40_fk_authentic FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED
 );
+CREATE INDEX authentication_user_created_by_id_d3f2a616 ON public.authentication_user USING btree (created_by_id);
+CREATE INDEX authentication_user_phone_number_f8159965_like ON public.authentication_user USING btree (phone_number varchar_pattern_ops);
+CREATE INDEX authentication_user_verified_by_id_e9e11f40 ON public.authentication_user USING btree (verified_by_id);
 
--- -------------------------------------------------------------------------
--- auth_user_groups
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS auth_user_groups (
-    id       BIGSERIAL PRIMARY KEY,
-    user_id  BIGINT    NOT NULL REFERENCES auth_user (id) ON DELETE CASCADE,
-    group_id BIGINT    NOT NULL REFERENCES auth_group (id) ON DELETE CASCADE,
-    UNIQUE (user_id, group_id)
+CREATE TABLE public.authentication_user_groups (
+	id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,
+	user_id int8 NOT NULL,
+	group_id int4 NOT NULL,
+	CONSTRAINT authentication_user_groups_group_id_not_null NOT NULL group_id,
+	CONSTRAINT authentication_user_groups_id_not_null NOT NULL id,
+	CONSTRAINT authentication_user_groups_pkey PRIMARY KEY (id),
+	CONSTRAINT authentication_user_groups_user_id_group_id_8af031ac_uniq UNIQUE (user_id, group_id),
+	CONSTRAINT authentication_user_groups_user_id_not_null NOT NULL user_id,
+	CONSTRAINT authentication_user__user_id_30868577_fk_authentic FOREIGN KEY (user_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT authentication_user_groups_group_id_6b5c44b7_fk_auth_group_id FOREIGN KEY (group_id) REFERENCES public.auth_group(id) DEFERRABLE INITIALLY DEFERRED
 );
+CREATE INDEX authentication_user_groups_group_id_6b5c44b7 ON public.authentication_user_groups USING btree (group_id);
+CREATE INDEX authentication_user_groups_user_id_30868577 ON public.authentication_user_groups USING btree (user_id);
 
-CREATE INDEX IF NOT EXISTS auth_user_groups_user_id_idx ON auth_user_groups (user_id);
-CREATE INDEX IF NOT EXISTS auth_user_groups_group_id_idx ON auth_user_groups (group_id);
-
--- -------------------------------------------------------------------------
--- auth_user_user_permissions
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS auth_user_user_permissions (
-    id            BIGSERIAL PRIMARY KEY,
-    user_id       BIGINT    NOT NULL REFERENCES auth_user (id) ON DELETE CASCADE,
-    permission_id BIGINT    NOT NULL REFERENCES auth_permission (id) ON DELETE CASCADE,
-    UNIQUE (user_id, permission_id)
+CREATE TABLE public.authentication_user_user_permissions (
+	id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,
+	user_id int8 NOT NULL,
+	permission_id int4 NOT NULL,
+	CONSTRAINT authentication_user_user_permissions_id_not_null NOT NULL id,
+	CONSTRAINT authentication_user_user_permissions_permission_id_not_null NOT NULL permission_id,
+	CONSTRAINT authentication_user_user_permissions_pkey PRIMARY KEY (id),
+	CONSTRAINT authentication_user_user_permissions_user_id_not_null NOT NULL user_id,
+	CONSTRAINT authentication_user_user_user_id_permission_id_ec51b09f_uniq UNIQUE (user_id, permission_id),
+	CONSTRAINT authentication_user__permission_id_ea6be19a_fk_auth_perm FOREIGN KEY (permission_id) REFERENCES public.auth_permission(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT authentication_user__user_id_736ebf7e_fk_authentic FOREIGN KEY (user_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED
 );
+CREATE INDEX authentication_user_user_permissions_permission_id_ea6be19a ON public.authentication_user_user_permissions USING btree (permission_id);
+CREATE INDEX authentication_user_user_permissions_user_id_736ebf7e ON public.authentication_user_user_permissions USING btree (user_id);
 
-CREATE INDEX IF NOT EXISTS auth_user_user_permissions_user_id_idx ON auth_user_user_permissions (user_id);
-CREATE INDEX IF NOT EXISTS auth_user_user_permissions_permission_id_idx ON auth_user_user_permissions (permission_id);
 
--- -------------------------------------------------------------------------
--- django_session
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS django_session (
-    session_key  VARCHAR(40) NOT NULL PRIMARY KEY,
-    session_data TEXT        NOT NULL,
-    expire_date  TIMESTAMP   NOT NULL
+CREATE TABLE public.django_admin_log (
+	id bigserial NOT NULL,
+	action_time timestamp NOT NULL,
+	user_id int8 NULL,
+	content_type_id int8 NULL,
+	object_id text NULL,
+	object_repr varchar(200) NOT NULL,
+	action_flag int2 NOT NULL,
+	change_message text NOT NULL,
+	CONSTRAINT django_admin_log_action_flag_not_null NOT NULL action_flag,
+	CONSTRAINT django_admin_log_action_time_not_null NOT NULL action_time,
+	CONSTRAINT django_admin_log_change_message_not_null NOT NULL change_message,
+	CONSTRAINT django_admin_log_id_not_null NOT NULL id,
+	CONSTRAINT django_admin_log_object_repr_not_null NOT NULL object_repr,
+	CONSTRAINT django_admin_log_pkey PRIMARY KEY (id),
+	CONSTRAINT django_admin_log_content_type_id_fkey FOREIGN KEY (content_type_id) REFERENCES public.django_content_type(id),
+	CONSTRAINT django_admin_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL
 );
+CREATE INDEX django_admin_log_content_type_id_idx ON public.django_admin_log USING btree (content_type_id);
+CREATE INDEX django_admin_log_user_id_idx ON public.django_admin_log USING btree (user_id);
 
-CREATE INDEX IF NOT EXISTS django_session_expire_date_idx ON django_session (expire_date);
 
--- -------------------------------------------------------------------------
--- django_admin_log
--- -------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS django_admin_log (
-    id              BIGSERIAL    PRIMARY KEY,
-    action_time     TIMESTAMP    NOT NULL,
-    user_id         BIGINT       NULL REFERENCES auth_user (id) ON DELETE SET NULL,
-    content_type_id BIGINT       NULL REFERENCES django_content_type (id),
-    object_id       TEXT         NULL,
-    object_repr     VARCHAR(200) NOT NULL,
-    action_flag     SMALLINT     NOT NULL,
-    change_message  TEXT         NOT NULL
+CREATE TABLE public.auth_group_permissions (
+	id bigserial NOT NULL,
+	group_id int8 NOT NULL,
+	permission_id int8 NOT NULL,
+	CONSTRAINT auth_group_permissions_group_id_not_null NOT NULL group_id,
+	CONSTRAINT auth_group_permissions_group_id_permission_id_key UNIQUE (group_id, permission_id),
+	CONSTRAINT auth_group_permissions_id_not_null NOT NULL id,
+	CONSTRAINT auth_group_permissions_permission_id_not_null NOT NULL permission_id,
+	CONSTRAINT auth_group_permissions_pkey PRIMARY KEY (id),
+	CONSTRAINT auth_group_permissions_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.auth_group(id) ON DELETE CASCADE,
+	CONSTRAINT auth_group_permissions_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES public.auth_permission(id) ON DELETE CASCADE
 );
+CREATE INDEX auth_group_permissions_group_id_idx ON public.auth_group_permissions USING btree (group_id);
+CREATE INDEX auth_group_permissions_permission_id_idx ON public.auth_group_permissions USING btree (permission_id);
 
-CREATE INDEX IF NOT EXISTS django_admin_log_user_id_idx ON django_admin_log (user_id);
-CREATE INDEX IF NOT EXISTS django_admin_log_content_type_id_idx ON django_admin_log (content_type_id);
+CREATE TABLE public.authentication_admin (
+	id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	user_id int8 NOT NULL,
+	CONSTRAINT authentication_admin_created_at_not_null NOT NULL created_at,
+	CONSTRAINT authentication_admin_id_not_null NOT NULL id,
+	CONSTRAINT authentication_admin_is_deleted_not_null NOT NULL is_deleted,
+	CONSTRAINT authentication_admin_pkey PRIMARY KEY (id),
+	CONSTRAINT authentication_admin_updated_at_not_null NOT NULL updated_at,
+	CONSTRAINT authentication_admin_user_id_key UNIQUE (user_id),
+	CONSTRAINT authentication_admin_user_id_not_null NOT NULL user_id,
+	CONSTRAINT authentication_admin_deleted_by_id_ba1bf8d2_fk_authentic FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT authentication_admin_user_id_2e7e3e20_fk_authentication_user_id FOREIGN KEY (user_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX authentication_admin_deleted_by_id_ba1bf8d2 ON public.authentication_admin USING btree (deleted_by_id);
+CREATE INDEX authentication_admin_is_deleted_699f106c ON public.authentication_admin USING btree (is_deleted);
 
-COMMIT;
+CREATE TABLE public.authentication_mobileverification (
+	id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	phone_number varchar(10) NOT NULL,
+	otp varchar(8) NOT NULL,
+	is_used bool NOT NULL,
+	expires_at timestamptz NOT NULL,
+	user_id int8 NOT NULL,
+	CONSTRAINT authentication_mobileverification_created_at_not_null NOT NULL created_at,
+	CONSTRAINT authentication_mobileverification_expires_at_not_null NOT NULL expires_at,
+	CONSTRAINT authentication_mobileverification_id_not_null NOT NULL id,
+	CONSTRAINT authentication_mobileverification_is_used_not_null NOT NULL is_used,
+	CONSTRAINT authentication_mobileverification_otp_not_null NOT NULL otp,
+	CONSTRAINT authentication_mobileverification_phone_number_not_null NOT NULL phone_number,
+	CONSTRAINT authentication_mobileverification_pkey PRIMARY KEY (id),
+	CONSTRAINT authentication_mobileverification_updated_at_not_null NOT NULL updated_at,
+	CONSTRAINT authentication_mobileverification_user_id_not_null NOT NULL user_id,
+	CONSTRAINT authentication_mobil_user_id_ac30ddbb_fk_authentic FOREIGN KEY (user_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX authentication_mobileverification_phone_number_cc8b10a6 ON public.authentication_mobileverification USING btree (phone_number);
+CREATE INDEX authentication_mobileverification_phone_number_cc8b10a6_like ON public.authentication_mobileverification USING btree (phone_number varchar_pattern_ops);
+CREATE INDEX authentication_mobileverification_user_id_ac30ddbb ON public.authentication_mobileverification USING btree (user_id);
+
+CREATE TABLE public.authentication_salesperson (
+	id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	user_id int8 NOT NULL,
+	CONSTRAINT authentication_salesperson_created_at_not_null NOT NULL created_at,
+	CONSTRAINT authentication_salesperson_id_not_null NOT NULL id,
+	CONSTRAINT authentication_salesperson_is_deleted_not_null NOT NULL is_deleted,
+	CONSTRAINT authentication_salesperson_pkey PRIMARY KEY (id),
+	CONSTRAINT authentication_salesperson_updated_at_not_null NOT NULL updated_at,
+	CONSTRAINT authentication_salesperson_user_id_key UNIQUE (user_id),
+	CONSTRAINT authentication_salesperson_user_id_not_null NOT NULL user_id,
+	CONSTRAINT authentication_sales_deleted_by_id_a5490b20_fk_authentic FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT authentication_sales_user_id_23cc5271_fk_authentic FOREIGN KEY (user_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX authentication_salesperson_deleted_by_id_a5490b20 ON public.authentication_salesperson USING btree (deleted_by_id);
+CREATE INDEX authentication_salesperson_is_deleted_e9d86904 ON public.authentication_salesperson USING btree (is_deleted);

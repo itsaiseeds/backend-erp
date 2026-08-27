@@ -17,7 +17,9 @@ ENV POSTGRES_PASSWORD=placeholder
 ENV POSTGRES_HOST=localhost
 ENV POSTGRES_PORT=5432
 
-RUN python manage.py collectstatic --noinput
+# Migrations, makemigrations, and collectstatic must NOT run during docker build
+# (the DB is not reachable from the build context). They run at container startup
+# via scripts/entrypoint.sh after the db health check passes.
 
 EXPOSE 8000
 
