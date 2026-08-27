@@ -29,24 +29,15 @@ Only Django's built-in apps. No custom apps yet.
 
 ## MIGRATION_MODULES (Critical)
 
-```python
-MIGRATION_MODULES = {app.split(".")[-1]: None for app in INSTALLED_APPS}
-```
-
-This disables Django's migration system for ALL installed apps. Produces:
+Disables migrations **only** for built-in Django apps (their schema lives in `sql/ddl.sql`):
 
 ```python
-{
-    'admin': None,
-    'auth': None,
-    'contenttypes': None,
-    'sessions': None,
-    'messages': None,
-    'staticfiles': None,
+MIGRATION_MODULES = {
+    app.split(".")[-1]: None for app in INSTALLED_APPS if app.startswith("django.")
 }
 ```
 
-**Implication:** When you add a new app to `INSTALLED_APPS`, it is automatically included in `MIGRATION_MODULES`. You must manage its schema via raw SQL in `sql/ddl.sql`.
+**Implication:** built-in apps' schema is managed via `sql/ddl.sql`. Project apps (`authentication`, `common`, `config`) use **normal Django migrations** — run `makemigrations` + `migrate` locally, then apply the resulting SQL to Neon manually (see `skills/database.md`).
 
 ---
 
@@ -111,10 +102,9 @@ No API endpoints, no custom views.
 
 1. `python manage.py startapp <app_name>`
 2. Add `'<app_name>'` to `INSTALLED_APPS` in `config/settings.py`
-3. The `MIGRATION_MODULES` dict comprehension auto-disables migrations for it
-4. Write models as reference — define actual schema in `sql/ddl.sql`
-5. Add content types + permissions to `sql/dml.sql` if the app has models
-6. Create URL patterns in `<app_name>/urls.py` and include in `config/urls.py`
+3. Place it at the project root (e.g. `/authentication`, `/common`)
+4. Project apps use real migrations: `makemigrations` + `migrate` locally, then apply the resulting SQL to prod manually
+5. See `skills/database.md` → "Changing a Table" for the full local → prod workflow
 
 ---
 

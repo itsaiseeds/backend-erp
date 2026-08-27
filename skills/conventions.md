@@ -39,27 +39,26 @@ backend-erp/
 
 ## Database Conventions
 
-### Schema (DDL)
-- One `CREATE TABLE` per model, in `sql/ddl.sql`
-- Always use `CREATE TABLE IF NOT EXISTS`
-- Always use `BIGSERIAL` for auto-increment primary keys
-- Always add indexes on FK columns
-- Wrap all statements in `BEGIN` / `COMMIT`
-- Place tables in dependency order (referenced tables first)
+### Schema
+- Project apps (`authentication`, `common`, `config`) use **Django migrations** — run `makemigrations` + `migrate` locally
+- Built-in Django apps use **raw SQL** in `sql/ddl.sql` (their migrations stay disabled)
+- For built-in apps: always use `CREATE TABLE IF NOT EXISTS`, `BIGSERIAL` PKs, indexes on FK columns, wrap in `BEGIN`/`COMMIT`, reference tables first
+- Prod (Neon) schema is applied **manually** — migrate runs only locally
 
 ### Seed Data (DML)
-- One `INSERT` block per model, in `sql/dml.sql`
+- `sql/dml.sql` seeds reference data for built-in apps (content types + permissions)
 - Always use `ON CONFLICT DO NOTHING` for idempotency
 - Always reset sequences with `SELECT setval('table_id_seq', N);`
 - Wrap all statements in `BEGIN` / `COMMIT`
 - Dev only — never seed production
+- The superuser is created at runtime by `createsuperuser_if_not_exists` — do not seed it via SQL
 
-### Adding a new model
-1. Write `CREATE TABLE` in `sql/ddl.sql`
-2. Add content type row to `sql/dml.sql` (if Django needs to know about it)
-3. Add permissions to `sql/dml.sql` (4 per model: add/change/delete/view)
-4. Add any seed data to `sql/dml.sql`
-5. Run `bash scripts/reload_db.sh --step all`
+### Changing a table
+1. Edit the model
+2. `makemigrations` + `migrate` on local Docker
+3. Copy the changed table's DDL from DBeaver
+4. Apply the SQL manually to Neon (prod)
+5. Breaking changes: prepare data → deploy code first → apply the DDL last
 
 ---
 
@@ -68,16 +67,16 @@ backend-erp/
 ### Settings
 - Single `config/settings.py` file (no split base/dev/prod)
 - All config from environment variables where possible
-- `MIGRATION_MODULES` auto-disables migrations for all apps
+- `MIGRATION_MODULES` disables migrations only for built-in `django.*` apps; project apps use normal migrations
 
 ### Apps
 - Use `python manage.py startapp <name>` to create
 - Add to `INSTALLED_APPS` in `config/settings.py`
-- Migrations are automatically disabled by `MIGRATION_MODULES`
+- Project apps get real migrations; built-in apps stay SQL-managed via `MIGRATION_MODULES`
 
 ### Models
-- Write models as documentation/reference — the actual schema is in SQL
-- Models must match the SQL schema exactly (same column names, types, constraints)
+- Project-app models define the real schema — generated via migrations
+- Prod schema is applied manually (local migrate → DBeaver DDL → Neon)
 
 ### URLs
 - Each app defines its own `urls.py`
@@ -128,11 +127,13 @@ backend-erp/
 
 ## Anti-Patterns to Avoid
 
-- Do not run `makemigrations` or `migrate` — migrations are disabled
-- Do not run DML SQL against production
+- Do not run `makemigrations` for a built-in `django.*` app — their schema is in `sql/ddl.sql`
+- Do not rely on prod running `migrate` to change the schema — apply it manually to Neon
+- Do not apply a breaking/restrictive DDL (e.g. `NOT NULL` constraint) before the code and data are ready — deploy first, alter last
 - Do not hardcode database credentials in Python files
-- Do not create tables outside of `sql/ddl.sql`
-- Do not add seed data outside of `sql/dml.sql`
+- Do not manage built-in-app schema outside of `sql/ddl.sql`; do not create built-in-app tables from migrations
+- Do not add built-in-app seed data outside of `sql/dml.sql`
+- Do not run DML/seed SQL against production
 - Do not commit `.env` (production secrets)
 - Do not push Flutter changes without rebuilding (`bash scripts/run.sh flutter`)
 - Do not install Flutter SDK in Docker — the build output is committed to git

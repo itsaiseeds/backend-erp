@@ -13,8 +13,8 @@
 | **Database** | PostgreSQL 18 |
 | **Python** | 3.14 |
 | **Container** | Docker Compose (web + db) |
-| **Schema management** | Raw SQL (no Django migrations) |
-| **Seed data** | Raw SQL, dev-only |
+| **Schema management** | Hybrid: Django migrations (project apps) + Raw SQL (built-in apps) |
+| **Seed data** | Raw SQL, dev-only (built-in apps); superuser via runtime command |
 | **Testing** | pytest + pytest-django |
 | **CI/CD** | GitHub Actions → Render |
 | **Deployment** | Render (web + cron) + Neon DB (serverless PostgreSQL) |
@@ -84,11 +84,14 @@ docker compose exec web python manage.py createsuperuser
 docker compose exec web python manage.py collectstatic
 ```
 
-### Add a new table
-1. Write `CREATE TABLE` in `sql/ddl.sql`
-2. Write any seed `INSERT`s in `sql/dml.sql`
-3. Run `bash scripts/reload_db.sh --step all`
-4. Update this skills index if the change is architectural
+### Change a table (local + prod)
+1. Edit the model (`authentication/models/*.py`, `common/models/*.py`)
+2. Migrate on local:
+   - `docker compose exec web python manage.py makemigrations <app>`
+   - `docker compose exec web python manage.py migrate`
+3. Copy the changed table's DDL from DBeaver (local Docker DB)
+4. Paste the DDL into the Neon / prod write replica (prod schema is manual SQL only)
+5. For breaking changes: prepare data → **deploy code first** → apply the DDL as the **last step**
 
 ### Key files you will touch often
 - `config/settings.py` — Django config
