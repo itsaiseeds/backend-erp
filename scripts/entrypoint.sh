@@ -2,8 +2,8 @@
 set -e
 
 # Dont push to prod without commenting out the following line. It will apply migrations on every deploy and can cause issues if not handled properly.
-# echo "Applying migrations ..."
-# python manage.py migrate
+echo "Applying migrations ..."
+python manage.py migrate
 
 echo "Collecting static files ..."
 python manage.py collectstatic --noinput

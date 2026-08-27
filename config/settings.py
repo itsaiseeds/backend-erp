@@ -10,18 +10,17 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-4nct9v_(3h@+3ne00wl6dd#xpdjb+q7kz1*8)5v*n!*akv*$ja")
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-4nct9v_(3h@+3ne00wl6dd#xpdjb+q7kz1*8)5v*n!*akv*$ja")  # noqa: E501
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
@@ -39,9 +38,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'drf_spectacular',
     'authentication',
     'common',
     'config',
+    'api',
 ]
 
 # Custom user model for the whole project.
@@ -55,6 +59,7 @@ MIGRATION_MODULES = {
 }
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -87,8 +92,6 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-import os
 
 DATABASES = {
     "default": {
@@ -155,3 +158,49 @@ FLUTTER_BUILD_DIR = BASE_DIR / "web" / "build" / "web"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Django REST Framework
+# ---------------------
+# Default classes mirror the split the base views already hard-code per client:
+# admin = session, android = token. Override per-view where a flow differs.
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# OpenAPI / Swagger documentation (drf-spectacular)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SaiSeeds ERP API',
+    'DESCRIPTION': (
+        'Backend API for the SaiSeeds sales admin website and salesperson '
+        'Android app. Auto-generated from the codebase.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    # Group endpoints by the namespace they are mounted under.
+    'TAGS': [],
+}
+
+# CORS
+# ----
+# The admin Flutter web app runs on its own origin and must send its session
+# cookie cross-origin, so allow credentials. The Android app talks JSON (no
+# cookies) and is unaffected.
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]

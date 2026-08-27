@@ -1,7 +1,7 @@
-from .admin import Admin
-from .mobile_verification import MobileVerification, OTP_LIFETIME_MINUTES
-from .sales_person import SalesPerson
-from .user import User, UserManager
+from .Admin import Admin
+from .MobileVerification import OTP_LIFETIME_MINUTES, MobileVerification
+from .SalesPerson import SalesPerson
+from .User import User, UserManager
 
 __all__ = [
     "User",

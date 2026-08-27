@@ -1,6 +1,7 @@
 import os
-from django.http import FileResponse, HttpResponseNotFound
+
 from django.conf import settings
+from django.http import FileResponse, HttpResponseNotFound
 
 
 def flutter_catch_all(request, path=""):

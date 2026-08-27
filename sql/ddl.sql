@@ -226,3 +226,15 @@ CREATE TABLE public.authentication_salesperson (
 );
 CREATE INDEX authentication_salesperson_deleted_by_id_a5490b20 ON public.authentication_salesperson USING btree (deleted_by_id);
 CREATE INDEX authentication_salesperson_is_deleted_e9d86904 ON public.authentication_salesperson USING btree (is_deleted);
+
+CREATE TABLE public.authtoken_token (
+	"key" varchar(40) NOT NULL,
+	created timestamptz NOT NULL,
+	user_id int8 NOT NULL,
+	CONSTRAINT authtoken_token_created_not_null NOT NULL created,
+	CONSTRAINT authtoken_token_key_not_null NOT NULL key,
+	CONSTRAINT authtoken_token_pkey PRIMARY KEY (key),
+	CONSTRAINT authtoken_token_user_id_key UNIQUE (user_id),
+	CONSTRAINT authtoken_token_user_id_not_null NOT NULL user_id
+);
+CREATE INDEX authtoken_token_key_10f0b77e_like ON public.authtoken_token USING btree (key varchar_pattern_ops);

@@ -1,3 +1,4 @@
+import secrets
 from datetime import timedelta
 
 from django.db import models
@@ -5,6 +6,12 @@ from django.db import models
 from common.models import TimeStampedModel, indian_now
 
 OTP_LIFETIME_MINUTES = 5
+OTP_LENGTH = 6
+
+
+def generate_otp() -> str:
+    """Return a fresh numeric OTP of the configured length."""
+    return "".join(secrets.choice("0123456789") for _ in range(OTP_LENGTH))
 
 
 class MobileVerification(TimeStampedModel):
@@ -32,6 +39,8 @@ class MobileVerification(TimeStampedModel):
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
+        if not self.otp:
+            self.otp = generate_otp()
         if not self.phone_number and self.user_id:
             self.phone_number = self.user.phone_number
         if not self.expires_at:

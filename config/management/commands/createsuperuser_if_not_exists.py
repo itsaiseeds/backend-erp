@@ -1,9 +1,9 @@
-import os
 import logging
+import os
 
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
 
 logger = logging.getLogger(__name__)
 

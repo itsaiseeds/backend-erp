@@ -55,7 +55,7 @@ class SoftDeletedModel(models.Model):
         abstract = True
 
     def _delete_permission_codename(self):
-        return "{}.delete_{}".format(self._meta.app_label, self._meta.model_name)
+        return f"{self._meta.app_label}.delete_{self._meta.model_name}"
 
     def delete(self, deleted_by=None, using=None, keep_parents=False):
         """Soft delete: flag the row instead of removing it.
@@ -74,9 +74,8 @@ class SoftDeletedModel(models.Model):
 
         if not deleted_by.has_perm(self._delete_permission_codename()):
             raise PermissionDenied(
-                "User '{}' does not have permission to delete '{}'.".format(
-                    deleted_by, self._meta.model_name
-                )
+                f"User '{deleted_by}' does not have permission to delete "
+                f"'{self._meta.model_name}'."
             )
 
         self.deleted_by = deleted_by
