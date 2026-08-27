@@ -101,7 +101,6 @@ docker compose exec web python manage.py collectstatic
 - `.env.dev` — local connection params
 - `docker-compose.yml` — service definitions
 - `Dockerfile` — container build (no Flutter SDK)
-- `render.yaml` — Render deployment blueprint
 - `tests/` — test files
 
 ### Run tests

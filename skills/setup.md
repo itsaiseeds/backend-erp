@@ -196,19 +196,23 @@ docker compose down
 ### Setup (one-time)
 
 1. Create account at [render.com](https://render.com)
-2. New → Blueprint → connect this GitHub repo
-3. Render reads `render.yaml` and provisions:
-   - Web service (`backend-erp`) using Dockerfile
-   - Cron job (`keep-alive`)
-4. Set env vars in Render dashboard (see below)
+2. Create a new Web Service → connect this GitHub repo
+3. Configure in the Render dashboard:
+   - **Runtime**: Docker
+   - **Branch**: `master`
+   - **Region**: Singapore (Southeast Asia)
+   - **Root directory**: (empty)
+   - **Auto-deploy**: On, from master
+4. Create a Cron Job (`keep-alive`, `*/10 * * * *`, `curl -s https://backend-erp-jlt9.onrender.com/ > /dev/null`)
+5. Set env vars in Render dashboard (see below)
 
 ### Environment variables (Render)
 
 | Variable | Value | Source |
 |---|---|---|
 | `SECRET_KEY` | Auto-generated | Render |
-| `DEBUG` | `False` | Hardcoded in render.yaml |
-| `ALLOWED_HOSTS` | `backend-erp-jlt9.onrender.com` | Hardcoded in render.yaml |
+| `DEBUG` | `False` | Render dashboard |
+| `ALLOWED_HOSTS` | `backend-erp-jlt9.onrender.com` | Render dashboard |
 | `POSTGRES_HOST` | `ep-misty-block-aya29p71-pooler.c-5.us-east-2.aws.neon.tech` | Neon |
 | `POSTGRES_PORT` | `5432` | Neon |
 | `POSTGRES_DB` | `neondb` | Neon |
@@ -218,7 +222,7 @@ docker compose down
 | `DJANGO_SUPERUSER_EMAIL` | (your choice) | Set manually in Render dashboard |
 | `DJANGO_SUPERUSER_PASSWORD` | (your choice) | Set manually in Render dashboard |
 
-> **Note:** `POSTGRES_PASSWORD` and `DJANGO_SUPERUSER_*` are not in `render.yaml` for security. Set them manually in Render dashboard.
+> **Note:** `POSTGRES_PASSWORD` and `DJANGO_SUPERUSER_*` are not committed to git. Set them manually in Render dashboard.
 
 ### Deploy workflow
 

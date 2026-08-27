@@ -21,7 +21,6 @@ backend-erp/
 ├── .env.dev            # Local dev env (committed)
 ├── docker-compose.yml  # Service definitions
 ├── Dockerfile          # Container build (no Flutter SDK)
-├── render.yaml         # Render deployment blueprint
 └── manage.py           # Django CLI
 ```
 
