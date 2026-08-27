@@ -5,13 +5,15 @@ description: How to run backend-erp tests (pytest) inside the Docker web contain
 
 # Running tests (backend-erp)
 
-All tests run **inside the `web` Docker container** via `scripts/run.sh`. The
-host Python (e.g. VS Code's debugpy / host interpreter) does NOT have Django or
-the project deps, so never run pytest on the host.
+All tests run **inside the `web` Python image** via `scripts/run.sh`, in
+short-lived one-off containers (the running `web` service/gunicorn is NOT used
+for tests). The host Python (e.g. VS Code's debugpy / host interpreter) does NOT
+have Django or the project deps, so never run pytest on the host.
 
 Prerequisites:
 
-- `docker compose up -d` (db + web up). Check: `bash scripts/run.sh status`.
+- The `db` service must be up: `docker compose up -d db`. Check:
+  `bash scripts/run.sh status`.
 - After changing `requirements.txt`, rebuild the image first:
   `bash scripts/run.sh build` (the running container is NOT updated in place).
 

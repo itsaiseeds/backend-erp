@@ -196,9 +196,17 @@ cmd_schema() {
 # ---------------------------------------------------------------------------
 # Tests (inside the web container so host Python without Django is irrelevant)
 # ---------------------------------------------------------------------------
+# Run commands in a SHORT-LIVED web-service container instead of exec-ing into
+# the long-running one. The one-off never boots the ENTRYPOINT (gunicorn etc.),
+# so tests/lint only pay for the python image + db — keeps memory tiny and
+# avoids GitHub Actions OOM-kills (exit 137).
+webrun() {
+    docker compose run --rm --no-deps --entrypoint "" -T web "$@"
+}
+
 cmd_test_unit() {
     echo "[test-unit] Running unit tests in web container ..."
-    docker compose exec -T web python -m pytest -m "not integration" -v
+    webrun python -m pytest -m "not integration" -v
 }
 
 cmd_test_integration() {
@@ -214,7 +222,7 @@ cmd_test_integration() {
     echo "[test-integration] Running pytest in web container: ${targets[*]}"
     echo "[test-integration] This builds the django_test DB, starts a live server, \
 and exercises the real HTTP endpoints."
-    docker compose exec -T web python -m pytest "${targets[@]}" -v "$@"
+    webrun python -m pytest "${targets[@]}" -v "$@"
 }
 
 cmd_test() {
@@ -227,12 +235,12 @@ cmd_test() {
 # ---------------------------------------------------------------------------
 cmd_lint() {
     echo "[lint] Running ruff check in web container ..."
-    docker compose exec -T web ruff check .
+    webrun ruff check .
 }
 
 cmd_typecheck() {
     echo "[typecheck] Running mypy in web container ..."
-    docker compose exec -T web mypy .
+    webrun mypy .
 }
 
 # ---------------------------------------------------------------------------

@@ -32,8 +32,8 @@ jobs:
       - name: Build Docker images
         run: docker compose build
 
-      - name: Start services (db first, then web)
-        run: docker compose up -d --wait
+      - name: Start database
+        run: docker compose up -d db --wait
 
       - name: Run unit tests
         run: bash scripts/run.sh test-unit
