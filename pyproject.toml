@@ -1,3 +1,53 @@
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["."]
+# Collect both Test-prefixed classes (pytest default) and PascalCase classes
+# that end in "Test" (e.g. AuthFlowTest), matching the project's file naming.
+python_classes = ["Test*", "*Test"]
+markers = [
+    "integration: live-server tests against a real Postgres built from sql/ddl.sql + sql/dml.sql",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["."]
+exclude = ["*migrations*", "staticfiles", "web"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "C4",  # flake8-comprehensions
+    "S",   # bandit (security)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/test_*.py" = ["S105", "S106", "D", "S101"]
+"config/management/commands/createsuperuser_if_not_exists.py" = ["S105"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+# django-stubs >= 6 registers no entry point; point at its plugin factory.
+plugins = ["mypy_django_plugin.main:plugin"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+[[tool.mypy.overrides]]
+module = ["mypy_django_plugin.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["rest_framework", "rest_framework.*"]
+# DRF ships without .pyi stubs; treat it as Any until djangorestframework-stubs
+# is added.
+ignore_missing_imports = true

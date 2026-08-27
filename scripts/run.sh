@@ -13,6 +13,12 @@
 #   bash scripts/run.sh shell        # Open Django shell in web container
 #   bash scripts/run.sh psql         # Open psql in db container
 #   bash scripts/run.sh flutter      # Build Flutter web app for production
+#   bash scripts/run.sh schema       # Regenerate docs/api/openapi.yml
+#   bash scripts/run.sh test         # Unit + integration tests (in web container)
+#   bash scripts/run.sh test-unit    # Only non-integration tests (in web container)
+#   bash scripts/run.sh test-integration [node] # Integration tests (in web container)
+#   bash scripts/run.sh lint         # ruff check (in web container)
+#   bash scripts/run.sh typecheck    # mypy (in web container)
 # =============================================================================
 
 set -euo pipefail
@@ -23,7 +29,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMMAND="${1:-}"
 
 if [[ -z "$COMMAND" ]]; then
-    echo "Usage: bash scripts/run.sh <command>"
+    echo "Usage: bash scripts/run.sh <command> [args...]"
     echo ""
     echo "Commands:"
     echo "  build       Build Docker images"
@@ -36,8 +42,18 @@ if [[ -z "$COMMAND" ]]; then
     echo "  shell       Open Django shell in web container"
     echo "  psql        Open psql in db container"
     echo "  flutter     Build Flutter web app for production"
+    echo "  schema      Regenerate docs/api/openapi.yml"
+    echo "  test        Run unit + integration tests in web container"
+    echo "  test-unit   Run only non-integration tests in web container"
+    echo "  test-integration [node]"
+    echo "              Run integration tests in web container (default: tests/integration)"
+    echo "  lint        Run ruff check in web container"
+    echo "  typecheck   Run mypy in web container"
     exit 1
 fi
+
+# Drop the command word; remaining "$@" are passed on to subcommands that take args.
+shift
 
 # ---------------------------------------------------------------------------
 # Find Flutter
@@ -169,6 +185,65 @@ cmd_psql() {
 }
 
 # ---------------------------------------------------------------------------
+# OpenAPI schema
+# ---------------------------------------------------------------------------
+cmd_schema() {
+    echo "[schema] Regenerating OpenAPI spec ..."
+    docker compose exec web python manage.py spectacular --file docs/api/openapi.yml
+    echo "[schema] Wrote docs/api/openapi.yml"
+}
+
+# ---------------------------------------------------------------------------
+# Tests (inside the web container so host Python without Django is irrelevant)
+# ---------------------------------------------------------------------------
+# Run commands in a SHORT-LIVED web-service container instead of exec-ing into
+# the long-running one. The one-off never boots the ENTRYPOINT (gunicorn etc.),
+# so tests/lint only pay for the python image + db — keeps memory tiny and
+# avoids GitHub Actions OOM-kills (exit 137).
+webrun() {
+    docker compose run --rm --no-deps --entrypoint "" -T web "$@"
+}
+
+cmd_test_unit() {
+    echo "[test-unit] Running unit tests in web container ..."
+    webrun python -m pytest -m "not integration" -v
+}
+
+cmd_test_integration() {
+    local node="${1:-tests/integration}"
+    if [[ -z "$node" ]]; then
+        node="tests/integration"
+    fi
+    shift 2>/dev/null || true
+    # Split the node on whitespace so a single task input can name several
+    # tests, e.g. "tests/a.py::C::t1 tests/a.py::C::t2".
+    local -a targets
+    read -r -a targets <<< "$node"
+    echo "[test-integration] Running pytest in web container: ${targets[*]}"
+    echo "[test-integration] This builds the django_test DB, starts a live server, \
+and exercises the real HTTP endpoints."
+    webrun python -m pytest "${targets[@]}" -v "$@"
+}
+
+cmd_test() {
+    cmd_test_unit
+    cmd_test_integration
+}
+
+# ---------------------------------------------------------------------------
+# Lint / typecheck (web container has our pinned versions of ruff + mypy)
+# ---------------------------------------------------------------------------
+cmd_lint() {
+    echo "[lint] Running ruff check in web container ..."
+    webrun ruff check .
+}
+
+cmd_typecheck() {
+    echo "[typecheck] Running mypy in web container ..."
+    webrun mypy .
+}
+
+# ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
 case "$COMMAND" in
@@ -182,6 +257,12 @@ case "$COMMAND" in
     shell)      cmd_shell ;;
     psql)       cmd_psql ;;
     flutter)    cmd_flutter ;;
+    schema)     cmd_schema ;;
+    test)       cmd_test ;;
+    test-unit)  cmd_test_unit ;;
+    test-integration)  cmd_test_integration "$@" ;;
+    lint)       cmd_lint ;;
+    typecheck)  cmd_typecheck ;;
     *)
         echo "Unknown command: $COMMAND"
         echo "Run: bash scripts/run.sh (no args) for help"

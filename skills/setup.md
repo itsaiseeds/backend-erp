@@ -48,7 +48,7 @@ Django is now running at:
 - `http://localhost:8000/admin/` — Django admin
 - `http://localhost:8000/sales-admin/` — Flutter admin app
 
-Login: `admin` / `admin` or `xZist` / `admin@123`
+Login: the superuser created at startup by `createsuperuser_if_not_exists` (or a user you create with `createsuperuser`).
 
 ---
 
@@ -250,13 +250,16 @@ Cron pings app every 10 min (prevents cold starts)
 
 ### Schema changes in production
 
-1. Write the `ALTER TABLE` / `CREATE TABLE` SQL
-2. Test locally against Docker PostgreSQL first
-3. Run against Neon via Neon SQL Editor or `psql`
-4. Update `sql/ddl.sql` to keep local reference in sync
+Production (Neon) schema is **manual SQL only** — it does not run `migrate`. The standard workflow:
+
+1. Edit the model
+2. `makemigrations` + `migrate` on local Docker PostgreSQL (this is a local tool — it produces the schema)
+3. Copy the changed table's DDL from **DBeaver** (local DB)
+4. Paste that DDL into the **Neon** write replica (SQL Editor or `psql`)
+5. For breaking changes (e.g. adding a `NOT NULL` constraint): prepare the data first (run a script so nothing is `NULL`), **deploy the code first**, then apply the DDL change as the **last step** for minimal downtime
 
 > **Never** use `reload_db.sh` against production.
-> **Never** run Django migrations against production.
+> **Never** rely on prod running `migrate` to change the schema — apply the SQL manually.
 
 ---
 
@@ -285,9 +288,11 @@ Cron pings app every 10 min (prevents cold starts)
 python manage.py startapp <app_name>
 
 # Add to INSTALLED_APPS in config/settings.py
+# Place app at project root (e.g. /authentication, /common)
 
-# Write your models, then:
-# 1. Add CREATE TABLE to sql/ddl.sql
-# 2. Add any seed data to sql/dml.sql
-# 3. Run: bash scripts/reload_db.sh --step all
+# Project apps use real Django migrations:
+# 1. Write your models
+# 2. docker compose exec web python manage.py makemigrations <app_name>
+# 3. docker compose exec web python manage.py migrate   # applies to local Docker DB
+# Follow "Changing a Table" in skills/database.md to get the SQL onto prod
 ```

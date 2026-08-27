@@ -13,7 +13,9 @@ services:
 
   db:
     image: postgres:18
-    command: postgres -c timezone=UTC
+    # Cap shared_buffers so postgres doesn't auto-tune to ~25% of host RAM and
+    # OOM small CI runners that also run pytest.
+    command: postgres -c timezone=UTC -c shared_buffers=128MB
     ports:
       - "5432:5432"
     environment:
