@@ -111,6 +111,7 @@ backend-erp/
 - `web/.dart_tool/` is gitignored (Flutter cache)
 - Never commit real passwords or secret keys
 - Commit messages should be concise and descriptive
+- **Only commit, push, or create PRs when explicitly asked** — do not do so automatically after making changes
 
 ---
 
