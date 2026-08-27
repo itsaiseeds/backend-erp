@@ -39,10 +39,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'authentication',
+    'common',
     'config',
 ]
 
-MIGRATION_MODULES = {app.split(".")[-1]: None for app in INSTALLED_APPS}
+# Custom user model for the whole project.
+AUTH_USER_MODEL = 'authentication.User'
+
+# Built-in Django apps' schema is managed via sql/ddl.sql -> keep their
+# migrations disabled. Our own apps (authentication, common, config) use
+# normal Django migrations so schema can be generated, not hand-written.
+MIGRATION_MODULES = {
+    app.split(".")[-1]: None for app in INSTALLED_APPS if app.startswith("django.")
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -88,6 +98,9 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "OPTIONS": {
+            "options": "-c timezone=Asia/Kolkata",
+        },
     }
 }
 
@@ -117,7 +130,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 

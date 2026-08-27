@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# reload_db.sh — Drop all tables, then recreate schema + seed data
+# reload_db.sh — Drop the whole database, then recreate schema + seed data
 # =============================================================================
 # Usage:
-#   bash scripts/reload_db.sh --step ddl      # Drop + create tables only
+#   bash scripts/reload_db.sh --step ddl      # Drop DB + create tables only
 #   bash scripts/reload_db.sh --step dml      # Insert seed data only
-#   bash scripts/reload_db.sh --step all      # Drop + DDL + DML
+#   bash scripts/reload_db.sh --step all      # Drop DB + DDL + DML
 #
 # Runs via the Docker db container (no local psql needed).
 # Use Git Bash: "C:\Program Files\Git\bin\bash.exe" scripts/reload_db.sh
@@ -94,23 +94,26 @@ run_psql() {
 }
 
 # ---------------------------------------------------------------------------
-# Drop all tables (reverse dependency order)
+# Drop the whole database, then recreate it (no hard-coded table list)
+# ---------------------------------------------------------------------------
+# We connect to the 'postgres' maintenance db because a database cannot be
+# dropped while we are connected to it. DROP/CREATE DATABASE cannot run inside
+# a transaction block, hence the separate psql -c calls.
 # ---------------------------------------------------------------------------
 drop_all() {
-    echo "[DROP] Dropping all tables ..."
-    run_psql "
-        DROP TABLE IF EXISTS django_admin_log CASCADE;
-        DROP TABLE IF EXISTS auth_user_user_permissions CASCADE;
-        DROP TABLE IF EXISTS auth_user_groups CASCADE;
-        DROP TABLE IF EXISTS auth_group_permissions CASCADE;
-        DROP TABLE IF EXISTS auth_user CASCADE;
-        DROP TABLE IF EXISTS auth_group CASCADE;
-        DROP TABLE IF EXISTS auth_permission CASCADE;
-        DROP TABLE IF EXISTS django_session CASCADE;
-        DROP TABLE IF EXISTS django_content_type CASCADE;
-        DROP TABLE IF EXISTS django_migrations CASCADE;
-    "
-    echo "[DROP] Done."
+    echo "[DROP] Dropping database '$DbName' ..."
+
+    # Terminate any active connections to the target database.
+    docker compose exec -T db psql -U "$DbUser" -d postgres -v ON_ERROR_STOP=1 \
+        -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DbName' AND pid <> pg_backend_pid();" >/dev/null
+
+    docker compose exec -T db psql -U "$DbUser" -d postgres -v ON_ERROR_STOP=1 \
+        -c "DROP DATABASE IF EXISTS \"$DbName\";"
+
+    docker compose exec -T db psql -U "$DbUser" -d postgres -v ON_ERROR_STOP=1 \
+        -c "CREATE DATABASE \"$DbName\" OWNER \"$DbUser\";"
+
+    echo "[DROP] Recreated database '$DbName'."
 }
 
 # ---------------------------------------------------------------------------

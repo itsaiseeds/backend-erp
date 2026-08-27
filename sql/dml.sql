@@ -1,9 +1,15 @@
 -- =============================================================================
--- DML: Dev Seed Data
+-- DML: Seed Data
 -- Backend ERP - PostgreSQL
 -- =============================================================================
--- Populates content types, permissions, and a default superuser.
--- DEV ONLY — never run against production.
+-- Seeds the reference data Django requires:
+--   * django_content_type  (one row per model)
+--   * auth_permission      (add / change / delete / view per content type)
+--
+-- Only tables that are SQL-managed (listed in sql/ddl.sql) are seeded here.
+-- The `authentication_*` tables are managed by Django migrations, and the
+-- default superuser is created at runtime by the `createsuperuser_if_not_exists`
+-- command (see scripts/entrypoint.sh) — neither is seeded here.
 --
 -- Run: bash scripts/reload_db.sh --step dml
 -- =============================================================================
@@ -11,7 +17,7 @@
 BEGIN;
 
 -- -------------------------------------------------------------------------
--- django_content_type (one row per model Django knows about)
+-- django_content_type
 -- -------------------------------------------------------------------------
 INSERT INTO django_content_type (id, app_label, model) VALUES
     (1, 'auth',        'user'),
@@ -25,7 +31,7 @@ ON CONFLICT DO NOTHING;
 SELECT setval('django_content_type_id_seq', 6);
 
 -- -------------------------------------------------------------------------
--- auth_permission (add / change / delete / view for each model)
+-- auth_permission
 -- -------------------------------------------------------------------------
 INSERT INTO auth_permission (id, name, content_type_id, codename) VALUES
     -- auth.user (content_type_id = 1)
@@ -62,18 +68,8 @@ ON CONFLICT DO NOTHING;
 
 SELECT setval('auth_permission_id_seq', 24);
 
--- -------------------------------------------------------------------------
--- Default superuser  (username: admin / password: admin)
--- Password hash: PBKDF2 SHA256, 1500000 iterations
--- -------------------------------------------------------------------------
-INSERT INTO public.auth_user (id, "password", last_login, is_superuser, username, first_name, last_name, email, is_staff, is_active, date_joined) VALUES(1, 'pbkdf2_sha256$1500000$0rmo5ZMlW4ia6yc0axl59h$gCQl0JPNSoJ0Hu8HpQD69OEuHxhOY0NO8jTGClma9oQ=', '2026-08-25 18:19:57.798', true, 'admin', '', '', 'admin@example.com', true, true, '2026-08-25 18:19:57.798');
-INSERT INTO public.auth_user (id, "password", last_login, is_superuser, username, first_name, last_name, email, is_staff, is_active, date_joined) VALUES(2, 'pbkdf2_sha256$1500000$n4oJdspqtOiwuvpsbuNtIO$YnME46AxGFlXOS4a4hzoWoIDJ9Kjx8hSHrkeE5ghPZU=', '2026-08-25 18:19:57.798', true, 'xZist', '', '', 'xZist@example.com', true, true, '2026-08-25 18:19:57.798');
-
-SELECT setval('auth_user_id_seq', 2);
-
--- Grant all permissions to superusers
-INSERT INTO auth_user_user_permissions (user_id, permission_id)
-SELECT id, unnest(ARRAY(SELECT id FROM auth_permission)) FROM auth_user WHERE is_superuser = TRUE
-ON CONFLICT DO NOTHING;
+INSERT INTO public.authentication_user
+(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
+VALUES(1, 'pbkdf2_sha256$1000000$UGqt8oGnUaTMbuaqbfbc5N$gosDWLrsqUTN2ws6uEwb828K/FAkYHstAzNzhdevkbk=', NULL, true, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '9999999999', 'admin', 'admin@example.com', true, true, true, '2026-08-27 23:52:54.057', NULL, NULL);
 
 COMMIT;
