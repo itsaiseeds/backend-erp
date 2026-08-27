@@ -165,7 +165,7 @@ SELECT setval('auth_permission_id_seq', 28);
 
 ## Connection Parameters
 
-| Variable | `.env.dev` (local Docker) | `.env` / `render.yaml` (production Neon) |
+| Variable | `.env.dev` (local Docker) | Render env (production Neon) |
 |---|---|---|
 | `POSTGRES_DB` | `django` | `neondb` |
 | `POSTGRES_USER` | `django` | `neondb_owner` |
