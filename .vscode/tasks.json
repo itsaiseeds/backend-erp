@@ -173,6 +173,23 @@
             }
         },
         {
+            "label": "flutter: prod",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "flutter-prod"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
             "label": "API Schema",
             "type": "shell",
             "command": "bash",
