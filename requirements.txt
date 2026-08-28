@@ -5,6 +5,8 @@ django-cors-headers>=4.4,<5.0
 psycopg[binary]>=3.2,<4.0
 gunicorn>=23,<24
 whitenoise>=6.8,<7
+pyotp>=2.9,<3.0
+qrcode[pil]>=7.4,<8.0
 pytest
 pytest-django
 requests

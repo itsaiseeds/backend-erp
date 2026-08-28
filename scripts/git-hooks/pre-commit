@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# =============================================================================
+# pre-commit — lint staged Python files with ruff (inside the web container)
+# =============================================================================
+# Runs ruff over ONLY the staged .py files, mirroring `bash scripts/run.sh lint`
+# (which runs `ruff check .` in the short-lived web container, because the host
+# Python has no ruff installed).
+#
+# Installed into .git/hooks/pre-commit by scripts/install-hooks.sh.
+#
+# Behaviour:
+#   * No staged .py files  -> exit 0 (nothing to check)
+#   * Docker unavailable   -> warn + exit 0 (never block a commit on infra)
+#   * ruff finds problems  -> exit 1 (blocks the commit)
+# =============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Ruff config + pinned binary live in the web image; the container also keeps
+# cwd as the mounted repo so project-relative paths work.
+WEBRUN=(docker compose run --rm --no-deps --entrypoint "" -T web)
+
+# Collect staged python files (renames/graphics handled by --diff-filter).
+# NOTE: newline separators (not -z) because MSYS/Windows mangles NUL bytes in
+# process substitution, which would make `read -d ''` receive nothing.
+staged_py=()
+while IFS= read -r file; do
+    staged_py+=("$file")
+done < <(git -C "$REPO_ROOT" diff --cached --name-only --diff-filter=ACM -- '*.py')
+
+if [[ ${#staged_py[@]} -eq 0 ]]; then
+    echo "[pre-commit] No staged Python files; skipping ruff."
+    exit 0
+fi
+
+if ! docker info &>/dev/null; then
+    echo "[pre-commit] WARNING: Docker daemon not running — skipping ruff."
+    echo "[pre-commit] Run 'bash scripts/run.sh lint' before pushing."
+    exit 0
+fi
+
+echo "[pre-commit] Running ruff on ${#staged_py[@]} staged file(s) ..."
+"${WEBRUN[@]}" ruff check "${staged_py[@]}"

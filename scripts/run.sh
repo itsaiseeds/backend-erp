@@ -19,6 +19,7 @@
 #   bash scripts/run.sh test-integration [node] # Integration tests (in web container)
 #   bash scripts/run.sh lint         # ruff check (in web container)
 #   bash scripts/run.sh typecheck    # mypy (in web container)
+#   bash scripts/run.sh hooks        # Install git pre-commit hooks (ruff lint)
 # =============================================================================
 
 set -euo pipefail
@@ -49,6 +50,7 @@ if [[ -z "$COMMAND" ]]; then
     echo "              Run integration tests in web container (default: tests/integration)"
     echo "  lint        Run ruff check in web container"
     echo "  typecheck   Run mypy in web container"
+    echo "  hooks       Install git pre-commit hooks (ruff lint)"
     exit 1
 fi
 
@@ -244,6 +246,13 @@ cmd_typecheck() {
 }
 
 # ---------------------------------------------------------------------------
+# Install git pre-commit hooks
+# ---------------------------------------------------------------------------
+cmd_hooks() {
+    "$SCRIPT_DIR/install-hooks.sh"
+}
+
+# ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
 case "$COMMAND" in
@@ -263,6 +272,7 @@ case "$COMMAND" in
     test-integration)  cmd_test_integration "$@" ;;
     lint)       cmd_lint ;;
     typecheck)  cmd_typecheck ;;
+    hooks)      cmd_hooks ;;
     *)
         echo "Unknown command: $COMMAND"
         echo "Run: bash scripts/run.sh (no args) for help"

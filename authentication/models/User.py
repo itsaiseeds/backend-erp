@@ -1,3 +1,4 @@
+import pyotp
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import BaseUserManager, PermissionsMixin
 from django.core.exceptions import ValidationError
@@ -6,6 +7,9 @@ from django.db import models
 from common.models import TimeStampedModel
 
 from ..validators import validate_phone_number
+
+TOTP_ISSUER = "SaiSeeds"
+TOTP_ISSUER_INTERNAL = "SaiSeeds Internal"
 
 
 class UserManager(BaseUserManager):
@@ -41,6 +45,12 @@ class UserManager(BaseUserManager):
         if extra_fields.get("is_superuser") is not True:
             raise ValueError("Superuser must have is_superuser=True.")
 
+        # A superuser must be able to log in via an authenticator app, so give
+        # them a fresh TOTP secret (and activate it) unless one was supplied.
+        if not extra_fields.get("totp_secret"):
+            extra_fields["totp_secret"] = pyotp.random_base32()
+            extra_fields["totp_enabled"] = True
+
         return self._create_user(phone_number, name, password, **extra_fields)
 
 
@@ -66,6 +76,18 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
     )
     name = models.CharField("name", max_length=255)
     email = models.EmailField("email", blank=True, null=True)
+    totp_secret = models.CharField(
+        "TOTP secret",
+        max_length=32,
+        blank=True,
+        null=True,
+        help_text="Base32 secret for authenticator-app (TOTP) login. Null until enrolled.",
+    )
+    totp_enabled = models.BooleanField(
+        "TOTP enabled",
+        default=False,
+        help_text="Whether the TOTP secret has been verified and is active.",
+    )
     is_verified = models.BooleanField(
         "verified",
         default=False,
@@ -177,3 +199,43 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
     def can_login_with_password(self):
         """Only superusers log in with a password; everyone else uses OTP."""
         return self.is_superuser
+
+    # -- TOTP (authenticator app) helpers --------------------------------------
+
+    def generate_totp_secret(self) -> str:
+        """Create and store a fresh base32 TOTP secret, deactivating it."""
+        self.totp_secret = pyotp.random_base32()
+        self.totp_enabled = False
+        return self.totp_secret
+
+    @property
+    def has_totp_secret(self) -> bool:
+        return bool(self.totp_secret)
+
+    @property
+    def totp(self) -> pyotp.TOTP | None:
+        """Return a TOTP object for the stored secret, or None if not enrolled."""
+        if not self.totp_secret:
+            return None
+        return pyotp.TOTP(self.totp_secret)
+
+    def totp_provisioning_uri(self, issuer: str = TOTP_ISSUER) -> str:
+        """Return the otpauth:// URI to render as a QR code for enrollment."""
+        if self.totp is None:
+            raise ValueError("User has no TOTP secret; enroll before provisioning.")
+        return self.totp.provisioning_uri(name=self.phone_number, issuer_name=issuer)
+
+    def verify_totp(self, code: str, valid_window: int = 1) -> bool:
+        """Verify a TOTP code against the stored secret.
+
+        ``valid_window`` accepts the current 30s window plus that many windows
+        in either direction, tolerating minor clock drift.
+        """
+        if not code or self.totp is None:
+            return False
+        return self.totp.verify(code, valid_window=valid_window)
+
+    def enable_totp(self) -> None:
+        """Mark the verified secret as active for login."""
+        self.totp_enabled = True
+        self.save(update_fields=["totp_enabled"])
