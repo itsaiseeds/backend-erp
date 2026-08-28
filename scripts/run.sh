@@ -13,6 +13,7 @@
 #   bash scripts/run.sh shell        # Open Django shell in web container
 #   bash scripts/run.sh psql         # Open psql in db container
 #   bash scripts/run.sh flutter      # Build Flutter web app for production
+#   bash scripts/run.sh flutter-prod # Build Flutter web app pointing at the prod API
 #   bash scripts/run.sh schema       # Regenerate docs/api/openapi.yml
 #   bash scripts/run.sh test         # Unit + integration tests (in web container)
 #   bash scripts/run.sh test-unit    # Only non-integration tests (in web container)
@@ -43,6 +44,7 @@ if [[ -z "$COMMAND" ]]; then
     echo "  shell       Open Django shell in web container"
     echo "  psql        Open psql in db container"
     echo "  flutter     Build Flutter web app for production"
+    echo "  flutter-prod Build Flutter web app for the production API"
     echo "  schema      Regenerate docs/api/openapi.yml"
     echo "  test        Run unit + integration tests in web container"
     echo "  test-unit   Run only non-integration tests in web container"
@@ -107,6 +109,27 @@ cmd_flutter() {
     MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release --base-href /sales-admin/
     cd "$REPO_ROOT"
     echo "[flutter] Build complete: web/build/web/"
+}
+
+# ---------------------------------------------------------------------------
+# Flutter build (production) with the prod API baked in.
+# ---------------------------------------------------------------------------
+# --dart-define bakes a COMPILE-TIME constant into the static web bundle, so
+# unlike a server-side Render env var it must be rebuilt whenever the URL
+# changes. Override at call time if needed:
+#   API_BASE_URL=https://api.example.com bash scripts/run.sh flutter-prod
+cmd_flutter_prod() {
+    find_flutter
+    local prod_url
+    prod_url="${API_BASE_URL:-https://backend-erp-jlt9.onrender.com/}"
+    echo "[flutter-prod] Building Flutter web app for prod API: $prod_url"
+    cd "$REPO_ROOT/web"
+    "$FLUTTER_CMD" pub get
+    MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release \
+        --base-href /sales-admin/ \
+        --dart-define=API_BASE_URL="$prod_url"
+    cd "$REPO_ROOT"
+    echo "[flutter-prod] Build complete: web/build/web/"
 }
 
 # ---------------------------------------------------------------------------
@@ -266,6 +289,7 @@ case "$COMMAND" in
     shell)      cmd_shell ;;
     psql)       cmd_psql ;;
     flutter)    cmd_flutter ;;
+    flutter-prod) cmd_flutter_prod ;;
     schema)     cmd_schema ;;
     test)       cmd_test ;;
     test-unit)  cmd_test_unit ;;

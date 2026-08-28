@@ -17,7 +17,14 @@ class ApiService {
 
   final String baseUrl;
 
-  Uri _uri(String path) => Uri.parse('$baseUrl$path');
+  Uri _uri(String path) {
+    // Normalise so both "https://host" and "https://host/" work, avoiding
+    // double slashes when concatenating "/api/...".
+    final base = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    return Uri.parse('$base$path');
+  }
 
   /// Exchange a phone number + authenticator-app TOTP code for credentials.
   ///
