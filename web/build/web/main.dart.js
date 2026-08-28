@@ -39178,7 +39178,7 @@ O(a){var s=null
 return new A.wN(B.t_,"Saiseeds Admin",A.rr(s,A.apu(B.a8,s,s,B.AZ),!0),!1,s)}}
 A.nt.prototype={
 an(){var s=$.al()
-return new A.B6(new A.Ub("http://localhost:8000"),new A.zf(B.kA,s),new A.zf(B.kA,s))}}
+return new A.B6(new A.Ub("https://backend-erp-jlt9.onrender.com/"),new A.zf(B.kA,s),new A.zf(B.kA,s))}}
 A.B6.prototype={
 l(){var s=this.e,r=$.al()
 s.n$=r
