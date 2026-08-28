@@ -69,7 +69,7 @@ ON CONFLICT DO NOTHING;
 SELECT setval('auth_permission_id_seq', 24);
 
 INSERT INTO public.authentication_user
-(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
-VALUES(1, 'pbkdf2_sha256$1000000$UGqt8oGnUaTMbuaqbfbc5N$gosDWLrsqUTN2ws6uEwb828K/FAkYHstAzNzhdevkbk=', NULL, true, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '9999999999', 'admin', 'admin@example.com', true, true, true, '2026-08-27 23:52:54.057', NULL, NULL);
+(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
+VALUES(1, 'pbkdf2_sha256$1000000$UGqt8oGnUaTMbuaqbfbc5N$gosDWLrsqUTN2ws6uEwb828K/FAkYHstAzNzhdevkbk=', NULL, true, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '9999999999', 'admin', 'admin@example.com', 'JBSWY3DPEHPK3PXP', true, true, true, true, '2026-08-27 23:52:54.057', NULL, NULL);
 
 COMMIT;

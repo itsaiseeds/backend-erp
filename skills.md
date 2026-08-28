@@ -25,6 +25,7 @@
 
 | File | What it covers |
 |---|---|
+| [docs/knowledge-graph.md](docs/knowledge-graph.md) | Codebase map: every component, model, route, and how they connect |
 | [skills/database.md](skills/database.md) | DDL, DML, reload script, schema conventions |
 | [skills/setup.md](skills/setup.md) | Environment files, first-time setup, daily workflow |
 | [skills/django.md](skills/django.md) | Settings, apps, middleware, MIGRATION_MODULES |

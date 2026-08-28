@@ -1,7 +1,8 @@
-"""Verify-an-OTP endpoint used by the sales admin website.
+"""TOTP login endpoint used by the sales admin website.
 
-Validates a previously-generated OTP and issues credentials for the matching
-user so their session is authenticated.
+Verifies a 6-digit authenticator-app code against the user's enrolled TOTP
+secret and issues credentials for the matching user so their session is
+authenticated (replaces the old SMS/email OTP flow).
 """
 
 from __future__ import annotations
@@ -13,8 +14,6 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from authentication.models import MobileVerification
-
 User = get_user_model()
 
 
@@ -24,11 +23,11 @@ class VerifyOTPSerializer(serializers.Serializer):
 
 
 class VerifyOTPView(APIView):
-    """Validate an OTP, then (re)issue credentials for that user."""
+    """Validate a TOTP code, then (re)issue credentials for that user."""
 
     serializer_class = VerifyOTPSerializer
 
-    # Pre-auth endpoint: allows an unauthenticated user to exchange an OTP
+    # Pre-auth endpoint: lets an unauthenticated user exchange a TOTP code
     # for credentials, so it opts out of the global auth defaults.
     authentication_classes: list[type] = []
     permission_classes: list[type] = [AllowAny]
@@ -39,19 +38,9 @@ class VerifyOTPView(APIView):
         data = serializer.validated_data
 
         user = User.objects.filter(phone_number=data["phone_number"]).first()
-        challenge = (
-            MobileVerification.objects.filter(
-                phone_number=data["phone_number"], is_used=False
-            )
-            .order_by("-created_at")
-            .first()
-        )
-        if user is None or challenge is None or challenge.otp != data["otp"]:
-            return Response({"detail": "Invalid phone number or OTP."}, status=400)
-        if challenge.is_expired:
-            return Response({"detail": "OTP has expired."}, status=400)
+        if user is None or not user.totp_enabled or not user.verify_totp(data["otp"]):
+            return Response({"detail": "Invalid phone number or TOTP code."}, status=400)
 
-        challenge.mark_used()
         token, _ = Token.objects.get_or_create(user=user)
         return Response(
             {
