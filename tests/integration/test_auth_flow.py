@@ -16,10 +16,12 @@ secret — there is no ORM access in these integration tests.
 # container, so the host Python never needs Django:
 #   bash scripts/run.sh test-integration
 #   bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest
-#   bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest::test_totp_verify_returns_token
+#   bash scripts/run.sh test-integration \
+#     tests/integration/test_auth_flow.py::AuthFlowTest::test_totp_verify_returns_token
 #
 # The same pytest node strings work ad hoc inside the container:
-#   docker compose exec -T web python -m pytest tests/integration/test_auth_flow.py::AuthFlowTest::test_totp_verify_returns_token -v
+#   docker compose exec -T web python -m pytest \
+#     tests/integration/test_auth_flow.py::AuthFlowTest::test_totp_verify_returns_token -v
 
 from __future__ import annotations
 

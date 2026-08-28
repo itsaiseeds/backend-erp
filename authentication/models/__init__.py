@@ -1,6 +1,6 @@
 from .Admin import Admin
 from .SalesPerson import SalesPerson
-from .User import User, UserManager, TOTP_ISSUER
+from .User import TOTP_ISSUER, User, UserManager
 
 __all__ = [
     "User",

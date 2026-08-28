@@ -1,9 +1,8 @@
+import pyotp
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import BaseUserManager, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import models
-
-import pyotp
 
 from common.models import TimeStampedModel
 

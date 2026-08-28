@@ -22,7 +22,15 @@ def _totp_qr_base64(uri: str) -> str:
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     ordering = ("phone_number",)
-    list_display = ("phone_number", "name", "email", "is_verified", "totp_enabled", "is_superuser", "is_active")
+    list_display = (
+        "phone_number",
+        "name",
+        "email",
+        "is_verified",
+        "totp_enabled",
+        "is_superuser",
+        "is_active",
+    )
     search_fields = ("phone_number", "name", "email")
     list_filter = ("is_verified", "is_superuser", "is_staff", "is_active", "totp_enabled")
 
