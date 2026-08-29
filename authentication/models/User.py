@@ -40,6 +40,8 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_verified", True)
 
+        if not password:
+            raise ValueError("Superusers must have a password.")
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")
         if extra_fields.get("is_superuser") is not True:
@@ -51,7 +53,14 @@ class UserManager(BaseUserManager):
             extra_fields["totp_secret"] = pyotp.random_base32()
             extra_fields["totp_enabled"] = True
 
-        return self._create_user(phone_number, name, password, **extra_fields)
+        user = self._create_user(phone_number, name, password, **extra_fields)
+
+        # Superusers are self-created / self-verified, satisfying the uniform
+        # audit-field rules now that the row exists.
+        user.created_by = user
+        user.verified_by = user
+        user.save(update_fields=["created_by", "verified_by"])
+        return user
 
 
 class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
@@ -59,11 +68,13 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
 
     - phone_number doubles as the username: a plain 10-digit numeric value with
       no country code (e.g. no +91).
-    - password is only used by superusers; everyone else logs in via OTP.
-    - created_by must be NULL for superusers (they are self-created / seeded),
-      but is always required for any other user.
-    - verified_by must be NULL for superusers, but is always required whenever
-      a (non-superuser) account has is_verified=True.
+    - password is only used by staff (Django admin login); everyone else logs
+      in via OTP.
+    - created_by is always required once the account exists: superusers
+      reference themselves, everyone else references the admin who created
+      them (the acting request.user).
+    - verified_by is always required whenever is_verified=True; superusers
+      self-verify.
     """
 
     phone_number = models.CharField(
@@ -81,7 +92,7 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
         max_length=32,
         blank=True,
         null=True,
-        help_text="Base32 secret for authenticator-app (TOTP) login. Null until enrolled.",
+        help_text="Base32 secret for authenticator-app (TOTP) login.",
     )
     totp_enabled = models.BooleanField(
         "TOTP enabled",
@@ -96,23 +107,28 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
     created_by = models.ForeignKey(
         "self",
         verbose_name="created by",
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="created_users",
-        help_text="User who created this account. Null only for superusers.",
+        help_text="User who created this account (PROTECTed from deletion while referenced); " \
+        "superusers reference themselves.",
     )
     verified_by = models.ForeignKey(
         "self",
         verbose_name="verified by",
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="verified_users",
-        help_text="User who verified this account. Null only for superusers.",
+        help_text="User who verified this account (PROTECTed from deletion while referenced); " \
+        "superusers reference themselves.",
     )
 
     # Standard Django user fields.
+    # A password is only required for staff (Django admin login); everyone else
+    # authenticates via OTP, so the field is not required at the form level.
+    password = models.CharField("password", max_length=128, blank=True)
     is_staff = models.BooleanField("staff status", default=False)
     is_active = models.BooleanField("active", default=True)
     date_joined = models.DateTimeField("date joined", auto_now_add=True)
@@ -141,16 +157,25 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
     def _validate_user_fields(self):
         errors = {}
 
-        if self.is_superuser:
-            # Superusers are self-created / self-verified.
-            if self.created_by is not None:
-                errors["created_by"] = "A superuser cannot have created_by."
-            if self.verified_by is not None:
-                errors["verified_by"] = "A superuser cannot have verified_by."
-        else:
-            # Anyone else must always have a creator.
+        if self.is_staff:
+            # Anyone who can reach the Django admin portal needs a usable
+            # password (admin login is password-based, not OTP). Check both the
+            # raw value (empty string) and the unusable "!" sentinel, because
+            # has_usable_password() alone treats "" as usable.
+            if not self.password or not self.has_usable_password():
+                errors["password"] = "Password is required for staff (Django admin) access."  # noqa: S105
+
+        # In-progress (never-saved) rows must not be checked yet: the audit
+        # fields are assigned by whoever finishes creating the user. The add
+        # form in the admin has no created_by field, so enforcing here during
+        # ModelForm._post_clean would crash the view with "'UserForm' has no
+        # field named 'created_by'". Both the admin add flow (request.user) and
+        # create_superuser (self) set these before the final save.
+        if self.pk is not None:
+            # Every user — including superusers — must have a creator. Only
+            # superusers self-reference; everyone else is created by an admin.
             if self.created_by_id is None:
-                errors["created_by"] = "created_by is required for all users except superusers."
+                errors["created_by"] = "created_by is required for all users."
 
             # verified_by is required whenever the account is marked verified.
             if self.is_verified and self.verified_by_id is None:
@@ -197,8 +222,8 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
 
     @property
     def can_login_with_password(self):
-        """Only superusers log in with a password; everyone else uses OTP."""
-        return self.is_superuser
+        """Only staff log in with a password (Django admin); everyone else uses OTP."""
+        return self.is_staff
 
     # -- TOTP (authenticator app) helpers --------------------------------------
 

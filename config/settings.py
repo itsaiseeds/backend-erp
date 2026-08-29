@@ -46,14 +46,17 @@ INSTALLED_APPS = [
     'common',
     'config',
     'api',
+    'aggregator',
 ]
 
 # Custom user model for the whole project.
 AUTH_USER_MODEL = 'authentication.User'
 
 # Built-in Django apps' schema is managed via sql/ddl.sql -> keep their
-# migrations disabled. Our own apps (authentication, common, config) use
-# normal Django migrations so schema can be generated, not hand-written.
+# migrations disabled so `migrate` never tries to create them. The project's
+# own apps (authentication, common, config, aggregator) are also schema-managed
+# through sql/ddl.sql + sql/dml.sql (see the "Schema & data" section of
+# docs/knowledge-graph.md) and intentionally ship no migration files.
 MIGRATION_MODULES = {
     app.split(".")[-1]: None for app in INSTALLED_APPS if app.startswith("django.")
 }
