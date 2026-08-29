@@ -111,7 +111,8 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
         null=True,
         blank=True,
         related_name="created_users",
-        help_text="User who created this account (PROTECTed from deletion while referenced); superusers reference themselves.",
+        help_text="User who created this account (PROTECTed from deletion while referenced); " \
+        "superusers reference themselves.",
     )
     verified_by = models.ForeignKey(
         "self",
@@ -120,7 +121,8 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
         null=True,
         blank=True,
         related_name="verified_users",
-        help_text="User who verified this account (PROTECTed from deletion while referenced); superusers reference themselves.",
+        help_text="User who verified this account (PROTECTed from deletion while referenced); " \
+        "superusers reference themselves.",
     )
 
     # Standard Django user fields.
