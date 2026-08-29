@@ -5,6 +5,7 @@ never creates a table of its own; the fields are merged into the concrete
 subclass.
 """
 
+from .created_by import CreatedByModel
 from .public_id import (
     PUBLIC_ID_ALPHABET,
     PUBLIC_ID_LENGTH,
@@ -22,6 +23,7 @@ __all__ = [
     "AllObjectsManager",
     "RandomIdModel",
     "PublicIdModel",
+    "CreatedByModel",
     "generate_public_id",
     "PUBLIC_ID_ALPHABET",
     "PUBLIC_ID_LENGTH",

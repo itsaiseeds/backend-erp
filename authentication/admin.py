@@ -1,11 +1,15 @@
 import base64
 import io
 
-import qrcode
+import qrcode  # type: ignore[import-untyped]
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import BaseUserCreationForm, ReadOnlyPasswordHashField
 from django.contrib.auth.models import Group
 from django.utils.html import format_html
+
+from common.admin import AuditFieldsAdminMixin, SoftDeleteModelAdmin
 
 from .models import Admin as AdminProfile
 from .models import SalesPerson, User
@@ -19,8 +23,78 @@ def _totp_qr_base64(uri: str) -> str:
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
+class UserCreationForm(BaseUserCreationForm):
+    """Admin form for creating users.
+
+    Only non-superusers can be created here (superusers are seeded by the
+    ``createsuperuser_if_not_exists`` command). The acting user (request.user)
+    is recorded automatically as both ``created_by`` and ``verified_by``, and
+    every new account ships with an active TOTP secret (``is_verified`` and
+    ``totp_enabled`` are both True).
+
+    A password is never required: the app authenticates via TOTP, and a
+    password only matters for Django-admin login. When left blank, the account
+    gets an unusable password.
+    """
+
+    password1 = forms.CharField(
+        label="Password",
+        widget=forms.PasswordInput,
+        strip=False,
+        required=False,
+        help_text="Optional. Only needed if this user should log in to the Django admin.",
+    )
+    password2 = forms.CharField(
+        label="Password confirmation",
+        widget=forms.PasswordInput,
+        strip=False,
+        required=False,
+    )
+
+    class Meta(BaseUserCreationForm.Meta):
+        model = User
+        fields = ("phone_number", "name", "email")
+
+    def set_password_and_save(self, user, password_field_name="password1", commit=True):  # noqa: S107
+        password = self.cleaned_data.get(password_field_name)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        if commit:
+            user.save()
+        return user
+
+
+class UserChangeForm(forms.ModelForm):
+    """Admin form for editing users (password stays read-only)."""
+
+    password = ReadOnlyPasswordHashField(
+        label="Password",
+        help_text=(
+            "Raw passwords are not stored, so there is no way to see this "
+            "user's password. Use the button below to set or reset it."
+        ),
+    )
+
+    class Meta:
+        model = User
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user_permissions = self.fields.get("user_permissions")
+        if user_permissions:
+            user_permissions.queryset = user_permissions.queryset.select_related(
+                "content_type"
+            )
+
+
 @admin.register(User)
-class UserAdmin(BaseUserAdmin):
+class UserAdmin(AuditFieldsAdminMixin, BaseUserAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
+
     ordering = ("phone_number",)
     list_display = (
         "phone_number",
@@ -39,7 +113,7 @@ class UserAdmin(BaseUserAdmin):
         ("Personal info", {"fields": ("name", "email")}),
         (
             "Authenticator app (TOTP)",
-            {"fields": ("is_verified", "totp_enabled", "totp_secret", "totp_qr")},
+            {"fields": ("is_verified", "verified_by", "totp_enabled", "totp_secret", "totp_qr")},
         ),
         (
             "Permissions",
@@ -53,21 +127,41 @@ class UserAdmin(BaseUserAdmin):
                 ),
             },
         ),
-        ("Account", {"fields": ("created_by", "date_joined", "last_login")}),
+        ("Account", {"fields": ("date_joined", "last_login")}),
     )
     add_fieldsets = (
         (
             None,
             {
                 "classes": ("wide",),
-                "fields": ("phone_number", "name", "email", "password1", "password2"),
+                "fields": ("phone_number", "name", "email"),
             },
         ),
+        ("Password", {"fields": ("password1", "password2")}),
     )
 
     readonly_fields = ("date_joined", "last_login", "totp_qr")
 
     actions = ("generate_totp_qr",)
+
+    def save_model(self, request, obj, form, change):
+        """Auto-assign audit fields on creation.
+
+        New accounts are verified and enrolled the moment they are created: the
+        creator/verifier is the acting (logged-in) staff user, is_verified is
+        True, and a fresh, activated TOTP secret is generated. On edits, keep
+        verified_by consistent when an account is (re)marked verified.
+        """
+        if not change:
+            obj.created_by = request.user
+            obj.verified_by = request.user
+            obj.is_verified = True
+            if not obj.totp_secret:
+                obj.generate_totp_secret()
+            obj.totp_enabled = True
+        elif obj.is_verified and obj.verified_by_id is None:
+            obj.verified_by = request.user
+        super().save_model(request, obj, form, change)
 
     @admin.display(description="TOTP QR code")
     def totp_qr(self, obj):
@@ -109,17 +203,26 @@ class UserAdmin(BaseUserAdmin):
         self.message_user(request, f"Generated a TOTP secret for {updated} user(s).")
 
 
-
 @admin.register(AdminProfile)
-class AdminProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "created_at")
+class AdminProfileAdmin(SoftDeleteModelAdmin):
+    list_display = ("user", "created_by", "created_at")
     search_fields = ("user__name", "user__phone_number")
+    autocomplete_fields = ("user",)
+
+    def has_add_permission(self, request):
+        """Only a superuser may promote someone to an application Admin."""
+        return request.user.is_superuser
 
 
 @admin.register(SalesPerson)
-class SalesPersonAdmin(admin.ModelAdmin):
-    list_display = ("user", "created_at")
+class SalesPersonAdmin(SoftDeleteModelAdmin):
+    list_display = ("user", "created_by", "created_at")
     search_fields = ("user__name", "user__phone_number", "user__created_by__name")
+    autocomplete_fields = ("user",)
+
+    def has_add_permission(self, request):
+        """An application Admin (or superuser) may hire a SalesPerson."""
+        return request.user.is_superuser or request.user.is_admin_user
 
 
 # Hide the default Django auth groups config in favour of our role groups

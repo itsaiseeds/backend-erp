@@ -1,11 +1,12 @@
-from django.core.exceptions import ValidationError
 from django.db import models
 
-from common.models import SoftDeletedModel, TimeStampedModel
+from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
 
 
-class SalesPerson(TimeStampedModel, SoftDeletedModel):
-    """Sales person. Only an application Admin (or superuser) can create one."""
+class SalesPerson(CreatedByModel, TimeStampedModel, SoftDeletedModel):
+    """Sales person. Only an application Admin (or superuser) may grant this
+    role (enforced in the admin site via ``SalesPersonAdmin.has_add_permission``);
+    the acting user is recorded in ``created_by``."""
 
     user = models.OneToOneField(
         "authentication.User",
@@ -19,22 +20,3 @@ class SalesPerson(TimeStampedModel, SoftDeletedModel):
 
     def __str__(self):
         return f"SalesPerson: {self.user}"
-
-    def clean(self):
-        super().clean()
-        if self.user_id is None:
-            return
-        creator = self.user.created_by
-        if creator is None:
-            if not self.user.is_superuser:
-                raise ValidationError(
-                    "A SalesPerson must be created by an Admin (created_by required)."
-                )
-        elif not (creator.is_superuser or creator.is_admin_user):
-            raise ValidationError(
-                {
-                    "user": {
-                        "created_by": "Only an Admin (or superuser) can create a SalesPerson."
-                    }
-                }
-            )

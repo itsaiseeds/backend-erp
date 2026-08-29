@@ -6,10 +6,14 @@
 --   * django_content_type  (one row per model)
 --   * auth_permission      (add / change / delete / view per content type)
 --
--- Only tables that are SQL-managed (listed in sql/ddl.sql) are seeded here.
--- The `authentication_*` tables are managed by Django migrations, and the
--- default superuser is created at runtime by the `createsuperuser_if_not_exists`
--- command (see scripts/entrypoint.sh) — neither is seeded here.
+-- Content types and permissions are seeded for the built-in apps AND for the
+-- project's own models (authentication.user/admin/salesperson and the
+-- aggregator master-data models) so that non-superuser staff can be granted
+-- per-model admin access through Django's group/permission system.
+--
+-- The default superuser is created at runtime by the `createsuperuser_if_not_exists`
+-- command (see scripts/entrypoint.sh); the two authentication_user rows below
+-- are reconciliation seeds that make the same accounts exist after a reload.
 --
 -- Run: bash scripts/reload_db.sh --step dml
 -- =============================================================================
@@ -25,10 +29,18 @@ INSERT INTO django_content_type (id, app_label, model) VALUES
     (3, 'auth',        'permission'),
     (4, 'contenttypes', 'contenttype'),
     (5, 'sessions',    'session'),
-    (6, 'admin',       'logentry')
+    (6, 'admin',       'logentry'),
+    (7, 'authentication', 'user'),
+    (8, 'authentication', 'admin'),
+    (9, 'authentication', 'salesperson'),
+    (10, 'aggregator',   'country'),
+    (11, 'aggregator',   'state'),
+    (12, 'aggregator',   'city'),
+    (13, 'aggregator',   'pincode'),
+    (14, 'aggregator',   'address')
 ON CONFLICT DO NOTHING;
 
-SELECT setval('django_content_type_id_seq', 6);
+SELECT setval('django_content_type_id_seq', 14);
 
 -- -------------------------------------------------------------------------
 -- auth_permission
@@ -63,19 +75,63 @@ INSERT INTO auth_permission (id, name, content_type_id, codename) VALUES
     (21, 'Can add log entry',        6, 'add_logentry'),
     (22, 'Can change log entry',     6, 'change_logentry'),
     (23, 'Can delete log entry',     6, 'delete_logentry'),
-    (24, 'Can view log entry',       6, 'view_logentry')
+    (24, 'Can view log entry',       6, 'view_logentry'),
+    -- authentication.user (content_type_id = 7)
+    (25, 'Can add user',        7, 'add_user'),
+    (26, 'Can change user',     7, 'change_user'),
+    (27, 'Can delete user',     7, 'delete_user'),
+    (28, 'Can view user',       7, 'view_user'),
+    -- authentication.admin (content_type_id = 8)
+    (29, 'Can add admin',        8, 'add_admin'),
+    (30, 'Can change admin',     8, 'change_admin'),
+    (31, 'Can delete admin',     8, 'delete_admin'),
+    (32, 'Can view admin',       8, 'view_admin'),
+    -- authentication.salesperson (content_type_id = 9)
+    (33, 'Can add sales person',        9, 'add_salesperson'),
+    (34, 'Can change sales person',     9, 'change_salesperson'),
+    (35, 'Can delete sales person',     9, 'delete_salesperson'),
+    (36, 'Can view sales person',       9, 'view_salesperson'),
+    -- aggregator.country (content_type_id = 10)
+    (37, 'Can add country',        10, 'add_country'),
+    (38, 'Can change country',     10, 'change_country'),
+    (39, 'Can delete country',     10, 'delete_country'),
+    (40, 'Can view country',       10, 'view_country'),
+    -- aggregator.state (content_type_id = 11)
+    (41, 'Can add state',        11, 'add_state'),
+    (42, 'Can change state',     11, 'change_state'),
+    (43, 'Can delete state',     11, 'delete_state'),
+    (44, 'Can view state',       11, 'view_state'),
+    -- aggregator.city (content_type_id = 12)
+    (45, 'Can add city',        12, 'add_city'),
+    (46, 'Can change city',     12, 'change_city'),
+    (47, 'Can delete city',     12, 'delete_city'),
+    (48, 'Can view city',       12, 'view_city'),
+    -- aggregator.pincode (content_type_id = 13)
+    (49, 'Can add pincode',        13, 'add_pincode'),
+    (50, 'Can change pincode',     13, 'change_pincode'),
+    (51, 'Can delete pincode',     13, 'delete_pincode'),
+    (52, 'Can view pincode',       13, 'view_pincode'),
+    -- aggregator.address (content_type_id = 14)
+    (53, 'Can add address',        14, 'add_address'),
+    (54, 'Can change address',     14, 'change_address'),
+    (55, 'Can delete address',     14, 'delete_address'),
+    (56, 'Can view address',       14, 'view_address')
 ON CONFLICT DO NOTHING;
 
-SELECT setval('auth_permission_id_seq', 24);
+SELECT setval('auth_permission_id_seq', 56);
 
 INSERT INTO public.authentication_user
 (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
-VALUES(1, 'pbkdf2_sha256$1000000$UGqt8oGnUaTMbuaqbfbc5N$gosDWLrsqUTN2ws6uEwb828K/FAkYHstAzNzhdevkbk=', NULL, true, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '9999999999', 'admin', 'admin@example.com', 'JBSWY3DPEHPK3PXP', true, true, true, true, '2026-08-27 23:52:54.057', NULL, NULL);
+VALUES(1, 'pbkdf2_sha256$1000000$UGqt8oGnUaTMbuaqbfbc5N$gosDWLrsqUTN2ws6uEwb828K/FAkYHstAzNzhdevkbk=', NULL, true, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '9999999999', 'admin', 'admin@example.com', 'JBSWY3DPEHPK3PXP', true, true, true, true, '2026-08-27 23:52:54.057', 1, 1);
 
 -- A second user with NO TOTP set, used by integration tests to exercise the
 -- "TOTP not enrolled" negative path over HTTP (no ORM access in these tests).
 INSERT INTO public.authentication_user
 (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
 VALUES(2, '!unusable', NULL, false, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '8888888888', 'no totp user', NULL, NULL, false, false, false, true, '2026-08-27 23:52:54.057', 1, NULL);
+
+-- The seed rows above are inserted with explicit ids, so advance the sequence
+-- to the highest id to keep ORM/admin-created rows from colliding.
+SELECT setval('authentication_user_id_seq', 2, true);
 
 COMMIT;
