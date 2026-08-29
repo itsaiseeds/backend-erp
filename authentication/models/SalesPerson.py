@@ -14,6 +14,13 @@ class SalesPerson(CreatedByModel, TimeStampedModel, SoftDeletedModel):
         related_name="salesperson_profile",
     )
 
+    city = models.ForeignKey(
+        "aggregator.City",
+        verbose_name="city",
+        on_delete=models.PROTECT,
+        related_name="sales_people",
+    )
+
     class Meta:
         verbose_name = "sales person"
         verbose_name_plural = "sales people"

@@ -14,6 +14,8 @@ class Admin(CreatedByModel, TimeStampedModel, SoftDeletedModel):
         related_name="admin_profile",
     )
 
+    can_update_stock_count = models.BooleanField(default=False)
+
     class Meta:
         verbose_name = "admin"
         verbose_name_plural = "admins"
