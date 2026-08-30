@@ -1,30 +1,32 @@
 # Database
 
-> Schema management for the Backend ERP project — a hybrid of Django migrations (project apps) and raw SQL (built-in Django apps).
+> Schema management for the Backend ERP project — **raw SQL only**. `sql/ddl.sql`
+> is the full-schema reference for every app; there are no migration files.
 
 ---
 
 ## Schema Management Model
 
-Schema is managed with a **hybrid** approach:
+The entire schema is **SQL-managed**:
 
 | Target | Managed by | Mechanism |
 |---|---|---|
-| Project apps (`authentication`, `common`, `config`) | **Django migrations** | `makemigrations` + `migrate` |
 | Built-in Django apps (`auth`, `contenttypes`, `sessions`, `admin`) | **Raw SQL** | `sql/ddl.sql` + `sql/dml.sql` |
+| Project apps (`authentication`, `common`, `config`, `api`, `aggregator`) | **Raw SQL** | `sql/ddl.sql` (full schema) + `sql/dml.sql` (seed) |
 
-This is controlled in `config/settings.py`:
+Controlled in `config/settings.py`:
 
 ```python
-# Built-in Django apps' schema is managed via sql/ddl.sql -> keep their
-# migrations disabled. Our own apps (authentication, common, config) use
-# normal Django migrations.
 MIGRATION_MODULES = {
     app.split(".")[-1]: None for app in INSTALLED_APPS if app.startswith("django.")
 }
 ```
 
-So migrations run **only** for the project's own apps. `python manage.py migrate` runs at container startup via `scripts/entrypoint.sh`.
+`MIGRATION_MODULES` only disables the built-in `django.*` apps, but the project
+apps ship **no migration files** either (the single `authentication/migrations/`
+directory is empty). `migrate` is commented out of `scripts/entrypoint.sh`;
+integration tests run `manage.py migrate --fake` so Django thinks the pre-built
+DDL schema has been migrated.
 
 ---
 
@@ -32,11 +34,13 @@ So migrations run **only** for the project's own apps. `python manage.py migrate
 
 | | Local (Docker PostgreSQL) | Production (Neon) |
 |---|---|---|
-| Tables are created | **Django migrations** run against the local DB | Schema applied **manually via SQL** (Neon does **not** run `migrate`) |
-| How | `docker compose exec web python manage.py migrate` | Paste DDL into the Neon SQL Editor / write replica |
-| Source of truth for containers | committed `migrations/` files | manual SQL derived from local |
+| Tables are created | `bash scripts/reload_db.sh --step all` (creates ALL tables from `sql/ddl.sql` + seed) | Schema applied **manually via SQL** (Neon does **not** run `migrate`) |
+| How | reload script / DBeaver against `postgres_data` | Paste DDL into the Neon SQL Editor / write replica |
+| Source of truth | `sql/ddl.sql` (+ `sql/dml.sql`), toggled in DBeaver | manual SQL derived from local |
 
-**Key rule:** `migrate` is only ever run on the **local** Docker database. Production schema is changed **only** by you pasting SQL manually. Migrations are used locally as a **tool to produce the SQL** that you then apply to Neon.
+**Key rule:** `migrate` is **never** part of the workflow. Local schema changes
+= edit model → update `sql/*.sql` → reload. Prod changes = paste the matching
+SQL manually into Neon.
 
 ---
 
@@ -46,42 +50,42 @@ This is the standard workflow for adding or changing a table, on **both** local 
 
 ### 1. Create / Edit the model
 
-Edit the model class (e.g. `authentication/models/user.py`, or a `common/models/*.py` base).
+Edit the model class (e.g. `authentication/models/*.py`,
+`aggregator/models/*.py`, or a `common/models/*.py` base).
 
-### 2. Migrate on the local server
+### 2. Update `sql/ddl.sql` (and related SQL)
 
-Generate + apply migrations against the local Docker PostgreSQL:
+`sql/ddl.sql` is the full-schema reference — the local and test DBs are built
+straight from it, so every new/changed table must be reflected there. Also
+touching `sql/dml.sql` (content types / permissions / seed rows) or
+`sql/admin_perf.sql` (indexes) as needed.
 
-```bash
-# inside the web container (recommended)
-docker compose exec web python manage.py makemigrations <app_name>
-docker compose exec web python manage.py migrate
-```
-
-Or directly with the venv Python used for local management commands:
+### 3. Rebuild the local DB
 
 ```bash
-python manage.py makemigrations <app_name>
-python manage.py migrate
+bash scripts/reload_db.sh --step all     # drop + recreate ALL tables + seed
 ```
 
-This applies the schema change to the **local** Docker database. The migration also runs in prod at deploy via `entrypoint.sh` — **but** prod schema is controlled by you manually (see next steps), so treat the local run as producing the authoritative DDL.
+Alternatively `--step ddl` (schema only) or `--step dml` (seed only).
 
-### 3. Generate the SQL from DBeaver
+### 4. Generate the SQL from DBeaver
 
-Open the changed table in **DBeaver** (connected to the local Docker DB) and copy its **table DDL** (DBeaver → table → SQL → DDL). This gives the `CREATE TABLE` / `ALTER TABLE` statements your model change produced.
+Open the changed table in **DBeaver** (connected to the local Docker DB) and copy
+its **table DDL** (DBeaver → table → SQL → DDL). This gives the `CREATE TABLE` /
+`ALTER TABLE` statements your model change produced — the SQL you run on prod.
 
-> `sql/ddl.sql` is the local reference for the built-in Django-app tables. Keep it in sync if the change touches one of them. Project-app table DDL lives in the committed migrations, but the DDL you extract from DBeaver is what you run on prod.
+### 5. Apply the same SQL to production
 
-### 4. Apply the same SQL to production
+Paste the DDL you copied into the **Neon** database (via the Neon SQL Editor or
+`psql` against the write replica) so the same change is applied there.
 
-Paste the DDL you copied into the **Neon** database (via the Neon SQL Editor or `psql` against the write replica) so the same change is applied there.
+> **Prod schema is manual SQL only.** Neon does not run `migrate`, and nothing
+> in CI applies prod schema for you.
 
-> **Prod schema is manual SQL only.** Neon does not run `migrate`. When a migration is committed, prod may attempt `migrate` at deploy, but you must verify / apply the schema yourself — never rely on it.
+### 6. Any breaking changes: deploy first, then change the field (zero downtime)
 
-### 5. Any breaking changes: deploy first, then change the field (zero downtime)
-
-For a **breaking change** (e.g. adding a `NOT NULL` constraint, or any change that would fail against existing data), apply it in phases to cause **minimum downtime**:
+For a **breaking change** (e.g. adding a `NOT NULL` constraint, or any change
+that would fail against existing data), apply it in phases to cause **minimum downtime**:
 
 1. **Prepare the data** — ensure no existing row will violate the new rule. Run a script / business logic to guarantee the field is populated (no `NULL`s) before the constraint is added.
 2. **Deploy the code first** — push/deploy the code change to prod.
@@ -91,39 +95,42 @@ For a **breaking change** (e.g. adding a `NOT NULL` constraint, or any change th
 
 ---
 
-## SQL Files (built-in Django apps)
+## SQL Files (dev reference)
 
 | File | Purpose |
 |---|---|
-| `sql/ddl.sql` | `CREATE TABLE` for the built-in Django apps (schema) |
-| `sql/dml.sql` | Seeds reference data: content types + permissions |
+| `sql/ddl.sql` | `CREATE TABLE` for **every** app — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), `authentication_user`, `authentication_user_groups/…_user_permissions`, `authentication_admin`, `authentication_salesperson`, `aggregator_*` (address/city/country/pincode/state), `authtoken_token` |
+| `sql/dml.sql` | Seeds content types (14) + permissions (56: add/change/delete/view × 14 models), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`) and a no-TOTP user (`8888888888`) used by the integration tests |
+| `sql/admin_perf.sql` | Prod DDL: `pg_trgm` extension + GIN indexes on `authentication_user(name, email)` for Django-admin `ILIKE` search (idempotent) |
+| `sql/session_auth_24h.sql` | Prod DDL: `authtoken_token.user_id` FK (DRF adds it only via migrate) + `created` index for the 24h TTL sweep (idempotent) |
 
-**Both files are dev-only.** Production (Neon) manages its schema independently.
+**All files are dev/reference only.** Production (Neon) manages its schema
+independently — apply `admin_perf.sql` / `session_auth_24h.sql` (and any newer
+DDL) there manually.
 
 ### `sql/ddl.sql`
 
-Creates the tables required by Django's built-in apps:
-
-| Table | App |
-|---|---|
-| `django_migrations` | Django internals (required even with migrations disabled) |
-| `django_content_type` | contenttypes |
-| `auth_permission` | auth |
-| `auth_group` | auth |
-| `auth_group_permissions` | auth |
-| `django_session` | sessions |
-| `django_admin_log` | admin |
-
-> `auth_user`, `auth_user_groups`, and `auth_user_user_permissions` were pruned — with `AUTH_USER_MODEL = 'authentication.User'` they are dead tables (the real user table `authentication_*` is migration-managed).
+Creates the tables for Django's built-in apps **plus** the project apps and
+drf-authtoken (`authtoken_token`). `auth_user`, `auth_user_groups`, and
+`auth_user_user_permissions` were pruned — with `AUTH_USER_MODEL =
+'authentication.User'` they are dead tables; the real user table is
+`authentication_user` (and its M2M join tables are kept).
 
 ### `sql/dml.sql`
 
-Seeds the reference data Django needs:
+Seeds the reference data Django and the tests need:
 
-1. **6 content types** (one per model Django knows about)
-2. **24 permissions** (add/change/delete/view × 6 models)
+1. **14 content types** (auth user/group/permission, contenttypes, sessions,
+   admin logentry, authentication user/admin/salesperson, aggregator
+   country/state/city/pincode/address)
+2. **56 permissions** (add/change/delete/view × 14 models)
+3. **Reconciliation users**: superuser `9999999999`/`admin` (TOTP enabled,
+   `created_by`/`verified_by` self-referenced) and non-TOTP user `8888888888`
+   (used by the negative-path integration tests).
 
-The default superuser is **not** seeded in SQL — it is created at runtime by `createsuperuser_if_not_exists` (see `scripts/entrypoint.sh`).
+The runtime `createsuperuser_if_not_exists` command is what guarantees a
+superuser exists on a fresh prod deploy; the SQL rows are reconciliation seeds
+so a local reload yields the same accounts the tests expect.
 
 Key details:
 - All `ON CONFLICT DO NOTHING` — idempotent
@@ -208,22 +215,25 @@ The `reload_db.sh` script always reads from `.env.dev` (localhost).
 
 ## Adding Content Types and Permissions for New Models
 
-Built-in apps are seeded via `sql/dml.sql`. When adding a new SQL-managed model that Django needs to know about, add its content type and the 4 CRUD permissions:
+`sql/dml.sql` seeds the content types and permissions for every SQL-managed
+model (currently 14 content types → 56 permissions). When adding a new
+SQL-managed model, append its content type and 4 CRUD permissions **after the
+current max IDs** (check `SELECT max(id), setval(...)` in `dml.sql`):
 
 ```sql
 INSERT INTO django_content_type (id, app_label, model) VALUES
-    (7, 'your_app', 'your_model')
+    (15, 'your_app', 'your_model')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO auth_permission (id, name, content_type_id, codename) VALUES
-    (25, 'Can add your model',    7, 'add_your_model'),
-    (26, 'Can change your model', 7, 'change_your_model'),
-    (27, 'Can delete your model', 7, 'delete_your_model'),
-    (28, 'Can view your model',   7, 'view_your_model')
+    (57, 'Can add your model',    15, 'add_your_model'),
+    (58, 'Can change your model', 15, 'change_your_model'),
+    (59, 'Can delete your model', 15, 'delete_your_model'),
+    (60, 'Can view your model',   15, 'view_your_model')
 ON CONFLICT DO NOTHING;
 
-SELECT setval('django_content_type_id_seq', 7);
-SELECT setval('auth_permission_id_seq', 28);
+SELECT setval('django_content_type_id_seq', 15);
+SELECT setval('auth_permission_id_seq', 60);
 ```
 
 ---
@@ -231,8 +241,8 @@ SELECT setval('auth_permission_id_seq', 28);
 ## Gotchas
 
 - **`django_migrations` table must exist** even with migrations disabled — Django queries it internally
-- **Migrations for project apps only** — never `makemigrations` for a built-in app (their schema is in `ddl.sql`)
-- **`migrate` local-only** — Neon schema is changed by manual SQL, so the committed migrations act as a record + a local tool to generate the DDL
+- **The whole schema is SQL-managed** — `sql/ddl.sql` is the reference for *every* app; never `makemigrations` for a built-in app (their schema is in `ddl.sql`)
+- **No `migrate` in the workflow** — `migrate` is commented out of `scripts/entrypoint.sh`; Neon is changed only by manual SQL; the tests use `migrate --fake` to mark the pre-built DDL schema
 - **Breaking changes go last** — deploy code first, then alter the field on Neon
 - **Sequence resets** — after inserting rows with explicit IDs, always call `setval()` to keep sequences in sync
 - **Idempotency** — all inserts use `ON CONFLICT DO NOTHING`, all creates use `IF NOT EXISTS`

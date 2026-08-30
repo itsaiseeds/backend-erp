@@ -48,7 +48,9 @@ Django is now running at:
 - `http://localhost:8000/admin/` — Django admin
 - `http://localhost:8000/sales-admin/` — Flutter admin app
 
-Login: the superuser created at startup by `createsuperuser_if_not_exists` (or a user you create with `createsuperuser`).
+Login: superuser `9999999999` / `admin` (dev fallback from
+`createsuperuser_if_not_exists`; non-staff users log in with a TOTP code from
+their authenticator app).
 
 ---
 
@@ -250,10 +252,13 @@ Cron pings app every 10 min (prevents cold starts)
 
 ### Schema changes in production
 
-Production (Neon) schema is **manual SQL only** — it does not run `migrate`. The standard workflow:
+Production (Neon) schema is **manual SQL only** — the project has **no
+migration files**, so `migrate` is not part of the workflow. The standard
+flow:
 
 1. Edit the model
-2. `makemigrations` + `migrate` on local Docker PostgreSQL (this is a local tool — it produces the schema)
+2. Update `sql/ddl.sql` (the full-schema reference) and rebuild the local DB:
+   `bash scripts/reload_db.sh --step all`
 3. Copy the changed table's DDL from **DBeaver** (local DB)
 4. Paste that DDL into the **Neon** write replica (SQL Editor or `psql`)
 5. For breaking changes (e.g. adding a `NOT NULL` constraint): prepare the data first (run a script so nothing is `NULL`), **deploy the code first**, then apply the DDL change as the **last step** for minimal downtime
@@ -272,9 +277,13 @@ Production (Neon) schema is **manual SQL only** — it does not run `migrate`. T
 | `POSTGRES_PASSWORD` | Yes | Yes | Yes |
 | `POSTGRES_HOST` | Yes | Yes | Yes (`db` for Docker) |
 | `POSTGRES_PORT` | Yes | Yes | Yes |
-| `ALLOWED_HOSTS` | Yes | Yes | Yes |
+| `CONN_MAX_AGE` | Yes (default 60) | Optional | Optional |
+| `ALLOWED_HOSTS` | Yes (default empty) | Yes | Yes |
+| `CORS_ALLOWED_ORIGINS` | Yes (comma list) | Yes (admin web origin) | — |
 | `SECRET_KEY` | Yes (with fallback) | Yes | Yes |
 | `DEBUG` | Yes (with fallback) | Yes | Yes |
+| `TOKEN_TTL_HOURS` | Yes (default 24) | Optional | Optional |
+| `SENTRY_DSN` / `SENTRY_ENV` / `SENTRY_TRACES_SAMPLE_RATE` | Yes (Sentry only when DEBUG off) | Optional | — |
 | `DJANGO_SUPERUSER_USERNAME` | No (command) | Required on Render | N/A |
 | `DJANGO_SUPERUSER_EMAIL` | No (command) | Required on Render | N/A |
 | `DJANGO_SUPERUSER_PASSWORD` | No (command) | Required on Render | N/A |
@@ -288,11 +297,21 @@ Production (Neon) schema is **manual SQL only** — it does not run `migrate`. T
 python manage.py startapp <app_name>
 
 # Add to INSTALLED_APPS in config/settings.py
-# Place app at project root (e.g. /authentication, /common)
+# Place app at project root (e.g. /aggregator, /authentication)
 
-# Project apps use real Django migrations:
+# Schema is SQL-managed (no migration files exist):
 # 1. Write your models
-# 2. docker compose exec web python manage.py makemigrations <app_name>
-# 3. docker compose exec web python manage.py migrate   # applies to local Docker DB
-# Follow "Changing a Table" in skills/database.md to get the SQL onto prod
+# 2. Add the tables to sql/ddl.sql and content types/permissions/seed to sql/dml.sql
+# 3. Rebuild the local DB: bash scripts/reload_db.sh --step all
+# 4. Follow "Changing a Table" in skills/database.md to get the SQL onto prod
+```
+
+### Running tests / lint / typecheck
+
+```bash
+bash scripts/run.sh test               # unit + integration (web container)
+bash scripts/run.sh test-unit          # unit only
+bash scripts/run.sh test-integration   # integration only
+bash scripts/run.sh lint               # ruff
+bash scripts/run.sh typecheck          # mypy
 ```

@@ -22,10 +22,15 @@ Prerequisites:
 | What you want                          | Command                                                              |
 | -------------------------------------- | -------------------------------------------------------------------- |
 | Everything (unit + integration)        | `bash scripts/run.sh test`                                            |
+<<<<<<< HEAD
 | Unit tests only                        | `bash scripts/run.sh test-unit` (never imports `tests/integration/` — `--ignore` keeps a missing/stale integration module from breaking unit runs) |
+=======
+| Unit tests only                        | `bash scripts/run.sh test-unit`                                       |
+| DML-backed Django tests                | `bash scripts/run.sh test-dml`                                        |
+>>>>>>> 23da69267412d2901f7602c63c5f67fb451eac93
 | All integration tests                  | `bash scripts/run.sh test-integration`                                |
-| One test CLASS                         | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest` |
-| One test METHOD                        | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest::test_generate_otp_returns_200` |
+| One DML test class                     | `bash scripts/run.sh test-dml`                                        |
+| One integration test class             | `bash scripts/run.sh test-integration tests/integration/test_sentry_probe.py::SentryProbeTest` |
 | Several tests at once                  | `bash scripts/run.sh test-integration "tests/a.py::C::t1 tests/a.py::C::t2"` |
 | Lint / typecheck                       | `bash scripts/run.sh lint` / `bash scripts/run.sh typecheck`           |
 

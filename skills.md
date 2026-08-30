@@ -13,8 +13,8 @@
 | **Database** | PostgreSQL 18 |
 | **Python** | 3.14 |
 | **Container** | Docker Compose (web + db) |
-| **Schema management** | Hybrid: Django migrations (project apps) + Raw SQL (built-in apps) |
-| **Seed data** | Raw SQL, dev-only (built-in apps); superuser via runtime command |
+| **Schema management** | **Raw SQL only** — `sql/ddl.sql` holds the full schema; no migration files exist (`migrate` is commented out, tests use `migrate --fake`) |
+| **Seed data** | Raw SQL, dev-only — `sql/dml.sql` (content types + permissions + reconciliation superuser) |
 | **Testing** | pytest + pytest-django |
 | **CI/CD** | GitHub Actions → Render |
 | **Deployment** | Render (web + cron) + Neon DB (serverless PostgreSQL) |
@@ -27,6 +27,7 @@
 |---|---|
 | [docs/knowledge-graph.md](docs/knowledge-graph.md) | Codebase map: every component, model, route, and how they connect |
 | [skills/database.md](skills/database.md) | DDL, DML, reload script, schema conventions |
+| [skills/api.md](skills/api.md) | API layer, auth model, and the CSRF token flow (`get_token`) |
 | [skills/setup.md](skills/setup.md) | Environment files, first-time setup, daily workflow |
 | [skills/django.md](skills/django.md) | Settings, apps, middleware, MIGRATION_MODULES |
 | [skills/docker.md](skills/docker.md) | Dockerfile, docker-compose, services, volumes |
@@ -44,7 +45,7 @@ docker compose up -d                              # start PostgreSQL + Django
 bash scripts/reload_db.sh --step all              # create tables + seed data
 # Django is now running at http://localhost:8000/admin/
 # Flutter app at http://localhost:8000/sales-admin/
-# Login: admin / admin  or  xZist / admin@123
+# TOTP login: superuser 9999999999 (secret JBSWY3DPEHPK3PXP), no-password users OTP via authenticator app
 ```
 
 ### Build Flutter app
@@ -86,13 +87,12 @@ docker compose exec web python manage.py collectstatic
 ```
 
 ### Change a table (local + prod)
-1. Edit the model (`authentication/models/*.py`, `common/models/*.py`)
-2. Migrate on local:
-   - `docker compose exec web python manage.py makemigrations <app>`
-   - `docker compose exec web python manage.py migrate`
-3. Copy the changed table's DDL from DBeaver (local Docker DB)
-4. Paste the DDL into the Neon / prod write replica (prod schema is manual SQL only)
-5. For breaking changes: prepare data → **deploy code first** → apply the DDL as the **last step**
+1. Edit the model (`authentication/models/*.py`, `aggregator/models/*.py`, `common/models/*.py`)
+2. Update `sql/ddl.sql` (the full-schema reference) and any affected SQL (`sql/dml.sql`, `sql/admin_perf.sql`)
+3. Rebuild the local DB: `bash scripts/reload_db.sh --step all`
+4. Copy the changed table's DDL from DBeaver (local Docker DB)
+5. Paste the DDL into the Neon / prod write replica (prod schema is manual SQL only)
+6. For breaking changes: prepare data → **deploy code first** → apply the DDL as the **last step**
 
 ### Key files you will touch often
 - `config/settings.py` — Django config
@@ -107,12 +107,16 @@ docker compose exec web python manage.py collectstatic
 - `Dockerfile` — container build (no Flutter SDK)
 - `tests/` — test files
 
-### Run tests
+### Run tests (inside the Docker web container)
 ```bash
-pytest                                      # run all tests
-pytest -v                                   # verbose output
-pytest tests/test_sample.py                 # run specific file
+bash scripts/run.sh test               # unit + integration
+bash scripts/run.sh test-unit          # unit only
+bash scripts/run.sh test-integration   # integration only
+bash scripts/run.sh lint               # ruff check
+bash scripts/run.sh typecheck          # mypy
 ```
+
+See the `run-tests` skill for single-test / single-class node IDs.
 
 ### Run management commands
 ```bash

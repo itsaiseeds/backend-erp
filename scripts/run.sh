@@ -15,9 +15,9 @@
 #   bash scripts/run.sh flutter      # Build Flutter web app for production
 #   bash scripts/run.sh flutter-prod # Build Flutter web app pointing at the prod API
 #   bash scripts/run.sh schema       # Regenerate docs/api/openapi.yml
-#   bash scripts/run.sh test         # Unit + integration tests (in web container)
+#   bash scripts/run.sh test         # All tests (in web container)
 #   bash scripts/run.sh test-unit    # Only non-integration tests (in web container)
-#   bash scripts/run.sh test-integration [node] # Integration tests (in web container)
+#   bash scripts/run.sh test-dml     # DML-seeded Django tests (in web container)
 #   bash scripts/run.sh lint         # ruff check (in web container)
 #   bash scripts/run.sh typecheck    # mypy (in web container)
 #   bash scripts/run.sh hooks        # Install git pre-commit hooks (ruff lint)
@@ -46,10 +46,9 @@ if [[ -z "$COMMAND" ]]; then
     echo "  flutter     Build Flutter web app for production"
     echo "  flutter-prod Build Flutter web app for the production API"
     echo "  schema      Regenerate docs/api/openapi.yml"
-    echo "  test        Run unit + integration tests in web container"
-    echo "  test-unit   Run only non-integration tests in web container"
-    echo "  test-integration [node]"
-    echo "              Run integration tests in web container (default: tests/integration)"
+    echo "  test        Run all tests in web container"
+    echo "  test-unit   Run unit tests in web container"
+    echo "  test-dml    Run DML-seeded Django tests in web container"
     echo "  lint        Run ruff check in web container"
     echo "  typecheck   Run mypy in web container"
     echo "  hooks       Install git pre-commit hooks (ruff lint)"
@@ -231,30 +230,22 @@ webrun() {
 
 cmd_test_unit() {
     echo "[test-unit] Running unit tests in web container ..."
+<<<<<<< HEAD
     # --ignore stops pytest from even importing the integration modules, so a
     # stale/missing tests/integration can never break a unit-only run.
     webrun python -m pytest -m "not integration" --ignore=tests/integration -v
+=======
+    webrun python -m pytest -v
+>>>>>>> 23da69267412d2901f7602c63c5f67fb451eac93
 }
 
-cmd_test_integration() {
-    local node="${1:-tests/integration}"
-    if [[ -z "$node" ]]; then
-        node="tests/integration"
-    fi
-    shift 2>/dev/null || true
-    # Split the node on whitespace so a single task input can name several
-    # tests, e.g. "tests/a.py::C::t1 tests/a.py::C::t2".
-    local -a targets
-    read -r -a targets <<< "$node"
-    echo "[test-integration] Running pytest in web container: ${targets[*]}"
-    echo "[test-integration] This builds the django_test DB, starts a live server, \
-and exercises the real HTTP endpoints."
-    webrun python -m pytest "${targets[@]}" -v "$@"
+cmd_test_dml() {
+    echo "[test-dml] Running DML-seeded Django tests in web container ..."
+    webrun python -m pytest tests/test_verify_otp_view.py tests/test_auth_flow.py -v
 }
 
 cmd_test() {
     cmd_test_unit
-    cmd_test_integration
 }
 
 # ---------------------------------------------------------------------------
@@ -295,7 +286,7 @@ case "$COMMAND" in
     schema)     cmd_schema ;;
     test)       cmd_test ;;
     test-unit)  cmd_test_unit ;;
-    test-integration)  cmd_test_integration "$@" ;;
+    test-dml)   cmd_test_dml ;;
     lint)       cmd_lint ;;
     typecheck)  cmd_typecheck ;;
     hooks)      cmd_hooks ;;

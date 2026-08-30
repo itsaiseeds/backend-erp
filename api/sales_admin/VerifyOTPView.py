@@ -17,6 +17,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model, login
 from django.middleware.csrf import get_token
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
@@ -31,6 +32,24 @@ class VerifyOTPSerializer(serializers.Serializer):
     otp = serializers.CharField(max_length=8)
 
 
+class VerifyOTPUserSerializer(serializers.Serializer):
+    """The authenticated user, as returned by the login flow."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    phone_number = serializers.CharField()
+    role = serializers.CharField()
+
+
+class VerifyOTPResponseSerializer(serializers.Serializer):
+    """Credentials returned after a successful TOTP exchange."""
+
+    token = serializers.CharField()
+    user = VerifyOTPUserSerializer()
+    can_create_admin = serializers.BooleanField()
+    can_create_sales_person = serializers.BooleanField()
+
+
 class VerifyOTPView(APIView):
     """Validate a TOTP code, then (re)issue credentials for that user."""
 
@@ -41,13 +60,24 @@ class VerifyOTPView(APIView):
     authentication_classes: list[type] = []
     permission_classes: list[type] = [AllowAny]
 
+    @extend_schema(
+        request=VerifyOTPSerializer,
+        responses={
+            200: VerifyOTPResponseSerializer,
+            400: {"description": "Invalid phone number or TOTP code."},
+        },
+    )
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
         user = User.objects.filter(phone_number=data["phone_number"]).first()
-        if user is None or not user.totp_enabled or not user.verify_totp(data["otp"]):
+
+        if user is None or (not user.is_admin_user and not user.is_superuser):
+            return Response({"detail": "Invalid phone number or TOTP code."}, status=400)
+
+        if not user.totp_enabled or not user.verify_totp(data["otp"]):
             return Response({"detail": "Invalid phone number or TOTP code."}, status=400)
 
         token, _ = Token.objects.get_or_create(user=user)
@@ -70,5 +100,7 @@ class VerifyOTPView(APIView):
                     "phone_number": user.phone_number,
                     "role": user.role,
                 },
+                "can_create_admin": user.is_superuser,
+                "can_create_sales_person": user.is_superuser or user.is_admin_user,
             }
         )
