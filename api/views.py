@@ -17,11 +17,10 @@ from collections.abc import Callable
 from typing import Any
 
 from django.db import transaction
-from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from .authentication import ExpiringTokenAuthentication
+from .authentication import ExpiringTokenAuthentication, SessionAuthentication
 from .permissions import IsAdminUser, IsSuperUser
 
 

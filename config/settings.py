@@ -200,7 +200,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # admin = session, android = token. Override per-view where a flow differs.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
+        'api.authentication.SessionAuthentication',
         'api.authentication.ExpiringTokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
