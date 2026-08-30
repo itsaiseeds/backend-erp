@@ -17,6 +17,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model, login
 from django.middleware.csrf import get_token
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
@@ -31,6 +32,24 @@ class VerifyOTPSerializer(serializers.Serializer):
     otp = serializers.CharField(max_length=8)
 
 
+class VerifyOTPUserSerializer(serializers.Serializer):
+    """The authenticated user, as returned by the login flow."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    phone_number = serializers.CharField()
+    role = serializers.CharField()
+
+
+class VerifyOTPResponseSerializer(serializers.Serializer):
+    """Credentials returned after a successful TOTP exchange."""
+
+    token = serializers.CharField()
+    user = VerifyOTPUserSerializer()
+    can_create_admin = serializers.BooleanField()
+    can_create_sales_person = serializers.BooleanField()
+
+
 class VerifyOTPView(APIView):
     """Validate a TOTP code, then (re)issue credentials for that user."""
 
@@ -41,6 +60,13 @@ class VerifyOTPView(APIView):
     authentication_classes: list[type] = []
     permission_classes: list[type] = [AllowAny]
 
+    @extend_schema(
+        request=VerifyOTPSerializer,
+        responses={
+            200: VerifyOTPResponseSerializer,
+            400: {"description": "Invalid phone number or TOTP code."},
+        },
+    )
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
