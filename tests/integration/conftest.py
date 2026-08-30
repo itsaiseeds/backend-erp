@@ -16,11 +16,12 @@ from tests.integration.base import IntegrationDbContext, LiveServer
 
 
 @pytest.fixture(scope="session")
-def db_context() -> IntegrationDbContext:
+def db_context(request) -> IntegrationDbContext:
     """A configured manager for the dedicated integration-test database."""
     context = IntegrationDbContext()
     context.build()
     context.mark_migrations_applied()
+    request.addfinalizer(context.release_build_lock)
     return context
 
 

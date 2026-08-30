@@ -38,6 +38,10 @@ SERVER_TIMEOUT_SECONDS = 60
 ADMIN_DB = "postgres"  # maintenance DB used to CREATE/DROP test databases.
 SQL_DIR = REPO_ROOT / "sql"
 
+# Advisory-lock key that serializes (re)building INTEGRATION_DB across
+# concurrent pytest processes (see IntegrationDbContext.acquire_build_lock).
+BUILD_LOCK_KEY = 2817198413
+
 
 def _db_host() -> str:
     """Postgres host to connect to.
@@ -58,6 +62,7 @@ class IntegrationDbContext:
         self.port = os.environ.get("POSTGRES_PORT", "5432")
         self.user = os.environ.get("POSTGRES_USER", "django")
         self.password = os.environ.get("POSTGRES_PASSWORD", "")
+        self._lock_conn: psycopg.Connection | None = None
 
     # -- psycopg helpers -------------------------------------------------------
     def _connect(self, db: str):
@@ -96,9 +101,35 @@ class IntegrationDbContext:
         env["ALLOWED_HOSTS"] = f"{HOST},127.0.0.1,localhost"
         return env
 
+    # -- Build lock -------------------------------------------------------------
+    def acquire_build_lock(self) -> None:
+        """Serialize integration-DB (re)creation across concurrent pytest runs.
+
+        Two ``test-integration`` invocations started at the same moment both
+        drop then recreate ``INTEGRATION_DB``; the loser dies with
+        ``UniqueViolation ... pg_database_datname_index`` (reported as
+        collection-time errors). A session-level Postgres advisory lock makes
+        the second run *wait* for the first instead of racing it. The lock is
+        held from :meth:`build` until the pytest session ends via
+        :meth:`release_build_lock`, so a run never drops a database another
+        run is still serving from.
+        """
+        conn = self._connect(ADMIN_DB)
+        conn.execute("SELECT pg_advisory_lock(%s)", (BUILD_LOCK_KEY,))
+        self._lock_conn = conn
+
+    def release_build_lock(self) -> None:
+        """Release the build lock (session finalizer). Closing the connection
+        drops the session-scoped advisory lock even without an explicit
+        unlock."""
+        if self._lock_conn is not None:
+            self._lock_conn.close()
+            self._lock_conn = None
+
     # -- Lifecycle -------------------------------------------------------------
     def build(self) -> None:
         """Drop any existing test DB, then (re)create it from DDL + DML."""
+        self.acquire_build_lock()
         self.drop()
         self._execute(
             ADMIN_DB,
