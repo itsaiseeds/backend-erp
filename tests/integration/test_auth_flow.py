@@ -107,15 +107,17 @@ class SessionAuthFlowTest(IntegrationTestCase):
 
     def test_login_issues_24h_session_and_csrf_cookies(self):
         """tests/integration/test_auth_flow.py::SessionAuthFlowTest::test_login_issues_24h_session_and_csrf_cookies"""
+        # Anonymous cannot read the superuser-only schema endpoint.
+        assert self.get("/api/schema/").status_code == 401
         response = self._login()
         assert response.status_code == 200
         set_cookie = response.headers.get("set-cookie", "")
         assert "sessionid=" in set_cookie
         assert "Max-Age=86400" in set_cookie
         assert "csrftoken=" in set_cookie
-        # The session cookie really authenticates: the admin enroll endpoint is
-        # reached and the role check runs (-> 403), instead of 401 anonymous.
-        assert self.get("/api/sales_admin/auth/totp/enroll").status_code == 403
+        # The session cookie really authenticates: the same superuser-only
+        # endpoint now answers 200, not the anonymous 401.
+        assert self.get("/api/schema/").status_code == 200
 
     def test_expired_session_is_rejected(self):
         """tests/integration/test_auth_flow.py::SessionAuthFlowTest::test_expired_session_is_rejected"""
@@ -125,7 +127,8 @@ class SessionAuthFlowTest(IntegrationTestCase):
                 "UPDATE django_session SET expire_date = NOW() - INTERVAL '1 hour' "
                 "WHERE expire_date > NOW()"
             )
-        assert self.get("/api/sales_admin/auth/totp/enroll").status_code == 401
+        # An expired session falls back to anonymous: 401 again.
+        assert self.get("/api/schema/").status_code == 401
 
     def test_verify_refreshes_token_clock_on_relogin(self):
         """tests/integration/test_auth_flow.py::SessionAuthFlowTest::test_verify_refreshes_token_clock_on_relogin"""
