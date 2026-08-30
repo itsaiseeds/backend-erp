@@ -12,7 +12,8 @@ paths:
       tags:
       - sales_admin
       security:
-      - tokenAuth: []
+      - bearerAuth: []
+      - sessionAuth: []
       responses:
         '200':
           content:
@@ -38,7 +39,8 @@ paths:
               $ref: '#/components/schemas/CreateAdminRequest'
         required: true
       security:
-      - tokenAuth: []
+      - bearerAuth: []
+      - sessionAuth: []
       responses:
         '200':
           content:
@@ -71,7 +73,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerifyOTP'
+                $ref: '#/components/schemas/VerifyOTPResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                description: Invalid phone number or TOTP code.
           description: ''
   /api/sales_admin/sales-people:
     get:
@@ -80,7 +88,8 @@ paths:
       tags:
       - sales_admin
       security:
-      - tokenAuth: []
+      - bearerAuth: []
+      - sessionAuth: []
       responses:
         '200':
           content:
@@ -106,7 +115,8 @@ paths:
               $ref: '#/components/schemas/CreateSalesPersonRequest'
         required: true
       security:
-      - tokenAuth: []
+      - bearerAuth: []
+      - sessionAuth: []
       responses:
         '200':
           content:
@@ -114,35 +124,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/CreateSalesPerson'
           description: ''
-  /api/test-sentry/:
-    get:
-      operationId: test_sentry_retrieve
-      description: |-
-        Force a 500 so its traceback is captured by error tracking.
-
-        Only a Django superuser may call it, to stop the public-facing endpoint
-        from being exploited as a free exception spammer.
-      tags:
-      - test-sentry
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          description: No response body
-    post:
-      operationId: test_sentry_create
-      description: |-
-        Force a 500 so its traceback is captured by error tracking.
-
-        Only a Django superuser may call it, to stop the public-facing endpoint
-        from being exploited as a free exception spammer.
-      tags:
-      - test-sentry
-      security:
-      - tokenAuth: []
-      responses:
-        '200':
-          description: No response body
   /api/utilities/cities:
     get:
       operationId: utilities_cities_list
@@ -296,18 +277,6 @@ components:
       - city
       - name
       - phone_number
-    VerifyOTP:
-      type: object
-      properties:
-        phone_number:
-          type: string
-          maxLength: 10
-        otp:
-          type: string
-          maxLength: 8
-      required:
-      - otp
-      - phone_number
     VerifyOTPRequest:
       type: object
       properties:
@@ -322,9 +291,48 @@ components:
       required:
       - otp
       - phone_number
+    VerifyOTPResponse:
+      type: object
+      description: Credentials returned after a successful TOTP exchange.
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/VerifyOTPUser'
+        can_create_admin:
+          type: boolean
+        can_create_sales_person:
+          type: boolean
+      required:
+      - can_create_admin
+      - can_create_sales_person
+      - token
+      - user
+    VerifyOTPUser:
+      type: object
+      description: The authenticated user, as returned by the login flow.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone_number:
+          type: string
+        role:
+          type: string
+      required:
+      - id
+      - name
+      - phone_number
+      - role
   securitySchemes:
-    tokenAuth:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
+      description: Expiring bearer token used by the Android app.
+    sessionAuth:
       type: apiKey
       in: header
-      name: Authorization
-      description: Token-based authentication with required prefix "Token"
+      name: sessionid
+      description: Django session cookie for the sales admin website.

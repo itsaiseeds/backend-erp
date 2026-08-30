@@ -143,9 +143,9 @@ if SENTRY_DSN and not DEBUG:
     sentry_sdk.init(dsn=SENTRY_DSN, ... auto_session_tracking=True ...)
 ```
 
-Only initialises when `SENTRY_DSN` is set **and** `DEBUG` is false. The
-`/api/test-sentry/` endpoint (`api/test_sentry.py`) raises on purpose to probe
-it. In development there is no Sentry, so the probe just returns a Django 500.
+Only initialises when `SENTRY_DSN` is set **and** `DEBUG` is false. The old
+`/api/test-sentry/` probe (`api/test_sentry.py`) was dropped in the master
+merge; errors surface via the normal Sentry capture of unhandled 5xx.
 
 ## URL Configuration
 

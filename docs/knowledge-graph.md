@@ -33,7 +33,7 @@ graph TD
         SA --> ADMV["AdminsView (superuser)"]
         SA --> SPLV["SalesPeopleView (admin/superuser)"]
         APIROOT --> AND["/api/android/v1/ (empty)"]
-        APIROOT --> TSENTRY["TestSentryView<br/>(/api/test-sentry/, superuser)"]
+        APIROOT --> UTIL["/api/utilities/ (cities by state)"]
         ADMINV["AdminApiView (session)"] --> BASE["BaseApiView<br/>(auth flags)"]
         ANDV["AndroidBaseView (token)"] --> BASE
         SESSAUTH --> BASE
@@ -183,7 +183,7 @@ graph TD
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `sql/ddl.sql` | full schema | **Every** table — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), custom apps (`authentication_*`, `aggregator_*`), and `authtoken_token`. Dev/test reference; prod schema applied manually on Neon | consumed by → `reload_db.sh`, `integration_db.sh`, integration tests |
+| `sql/ddl.sql` | full schema | **Every** table — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), custom apps (`authentication_*`, `aggregator_*`), and `authtoken_token`. Dev/test reference; prod schema applied manually on Neon | consumed by → `reload_db.sh`, integration tests |
 | `sql/dml.sql` | seed data | Content types (14) + permissions (56, 4 per model) + **reconciliation superuser** `9999999999` (with TOTP secret `JBSWY3DPEHPK3PXP`) + a no-TOTP user `8888888888` for the negative-path test. Idempotent `ON CONFLICT DO NOTHING`, `setval()` sequence resets, wrapped in txn | consumed by → same as above |
 | `sql/admin_perf.sql` | prod DDL | `pg_trgm` extension + GIN trigram indexes on `authentication_user(name, email)` for Django admin `ILIKE` search | applied to → local/test DBs, Neon (manual) |
 | `sql/session_auth_24h.sql` | prod DDL | `authtoken_token.user_id` FK (DRF only adds it via migrate) + `created` index for the TTL expiry sweep | applied to → Neon (manual) |
@@ -193,17 +193,12 @@ graph TD
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `scripts/run.sh` | single entry point | `build/up/down/restart/reload-db/logs/status/shell/psql/flutter/schema/test/test-unit/test-integration/lint/typecheck`. Tests/lint/typecheck run in **short-lived one-off `web` containers** (`compose run --rm --no-deps --entrypoint ""`) to avoid booting gunicorn | calls → `reload_db.sh`, `integration_db.sh`, compose |
+| `scripts/run.sh` | single entry point | `build/up/down/restart/reload-db/logs/status/shell/psql/flutter/schema/test/test-unit/test-dml/test-integration/lint/typecheck`. Tests/lint/typecheck run in **short-lived one-off `web` containers** (`compose run --rm --no-deps --entrypoint ""`) to avoid booting gunicorn | calls → `reload_db.sh`, compose |
 | `scripts/reload_db.sh` | local DB reload | `--step all/ddl/dml`; **local Docker Postgres only, never prod** | reads → `sql/ddl.sql`, `sql/dml.sql`, `.env.dev` |
-| `scripts/integration_db.sh` | test DB builder | Build/drop throwaway `django_test` DB from DDL+DML | consumed by integration tests (now via `tests/integration/base.py`) |
-<<<<<<< HEAD
-| Unit tests | `tests/test_sample.py` | Sanity pytest | none |
-| Integration framework | `tests/integration/` | `base.py` (`IntegrationDbContext`, `LiveServer`, `IntegrationTestCase`) + `conftest.py` fixtures; builds `django_test` from `sql/ddl.sql`+`dml.sql` (DB rebuilds serialized across concurrent runs via a Postgres advisory lock), `migrate --fake`, runs real `runserver` on `127.0.0.1:8001`, exercises HTTP via `requests.Session` | depends on → `db`; consumed by → `test_auth_flow.py` |
-=======
-| Unit tests | `tests/test_sample.py`, `tests/test_expiring_token.py` | Sanity pytest + token-TTL unit test | none |
-| Integration framework | `tests/integration/` | `base.py` (`IntegrationDbContext`, `LiveServer`, `IntegrationTestCase`) + `conftest.py` fixtures; builds `django_test` from `sql/ddl.sql`+`dml.sql`+`admin_perf.sql`, `migrate --fake`, runs real `runserver` on `127.0.0.1:8001`, exercises HTTP via `requests.Session` | depends on → `db`; consumed by → `test_sentry_probe.py` |
->>>>>>> 23da69267412d2901f7602c63c5f67fb451eac93
-| CI | `.github/workflows/tests.yml` | Builds images, starts `db`, runs `test-unit` + `test-integration` + `lint` in one-off containers | gate on → PRs to `master`; renders check `Tests / test` |
+| Unit tests | `tests/test_sample.py`, `tests/test_expiring_token.py` | Sanity pytest + token-TTL unit test; no DB (explicit file list in `run.sh test-unit`) | none |
+| Integration framework | `tests/integration/` | `base.py` (`IntegrationDbContext`, `LiveServer`, `IntegrationTestCase`) + `conftest.py` fixtures; builds `django_test` from `sql/ddl.sql`+`dml.sql`+`admin_perf.sql` (DB rebuilds serialized across concurrent runs via a Postgres advisory lock), `migrate --fake`, runs real `runserver` on `127.0.0.1:8001`, exercises HTTP via `requests.Session` | depends on → `db`; consumed by → `test_users_management.py`, `test_utilities.py` |
+| DML-backed Django tests | `tests/test_auth_flow.py`, `tests/test_verify_otp_view.py` (via `tests/common.py::DMLTestCase`) | django `TestCase` session/cookie flows seeded from `dml.sql`, hit views in-process (no live server) | consumed by → `run.sh test-dml` |
+| CI | `.github/workflows/tests.yml` | Builds images, starts `db`, runs `test-unit` + `test-dml` + `lint` in one-off containers | gate on → PRs to `master`; renders check `Tests / test` |
 | Branch protection | GitHub settings | `master` requires `Tests / test` to pass + PR review | enforced by → GitHub |
 | Skills | `skills/*.md`, `.agents/skills/run-tests/SKILL.md` | Domain knowledge + test-run instructions (node-id docstring convention) | read before editing |
 
@@ -309,7 +304,7 @@ models/*.py ----(DBeaver: copy table DDL)---->  Neon SQL Editor (prod, manual)
             sql/ddl.sql (full schema reference)
 
 sql/ddl.sql + sql/dml.sql + sql/admin_perf.sql
-    ----reload_db.sh / integration_db.sh / integration tests---->
+    ----reload_db.sh / integration tests---->
             local Docker "django" / "django_test" DB
 
 No migration files exist in the repo. `migrate` is commented out of the
@@ -341,7 +336,7 @@ master merged → Render auto-deploy (Docker build)
 - **Token TTL:** bearer tokens die `TOKEN_TTL_HOURS` (24) after their last "login"; `ExpiringTokenAuthentication` deletes an expired token on first use so the next request forces a fresh login. Session cookies share the same 24h through `SESSION_COOKIE_AGE`.
 - **401 vs 403:** the custom `SessionAuthentication`/`ExpiringTokenAuthentication` return a `WWW-Authenticate` challenge header, which is what keeps anonymous calls a **401** instead of DRF's default 403.
 - **CSRF is *not* enforced by the global middleware on DRF routes** (view handlers are `csrf_exempt`); only DRF `SessionAuthentication` enforces it, so the sales-admin SPA must send the `csrftoken` cookie value as `X-CSRFToken` on every session-authenticated POST/PUT/PATCH/DELETE.
-- **Sentry/GlitchTip** only initialises when `SENTRY_DSN` is set and `DEBUG` is false; `/api/test-sentry/` is the wired-up probe.
+- **Sentry/GlitchTip** only initialises when `SENTRY_DSN` is set and `DEBUG` is false (no `/api/test-sentry/` probe — it was dropped in the master merge).
 - `api/admin.py` = `AdminApiView` base, not Django admin.
 - Creating an **Admin** automatically creates a **fallback `SalesPerson`** for the same user.
 - **Salespersons carry only `city`** — **admins carry neither `city` nor `address`**; any such keys sent to the endpoints are ignored and never persisted, and response payloads never expose `user_id`/`is_deleted`/`deleted_by`.

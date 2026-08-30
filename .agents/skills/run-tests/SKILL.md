@@ -21,17 +21,13 @@ Prerequisites:
 
 | What you want                          | Command                                                              |
 | -------------------------------------- | -------------------------------------------------------------------- |
-| Everything (unit + integration)        | `bash scripts/run.sh test`                                            |
-<<<<<<< HEAD
-| Unit tests only                        | `bash scripts/run.sh test-unit` (never imports `tests/integration/` — `--ignore` keeps a missing/stale integration module from breaking unit runs) |
-=======
-| Unit tests only                        | `bash scripts/run.sh test-unit`                                       |
+| Everything (unit + DML + integration)  | `bash scripts/run.sh test`                                            |
+| Unit tests only (no DB)                | `bash scripts/run.sh test-unit`                                       |
 | DML-backed Django tests                | `bash scripts/run.sh test-dml`                                        |
->>>>>>> 23da69267412d2901f7602c63c5f67fb451eac93
 | All integration tests                  | `bash scripts/run.sh test-integration`                                |
-| One DML test class                     | `bash scripts/run.sh test-dml`                                        |
-| One integration test class             | `bash scripts/run.sh test-integration tests/integration/test_sentry_probe.py::SentryProbeTest` |
-| Several tests at once                  | `bash scripts/run.sh test-integration "tests/a.py::C::t1 tests/a.py::C::t2"` |
+| One integration test CLASS             | `bash scripts/run.sh test-integration tests/integration/test_users_management.py::UserManagementTest` |
+| One integration test METHOD            | `bash scripts/run.sh test-integration tests/integration/test_utilities.py::UtilitiesTest::test_unknown_state_returns_404` |
+| Several tests at once                  | `bash scripts/run.sh test-integration "tests/integration/test_users_management.py::UserManagementTest tests/integration/test_utilities.py::UtilitiesTest"` |
 | Lint / typecheck                       | `bash scripts/run.sh lint` / `bash scripts/run.sh typecheck`           |
 
 Any extra `pytest` args can be appended after the node id, e.g.
@@ -42,9 +38,9 @@ Any extra `pytest` args can be appended after the node id, e.g.
 Terminal > Run Task... (Ctrl+Shift+R on Windows):
 
 - `test` — full suite.
-- `test: unit` — unit only.
-- `test-integration: all tests` — whole integration suite.
-- `test-integration: pick a test` — **asks for a pytest node id**, then runs it.
+- `test: unit` — unit only (no DB).
+- `test: DML-backed Django` — the DML-seeded Django tests.
+- `test: integration (live server)` — whole integration suite.
 
 There is no launch.json (debug attach) in this project; tasks are the way to
 run tests.
@@ -73,16 +69,16 @@ terminal or the "pick a test" task prompt.
   wrapper) so lines stay under 100 chars and ruff stays clean.
 - No trailing whitespace.
 
-Example (`tests/integration/test_auth_flow.py`):
+Example (`tests/integration/test_users_management.py`):
 
 ```python
-class AuthFlowTest(IntegrationTestCase):
-    """Covers the OTP request + verify endpoints of the sales admin API.
-    Run: tests/integration/test_auth_flow.py::AuthFlowTest
+class UserManagementTest(IntegrationTestCase):
+    """Covers the admin + sales-person management endpoints of the sales admin.
+    Run: tests/integration/test_users_management.py::UserManagementTest
     """
 
-    def test_generate_otp_returns_200(self):
-        """Run: tests/integration/test_auth_flow.py::AuthFlowTest::test_generate_otp_returns_200"""
+    def test_only_superuser_can_create_admin(self):
+        """Run: tests/integration/test_users_management.py::UserManagementTest::test_only_superuser_can_create_admin"""
         ...
 ```
 

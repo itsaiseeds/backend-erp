@@ -38,7 +38,7 @@ class VerifyOTPTest(DMLTestCase):
         )
         city = City.objects.create(name="Test City", state=state, created_by=cls.superuser)
         salesperson_user = User.objects.create_user(
-            phone_number="7777777777",
+            phone_number="6565656565",
             name="salesperson",
             totp_secret="KRSXG5DSNFXGOIDB",
             totp_enabled=True,

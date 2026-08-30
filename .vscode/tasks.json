@@ -261,6 +261,23 @@
             }
         },
         {
+            "label": "test: integration (live server)",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "test-integration"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
             "label": "lint",
             "type": "shell",
             "command": "bash",

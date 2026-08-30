@@ -162,9 +162,10 @@ SELECT setval('aggregator_pincode_id_seq', 1);
 
 -- -------------------------------------------------------------------------
 -- Rolled-up users used by the integration tests
---   * an application Admin (7777777777) with a known, enabled TOTP secret, and
---   * a plain verified user (6666666666) with a known, enabled TOTP secret.
--- Both authenticate over HTTP exactly like the seeded superuser above.
+--   * an application Admin (7777777777) with a known, enabled TOTP secret.
+-- The TOTP login endpoint only lets admins/superusers in, so the plain
+-- verified user (6666666666) below authenticates nowhere: it exists so the
+-- suites can assert non-staff accounts are rejected.
 -- -------------------------------------------------------------------------
 INSERT INTO public.authentication_user
 (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)

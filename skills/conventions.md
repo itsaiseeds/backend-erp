@@ -156,7 +156,7 @@ backend-erp/
 - Do not commit `.env` (production secrets)
 - Do not push Flutter changes without rebuilding (`bash scripts/run.sh flutter`)
 - Do not install Flutter SDK in Docker — the build output is committed to git
-- Do not call `/api/test-sentry/` without a superuser account — it is there to probe error tracking
+- Do not use `/api/test-sentry/` — it was removed in the master merge (no error-tracking probe endpoint)
 
 ---
 

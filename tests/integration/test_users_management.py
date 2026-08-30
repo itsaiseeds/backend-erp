@@ -5,7 +5,8 @@ These hit the live Django server over HTTP via the helpers in
 
 * a TOTP-enabled superuser (phone 9999999999, secret ``JBSWY3DPEHPK3PXP``),
 * a TOTP-enabled application Admin (phone 7777777777, secret ``KRSXG5CTMVRXEZLU``),
-* a TOTP-enabled plain user (phone 6666666666, secret ``IJQXGZJTGMFWC3LN``), and
+* a plain verified user (phone 6666666666) that the login endpoint rejects
+  (only admins/superusers can authenticate), and
 * a minimal geography tree (country India -> state Maharashtra -> city Pune,
   id 1) backing the ``city`` pickers.
 
@@ -26,8 +27,6 @@ SUPERUSER_PHONE = "9999999999"
 SUPERUSER_SECRET = "JBSWY3DPEHPK3PXP"
 ADMIN_PHONE = "7777777777"
 ADMIN_SECRET = "KRSXG5CTMVRXEZLU"
-PLAIN_PHONE = "6666666666"
-PLAIN_SECRET = "IJQXGZJTGMFWC3LN"
 PUNE_CITY_ID = 1
 
 
@@ -73,25 +72,14 @@ class UserManagementTest(IntegrationTestCase):
             "phone_number": "9000000099",
             "city": PUNE_CITY_ID,
         }
-        for phone, secret in ((PLAIN_PHONE, PLAIN_SECRET), (ADMIN_PHONE, ADMIN_SECRET)):
-            self._auth_as(phone, secret)
-            response = self.post("/api/sales_admin/admins", json=payload)
-            assert response.status_code == 403
+        # An Admin can log in but must not be able to create another Admin.
+        self._auth_as(ADMIN_PHONE, ADMIN_SECRET)
+        response = self.post("/api/sales_admin/admins", json=payload)
+        assert response.status_code == 403
 
         self._auth_as(SUPERUSER_PHONE, SUPERUSER_SECRET)
         response = self.post("/api/sales_admin/admins", json=payload)
         assert response.status_code == 201, response.text
-
-    def test_only_admin_or_superuser_can_create_salesperson(self):
-        """tests/integration/test_users_management.py::UserManagementTest::test_only_admin_or_superuser_can_create_salesperson"""
-        payload = {
-            "name": "Blocked Person",
-            "phone_number": "9000000088",
-            "city": PUNE_CITY_ID,
-        }
-        self._auth_as(PLAIN_PHONE, PLAIN_SECRET)
-        response = self.post("/api/sales_admin/sales-people", json=payload)
-        assert response.status_code == 403
 
     # -- admin creation ---------------------------------------------------------
 

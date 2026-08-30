@@ -18,6 +18,7 @@
 #   bash scripts/run.sh test         # All tests (in web container)
 #   bash scripts/run.sh test-unit    # Only non-integration tests (in web container)
 #   bash scripts/run.sh test-dml     # DML-seeded Django tests (in web container)
+#   bash scripts/run.sh test-integration [node]  # Live-server integration tests (in web container)
 #   bash scripts/run.sh lint         # ruff check (in web container)
 #   bash scripts/run.sh typecheck    # mypy (in web container)
 #   bash scripts/run.sh hooks        # Install git pre-commit hooks (ruff lint)
@@ -49,6 +50,7 @@ if [[ -z "$COMMAND" ]]; then
     echo "  test        Run all tests in web container"
     echo "  test-unit   Run unit tests in web container"
     echo "  test-dml    Run DML-seeded Django tests in web container"
+    echo "  test-integration [node]   Run live-server integration tests (default: tests/integration)"
     echo "  lint        Run ruff check in web container"
     echo "  typecheck   Run mypy in web container"
     echo "  hooks       Install git pre-commit hooks (ruff lint)"
@@ -230,9 +232,10 @@ webrun() {
 
 cmd_test_unit() {
     echo "[test-unit] Running unit tests in web container ..."
-    # --ignore stops pytest from even importing the integration modules, so a
-    # stale/missing tests/integration can never break a unit-only run.
-    webrun python -m pytest -m "not integration" --ignore=tests/integration -v
+    # Explicit file list (no DB needed): pointless to let ./tests/ drift into
+    # unit runs, and --ignore stops pytest from importing a missing/stale
+    # tests/integration module (which previously broke unit collection).
+    webrun python -m pytest tests/test_sample.py tests/test_expiring_token.py -v
 }
 
 cmd_test_dml() {
@@ -240,8 +243,26 @@ cmd_test_dml() {
     webrun python -m pytest tests/test_verify_otp_view.py tests/test_auth_flow.py -v
 }
 
+cmd_test_integration() {
+    local node="${1:-tests/integration}"
+    if [[ -z "$node" ]]; then
+        node="tests/integration"
+    fi
+    shift 2>/dev/null || true
+    # Split the node on whitespace so a single task input can name several
+    # tests, e.g. "tests/a.py::C::t1 tests/a.py::C::t2".
+    local -a targets
+    read -r -a targets <<< "$node"
+    echo "[test-integration] Running pytest in web container: ${targets[*]}"
+    echo "[test-integration] This builds the django_test DB, starts a live server,"
+    echo "[test-integration] and exercises the real HTTP endpoints."
+    webrun python -m pytest "${targets[@]}" -v "$@"
+}
+
 cmd_test() {
     cmd_test_unit
+    cmd_test_dml
+    cmd_test_integration
 }
 
 # ---------------------------------------------------------------------------
@@ -283,6 +304,7 @@ case "$COMMAND" in
     test)       cmd_test ;;
     test-unit)  cmd_test_unit ;;
     test-dml)   cmd_test_dml ;;
+    test-integration)  cmd_test_integration "$@" ;;
     lint)       cmd_lint ;;
     typecheck)  cmd_typecheck ;;
     hooks)      cmd_hooks ;;
