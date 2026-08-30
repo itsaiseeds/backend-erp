@@ -4,10 +4,6 @@ pythonpath = ["."]
 # Collect both Test-prefixed classes (pytest default) and PascalCase classes
 # that end in "Test" (e.g. AuthFlowTest), matching the project's file naming.
 python_classes = ["Test*", "*Test"]
-markers = [
-    "integration: live-server tests against a real Postgres built from sql/ddl.sql + sql/dml.sql",
-]
-
 [tool.ruff]
 line-length = 100
 target-version = "py311"

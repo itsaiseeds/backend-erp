@@ -24,8 +24,8 @@
 | **Image** | `postgres:18` |
 | **Port** | 5432 (mapped to host for DBeaver access) |
 | **Volume** | `postgres_data:/var/lib/postgresql` (persistent) |
-| **Healthcheck** | `pg_isready -U django -d django` every 5s |
-| **Timezone** | UTC (forced via `postgres -c timezone=UTC`) |
+| **Command** | `postgres -c timezone=UTC -c shared_buffers=128MB` (caps shared buffers so Postgres doesn't auto-tune to ~25% of host RAM and OOM small CI runners) |
+| **Healthcheck** | `pg_isready -U django -d django` (5s interval) |
 
 ---
 
@@ -155,6 +155,21 @@ docker compose exec db psql -U django -d django
 
 ---
 
+## Container entrypoint (`scripts/entrypoint.sh`)
+
+At startup the container does (in order):
+
+1. `collectstatic --noinput`
+2. `createsuperuser_if_not_exists` (idempotent)
+3. Start the server:
+   - `DEBUG` truthy (as in `.env.dev`) → `python manage.py runserver 0.0.0.0:8000`
+     (dev live reload, works on the bind mount)
+   - otherwise → `gunicorn --workers ${GUNICORN_WORKERS:-1} --threads ${GUNICORN_THREADS:-4} config.wsgi:application`
+
+**`migrate` is commented out** — the schema is pre-applied SQL (see
+`skills/database.md`). Invoked via `bash` so it needs no `+x` bit:
+`ENTRYPOINT ["bash", "scripts/entrypoint.sh"]`.
+
 ## Dockerfile
 
 ```dockerfile
@@ -170,14 +185,14 @@ ENV POSTGRES_USER=django
 ENV POSTGRES_PASSWORD=placeholder
 ENV POSTGRES_HOST=localhost
 ENV POSTGRES_PORT=5432
-RUN python manage.py collectstatic --noinput
 EXPOSE 8000
-ENTRYPOINT ["scripts/entrypoint.sh"]
+ENTRYPOINT ["bash", "scripts/entrypoint.sh"]
 ```
 
 - Flutter build (`web/build/web/`) is committed to git — no Flutter SDK in Docker
+- `collectstatic` / `migrate` **do not run during the build** (the DB isn't
+  reachable from the build context); the entrypoint runs them at startup
 - Good layer caching: `requirements.txt` copied and installed before project code
-- `collectstatic` runs during build with dummy DB env vars
 
 ---
 
@@ -204,5 +219,8 @@ The `web` service waits for this via `depends_on: condition: service_healthy`.
 
 - **Volume mount** — `.:/app` means local file changes are reflected immediately in the container.
 - **`postgres_data` volume** — persists even after `docker compose down`. Use `docker compose down -v` to destroy it.
-- **Timezone** — PostgreSQL is forced to UTC via `postgres -c timezone=UTC`.
+- **Timezone** — the `db` container runs with `timezone=UTC`; Django's app-level `TIME_ZONE` is `Asia/Kolkata` (set in `config/settings.py` + the DB `-c timezone` option).
+- **`shared_buffers=128MB`** — deliberate cap so Postgres doesn't OOM small CI runners.
+- **`migrate` is commented out of the entrypoint** — schema comes from the SQL files, never from migrations.
+- **Dev vs prod server** — DEBUG truthy runs `runserver` (auto-reload on the bind mount); prod runs gunicorn.
 - **Flutter build** — Run `bash scripts/run.sh flutter` locally before `docker compose build` if you've changed Flutter code.

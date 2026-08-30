@@ -38,8 +38,8 @@ jobs:
       - name: Run unit tests
         run: bash scripts/run.sh test-unit
 
-      - name: Run integration tests
-        run: bash scripts/run.sh test-integration
+      - name: Run DML-backed Django tests
+        run: bash scripts/run.sh test-dml
 
       - name: Lint
         run: bash scripts/run.sh lint

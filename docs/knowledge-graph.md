@@ -12,12 +12,17 @@
 ```mermaid
 graph TD
     subgraph RUNS["Runtime (docker compose)"]
-        GW["gunicorn :8000<br/>(scripts/entrypoint.sh)"] --> WSGI["config.wsgi"]
+        GW["entrypoint.sh<br/>(runserver in dev, gunicorn in prod)"] --> WSGI["config.wsgi"]
         WSGI --> URLS["config.urls"]
         DB[(PostgreSQL 18<br/>service: db)]
         URLS --> ADMIN["django /admin/"]
         URLS --> FL["Flutter web app<br/>/sales-admin/ (config/views.py)"]
-        URLS --> SCHEMA["/api/schema/ + /api/docs/<br/>(drf-spectacular)"]
+        URLS --> SCHEMA["/api/schema/ + /api/docs/<br/>(drf-spectacular, superuser)"]
+    end
+
+    subgraph AUTHCLASSES["Shared auth (api/authentication.py)"]
+        SESSAUTH["SessionAuthentication<br/>(sales admin — cookie, 401 semantics)"]
+        EXPTAUTH["ExpiringTokenAuthentication<br/>(Android — bearer token, 24h TTL)"]
     end
 
     subgraph API["API layer (api/)"]
@@ -28,9 +33,11 @@ graph TD
         SA --> ADMV["AdminsView (superuser)"]
         SA --> SPLV["SalesPeopleView (admin/superuser)"]
         APIROOT --> AND["/api/android/v1/ (empty)"]
+        APIROOT --> TSENTRY["TestSentryView<br/>(/api/test-sentry/, superuser)"]
         ADMINV["AdminApiView (session)"] --> BASE["BaseApiView<br/>(auth flags)"]
         ANDV["AndroidBaseView (token)"] --> BASE
-        OTPREQ -. pre-auth .-> DB
+        SESSAUTH --> BASE
+        EXPTAUTH --> BASE
         OTPVER -. pre-auth .-> DB
     end
 
@@ -38,35 +45,58 @@ graph TD
         U["User (custom user)"]
         U --> ADMINP["Admin (1:1)"]
         U --> SPP["SalesPerson (1:1)"]
-        U --> MV["MobileVerification (OTP)"]
+    end
+
+    subgraph AGG["Domain (aggregator/)"]
+        CTRY["Country"]
+        ST["State"]
+        CIT["City"]
+        PIN["Pincode"]
+        ADDR["Address"]
+        CTRY --> ST
+        ST --> CIT
+        CIT --> PIN
+        CIT --> ADDR
+        ST --> ADDR
+        CTRY --> ADDR
+        PIN --> ADDR
+        SPP --> CIT
     end
 
     subgraph COMMON["Reusable bases (common/)"]
         TS["TimeStampedModel"]
         SD["SoftDeletedModel"]
+        CB["CreatedByModel"]
         PID["PublicIdModel (idle)"]
         RID["RandomIdModel (idle)"]
     end
 
     subgraph DATA["Schema (sql/)"]
-        DDL["ddl.sql (full schema)"]
-        DML["dml.sql (content types + perms)"]
+        DDL["ddl.sql (full schema, all apps)"]
+        DML["dml.sql (content types + perms + seed users)"]
+        APF["admin_perf.sql (pg_trgm admin indexes)"]
+        S24["session_auth_24h.sql (prod FK + TTL indexes)"]
     end
 
     DB --> DATA
-    OTPREQ --> MV
-    OTPVER --> MV
-    MV --> U
     ADMINP --> U
     SPP --> U
-    U --> TS
     ADMINP --> SD
+    ADMINP --> CB
     SPP --> SD
-    MV --> TS
+    SPP --> CB
+    ADDR --> CB
+    CTRY --> CB
+    ST --> CB
+    CIT --> CB
+    PIN --> CB
+    U --> TS
+    ADMINP --> TS
+    SPP --> TS
 
     subgraph QA["Quality (pytest → CI)"]
-        UNIT["tests/test_sample.py"]
-        IT["tests/integration/ (builds django_test from DDL+DML)"]
+        UNIT["tests/ (unit: sample, expiring token)"]
+        IT["tests/integration/ (django_test from ddl+dml)"]
         CI["GitHub Actions: Tests / test<br/>gate on PR → master"]
     end
     IT --> DB
@@ -80,27 +110,28 @@ graph TD
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `web` service | `docker-compose.yml`, `Dockerfile` | Python 3.14-slim image; `python:3.14-slim`; bind-mounts repo at `/app`; port 8000 | starts → `scripts/entrypoint.sh`; depends_on → `db` (healthy) |
-| `db` service | `docker-compose.yml` | PostgreSQL 18, port 5432, named volume `postgres_data`; `pg_isready` healthcheck; `shared_buffers=128MB` | provider ← web, tests, DBeaver |
-| Container entrypoint | `scripts/entrypoint.sh` | Starts collectstatic → `createsuperuser_if_not_exists` → gunicorn. **Migrations are commented out** (schema is pre-applied). Invoked via `bash` (Dockerfile `ENTRYPOINT ["bash", ...]`) so it needs no `+x` | runs → gunicorn `config.wsgi` |
+| `web` service | `docker-compose.yml`, `Dockerfile` | Python 3.14-slim image; bind-mounts repo at `/app`; port 8000 | starts → `scripts/entrypoint.sh`; depends_on → `db` (healthy) |
+| `db` service | `docker-compose.yml` | PostgreSQL 18, port 5432, named volume `postgres_data`; `pg_isready` healthcheck; `shared_buffers=128MB`; timezone UTC | provider ← web, tests, DBeaver |
+| Container entrypoint | `scripts/entrypoint.sh` | Starts collectstatic → `createsuperuser_if_not_exists` → then runs **dev `runserver`** when `DEBUG=true` (live reload on bind mount) or **gunicorn** otherwise (`--workers`/`--threads` env). **`migrate` is commented out** — the whole schema is pre-applied SQL (see `sql/` below). Invoked via `bash` (Dockerfile `ENTRYPOINT ["bash", ...]`) so it needs no `+x` | runs → `config.wsgi` / `manage.py runserver` |
 | WSGI / ASGI | `config/wsgi.py`, `config/asgi.py` | Gunicorn hooks in here | → `config.urls` |
-| Root URLconf | `config/urls.py` | Mounts `/admin/`, `/api/`, `/api/schema|docs/`, `/sales-admin/...` catch-all | → `api/urls.py`, `config.views.flutter_catch_all`, drf-spectacular views |
+| Root URLconf | `config/urls.py` | Mounts `/admin/`, `/api/`, `/api/schema|docs/` (superuser-only), `/sales-admin/...` catch-all | → `api/urls.py`, `config.views.flutter_catch_all`, drf-spectacular views |
 | Flutter catch-all | `config/views.py` | Serves `web/build/web/` (committed build output) for all `/sales-admin/*` routes; SPA fallback to `index.html` | serves ← `web/` |
 
 ### Configuration
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `config/settings.py` | single settings module | env-driven; DRF default auth = Session+Token, default permission = `IsAuthenticated`; CORS allows credentials; timezone `Asia/Kolkata`; `AUTH_USER_MODEL = authentication.User`; `MIGRATION_MODULES` disables built-in-app migrations | configures → all apps; reads → env vars |
-| Superuser bootstrap | `config/management/commands/createsuperuser_if_not_exists.py` | Idempotent superuser create; dev fallback `9999999999/admin` when `DEBUG=True` | called by → entrypoint |
+| `config/settings.py` | single settings module | env-driven (`SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS` have fallbacks); DRF default auth = `SessionAuthentication` + `ExpiringTokenAuthentication`, permission `IsAuthenticated`; Argon2-first password hashers; `CONN_MAX_AGE=60` + `CONN_HEALTH_CHECKS` + db `timezone=Asia/Kolkata`; WhiteNoise static with `STATIC_ROOT=staticfiles`; `SESSION_COOKIE_AGE=86400` + `TOKEN_TTL_HOURS=24`; `CORS_ALLOW_CREDENTIALS`; Sentry init when `SENTRY_DSN` set and not DEBUG | configures → all apps; reads → env vars |
+| Superuser bootstrap | `config/management/commands/createsuperuser_if_not_exists.py` | Idempotent superuser create; dev fallback `9999999999/admin` when `DEBUG=True`; `DJANGO_SUPERUSER_*` env otherwise | called by → entrypoint |
 
 ### API layer
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `BaseApiView` | `api/views.py` | Flag-driven base (`auth_required`, `admin_required`, `superuser_required`) → DRF `authentication_classes`/`get_permissions()` | base ← `AdminApiView`, `AndroidBaseView`; also defines `fire_and_forget` (post-commit background thread) |
+| `BaseApiView` | `api/views.py` | Flag-driven base (`auth_required`, `admin_required`, `superuser_required`) → DRF `get_permissions()`; also defines `fire_and_forget` (post-commit background thread) | base ← `AdminApiView`, `AndroidBaseView` |
+| Shared auth classes | `api/authentication.py` | `SessionAuthentication` (DRF session but with a real `WWW-Authenticate` challenge so anonymous = **401**, not 403) + `ExpiringTokenAuthentication` (24h TTL via `TOKEN_TTL_HOURS`; an expired token is deleted on first use) | used by → base views + `settings.REST_FRAMEWORK` defaults |
 | `AdminApiView` | `api/admin.py` | Sales-admin website base: **session cookie** auth + requires `Admin` profile | → `BaseApiView`, `.permissions.IsAdminUser` |
-| `AndroidBaseView` | `api/android/base.py` | Salesperson Android base: **bearer TokenAuthentication** + requires `SalesPerson` profile | → `BaseApiView`, `.permissions.IsSalesPerson` |
+| `AndroidBaseView` | `api/android/base.py` | Salesperson Android base: **bearer `ExpiringTokenAuthentication`** + requires `SalesPerson` profile | → `BaseApiView`, `.permissions.IsSalesPerson` |
 | Permissions | `api/permissions.py` | `IsRolePermission` meta-class + `IsAdminUser`, `IsSuperUser`, `IsSalesPerson` | keyed off → `User.is_admin_user/is_superuser/is_salesperson` |
 | Top API router | `api/urls.py` | `/api/android/`, `/api/sales_admin/` | → namespace URLconfs |
 | `GenerateOTPView` | `api/sales_admin/GenerateOTPView.py` | `POST /api/sales_admin/auth/otp/request` — pre-auth, `AllowAny`; creates a `MobileVerification` challenge; deliberately vague response | creates → `MobileVerification`; looks up → `User` |
@@ -120,19 +151,31 @@ graph TD
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `User` | `authentication/models/User.py` | Custom user (`AbstractBaseUser` + `PermissionsMixin`); `phone_number` is `USERNAME_FIELD` (10 digits, no country code); password only for superusers; `created_by`/`verified_by` self-FK invariants (superuser must have both NULL); role helpers `role`, `is_salesperson`, `is_admin_user` | extends → `TimeStampedModel`; related ← `Admin`, `SalesPerson`, `MobileVerification` |
-| `Admin` | `authentication/models/Admin.py` | Application admin profile (1:1). Only a superuser may create one | extends → `TimeStampedModel`, `SoftDeletedModel`; 1:1 → `User` |
-| `SalesPerson` | `authentication/models/SalesPerson.py` | Salesperson profile (1:1). Only an Admin (or superuser) may create one | extends → `TimeStampedModel`, `SoftDeletedModel`; 1:1 → `User` |
-| `MobileVerification` | `authentication/models/MobileVerification.py` | OTP challenge: 6-digit secret, 5-min expiry, `is_used` flag; `generate_otp()` uses `secrets` | FK → `User`; extends → `TimeStampedModel`; read/written by → OTP views |
-| Admin site | `authentication/admin.py` | Registers `User`, `Admin`, `SalesPerson`, `MobileVerification`; unregisters stock `Group` admin | configures → Django `admin` |
+| `User` | `authentication/models/User.py` | Custom user (`AbstractBaseUser` + `PermissionsMixin`); `phone_number` is `USERNAME_FIELD` (10 digits, no country code); password only for staff; everyone else logs in via **TOTP authenticator app**; `created_by`/`verified_by` self-FK invariants (superusers self-reference); TOTP helpers (`generate_totp_secret`, `enable_totp`, `verify_totp`, provisioning URI); role helpers `role`, `is_salesperson`, `is_admin_user`, `is_verified_user`, `can_login_with_password` | extends → `TimeStampedModel`; related ← `Admin`, `SalesPerson` |
+| `Admin` | `authentication/models/Admin.py` | Application admin profile (1:1). Only a superuser may create one; `can_update_stock_count` flag | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
+| `SalesPerson` | `authentication/models/SalesPerson.py` | Salesperson profile (1:1). Only an Admin (or superuser) may create one; `city` FK | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User`; FK → `aggregator.City` |
+| Admin site | `authentication/admin.py` | Registers `User`, `Admin`, `SalesPerson`; enforces who may grant `Admin`/`SalesPerson` roles; unregisters stock `Group` admin | configures → Django `admin` |
 | Validator | `authentication/validators.py` | `^\d{10}$` 10-digit phone validator | used by → `User.phone_number` |
+
+### Domain — aggregator (geo master data)
+
+| Node | Path | Purpose | Edges |
+|---|---|---|---|
+| `Country` | `aggregator/models/Country.py` | `name` + `iso_code` (both unique, indexed); root of the geo hierarchy | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:N → `State` |
+| `State` | `aggregator/models/State.py` | `name` + optional `code`; unique `(country, name)` | 1:N → `City` |
+| `City` | `aggregator/models/City.py` | `name`; unique `(state, name)`; `country` property; `ordering = name` | 1:N → `Pincode`, `Address`; ← `SalesPerson.city` |
+| `Pincode` | `aggregator/models/Pincode.py` | `code`; unique `(city, code)`; `state`/`country` convenience properties | 1:N → `Address` |
+| `Address` | `aggregator/models/Address.py` | Denormalised pincode/city/state/country chain so any level can be listed/filtered; `clean()` validates the chain matches | FK → all four geo nodes |
+| aggregator admin | `aggregator/admin.py` | `SoftDeleteModelAdmin` + `autocomplete_fields`/`list_select_related` so related picks don't N+1 | configures → Django `admin` |
 
 ### Reusable bases — common
 
 | Node | Path | Purpose | Used by |
 |---|---|---|---|
-| `TimeStampedModel` | `common/models/timestamped.py` | `created_at` (`indian_now`) / `updated_at`; `indian_now()` = Asia/Kolkata localtime | `User`, `Admin`, `SalesPerson`, `MobileVerification` |
-| `SoftDeletedModel` | `common/models/soft_deleted.py` | Soft delete: `is_deleted`/`deleted_at`/`deleted_by`; managers `objects` (hide deleted) + `all_objects`; `delete()` requires `deleted_by` with the `delete_<model>` permission; `hard_delete()`, `restore()` | `Admin`, `SalesPerson` |
+| `TimeStampedModel` | `common/models/timestamped.py` | `created_at` (`indian_now`) / `updated_at`; `indian_now()` = Asia/Kolkata localtime | `User`, `Admin`, `SalesPerson`, aggregator models |
+| `CreatedByModel` | `common/models/created_by.py` | `created_by` user audit FK (`PROTECT`, auto-filled with `request.user` by `AuditFieldsAdminMixin` if you use ModelAdmin) | `Admin`, `SalesPerson`, all aggregator models |
+| `SoftDeletedModel` | `common/models/soft_deleted.py` | Soft delete: `is_deleted`/`deleted_at`/`deleted_by`; managers `objects` (hide deleted) + `all_objects`; `delete()` requires `deleted_by` with the `delete_<model>` permission; `hard_delete()`, `restore()` | `Admin`, `SalesPerson`, aggregator models |
+| Admin helpers | `common/admin.py`, `common/models/` | `AuditFieldsAdminMixin` (read-only audit fieldsets, auto `created_by`) + `SoftDeleteModelAdmin` (soft delete through the admin) | aggregator + auth admins |
 | `PublicIdModel` | `common/models/public_id.py` | 12-char `public_id` for user-facing refs (intended for orders/invoices) | (no concrete use yet) |
 | `RandomIdModel` | `common/models/random_id.py` | random `UUIDField` column | (no concrete use yet) |
 
@@ -140,9 +183,11 @@ graph TD
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `sql/ddl.sql` | full schema | All tables: Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`) + `authentication_*` + `authtoken_token`. **Dev-only reference**; prod schema applied manually on Neon | consumed by → `reload_db.sh`, `integration_db.sh`, integration tests |
-| `sql/dml.sql` | seed data | Content types + permissions (idempotent `ON CONFLICT DO NOTHING`, `setval()` sequence resets, wrapped in txn). Superuser NOT seeded here | consumed by → same as above |
-| `MIGRATION_MODULES` | `config/settings.py` | Project apps (`authentication`, `common`, `config`) keep real migrations; built-in apps are SQL-managed | drives → `migrate` behavior |
+| `sql/ddl.sql` | full schema | **Every** table — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), custom apps (`authentication_*`, `aggregator_*`), and `authtoken_token`. Dev/test reference; prod schema applied manually on Neon | consumed by → `reload_db.sh`, `integration_db.sh`, integration tests |
+| `sql/dml.sql` | seed data | Content types (14) + permissions (56, 4 per model) + **reconciliation superuser** `9999999999` (with TOTP secret `JBSWY3DPEHPK3PXP`) + a no-TOTP user `8888888888` for the negative-path test. Idempotent `ON CONFLICT DO NOTHING`, `setval()` sequence resets, wrapped in txn | consumed by → same as above |
+| `sql/admin_perf.sql` | prod DDL | `pg_trgm` extension + GIN trigram indexes on `authentication_user(name, email)` for Django admin `ILIKE` search | applied to → local/test DBs, Neon (manual) |
+| `sql/session_auth_24h.sql` | prod DDL | `authtoken_token.user_id` FK (DRF only adds it via migrate) + `created` index for the TTL expiry sweep | applied to → Neon (manual) |
+| `MIGRATION_MODULES` | `config/settings.py` | Disables migrations for built-in `django.*` apps via a dict comprehension (settings comment additionally states the project apps are schema-managed). **No migration files exist** — the repo has one empty `authentication/migrations/` dir. The *entire* schema is SQL-managed; integration tests run `manage.py migrate --fake` to mark the pre-built tables as applied | drives → `migrate` behaviour |
 
 ### Tooling & quality
 
@@ -151,8 +196,8 @@ graph TD
 | `scripts/run.sh` | single entry point | `build/up/down/restart/reload-db/logs/status/shell/psql/flutter/schema/test/test-unit/test-integration/lint/typecheck`. Tests/lint/typecheck run in **short-lived one-off `web` containers** (`compose run --rm --no-deps --entrypoint ""`) to avoid booting gunicorn | calls → `reload_db.sh`, `integration_db.sh`, compose |
 | `scripts/reload_db.sh` | local DB reload | `--step all/ddl/dml`; **local Docker Postgres only, never prod** | reads → `sql/ddl.sql`, `sql/dml.sql`, `.env.dev` |
 | `scripts/integration_db.sh` | test DB builder | Build/drop throwaway `django_test` DB from DDL+DML | consumed by integration tests (now via `tests/integration/base.py`) |
-| Unit tests | `tests/test_sample.py` | Sanity pytest | none |
-| Integration framework | `tests/integration/` | `base.py` (`IntegrationDbContext`, `LiveServer`, `IntegrationTestCase`) + `conftest.py` fixtures; builds `django_test` from `sql/ddl.sql`+`dml.sql`, `migrate --fake`, runs real `runserver` on `127.0.0.1:8001`, exercises HTTP via `requests.Session` | depends on → `db`; consumed by → `test_auth_flow.py` |
+| Unit tests | `tests/test_sample.py`, `tests/test_expiring_token.py` | Sanity pytest + token-TTL unit test | none |
+| Integration framework | `tests/integration/` | `base.py` (`IntegrationDbContext`, `LiveServer`, `IntegrationTestCase`) + `conftest.py` fixtures; builds `django_test` from `sql/ddl.sql`+`dml.sql`+`admin_perf.sql`, `migrate --fake`, runs real `runserver` on `127.0.0.1:8001`, exercises HTTP via `requests.Session` | depends on → `db`; consumed by → `test_sentry_probe.py` |
 | CI | `.github/workflows/tests.yml` | Builds images, starts `db`, runs `test-unit` + `test-integration` + `lint` in one-off containers | gate on → PRs to `master`; renders check `Tests / test` |
 | Branch protection | GitHub settings | `master` requires `Tests / test` to pass + PR review | enforced by → GitHub |
 | Skills | `skills/*.md`, `.agents/skills/run-tests/SKILL.md` | Domain knowledge + test-run instructions (node-id docstring convention) | read before editing |
@@ -163,37 +208,63 @@ graph TD
 erDiagram
     USER ||--o| ADMIN : "admin_profile (1:1)"
     USER ||--o| SALESPERSON : "salesperson_profile (1:1)"
-    USER ||--o{ MOBILEVERIFICATION : "mobile_verifications"
-    USER o|--o{ USER : "created_by / verified_by (self-FK)"
+    USER o|--o| USER : "created_by / verified_by (self-FK)"
+    SALESPERSON o|--o| CITY : "city FK"
+    COUNTRY ||--o{ STATE : "states"
+    STATE ||--o{ CITY : "cities"
+    CITY ||--o{ PINCODE : "pincodes"
+    CITY ||--o{ ADDRESS : "city"
+    STATE ||--o{ ADDRESS : "state"
+    COUNTRY ||--o{ ADDRESS : "country"
+    PINCODE ||--o{ ADDRESS : "pincode"
 
     USER {
         char phone_number "10 digits, unique, USERNAME_FIELD"
         char name
         email email
-        bool is_verified
-        bool is_staff is_superuser is_active
-        fk created_by nullable "NULL for superusers"
-        fk verified_by nullable "required when is_verified"
+        bool is_verified is_staff is_superuser is_active
+        bool totp_enabled
+        char totp_secret "base32, nullable"
+        fk created_by "self; superusers self-reference"
+        fk verified_by "required when is_verified"
         dt date_joined
     }
     ADMIN {
         fk user "1:1, CASCADE"
+        bool can_update_stock_count
+        fk created_by "PROTECT; acting request.user"
         bool is_deleted "soft delete"
-        dt deleted_at
-        fk deleted_by
     }
     SALESPERSON {
         fk user "1:1, CASCADE"
+        fk city "→ aggregator_city"
+        fk created_by "PROTECT; acting request.user"
         bool is_deleted "soft delete"
-        dt deleted_at
-        fk deleted_by
     }
-    MOBILEVERIFICATION {
-        fk user "CASCADE"
-        char phone_number "10 digits"
-        char otp "6 digits"
-        bool is_used
-        dt expires_at "created_at + 5min"
+    COUNTRY {
+        char name "unique"
+        char iso_code "unique, ISO 3166"
+    }
+    STATE {
+        char name "(country, name) unique"
+        char code "nullable, e.g. MH"
+        fk country "PROTECT"
+    }
+    CITY {
+        char name "(state, name) unique"
+        fk state "PROTECT"
+    }
+    PINCODE {
+        char code "(city, code) unique"
+        fk city "PROTECT"
+    }
+    ADDRESS {
+        char address_line_1
+        char address_line_2 "optional"
+        fk pincode "PROTECT"
+        fk city "PROTECT"
+        fk state "PROTECT"
+        fk country "PROTECT"
     }
 ```
 
@@ -201,7 +272,7 @@ erDiagram
 
 ```
 /                    -> 404
-/admin/              -> Django admin (authentication/admin.py)
+/admin/              -> Django admin (authentication/admin.py + aggregator/admin.py)
 /api/
 ├── sales_admin/
 │   ├── auth/otp/request   POST  GenerateOTPView          (AllowAny)
@@ -227,12 +298,18 @@ erDiagram
 ## 5. Data & schema flow
 
 ```
-models/*.py  --makemigrations-->  migrations/  --migrate(local only)-->  Docker DB
-                    \                                                    |
-                     \--(copy DDL from DBeaver)-->  Neon SQL Editor  <---/
-                                              (prod schema = manual SQL, never migrate)
+models/*.py ----(DBeaver: copy table DDL)---->  Neon SQL Editor (prod, manual)
+                    |
+                    v
+            sql/ddl.sql (full schema reference)
 
-sql/ddl.sql + sql/dml.sql ----reload_db.sh / integration tests---->  local Docker "django[_test]" DB
+sql/ddl.sql + sql/dml.sql + sql/admin_perf.sql
+    ----reload_db.sh / integration_db.sh / integration tests---->
+            local Docker "django" / "django_test" DB
+
+No migration files exist in the repo. `migrate` is commented out of the
+entrypoint; integration tests run `manage.py migrate --fake` to mark the
+pre-built SQL schema as applied.
 ```
 
 ## 6. Test & release flow
@@ -241,18 +318,25 @@ sql/ddl.sql + sql/dml.sql ----reload_db.sh / integration tests---->  local Docke
 feature branch → PR to master
   → GitHub Actions "Tests / test" (test-unit + test-integration + lint)
       ↑ branch protection blocks merge until it passes
-master merged → Render auto-deploy (Docker build))
-  → entrypoint: collectstatic → createsuperuser_if_not_exists → gunicorn
-  → keep-alive cron pings every 10 min
+master merged → Render auto-deploy (Docker build)
+  → entrypoint: collectstatic → createsuperuser_if_not_exists → runserver (dev) / gunicorn (prod)
+  → keep-alive cron pings every 10 min (prevents cold starts)
 ```
 
 ## 7. Gotchas / invariants
 
-- Project apps run **real migrations**; built-in `django.*` apps are **SQL-managed** in `sql/ddl.sql`.
+- **No migrations anywhere.** The whole schema is SQL-managed: `sql/ddl.sql`
+  covers every table, `migrate` is commented out of the entrypoint, and tests
+  use `manage.py migrate --fake` against the pre-built DDL.
 - Prod (Neon) schema is applied **manually** — never rely on `migrate` in prod; never run `reload_db.sh` against prod.
 - `web/build/web/` (Flutter) is **committed**; rebuild with `bash scripts/run.sh flutter` before pushing Flutter changes.
 - Tests never boot gunicorn: they run in one-off containers and integration tests start their own `runserver` on `127.0.0.1:8001`.
-- Every test docstring must state its runnable pytest node id (see `.agents/skills/run-tests/SKILL.md`).
+- **Auth/TOTP:** non-staff users log in with an **authenticator app (TOTP)**, not SMS/OTP. Only `POST /api/sales_admin/auth/otp/verify` exists — there is no `otp/request`.
+- **Role creation:** only superusers can create Admins; superusers *and* Admins can create SalesPeople. `VerifyOTPView` exposes this to the SPA via `can_create_admin` / `can_create_sales_person`.
+- **Token TTL:** bearer tokens die `TOKEN_TTL_HOURS` (24) after their last "login"; `ExpiringTokenAuthentication` deletes an expired token on first use so the next request forces a fresh login. Session cookies share the same 24h through `SESSION_COOKIE_AGE`.
+- **401 vs 403:** the custom `SessionAuthentication`/`ExpiringTokenAuthentication` return a `WWW-Authenticate` challenge header, which is what keeps anonymous calls a **401** instead of DRF's default 403.
+- **CSRF is *not* enforced by the global middleware on DRF routes** (view handlers are `csrf_exempt`); only DRF `SessionAuthentication` enforces it, so the sales-admin SPA must send the `csrftoken` cookie value as `X-CSRFToken` on every session-authenticated POST/PUT/PATCH/DELETE.
+- **Sentry/GlitchTip** only initialises when `SENTRY_DSN` is set and `DEBUG` is false; `/api/test-sentry/` is the wired-up probe.
 - `api/admin.py` = `AdminApiView` base, not Django admin.
 - Creating an **Admin** automatically creates a **fallback `SalesPerson`** for the same user.
 - **Salespersons carry only `city`** — **admins carry neither `city` nor `address`**; any such keys sent to the endpoints are ignored and never persisted, and response payloads never expose `user_id`/`is_deleted`/`deleted_by`.
