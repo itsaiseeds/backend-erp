@@ -178,4 +178,5 @@ holds production/Neon secrets.
 
 - [Knowledge graph — codebase map](docs/knowledge-graph.md)
 - [Skills index](skills.md) — setup, database, conventions, Docker, Django
+
 - [API reference](docs/api/openapi.yml) / [Swagger UI](http://localhost:8000/api/docs/)
