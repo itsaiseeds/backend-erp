@@ -59,6 +59,9 @@ class AuthFlowTest(IntegrationTestCase):
         payload = response.json()
         assert payload["token"]
         assert payload["user"]["phone_number"] == SUPERUSER_PHONE
+        # Superusers can create both admins and sales people.
+        assert payload["can_create_admin"] is True
+        assert payload["can_create_sales_person"] is True
 
     def test_totp_verify_wrong_code(self):
         """tests/integration/test_auth_flow.py::AuthFlowTest::test_totp_verify_wrong_code"""

@@ -70,5 +70,7 @@ class VerifyOTPView(APIView):
                     "phone_number": user.phone_number,
                     "role": user.role,
                 },
+                "can_create_admin": user.is_superuser,
+                "can_create_sales_person": user.is_superuser or user.is_admin_user,
             }
         )
