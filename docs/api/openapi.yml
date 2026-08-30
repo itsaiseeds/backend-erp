@@ -143,8 +143,49 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/utilities/cities:
+    get:
+      operationId: utilities_cities_list
+      description: Public city look-up for the state -> city pickers.
+      summary: List cities of a state
+      parameters:
+      - in: query
+        name: state
+        schema:
+          type: string
+        description: State name (case-insensitive), e.g. 'Maharashtra'.
+        required: true
+      tags:
+      - utilities
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/City'
+          description: ''
+        '400':
+          description: The 'state' query parameter is required.
+        '404':
+          description: No state matched the given name.
 components:
   schemas:
+    City:
+      type: object
+      description: Output shape for one city row (schema only; responses are built
+        by hand).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     CreateAdmin:
       type: object
       description: |-
