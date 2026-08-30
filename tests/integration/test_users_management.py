@@ -207,6 +207,16 @@ class UserManagementTest(IntegrationTestCase):
     def test_list_admins_skips_soft_deleted(self):
         """tests/integration/test_users_management.py::UserManagementTest::test_list_admins_skips_soft_deleted"""
         self._auth_as(SUPERUSER_PHONE, SUPERUSER_SECRET)
+        created = self.post(
+            "/api/sales_admin/admins",
+            json={
+                "name": "Vikram Kumar",
+                "phone_number": "9000000050",
+                "city": PUNE_CITY_ID,
+            },
+        )
+        assert created.status_code == 201, created.text
+
         response = self.get("/api/sales_admin/admins")
         assert response.status_code == 200
         admins = response.json()
@@ -260,6 +270,16 @@ class UserManagementTest(IntegrationTestCase):
     def test_list_sales_people(self):
         """tests/integration/test_users_management.py::UserManagementTest::test_list_sales_people"""
         self._auth_as(ADMIN_PHONE, ADMIN_SECRET)
+        created = self.post(
+            "/api/sales_admin/sales-people",
+            json={
+                "name": "Ramesh Patil",
+                "phone_number": "9000000051",
+                "city": PUNE_CITY_ID,
+            },
+        )
+        assert created.status_code == 201, created.text
+
         response = self.get("/api/sales_admin/sales-people")
         assert response.status_code == 200
         people = response.json()
