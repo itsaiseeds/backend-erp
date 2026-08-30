@@ -5,7 +5,8 @@ Backend API for the SaiSeeds **sales-administration web app** (Flutter) and the 
 - **Django** 5.2 LTS + **Django REST Framework** REST API
 - **PostgreSQL** 18 via **Docker Compose** locally, **Neon** (serverless Postgres) in production
 - **Flutter** admin web app served by the same Django process
-- **OTP-based** authentication (no passwords for non-superusers; superusers log in with password / Django admin)
+- **OTP-based** authentication: everyone except staff logs in with a **TOTP
+  code from an authenticator app** (no passwords); staff use the Django admin password login
 - Auto-generated **OpenAPI/Swagger** docs, container-native **pytest** suite, **GitHub Actions** CI gating merges to `master`
 
 > Start with the **[knowledge graph](docs/knowledge-graph.md)** to navigate the
@@ -32,8 +33,9 @@ config/            Django project (settings, urls, wsgi, Flutter catch-all)
 api/               REST API: flag-driven base views, permissions, namespaces
   ├── sales_admin/     admin website endpoints (OTP auth flow)
   └── android/         Android app API (v1, being built)
-authentication/    Custom user + Admin / SalesPerson / MobileVerification models
-common/            Abstract base models (timestamps, soft delete, public/random id)
+authentication/    Custom user + Admin / SalesPerson models (TOTP login)
+aggregator/        Geo master data: Country / State / City / Pincode / Address
+common/            Abstract base models + admin mixes (timestamp, soft delete, created_by)
 sql/               ddl.sql (full schema) + dml.sql (seed data) — dev reference
 scripts/           run.sh (all commands), reload_db.sh, entrypoint.sh, integration_db.sh
 tests/             pytest: unit + live-server integration suite
@@ -100,7 +102,7 @@ containers — the host Python never needs Django (start the `db` service with
 | Unit only | `bash scripts/run.sh test-unit` |
 | All integration | `bash scripts/run.sh test-integration` |
 | One class | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest` |
-| One test | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest::test_generate_otp_returns_200` |
+| One test | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest::test_totp_verify_returns_token` |
 | Lint / typecheck | `bash scripts/run.sh lint` / `bash scripts/run.sh typecheck` |
 
 Integration tests build a throwaway `django_test` DB from `sql/ddl.sql` +
@@ -116,15 +118,19 @@ node id, e.g. `tests/integration/test_auth_flow.py::AuthFlowTest`).
 
 ## Database & schema management
 
-Hybrid model: **Django migrations for project apps** (`authentication`, `common`,
-`config`), **raw SQL for built-in Django apps** (`sql/ddl.sql` + `sql/dml.sql`,
-controlled by `MIGRATION_MODULES`).
+**Raw SQL only.** There are no migration files — `sql/ddl.sql` is the
+full-schema reference for every app (built-in and project), and `sql/dml.sql`
+seeds content types, permissions, and reconciliation users.
 
-- Local schema: `makemigrations` + `migrate`, or `bash scripts/reload_db.sh --step all`.
-- **Production (Neon) schema is manual SQL only** — `migrate` never changes prod.
-  Changes flow: edit model → migrate locally → copy the DDL from DBeaver → apply
-  it manually to the Neon write replica. Breaking changes: prepare data, **deploy
-  code first**, apply the DDL **last**.
+- Local schema changes: edit the model → update `sql/*.sql` →
+  `bash scripts/reload_db.sh --step all`.
+- **Production (Neon) schema is manual SQL only** — `migrate` never changes prod
+  (it is commented out of the entrypoint; tests use `migrate --fake` against the
+  pre-built DDL schema). Changes flow: edit model → update `sql/ddl.sql` →
+  copy the DDL from DBeaver → apply it manually to the Neon write replica.
+  Breaking changes: prepare data, **deploy code first**, apply the DDL **last**.
+- Additional prod DDL lives in `sql/admin_perf.sql` (admin `ILIKE` indexes) and
+  `sql/session_auth_24h.sql` (token FK + TTL indexes).
 - `reload_db.sh` targets **local Docker PostgreSQL only** and can never touch prod.
 
 See [skills/database.md](skills/database.md) for the full workflow.
@@ -132,11 +138,16 @@ See [skills/database.md](skills/database.md) for the full workflow.
 ## Authentication model
 
 - Custom `User` with `phone_number` (10 digits) as the login username.
-- **OTP login** for everyone except superusers: `POST /api/sales_admin/auth/otp/request`
-  then `POST /api/sales_admin/auth/otp/verify` (returns a DRF `Token`).
-- Rolles: **superuser** (password, Django admin), **Admin** (session cookie on the
-  web app), **SalesPerson** (bearer token on Android). Role gates live in
-  `api/permissions.py` and the flag-driven `BaseApiView`.
+- Non-staff users log in with a **TOTP code**: `POST
+  /api/sales_admin/auth/otp/verify` (body `phone_number` + `otp`) returns a DRF
+  `Token`, opens a browser session (`sessionid` + `csrftoken` cookies), and
+  reports the SPA's role-creation rights (`can_create_admin`,
+  `can_create_sales_person`). There is no SMS/OTP request endpoint.
+- Roles: **superuser** (Django admin password + TOTP), **Admin** (session cookie
+  on the web app, only superusers create them), **SalesPerson** (bearer token on
+  Android, superusers *and* Admins create them). Role gates live in
+  `api/permissions.py` and the flag-driven `BaseApiView`; bearer tokens expire
+  after `TOKEN_TTL_HOURS` (24h).
 
 ## CI/CD & release
 

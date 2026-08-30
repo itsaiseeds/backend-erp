@@ -32,6 +32,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyOTP'
           description: ''
+  /api/test-sentry/:
+    get:
+      operationId: test_sentry_retrieve
+      description: |-
+        Force a 500 so its traceback is captured by error tracking.
+
+        Only a Django superuser may call it, to stop the public-facing endpoint
+        from being exploited as a free exception spammer.
+      tags:
+      - test-sentry
+      security:
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: test_sentry_create
+      description: |-
+        Force a 500 so its traceback is captured by error tracking.
+
+        Only a Django superuser may call it, to stop the public-facing endpoint
+        from being exploited as a free exception spammer.
+      tags:
+      - test-sentry
+      security:
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
 components:
   schemas:
     VerifyOTP:
@@ -60,3 +89,9 @@ components:
       required:
       - otp
       - phone_number
+  securitySchemes:
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"

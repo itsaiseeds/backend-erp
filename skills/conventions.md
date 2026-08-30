@@ -9,13 +9,18 @@
 ```
 backend-erp/
 ├── config/             # Django project package (settings, urls, wsgi)
+├── api/                # REST API (base views, permissions, sales_admin + android namespaces)
+├── authentication/     # Custom User + Admin / SalesPerson models + admin site
+├── aggregator/         # Geo master data (Country/State/City/Pincode/Address)
+├── common/             # Abstract bases + admin mixins (timestamps, soft delete, created_by)
 ├── scripts/            # Shell scripts (reload_db.sh, run.sh, entrypoint.sh)
-├── sql/                # Raw SQL files (ddl.sql, dml.sql)
+├── sql/                # Full-schema + seed + prod-DDL files (ddl.sql, dml.sql, admin_perf.sql, session_auth_24h.sql)
 ├── skills/             # Project knowledge base
 ├── web/                # Flutter admin web app
 │   ├── lib/            # Flutter source code
 │   └── build/web/      # Flutter build output (committed to git)
-├── tests/              # pytest tests
+├── tests/              # pytest tests (unit + integration)
+├── docs/               # knowledge graph + auto-generated OpenAPI spec
 ├── skills.md           # Skills index
 ├── .env                # Production env (gitignored)
 ├── .env.dev            # Local dev env (committed)
@@ -40,25 +45,31 @@ backend-erp/
 ## Database Conventions
 
 ### Schema
-- Project apps (`authentication`, `common`, `config`) use **Django migrations** — run `makemigrations` + `migrate` locally
-- Built-in Django apps use **raw SQL** in `sql/ddl.sql` (their migrations stay disabled)
-- For built-in apps: always use `CREATE TABLE IF NOT EXISTS`, `BIGSERIAL` PKs, indexes on FK columns, wrap in `BEGIN`/`COMMIT`, reference tables first
-- Prod (Neon) schema is applied **manually** — migrate runs only locally
+- The **entire schema is SQL-managed** — no migration files exist. `sql/ddl.sql`
+  is the full-schema reference for every app (built-in + project).
+- Always use `CREATE TABLE IF NOT EXISTS`, `BIGSERIAL` PKs, indexes on FK
+  columns, wrap in `BEGIN`/`COMMIT`, reference tables first.
+- Prod (Neon) schema is applied **manually** — copy DDL out of DBeaver (local
+  DB) and paste it into Neon; `migrate` is never part of the workflow.
 
 ### Seed Data (DML)
-- `sql/dml.sql` seeds reference data for built-in apps (content types + permissions)
+- `sql/dml.sql` seeds content types (14) + permissions (56) + reconciliation
+  users (superuser `9999999999` with TOTP, no-TOTP user `8888888888`).
 - Always use `ON CONFLICT DO NOTHING` for idempotency
 - Always reset sequences with `SELECT setval('table_id_seq', N);`
 - Wrap all statements in `BEGIN` / `COMMIT`
 - Dev only — never seed production
-- The superuser is created at runtime by `createsuperuser_if_not_exists` — do not seed it via SQL
+- `createsuperuser_if_not_exists` additionally guarantees a superuser on fresh
+  prod deploys (reads `DJANGO_SUPERUSER_*` or falls back to `9999999999/admin`
+  when `DEBUG`).
 
 ### Changing a table
 1. Edit the model
-2. `makemigrations` + `migrate` on local Docker
-3. Copy the changed table's DDL from DBeaver
-4. Apply the SQL manually to Neon (prod)
-5. Breaking changes: prepare data → deploy code first → apply the DDL last
+2. Update `sql/ddl.sql` (and `sql/dml.sql` / `sql/admin_perf.sql` as needed)
+3. Rebuild local: `bash scripts/reload_db.sh --step all`
+4. Copy the changed table's DDL from DBeaver
+5. Apply the SQL manually to Neon (prod)
+6. Breaking changes: prepare data → deploy code first → apply the DDL last
 
 ---
 
@@ -72,15 +83,25 @@ backend-erp/
 ### Apps
 - Use `python manage.py startapp <name>` to create
 - Add to `INSTALLED_APPS` in `config/settings.py`
-- Project apps get real migrations; built-in apps stay SQL-managed via `MIGRATION_MODULES`
+- Place the app at the project root (e.g. `/aggregator`)
+- All apps (built-in and project) are SQL-managed via `sql/ddl.sql`; there are no migration files
 
 ### Models
-- Project-app models define the real schema — generated via migrations
-- Prod schema is applied manually (local migrate → DBeaver DDL → Neon)
+- Project-app models define the real schema, mirrored in `sql/ddl.sql`
+- Prod schema is applied manually (edit model → update SQL → DBeaver DDL → Neon)
+
+### Auth / roles
+- Login is **TOTP** (authenticator app) for everyone except staff (Django admin
+  password login). There is no SMS/OTP request endpoint.
+- **Role creation:** only superusers can create Admins; superusers **and**
+  Admins can create SalesPeople. The SPA learns this from the
+  `can_create_admin` / `can_create_sales_person` fields on the TOTP login response.
+- Auth classes live in `api/authentication.py` (`SessionAuthentication`,
+  `ExpiringTokenAuthentication` with 24h TTL).
 
 ### URLs
 - Each app defines its own `urls.py`
-- Include app URLs in `config/urls.py`
+- Include app URLs in `api/urls.py` / `config/urls.py`
 
 ---
 
@@ -127,16 +148,15 @@ backend-erp/
 
 ## Anti-Patterns to Avoid
 
-- Do not run `makemigrations` for a built-in `django.*` app — their schema is in `sql/ddl.sql`
+- Do not create migration files — the schema is managed entirely in `sql/ddl.sql`
 - Do not rely on prod running `migrate` to change the schema — apply it manually to Neon
 - Do not apply a breaking/restrictive DDL (e.g. `NOT NULL` constraint) before the code and data are ready — deploy first, alter last
 - Do not hardcode database credentials in Python files
-- Do not manage built-in-app schema outside of `sql/ddl.sql`; do not create built-in-app tables from migrations
-- Do not add built-in-app seed data outside of `sql/dml.sql`
 - Do not run DML/seed SQL against production
 - Do not commit `.env` (production secrets)
 - Do not push Flutter changes without rebuilding (`bash scripts/run.sh flutter`)
 - Do not install Flutter SDK in Docker — the build output is committed to git
+- Do not call `/api/test-sentry/` without a superuser account — it is there to probe error tracking
 
 ---
 
@@ -145,11 +165,13 @@ backend-erp/
 ### Framework
 - **pytest** + **pytest-django** — all tests go in `tests/`
 
-### Running tests
+### Running (via `scripts/run.sh`, inside the web container)
 ```bash
-pytest              # run all tests
-pytest -v           # verbose output
-pytest tests/test_sample.py   # run a specific file
+bash scripts/run.sh test               # unit + integration
+bash scripts/run.sh test-unit          # unit only
+bash scripts/run.sh test-integration   # integration only
+bash scripts/run.sh lint               # ruff
+bash scripts/run.sh typecheck          # mypy
 ```
 
 ### Writing tests
@@ -157,16 +179,12 @@ pytest tests/test_sample.py   # run a specific file
 - Test functions: `def test_<name>():`
 - Use `assert` for assertions (pytest style, not `unittest.TestCase`)
 - Keep tests simple and focused — one assertion per test when possible
+- Every test class/method docstring must state its copy/paste pytest node id
+  (see `.agents/skills/run-tests/SKILL.md`)
+- Integration tests use `tests/integration/base.py` helpers and build a
+  throwaway `django_test` DB from `sql/ddl.sql` + `dml.sql` (then `migrate --fake`)
 
 ### CI
-- GitHub Actions runs `pytest` on every PR to `master`
-- PRs cannot merge if tests fail
-- Enable branch protection: require the `tests` status check to pass
-
-### Where to put tests
-```
-tests/
-├── __init__.py
-├── test_sample.py       # trivial sanity tests
-└── test_<app_name>.py   # app-specific tests (when apps exist)
-```
+- `.github/workflows/tests.yml` runs `test-unit` + `test-integration` + `lint`
+  inside the web container on every PR to `master`
+- Branch protection requires the `Tests / test` check to pass
