@@ -464,8 +464,20 @@ ALTER TABLE public.aggregator_address ADD CONSTRAINT aggregator_address_created_
 ALTER TABLE public.aggregator_address DROP CONSTRAINT aggregator_address_deleted_by_id_dc377b3e_fk_authentic;
 ALTER TABLE public.aggregator_address ADD CONSTRAINT aggregator_address_deleted_by_id_dc377b3e_fk_authentic FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
--- authtoken_token.user (DRF Token): the created-schema never declared it; add
--- it now with the model-matching CASCADE.
 ALTER TABLE public.authtoken_token ADD CONSTRAINT authtoken_token_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.authentication_user(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE authentication_salesperson
+    ADD COLUMN city_id BIGINT NOT NULL,
+    ADD CONSTRAINT fk_salesperson_city
+        FOREIGN KEY (city_id)
+        REFERENCES aggregator_city (id)
+        ON DELETE RESTRICT;
+
+CREATE INDEX authentication_salesperson_city_id
+    ON authentication_salesperson (city_id);
+
+
+ALTER TABLE authentication_admin
+    ADD COLUMN can_update_stock_count boolean NOT NULL DEFAULT false;
 
 

@@ -32,28 +32,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyOTP'
           description: ''
-  /api/sales_admin/auth/totp/enroll:
-    post:
-      operationId: sales_admin_auth_totp_enroll_create
-      description: Generate and activate a TOTP secret for a user.
-      tags:
-      - sales_admin
-      security:
-      - cookieAuth: []
-      responses:
-        '200':
-          description: No response body
-  /api/sales_admin/auth/totp/verify-enroll:
-    post:
-      operationId: sales_admin_auth_totp_verify_enroll_create
-      description: Verify a code to activate the generated TOTP secret for a user.
-      tags:
-      - sales_admin
-      security:
-      - cookieAuth: []
-      responses:
-        '200':
-          description: No response body
 components:
   schemas:
     VerifyOTP:
@@ -82,8 +60,3 @@ components:
       required:
       - otp
       - phone_number
-  securitySchemes:
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: sessionid
