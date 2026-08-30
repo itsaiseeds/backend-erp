@@ -20,6 +20,10 @@ class TestSentryView(BaseApiView):
 
     superuser_required = True
 
+    # This view never returns a normal response (it always raises), so it cannot
+    # be introspected into the OpenAPI schema; exclude it entirely.
+    schema = None
+
     def get(self, request):
         raise ValueError("Sentry test exception from /api/test-sentry/")
 
