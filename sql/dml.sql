@@ -134,4 +134,47 @@ VALUES(2, '!unusable', NULL, false, '2026-08-27 23:52:53.878', '2026-08-27 23:52
 -- to the highest id to keep ORM/admin-created rows from colliding.
 SELECT setval('authentication_user_id_seq', 2, true);
 
+-- -------------------------------------------------------------------------
+-- Geography master data (country -> state -> city)
+-- Needed so admin/salesperson creation can pick a city. The single seed tree
+-- is also what the integration tests rely on (city ids drift with real data).
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_country
+(id, created_at, updated_at, is_deleted, deleted_at, "name", iso_code, created_by_id, deleted_by_id)
+VALUES(1, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', false, NULL, 'India', 'IN', 1, NULL);
+
+INSERT INTO public.aggregator_state
+(id, created_at, updated_at, is_deleted, deleted_at, "name", code, country_id, created_by_id, deleted_by_id)
+VALUES(1, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', false, NULL, 'Maharashtra', 'MH', 1, 1, NULL);
+
+INSERT INTO public.aggregator_city
+(id, created_at, updated_at, is_deleted, deleted_at, "name", created_by_id, deleted_by_id, state_id)
+VALUES(1, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', false, NULL, 'Pune', 1, NULL, 1);
+
+SELECT setval('aggregator_country_id_seq', 1);
+SELECT setval('aggregator_state_id_seq', 1);
+SELECT setval('aggregator_city_id_seq', 1);
+
+-- -------------------------------------------------------------------------
+-- Rolled-up users used by the integration tests
+--   * an application Admin (7777777777) with a known, enabled TOTP secret, and
+--   * a plain verified user (6666666666) with a known, enabled TOTP secret.
+-- Both authenticate over HTTP exactly like the seeded superuser above.
+-- -------------------------------------------------------------------------
+INSERT INTO public.authentication_user
+(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
+VALUES(3, '!unusable', NULL, false, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '7777777777', 'seed admin', 'seed-admin@example.com', 'KRSXG5CTMVRXEZLU', true, true, false, true, '2026-08-27 23:52:54.057', 1, 1);
+
+INSERT INTO public.authentication_user
+(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
+VALUES(4, '!unusable', NULL, false, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '6666666666', 'plain user', NULL, 'IJQXGZJTGMFWC3LN', true, true, false, true, '2026-08-27 23:52:54.057', 1, 1);
+
+SELECT setval('authentication_user_id_seq', 4, true);
+
+INSERT INTO public.authentication_admin
+(id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count)
+VALUES(1, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', false, NULL, NULL, 1, 3, true);
+
+SELECT setval('authentication_admin_id_seq', 1);
+
 COMMIT;

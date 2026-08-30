@@ -25,6 +25,8 @@ graph TD
         APIROOT --> SA["/api/sales_admin/"]
         SA --> OTPREQ["GenerateOTPView"]
         SA --> OTPVER["VerifyOTPView"]
+        SA --> ADMV["AdminsView (superuser)"]
+        SA --> SPLV["SalesPeopleView (admin/superuser)"]
         APIROOT --> AND["/api/android/v1/ (empty)"]
         ADMINV["AdminApiView (session)"] --> BASE["BaseApiView<br/>(auth flags)"]
         ANDV["AndroidBaseView (token)"] --> BASE
@@ -103,6 +105,10 @@ graph TD
 | Top API router | `api/urls.py` | `/api/android/`, `/api/sales_admin/` | → namespace URLconfs |
 | `GenerateOTPView` | `api/sales_admin/GenerateOTPView.py` | `POST /api/sales_admin/auth/otp/request` — pre-auth, `AllowAny`; creates a `MobileVerification` challenge; deliberately vague response | creates → `MobileVerification`; looks up → `User` |
 | `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales_admin/auth/otp/verify` — pre-auth, `AllowAny`; validates OTP, marks used, returns DRF `Token` + user payload | reads → `MobileVerification`, `User`, `rest_framework.authtoken`; calls → `MobileVerification.mark_used()` |
+| `AdminsView` | `api/sales_admin/AdminsView.py` | `GET`/`POST /api/sales_admin/admins` — **superuser only**; POST creates a verified user + `Admin` profile + **fallback `SalesPerson`** in one transaction; GET lists (incl. soft-deleted) with dummy-filled payloads | reads → `Admin`, `SalesPerson`, `City`; calls → `create_verified_user`, `admin_payload` |
+| `SalesPeopleView` | `api/sales_admin/SalesPeopleView.py` | `GET`/`POST /api/sales_admin/sales-people` — admin OR superuser (`IsAdminOrSuperUser`); POST creates a verified user + `SalesPerson` profile; GET lists with dummy-filled payloads | reads → `SalesPerson`, `City`; calls → `create_verified_user`, `salesperson_payload` |
+| `sales_admin serializers` | `api/sales_admin/serializers.py` | Input validators (`CreateAdminSerializer`/`CreateSalesPersonSerializer`) + output payload builders; the only location data on a profile is `city` (no address/pincode) | used by → `AdminsView`, `SalesPeopleView` |
+| Sales admin routes | `api/sales_admin/urls.py` | Namespaced routes (`auth/otp/*`, `admins`, `sales-people`) | → `GenerateOTPView`, `VerifyOTPView`, `AdminsView`, `SalesPeopleView` |
 | Android v1 | `api/android/v1/urls.py` | Versioned namespace, currently empty (endpoints built out one module each) | — |
 
 > Naming gotcha: `api/admin.py` defines the **`AdminApiView` base controller**, not
@@ -196,8 +202,12 @@ erDiagram
 /admin/              -> Django admin (authentication/admin.py)
 /api/
 ├── sales_admin/
-│   ├── auth/otp/request   POST  GenerateOTPView         (AllowAny)
-│   └── auth/otp/verify    POST  VerifyOTPView          (AllowAny → Token)
+│   ├── auth/otp/request   POST  GenerateOTPView          (AllowAny)
+│   ├── auth/otp/verify    POST  VerifyOTPView            (AllowAny → Token)
+│   ├── admins             GET   AdminsView               (superuser; incl. soft-deleted)
+│   │                     POST   AdminsView               (superuser; also creates fallback SalesPerson)
+│   └── sales-people       GET   SalesPeopleView          (admin OR superuser)
+│                         POST   SalesPeopleView          (admin OR superuser)
 └── android/
     └── v1/                (empty — being built)
 /api/schema/         -> OpenAPI JSON   (drf-spectacular)
@@ -206,9 +216,11 @@ erDiagram
 ```
 
 > Auth model: default DRF global = `Session + Token` auth, `IsAuthenticated`.
-> Pre-auth endpoints (OTP) opt out with `authentication_classes = []` and
-> `permission_classes = [AllowAny]`. Client base views pick credentials:
-> admin → session cookie; android → bearer token.
+> Admin/salesperson management views accept both the **session cookie** and the
+> OTP-issued bearer **Token**. Pre-auth endpoints (OTP) opt out with
+> `authentication_classes = []` and `permission_classes = [AllowAny]`.
+> Client base views pick credentials: admin → session cookie; android → bearer
+> token.
 
 ## 5. Data & schema flow
 
@@ -240,5 +252,7 @@ master merged → Render auto-deploy (Docker build))
 - Tests never boot gunicorn: they run in one-off containers and integration tests start their own `runserver` on `127.0.0.1:8001`.
 - Every test docstring must state its runnable pytest node id (see `.agents/skills/run-tests/SKILL.md`).
 - `api/admin.py` = `AdminApiView` base, not Django admin.
+- Creating an **Admin** automatically creates a **fallback `SalesPerson`** for the same user.
+- Salespersons carry only a **`city`** reference — no address/pincode; the management payloads never emit an `address` block.
 
 _Keep this graph in sync when adding apps, endpoints, models, or schema flows._

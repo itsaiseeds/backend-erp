@@ -5,6 +5,59 @@ info:
   description: Backend API for the SaiSeeds sales admin website and salesperson Android
     app. Auto-generated from the codebase.
 paths:
+  /api/sales_admin/admins:
+    get:
+      operationId: sales_admin_admins_retrieve
+      description: |-
+        List (GET) or create (POST) application admins.
+
+        Restricted to superusers. ``authentication_classes`` keeps the session
+        cookie for the web app and accepts the bearer Token already issued by the
+        auth (OTP verify) flow.
+      tags:
+      - sales_admin
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAdmin'
+          description: ''
+    post:
+      operationId: sales_admin_admins_create
+      description: |-
+        List (GET) or create (POST) application admins.
+
+        Restricted to superusers. ``authentication_classes`` keeps the session
+        cookie for the web app and accepts the bearer Token already issued by the
+        auth (OTP verify) flow.
+      tags:
+      - sales_admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateAdminRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAdmin'
+          description: ''
   /api/sales_admin/auth/otp/verify:
     post:
       operationId: sales_admin_auth_otp_verify_create
@@ -32,8 +85,165 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyOTP'
           description: ''
+  /api/sales_admin/sales-people:
+    get:
+      operationId: sales_admin_sales_people_retrieve
+      description: |-
+        List (GET) or create (POST) sales people.
+
+        ``authentication_classes`` keeps the session cookie for the web app and
+        accepts the bearer Token already issued by the auth (OTP verify) flow.
+      tags:
+      - sales_admin
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSalesPerson'
+          description: ''
+    post:
+      operationId: sales_admin_sales_people_create
+      description: |-
+        List (GET) or create (POST) sales people.
+
+        ``authentication_classes`` keeps the session cookie for the web app and
+        accepts the bearer Token already issued by the auth (OTP verify) flow.
+      tags:
+      - sales_admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSalesPersonRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateSalesPersonRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateSalesPersonRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSalesPerson'
+          description: ''
 components:
   schemas:
+    CreateAdmin:
+      type: object
+      description: Validation for the fields shared by admin and salesperson creation.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          maxLength: 10
+        can_update_stock_count:
+          type: boolean
+          default: false
+        city:
+          type: integer
+          description: City for the fallback salesperson profile created with this
+            admin.
+      required:
+      - city
+      - name
+      - phone_number
+    CreateAdminRequest:
+      type: object
+      description: Validation for the fields shared by admin and salesperson creation.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        can_update_stock_count:
+          type: boolean
+          default: false
+        city:
+          type: integer
+          description: City for the fallback salesperson profile created with this
+            admin.
+      required:
+      - city
+      - name
+      - phone_number
+    CreateSalesPerson:
+      type: object
+      description: Validation for the fields shared by admin and salesperson creation.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          maxLength: 10
+        city:
+          type: integer
+      required:
+      - city
+      - name
+      - phone_number
+    CreateSalesPersonRequest:
+      type: object
+      description: Validation for the fields shared by admin and salesperson creation.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        city:
+          type: integer
+      required:
+      - city
+      - name
+      - phone_number
     VerifyOTP:
       type: object
       properties:
@@ -60,3 +270,13 @@ components:
       required:
       - otp
       - phone_number
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"
