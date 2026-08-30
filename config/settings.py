@@ -28,6 +28,19 @@ DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
 
 
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if SENTRY_DSN and not DEBUG:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=os.environ.get("SENTRY_ENV", "production"),
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.01")),
+        send_default_pii=False,
+        # Report login/logout sessions so downtimes correlate with user activity.
+        auto_session_tracking=True,
+    )
+
 
 # Application definition
 
@@ -104,6 +117,12 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        # Keep connections alive across requests instead of paying a fresh TLS
+        # handshake to the managed Postgres on every page load. This is the
+        # single biggest admin latency win in production. Set CONN_MAX_AGE=0 to
+        # opt out.
+        "CONN_MAX_AGE": int(os.environ.get("CONN_MAX_AGE", "60")),
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
             "options": "-c timezone=Asia/Kolkata",
         },
@@ -114,6 +133,18 @@ DATABASES = {
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+
+# Argon2 verifies ~5-10x faster than PBKDF2 and is more GPU-resistant, so every
+# new/updated password uses it. Old PBKDF2 hashes still verify (fallback order
+# below) until that account's password is next set or reset.
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+    'django.contrib.auth.hashers.ScryptPasswordHasher',
+    'django.contrib.auth.hashers.BCryptPasswordHasher',
+]
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -169,8 +200,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # admin = session, android = token. Override per-view where a flow differs.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
+        'api.authentication.SessionAuthentication',
+        'api.authentication.ExpiringTokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -181,6 +212,14 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
+# Bearer (persistent-login) tokens are valid for this many hours from creation.
+TOKEN_TTL_HOURS = int(os.environ.get("TOKEN_TTL_HOURS", "24"))
+
+# Web session cookies expire on the same 24h clock as the bearer tokens above,
+# so a browser session also dies ~1 day after login (see api/authentication.py).
+SESSION_COOKIE_AGE = 24 * 60 * 60
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 # OpenAPI / Swagger documentation (drf-spectacular)
 SPECTACULAR_SETTINGS = {

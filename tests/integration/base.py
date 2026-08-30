@@ -106,6 +106,11 @@ class IntegrationDbContext:
         )
         self._run_sql_file(self.db_name, SQL_DIR / "ddl.sql")
         self._run_sql_file(self.db_name, SQL_DIR / "dml.sql")
+        # Apply the admin search indexes (sql/admin_perf.sql) so the test DB
+        # matches prod schema. CREATE EXTENSION must be a standalone statement;
+        # the index DDL that follows it is transactional-safe.
+        self._execute(self.db_name, "CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+        self._run_sql_file(self.db_name, SQL_DIR / "admin_perf.sql")
 
     def wait_until_ready(self, timeout: int = DB_TIMEOUT_SECONDS) -> None:
         """Poll until the database accepts Django connections."""
@@ -149,6 +154,31 @@ class IntegrationDbContext:
             )
         except psycopg.Error:
             pass
+
+    def public_tables(self) -> list[str]:
+        """Names of every table in the test database's ``public`` schema."""
+        with self._connect(self.db_name) as conn:
+            rows = conn.execute(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+            ).fetchall()
+        return [str(row[0]) for row in rows]
+
+    def reset_baseline(self) -> None:
+        """Reset the test DB to the dml.sql baseline for a single test.
+
+        The live server + real Postgres are shared across the whole session, so
+        per-test isolation cannot use rolled-back transactions. Instead truncate
+        every table (schema is untouched) and re-seed dml.sql, so each test
+        begins with exactly the dml.sql state regardless of what earlier tests
+        wrote.
+        """
+        tables = ", ".join(f'"{table}"' for table in self.public_tables())
+        if not tables:
+            raise RuntimeError(
+                "No tables to reset; is the test database built?"
+            )
+        self._execute(self.db_name, f"TRUNCATE {tables} RESTART IDENTITY CASCADE")
+        self._run_sql_file(self.db_name, SQL_DIR / "dml.sql")
 
 
 class LiveServer:
