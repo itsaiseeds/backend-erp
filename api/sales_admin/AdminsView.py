@@ -14,25 +14,41 @@ from rest_framework.response import Response
 from api.admin import AdminApiView
 from authentication.models import Admin, SalesPerson
 
-from .serializers import CreateAdminSerializer, admin_payload, create_verified_user
+from .serializers import (
+    CreateAdminSerializer,
+    admin_payload,
+    create_address,
+    create_verified_user,
+)
 
 
 class AdminsView(AdminApiView):
     """List (GET) or create (POST) application admins.
 
-    Restricted to superusers. ``authentication_classes`` keeps the session
-    cookie for the web app and accepts the bearer Token already issued by the
-    auth (OTP verify) flow.
+    Restricted to superusers. ``authentication_classes`` tries the bearer Token
+    issued by the auth (OTP verify) flow first, then falls back to the session
+    cookie for the web app. Token-first ordering matters: the OTP flow also
+    opens a browser session, so a token request that also carries the session
+    cookie must be authenticated as the token (and skip the session's CSRF
+    check), not rejected.
     """
 
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
     admin_required = False
     superuser_required = True
     serializer_class = CreateAdminSerializer
 
     def get(self, request):
         admins = (
-            Admin.all_objects.select_related("user", "created_by", "deleted_by")
+            Admin.all_objects.select_related(
+                "user",
+                "created_by",
+                "deleted_by",
+                "address__city",
+                "address__state",
+                "address__pincode",
+                "address__country",
+            )
             .order_by("-id")
         )
         return Response([admin_payload(admin) for admin in admins])
@@ -47,6 +63,7 @@ class AdminsView(AdminApiView):
             admin = Admin.objects.create(
                 user=user,
                 can_update_stock_count=data["can_update_stock_count"],
+                address=create_address(data.get("address"), actor=request.user),
                 created_by=request.user,
             )
             # Fallback salesperson so the account can always use the sales app.

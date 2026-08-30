@@ -16,6 +16,16 @@ class Admin(CreatedByModel, TimeStampedModel, SoftDeletedModel):
 
     can_update_stock_count = models.BooleanField(default=False)
 
+    address = models.OneToOneField(
+        "aggregator.Address",
+        verbose_name="address",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="admin_profile",
+        help_text="Full primary address of this admin (optional).",
+    )
+
     class Meta:
         verbose_name = "admin"
         verbose_name_plural = "admins"

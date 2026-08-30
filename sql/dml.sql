@@ -151,9 +151,14 @@ INSERT INTO public.aggregator_city
 (id, created_at, updated_at, is_deleted, deleted_at, "name", created_by_id, deleted_by_id, state_id)
 VALUES(1, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', false, NULL, 'Pune', 1, NULL, 1);
 
+INSERT INTO public.aggregator_pincode
+(id, created_at, updated_at, is_deleted, deleted_at, code, city_id, created_by_id, deleted_by_id)
+VALUES(1, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', false, NULL, '411001', 1, 1, NULL);
+
 SELECT setval('aggregator_country_id_seq', 1);
 SELECT setval('aggregator_state_id_seq', 1);
 SELECT setval('aggregator_city_id_seq', 1);
+SELECT setval('aggregator_pincode_id_seq', 1);
 
 -- -------------------------------------------------------------------------
 -- Rolled-up users used by the integration tests

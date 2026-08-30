@@ -105,9 +105,9 @@ graph TD
 | Top API router | `api/urls.py` | `/api/android/`, `/api/sales_admin/` | → namespace URLconfs |
 | `GenerateOTPView` | `api/sales_admin/GenerateOTPView.py` | `POST /api/sales_admin/auth/otp/request` — pre-auth, `AllowAny`; creates a `MobileVerification` challenge; deliberately vague response | creates → `MobileVerification`; looks up → `User` |
 | `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales_admin/auth/otp/verify` — pre-auth, `AllowAny`; validates OTP, marks used, returns DRF `Token` + user payload | reads → `MobileVerification`, `User`, `rest_framework.authtoken`; calls → `MobileVerification.mark_used()` |
-| `AdminsView` | `api/sales_admin/AdminsView.py` | `GET`/`POST /api/sales_admin/admins` — **superuser only**; POST creates a verified user + `Admin` profile + **fallback `SalesPerson`** in one transaction; GET lists (incl. soft-deleted) with dummy-filled payloads | reads → `Admin`, `SalesPerson`, `City`; calls → `create_verified_user`, `admin_payload` |
-| `SalesPeopleView` | `api/sales_admin/SalesPeopleView.py` | `GET`/`POST /api/sales_admin/sales-people` — admin OR superuser (`IsAdminOrSuperUser`); POST creates a verified user + `SalesPerson` profile; GET lists with dummy-filled payloads | reads → `SalesPerson`, `City`; calls → `create_verified_user`, `salesperson_payload` |
-| `sales_admin serializers` | `api/sales_admin/serializers.py` | Input validators (`CreateAdminSerializer`/`CreateSalesPersonSerializer`) + output payload builders; the only location data on a profile is `city` (no address/pincode) | used by → `AdminsView`, `SalesPeopleView` |
+| `AdminsView` | `api/sales_admin/AdminsView.py` | `GET`/`POST /api/sales_admin/admins` — **superuser only**; POST creates a verified user + `Admin` profile (with optional full `Address`) + **fallback `SalesPerson`** in one transaction; GET lists (incl. soft-deleted) | reads → `Admin`, `SalesPerson`, `City`, `Address`; calls → `create_verified_user`, `create_address`, `admin_payload` |
+| `SalesPeopleView` | `api/sales_admin/SalesPeopleView.py` | `GET`/`POST /api/sales_admin/sales-people` — admin OR superuser (`IsAdminOrSuperUser`); POST creates a verified user + `SalesPerson` profile (**city only**, address ignored); GET lists with dummy-filled payloads | reads → `SalesPerson`, `City`; calls → `create_verified_user`, `salesperson_payload` |
+| `sales_admin serializers` | `api/sales_admin/serializers.py` | Input validators (`CreateAdminSerializer`/`CreateSalesPersonSerializer`/`AddressInputSerializer`) + output payload builders; **Admin** carries a persisted `address` block, **Salesperson** carries only `city`; missing values fall back to `N/A` | used by → `AdminsView`, `SalesPeopleView` |
 | Sales admin routes | `api/sales_admin/urls.py` | Namespaced routes (`auth/otp/*`, `admins`, `sales-people`) | → `GenerateOTPView`, `VerifyOTPView`, `AdminsView`, `SalesPeopleView` |
 | Android v1 | `api/android/v1/urls.py` | Versioned namespace, currently empty (endpoints built out one module each) | — |
 
@@ -253,6 +253,6 @@ master merged → Render auto-deploy (Docker build))
 - Every test docstring must state its runnable pytest node id (see `.agents/skills/run-tests/SKILL.md`).
 - `api/admin.py` = `AdminApiView` base, not Django admin.
 - Creating an **Admin** automatically creates a **fallback `SalesPerson`** for the same user.
-- Salespersons carry only a **`city`** reference — no address/pincode; the management payloads never emit an `address` block.
+- **Admins** carry a full optional `address` (persisted as an `aggregator.Address`); **Salespersons carry only `city`** — any `address` sent to the sales-people endpoint is ignored and never persisted.
 
 _Keep this graph in sync when adding apps, endpoints, models, or schema flows._
