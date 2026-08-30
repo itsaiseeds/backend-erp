@@ -17,13 +17,10 @@ from collections.abc import Callable
 from typing import Any
 
 from django.db import transaction
-from rest_framework.authentication import (
-    SessionAuthentication,
-    TokenAuthentication,
-)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from .authentication import ExpiringTokenAuthentication, SessionAuthentication
 from .permissions import IsAdminUser, IsSuperUser
 
 
@@ -58,7 +55,7 @@ class BaseApiView(APIView):
     admin_required = False
     superuser_required = False
 
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [SessionAuthentication, ExpiringTokenAuthentication]
 
     def get_permissions(self):
         permissions = []

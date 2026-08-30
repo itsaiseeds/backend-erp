@@ -7,8 +7,7 @@ on a subclass to additionally require a Django superuser.
 
 from __future__ import annotations
 
-from rest_framework.authentication import SessionAuthentication
-
+from .authentication import SessionAuthentication
 from .views import BaseApiView
 
 

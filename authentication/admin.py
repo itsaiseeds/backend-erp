@@ -208,6 +208,8 @@ class AdminProfileAdmin(SoftDeleteModelAdmin):
     list_display = ("user", "created_by", "created_at")
     search_fields = ("user__name", "user__phone_number")
     autocomplete_fields = ("user",)
+    # Avoid one query per row for the FK/one-to-one columns in list_display.
+    list_select_related = ("user", "created_by")
 
     def has_add_permission(self, request):
         """Only a superuser may promote someone to an application Admin."""
@@ -219,6 +221,8 @@ class SalesPersonAdmin(SoftDeleteModelAdmin):
     list_display = ("user", "created_by", "created_at")
     search_fields = ("user__name", "user__phone_number", "user__created_by__name")
     autocomplete_fields = ("user",)
+    # Avoid one query per row for the FK/one-to-one columns in list_display.
+    list_select_related = ("user", "created_by")
 
     def has_add_permission(self, request):
         """An application Admin (or superuser) may hire a SalesPerson."""
