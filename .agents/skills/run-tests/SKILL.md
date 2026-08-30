@@ -22,7 +22,7 @@ Prerequisites:
 | What you want                          | Command                                                              |
 | -------------------------------------- | -------------------------------------------------------------------- |
 | Everything (unit + integration)        | `bash scripts/run.sh test`                                            |
-| Unit tests only                        | `bash scripts/run.sh test-unit`                                       |
+| Unit tests only                        | `bash scripts/run.sh test-unit` (never imports `tests/integration/` — `--ignore` keeps a missing/stale integration module from breaking unit runs) |
 | All integration tests                  | `bash scripts/run.sh test-integration`                                |
 | One test CLASS                         | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest` |
 | One test METHOD                        | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest::test_generate_otp_returns_200` |
@@ -49,7 +49,9 @@ run tests.
 For each `test-integration` run, `tests/integration/conftest.py`:
 
 1. Drops + recreates the `django_test` Postgres DB from `sql/ddl.sql` and
-   `sql/dml.sql` (seeded superuser phone `9999999999`).
+   `sql/dml.sql` (seeded superuser phone `9999999999`). DB rebuilds are
+   serialized across concurrent runs by a Postgres advisory lock
+   (`IntegrationDbContext.acquire_build_lock`).
 2. Runs `manage.py migrate --fake` so the live server uses the pre-built
    schema.
 3. Starts a real Django dev server on `127.0.0.1:8001` inside the container.

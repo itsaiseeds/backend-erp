@@ -231,7 +231,9 @@ webrun() {
 
 cmd_test_unit() {
     echo "[test-unit] Running unit tests in web container ..."
-    webrun python -m pytest -m "not integration" -v
+    # --ignore stops pytest from even importing the integration modules, so a
+    # stale/missing tests/integration can never break a unit-only run.
+    webrun python -m pytest -m "not integration" --ignore=tests/integration -v
 }
 
 cmd_test_integration() {
