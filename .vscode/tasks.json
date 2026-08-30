@@ -244,30 +244,12 @@
             }
         },
         {
-            "label": "test-integration: all tests",
+            "label": "test: DML-backed Django",
             "type": "shell",
             "command": "bash",
             "args": [
                 "scripts/run.sh",
-                "test-integration"
-            ],
-            "group": "test",
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated"
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            }
-        },
-        {
-            "label": "test-integration: pick a test",
-            "type": "shell",
-            "command": "bash",
-            "args": [
-                "scripts/run.sh",
-                "test-integration",
-                "${input:integrationTestNode}"
+                "test-dml"
             ],
             "group": "test",
             "presentation": {
@@ -311,14 +293,6 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             }
-        }
-    ],
-    "inputs": [
-        {
-            "id": "integrationTestNode",
-            "type": "promptString",
-            "description": "Pytest node id to run in the container, for example:\n    tests/integration/test_auth_flow.py::AuthFlowTest::test_generate_otp_returns_200\nKeep the default to run the whole integration suite.",
-            "default": "tests/integration"
         }
     ]
 }

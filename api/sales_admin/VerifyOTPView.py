@@ -73,7 +73,11 @@ class VerifyOTPView(APIView):
         data = serializer.validated_data
 
         user = User.objects.filter(phone_number=data["phone_number"]).first()
-        if user is None or not user.totp_enabled or not user.verify_totp(data["otp"]):
+
+        if user is None or (not user.is_admin_user and not user.is_superuser):
+            return Response({"detail": "Invalid phone number or TOTP code."}, status=400)
+
+        if not user.totp_enabled or not user.verify_totp(data["otp"]):
             return Response({"detail": "Invalid phone number or TOTP code."}, status=400)
 
         token, _ = Token.objects.get_or_create(user=user)

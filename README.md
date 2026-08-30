@@ -37,8 +37,8 @@ authentication/    Custom user + Admin / SalesPerson models (TOTP login)
 aggregator/        Geo master data: Country / State / City / Pincode / Address
 common/            Abstract base models + admin mixes (timestamp, soft delete, created_by)
 sql/               ddl.sql (full schema) + dml.sql (seed data) — dev reference
-scripts/           run.sh (all commands), reload_db.sh, entrypoint.sh, integration_db.sh
-tests/             pytest: unit + live-server integration suite
+scripts/           run.sh (all commands), reload_db.sh, entrypoint.sh
+tests/             pytest unit and DML-backed Django tests
 web/               Flutter admin app source + committed build output
 docs/              knowledge graph + auto-generated API reference
 skills/            domain knowledge (setup, database, conventions, …)
@@ -98,20 +98,14 @@ containers — the host Python never needs Django (start the `db` service with
 
 | What | Command |
 |---|---|
-| Everything | `bash scripts/run.sh test` |
-| Unit only | `bash scripts/run.sh test-unit` |
-| All integration | `bash scripts/run.sh test-integration` |
-| One class | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest` |
-| One test | `bash scripts/run.sh test-integration tests/integration/test_auth_flow.py::AuthFlowTest::test_totp_verify_returns_token` |
+| All tests | `bash scripts/run.sh test` |
+| Unit tests | `bash scripts/run.sh test-unit` |
+| DML-backed Django tests | `bash scripts/run.sh test-dml` |
+| One unit test | `docker compose run --rm --no-deps --entrypoint "" -T web python -m pytest tests/test_verify_otp_view.py::VerifyOTPTest::test_superuser_can_verify_otp_and_receive_credentials -v` |
 | Lint / typecheck | `bash scripts/run.sh lint` / `bash scripts/run.sh typecheck` |
 
-Integration tests build a throwaway `django_test` DB from `sql/ddl.sql` +
-`sql/dml.sql`, `migrate --fake`, start a real Django server on `127.0.0.1:8001`,
-and exercise the endpoints over HTTP.
-
-Inside VS Code, use **Run Task...**: `test`, `test: unit`,
-`test-integration: all tests`, or `test-integration: pick a test` (paste a pytest
-node id, e.g. `tests/integration/test_auth_flow.py::AuthFlowTest`).
+Inside VS Code, use **Run Task...**: `test`, `test: unit`, or
+`test: DML-backed Django`.
 
 > Convention: every test class/method docstring states its copy/paste pytest
 > node id. Full details run flows in the `run-tests` skill.
@@ -151,7 +145,7 @@ See [skills/database.md](skills/database.md) for the full workflow.
 
 ## CI/CD & release
 
-- **CI** — `.github/workflows/tests.yml` runs unit tests, integration tests, and
+- **CI** — `.github/workflows/tests.yml` runs unit tests, DML-backed Django tests, and
   lint on every PR to `master` in Docker.
 - **Merge gate** — branch protection on `master` blocks merges until the
   `Tests / test` status check passes (and requires a PR approval).
