@@ -25,6 +25,9 @@ secret — there is no ORM access in these integration tests.
 
 from __future__ import annotations
 
+import os
+
+import psycopg
 import pyotp
 import pytest
 
@@ -73,3 +76,76 @@ class AuthFlowTest(IntegrationTestCase):
             json={"phone_number": UNENROLLED_PHONE, "otp": _current_code()},
         )
         assert response.status_code == 400
+
+
+def _test_db_connection():
+    """Open a psycopg connection to the integration-test database.
+
+    Mirrors IntegrationDbContext: real Postgres, credentials from the same env
+    vars (TEST_DB_HOST / POSTGRES_*). Used to backdate rows the 24h-clock tests
+    rely on, since these tests deliberately avoid ORM access.
+    """
+    return psycopg.connect(
+        host=os.environ.get("TEST_DB_HOST", "db"),
+        port=os.environ.get("POSTGRES_PORT", "5432"),
+        user=os.environ.get("POSTGRES_USER", "django"),
+        password=os.environ.get("POSTGRES_PASSWORD", ""),
+        dbname="django_test",
+    )
+
+
+class SessionAuthFlowTest(IntegrationTestCase):
+    """Covers the 24h session + bearer-token credentials a successful login issues.
+    tests/integration/test_auth_flow.py::SessionAuthFlowTest
+    """
+
+    def _login(self):
+        return self.post(
+            "/api/sales_admin/auth/otp/verify",
+            json={"phone_number": SUPERUSER_PHONE, "otp": _current_code()},
+        )
+
+    def test_login_issues_24h_session_and_csrf_cookies(self):
+        """tests/integration/test_auth_flow.py::SessionAuthFlowTest::test_login_issues_24h_session_and_csrf_cookies"""
+        response = self._login()
+        assert response.status_code == 200
+        set_cookie = response.headers.get("set-cookie", "")
+        assert "sessionid=" in set_cookie
+        assert "Max-Age=86400" in set_cookie
+        assert "csrftoken=" in set_cookie
+        # The session cookie really authenticates: the admin enroll endpoint is
+        # reached and the role check runs (-> 403), instead of 401 anonymous.
+        assert self.get("/api/sales_admin/auth/totp/enroll").status_code == 403
+
+    def test_expired_session_is_rejected(self):
+        """tests/integration/test_auth_flow.py::SessionAuthFlowTest::test_expired_session_is_rejected"""
+        assert self._login().status_code == 200
+        with _test_db_connection() as conn:
+            conn.execute(
+                "UPDATE django_session SET expire_date = NOW() - INTERVAL '1 hour' "
+                "WHERE expire_date > NOW()"
+            )
+        assert self.get("/api/sales_admin/auth/totp/enroll").status_code == 401
+
+    def test_verify_refreshes_token_clock_on_relogin(self):
+        """tests/integration/test_auth_flow.py::SessionAuthFlowTest::test_verify_refreshes_token_clock_on_relogin"""
+        first = self._login()
+        assert first.status_code == 200
+        token_key = first.json()["token"]
+        with _test_db_connection() as conn:
+            original_created = conn.execute(
+                "SELECT created FROM authtoken_token WHERE key = %s", (token_key,)
+            ).fetchone()[0]
+            conn.execute(
+                "UPDATE authtoken_token SET created = NOW() - INTERVAL '25 hours' "
+                "WHERE key = %s",
+                (token_key,),
+            )
+        second = self._login()
+        assert second.status_code == 200
+        assert second.json()["token"] == token_key
+        with _test_db_connection() as conn:
+            refreshed_created = conn.execute(
+                "SELECT created FROM authtoken_token WHERE key = %s", (token_key,)
+            ).fetchone()[0]
+        assert refreshed_created > original_created

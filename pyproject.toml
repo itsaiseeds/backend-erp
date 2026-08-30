@@ -51,3 +51,8 @@ module = ["rest_framework", "rest_framework.*"]
 # DRF ships without .pyi stubs; treat it as Any until djangorestframework-stubs
 # is added.
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["sentry_sdk", "sentry_sdk.*"]
+# sentry-sdk ships without .pyi stubs; treat it as Any until typed stubs exist.
+ignore_missing_imports = true

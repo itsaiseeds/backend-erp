@@ -24,6 +24,12 @@ case "$DEBUG_VALUE" in
         ;;
     *)
         echo "Starting gunicorn ..."
-        exec gunicorn --bind 0.0.0.0:8000 config.wsgi:application
+        # Gunicorn default is a single sync worker, which serialises requests on
+        # small hosts. Threads multiplex admin/API requests on one process with
+        # minimal memory; tune via GUNICORN_WORKERS / GUNICORN_THREADS env.
+        exec gunicorn --bind 0.0.0.0:8000 \
+            --workers "${GUNICORN_WORKERS:-1}" \
+            --threads "${GUNICORN_THREADS:-4}" \
+            config.wsgi:application
         ;;
 esac

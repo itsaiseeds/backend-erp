@@ -33,5 +33,18 @@ def api_base_url(db_context: IntegrationDbContext) -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def client() -> Session:
-    """A ``requests.Session`` (cookies persist, so logins carry across tests)."""
+    """A ``requests.Session`` shared across tests (cookie jar per test)."""
     return Session()
+
+
+@pytest.fixture(autouse=True)
+def _reset_db(db_context: IntegrationDbContext, client: Session) -> None:
+    """Give every integration test a fresh dml.sql DB + empty cookie jar.
+
+    ``db_context`` and ``client`` are session-scoped (one live server, one
+    cookie jar), so without this each test would run against whatever rows and
+    cookies earlier tests in the session left behind. Runs before every test:
+    truncates all tables, re-seeds dml.sql, and clears the jar.
+    """
+    db_context.reset_baseline()
+    client.cookies.clear()
