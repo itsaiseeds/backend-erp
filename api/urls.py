@@ -8,11 +8,7 @@ Every HTTP endpoint lives under ``/api/`` and is namespaced by client/app:
 
 from django.urls import include, path
 
-from .test_sentry import TestSentryView
-
 urlpatterns = [
     path("android/", include("api.android.urls")),
     path("sales_admin/", include("api.sales_admin.urls")),
-    # Error-tracking probe: trigger a 500 to verify Sentry events flow.
-    path("test-sentry/", TestSentryView.as_view(), name="test-sentry"),
 ]

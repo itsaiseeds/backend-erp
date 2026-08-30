@@ -188,7 +188,7 @@ graph TD
 | `scripts/reload_db.sh` | local DB reload | `--step all/ddl/dml`; **local Docker Postgres only, never prod** | reads → `sql/ddl.sql`, `sql/dml.sql`, `.env.dev` |
 | `scripts/integration_db.sh` | test DB builder | Build/drop throwaway `django_test` DB from DDL+DML | consumed by integration tests (now via `tests/integration/base.py`) |
 | Unit tests | `tests/test_sample.py`, `tests/test_expiring_token.py` | Sanity pytest + token-TTL unit test | none |
-| Integration framework | `tests/integration/` | `base.py` (`IntegrationDbContext`, `LiveServer`, `IntegrationTestCase`) + `conftest.py` fixtures; builds `django_test` from `sql/ddl.sql`+`dml.sql`+`admin_perf.sql`, `migrate --fake`, runs real `runserver` on `127.0.0.1:8001`, exercises HTTP via `requests.Session` | depends on → `db`; consumed by → `test_auth_flow.py`, `test_sentry_probe.py` |
+| Integration framework | `tests/integration/` | `base.py` (`IntegrationDbContext`, `LiveServer`, `IntegrationTestCase`) + `conftest.py` fixtures; builds `django_test` from `sql/ddl.sql`+`dml.sql`+`admin_perf.sql`, `migrate --fake`, runs real `runserver` on `127.0.0.1:8001`, exercises HTTP via `requests.Session` | depends on → `db`; consumed by → `test_sentry_probe.py` |
 | CI | `.github/workflows/tests.yml` | Builds images, starts `db`, runs `test-unit` + `test-integration` + `lint` in one-off containers | gate on → PRs to `master`; renders check `Tests / test` |
 | Branch protection | GitHub settings | `master` requires `Tests / test` to pass + PR review | enforced by → GitHub |
 | Skills | `skills/*.md`, `.agents/skills/run-tests/SKILL.md` | Domain knowledge + test-run instructions (node-id docstring convention) | read before editing |
