@@ -480,15 +480,4 @@ CREATE INDEX authentication_salesperson_city_id
 ALTER TABLE authentication_admin
     ADD COLUMN can_update_stock_count boolean NOT NULL DEFAULT false;
 
-ALTER TABLE authentication_admin
-    ADD COLUMN address_id BIGINT NULL,
-    ADD CONSTRAINT fk_admin_address
-        FOREIGN KEY (address_id)
-        REFERENCES aggregator_address (id)
-        ON DELETE RESTRICT,
-    ADD CONSTRAINT uq_admin_address UNIQUE (address_id);
-
-CREATE INDEX authentication_admin_address_id
-    ON authentication_admin (address_id);
-
 

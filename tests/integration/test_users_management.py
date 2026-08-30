@@ -7,7 +7,7 @@ These hit the live Django server over HTTP via the helpers in
 * a TOTP-enabled application Admin (phone 7777777777, secret ``KRSXG5CTMVRXEZLU``),
 * a TOTP-enabled plain user (phone 6666666666, secret ``IJQXGZJTGMFWC3LN``), and
 * a minimal geography tree (country India -> state Maharashtra -> city Pune,
-  id 1, pincode 411001) backing the admin ``city``/``address`` blocks.
+  id 1) backing the ``city`` pickers.
 
 Codes are computed with pyotp against those known secrets - there is no ORM
 access in these integration tests.
@@ -28,35 +28,7 @@ ADMIN_PHONE = "7777777777"
 ADMIN_SECRET = "KRSXG5CTMVRXEZLU"
 PLAIN_PHONE = "6666666666"
 PLAIN_SECRET = "IJQXGZJTGMFWC3LN"
-SEED_ADMIN_USER_ID = 3
 PUNE_CITY_ID = 1
-PUNE_STATE_ID = 1
-PUNE_PINCODE_ID = 1
-INDIA_COUNTRY_ID = 1
-ADDRESS_BLOCK = {
-    "line_1": "FC Road",
-    "line_2": "2nd Floor, Shri Complex",
-    "city": PUNE_CITY_ID,
-    "state": PUNE_STATE_ID,
-    "pincode": PUNE_PINCODE_ID,
-    "country": INDIA_COUNTRY_ID,
-}
-REAL_ADDRESS = {
-    "line_1": "FC Road",
-    "line_2": "2nd Floor, Shri Complex",
-    "city": "Pune",
-    "state": "Maharashtra",
-    "pincode": "411001",
-    "country": "India",
-}
-NA_ADDRESS = {
-    "line_1": "N/A",
-    "line_2": "N/A",
-    "city": "N/A",
-    "state": "N/A",
-    "pincode": "N/A",
-    "country": "N/A",
-}
 
 
 class UserManagementTest(IntegrationTestCase):
@@ -134,7 +106,6 @@ class UserManagementTest(IntegrationTestCase):
                 "phone_number": "9000000001",
                 "can_update_stock_count": True,
                 "city": PUNE_CITY_ID,
-                "address": ADDRESS_BLOCK,
             },
         )
         assert response.status_code == 201, response.text
@@ -144,16 +115,17 @@ class UserManagementTest(IntegrationTestCase):
         assert admin["email"] == "vikram@example.com"
         assert admin["phone_number"] == "9000000001"
         assert admin["role"] == "admin"
-        assert admin["is_deleted"] is False
-        assert admin["deleted_by"] is None
         assert admin["can_update_stock_count"] is True
         assert admin["is_salesperson"] is True
-        assert admin["city"]["id"] == PUNE_CITY_ID
-        assert admin["address"] == REAL_ADDRESS
+        assert "city" not in admin
+        assert "address" not in admin
+        assert "user_id" not in admin
+        assert "is_deleted" not in admin
+        assert "deleted_by" not in admin
 
         users = self.get("/api/sales_admin/sales-people").json()
         fallback = next(
-            item for item in users if item["user_id"] == admin["user_id"]
+            item for item in users if item["phone_number"] == "9000000001"
         )
         assert fallback["role"] == "salesperson"
         assert fallback["city"]["id"] == PUNE_CITY_ID
@@ -184,28 +156,8 @@ class UserManagementTest(IntegrationTestCase):
             response = self.post("/api/sales_admin/admins", json=payload)
             assert response.status_code == 400, payload
 
-    def test_create_admin_invalid_address_rejected(self):
-        """tests/integration/test_users_management.py::UserManagementTest::test_create_admin_invalid_address_rejected"""
-        self._auth_as(SUPERUSER_PHONE, SUPERUSER_SECRET)
-        cases = [
-            {"address": {}},
-            {"address": {"line_1": "Only a line"}},
-            {"address": {"line_1": "Line", "city": PUNE_CITY_ID, "state": 99}},
-        ]
-        for address in cases:
-            response = self.post(
-                "/api/sales_admin/admins",
-                json={
-                    "name": "Bad Address",
-                    "phone_number": "9000000004",
-                    "city": PUNE_CITY_ID,
-                    "address": address,
-                },
-            )
-            assert response.status_code == 400, address
-
-    def test_list_admins_skips_soft_deleted(self):
-        """tests/integration/test_users_management.py::UserManagementTest::test_list_admins_skips_soft_deleted"""
+    def test_list_admins(self):
+        """tests/integration/test_users_management.py::UserManagementTest::test_list_admins"""
         self._auth_as(SUPERUSER_PHONE, SUPERUSER_SECRET)
         created = self.post(
             "/api/sales_admin/admins",
@@ -222,12 +174,14 @@ class UserManagementTest(IntegrationTestCase):
         admins = response.json()
         assert isinstance(admins, list)
         assert any(item["name"] == "Vikram Kumar" for item in admins)
-        seed_admin = next(item for item in admins if item["user_id"] == SEED_ADMIN_USER_ID)
+        seed_admin = next(item for item in admins if item["is_salesperson"] is False)
         assert seed_admin["role"] == "admin"
-        assert seed_admin["is_salesperson"] is False
-        assert seed_admin["city"]["name"] == "N/A"
-        assert seed_admin["address"] == NA_ADDRESS
         assert all(item["role"] == "admin" for item in admins)
+        assert all("city" not in item for item in admins)
+        assert all("address" not in item for item in admins)
+        assert all("user_id" not in item for item in admins)
+        assert all("is_deleted" not in item for item in admins)
+        assert all("deleted_by" not in item for item in admins)
 
     # -- salesperson creation ---------------------------------------------------
 
@@ -240,7 +194,6 @@ class UserManagementTest(IntegrationTestCase):
                 "name": "Ramesh Patil",
                 "phone_number": "9000000011",
                 "city": PUNE_CITY_ID,
-                "address": ADDRESS_BLOCK,
             },
         )
         assert response.status_code == 201, response.text
@@ -249,9 +202,8 @@ class UserManagementTest(IntegrationTestCase):
         assert person["email"] is None
         assert person["phone_number"] == "9000000011"
         assert person["role"] == "salesperson"
-        assert person["is_deleted"] is False
         assert person["city"]["id"] == PUNE_CITY_ID
-        assert "address" not in person
+        assert all(key not in person for key in ("address", "user_id", "is_deleted", "deleted_by"))
 
     def test_create_salesperson_by_superuser(self):
         """tests/integration/test_users_management.py::UserManagementTest::test_create_salesperson_by_superuser"""
@@ -287,3 +239,7 @@ class UserManagementTest(IntegrationTestCase):
         assert any(item["name"] == "Ramesh Patil" for item in people)
         assert all(item["role"] == "salesperson" for item in people)
         assert all("city" in item for item in people)
+        assert all("address" not in item for item in people)
+        assert all("user_id" not in item for item in people)
+        assert all("is_deleted" not in item for item in people)
+        assert all("deleted_by" not in item for item in people)

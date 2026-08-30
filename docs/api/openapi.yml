@@ -8,20 +8,11 @@ paths:
   /api/sales_admin/admins:
     get:
       operationId: sales_admin_admins_retrieve
-      description: |-
-        List (GET) or create (POST) application admins.
-
-        Restricted to superusers. ``authentication_classes`` tries the bearer Token
-        issued by the auth (OTP verify) flow first, then falls back to the session
-        cookie for the web app. Token-first ordering matters: the OTP flow also
-        opens a browser session, so a token request that also carries the session
-        cookie must be authenticated as the token (and skip the session's CSRF
-        check), not rejected.
+      description: List (GET) or create (POST) application admins.
       tags:
       - sales_admin
       security:
       - tokenAuth: []
-      - cookieAuth: []
       responses:
         '200':
           content:
@@ -31,15 +22,7 @@ paths:
           description: ''
     post:
       operationId: sales_admin_admins_create
-      description: |-
-        List (GET) or create (POST) application admins.
-
-        Restricted to superusers. ``authentication_classes`` tries the bearer Token
-        issued by the auth (OTP verify) flow first, then falls back to the session
-        cookie for the web app. Token-first ordering matters: the OTP flow also
-        opens a browser session, so a token request that also carries the session
-        cookie must be authenticated as the token (and skip the session's CSRF
-        check), not rejected.
+      description: List (GET) or create (POST) application admins.
       tags:
       - sales_admin
       requestBody:
@@ -56,7 +39,6 @@ paths:
         required: true
       security:
       - tokenAuth: []
-      - cookieAuth: []
       responses:
         '200':
           content:
@@ -94,19 +76,11 @@ paths:
   /api/sales_admin/sales-people:
     get:
       operationId: sales_admin_sales_people_retrieve
-      description: |-
-        List (GET) or create (POST) sales people.
-
-        ``authentication_classes`` tries the bearer Token issued by the auth (OTP
-        verify) flow first, then falls back to the session cookie for the web app.
-        Token-first ordering matters: the OTP flow also opens a browser session, so
-        a token request that also carries the session cookie must be authenticated
-        as the token (and skip the session's CSRF check), not rejected.
+      description: List (GET) or create (POST) sales people.
       tags:
       - sales_admin
       security:
       - tokenAuth: []
-      - cookieAuth: []
       responses:
         '200':
           content:
@@ -116,14 +90,7 @@ paths:
           description: ''
     post:
       operationId: sales_admin_sales_people_create
-      description: |-
-        List (GET) or create (POST) sales people.
-
-        ``authentication_classes`` tries the bearer Token issued by the auth (OTP
-        verify) flow first, then falls back to the session cookie for the web app.
-        Token-first ordering matters: the OTP flow also opens a browser session, so
-        a token request that also carries the session cookie must be authenticated
-        as the token (and skip the session's CSRF check), not rejected.
+      description: List (GET) or create (POST) sales people.
       tags:
       - sales_admin
       requestBody:
@@ -140,7 +107,6 @@ paths:
         required: true
       security:
       - tokenAuth: []
-      - cookieAuth: []
       responses:
         '200':
           content:
@@ -179,55 +145,13 @@ paths:
           description: No response body
 components:
   schemas:
-    AddressInput:
-      type: object
-      description: |-
-        Validation for the optional nested ``address`` block (admins only).
-
-        When present, every field below is required (``line_2`` defaults to an
-        empty string) and the full pincode/city/state/country chain is validated
-        the same way ``aggregator.Address.clean()`` does.
-      properties:
-        line_1:
-          type: string
-          maxLength: 255
-        line_2:
-          type: string
-          maxLength: 255
-        city:
-          type: integer
-        state:
-          type: integer
-        pincode:
-          type: integer
-        country:
-          type: integer
-    AddressInputRequest:
-      type: object
-      description: |-
-        Validation for the optional nested ``address`` block (admins only).
-
-        When present, every field below is required (``line_2`` defaults to an
-        empty string) and the full pincode/city/state/country chain is validated
-        the same way ``aggregator.Address.clean()`` does.
-      properties:
-        line_1:
-          type: string
-          maxLength: 255
-        line_2:
-          type: string
-          maxLength: 255
-        city:
-          type: integer
-        state:
-          type: integer
-        pincode:
-          type: integer
-        country:
-          type: integer
     CreateAdmin:
       type: object
-      description: Validation for the fields shared by admin and salesperson creation.
+      description: |-
+        Validation for a new application ``Admin``.
+
+        ``city`` is required because creating an admin also creates the fallback
+        ``SalesPerson`` profile, which needs a city.
       properties:
         name:
           type: string
@@ -247,19 +171,17 @@ components:
           default: false
         city:
           type: integer
-          description: City for the fallback salesperson profile created with this
-            admin.
-        address:
-          allOf:
-          - $ref: '#/components/schemas/AddressInput'
-          nullable: true
       required:
       - city
       - name
       - phone_number
     CreateAdminRequest:
       type: object
-      description: Validation for the fields shared by admin and salesperson creation.
+      description: |-
+        Validation for a new application ``Admin``.
+
+        ``city`` is required because creating an admin also creates the fallback
+        ``SalesPerson`` profile, which needs a city.
       properties:
         name:
           type: string
@@ -281,19 +203,13 @@ components:
           default: false
         city:
           type: integer
-          description: City for the fallback salesperson profile created with this
-            admin.
-        address:
-          allOf:
-          - $ref: '#/components/schemas/AddressInputRequest'
-          nullable: true
       required:
       - city
       - name
       - phone_number
     CreateSalesPerson:
       type: object
-      description: Validation for the fields shared by admin and salesperson creation.
+      description: Validation for a new ``SalesPerson`` (city only, no address).
       properties:
         name:
           type: string
@@ -316,7 +232,7 @@ components:
       - phone_number
     CreateSalesPersonRequest:
       type: object
-      description: Validation for the fields shared by admin and salesperson creation.
+      description: Validation for a new ``SalesPerson`` (city only, no address).
       properties:
         name:
           type: string
@@ -366,10 +282,6 @@ components:
       - otp
       - phone_number
   securitySchemes:
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: sessionid
     tokenAuth:
       type: apiKey
       in: header
