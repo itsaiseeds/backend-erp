@@ -2,5 +2,3 @@
 
 Only superusers may access these endpoints (see ``api/utilities/urls.py``).
 """
-
-from __future__ import annotations
