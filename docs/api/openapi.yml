@@ -177,6 +177,8 @@ components:
           format: date-time
         can_update_stock_count:
           type: boolean
+        totp:
+          $ref: '#/components/schemas/Totp'
       required:
       - can_update_stock_count
       - created_at
@@ -292,6 +294,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/CityRef'
           nullable: true
+        totp:
+          $ref: '#/components/schemas/Totp'
       required:
       - created_at
       - id
@@ -314,6 +318,15 @@ components:
       - cities
       - id
       - name
+    Totp:
+      type: object
+      description: Swagger schema for a user's TOTP provisioning URI (used to render
+        a QR code).
+      properties:
+        provisioning_uri:
+          type: string
+      required:
+      - provisioning_uri
     UserRef:
       type: object
       description: Swagger schema for a compact ``{id, name}`` user reference.
