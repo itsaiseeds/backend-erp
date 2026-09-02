@@ -96,4 +96,7 @@ class AdminsView(APIView):
                 user=user, city=data["city"], created_by=request.user
             )
 
-        return Response(admin_payload(admin), status=status.HTTP_201_CREATED)
+        return Response(
+            admin_payload(admin, include_totp=True),
+            status=status.HTTP_201_CREATED,
+        )

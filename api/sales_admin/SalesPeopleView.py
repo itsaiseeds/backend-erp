@@ -84,4 +84,7 @@ class SalesPeopleView(APIView):
                 user=user, city=data["city"], created_by=request.user
             )
 
-        return Response(salesperson_payload(salesperson), status=status.HTTP_201_CREATED)
+        return Response(
+            salesperson_payload(salesperson, include_totp=True),
+            status=status.HTTP_201_CREATED,
+        )

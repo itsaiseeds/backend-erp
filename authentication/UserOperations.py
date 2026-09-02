@@ -52,6 +52,12 @@ class CityRefSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
+class TotpSerializer(serializers.Serializer):
+    """Swagger schema for a user's TOTP provisioning URI (used to render a QR code)."""
+
+    provisioning_uri = serializers.CharField()
+
+
 class AdminPayloadSerializer(serializers.Serializer):
     """Swagger schema for one admin row (no city, address or audit keys)."""
 
@@ -63,6 +69,7 @@ class AdminPayloadSerializer(serializers.Serializer):
     created_by = UserRefSerializer(allow_null=True, required=False)
     created_at = serializers.DateTimeField()
     can_update_stock_count = serializers.BooleanField()
+    totp = TotpSerializer(required=False)
 
 
 class SalesPersonPayloadSerializer(serializers.Serializer):
@@ -76,12 +83,18 @@ class SalesPersonPayloadSerializer(serializers.Serializer):
     created_by = UserRefSerializer(allow_null=True, required=False)
     created_at = serializers.DateTimeField()
     city = CityRefSerializer(allow_null=True, required=False)
+    totp = TotpSerializer(required=False)
 
 
-def admin_payload(admin: Admin) -> dict:
-    """Serialize an ``Admin`` for the frontend (no city, address or audit keys)."""
+def admin_payload(admin: Admin, *, include_totp: bool = False) -> dict:
+    """Serialize an ``Admin`` for the frontend (no city, address or audit keys).
+
+    When ``include_totp`` is set the freshly created user's TOTP provisioning
+    URI is included so the caller can render a QR code for the new user. The
+    URI is only exposed at creation time.
+    """
     user = admin.user
-    return {
+    payload = {
         "id": admin.id,
         "name": user.name,
         "email": user.email,
@@ -91,12 +104,20 @@ def admin_payload(admin: Admin) -> dict:
         "created_at": admin.created_at,
         "can_update_stock_count": admin.can_update_stock_count,
     }
+    if include_totp:
+        payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
+    return payload
 
 
-def salesperson_payload(salesperson: SalesPerson) -> dict:
-    """Serialize a ``SalesPerson`` for the frontend (city only)."""
+def salesperson_payload(salesperson: SalesPerson, *, include_totp: bool = False) -> dict:
+    """Serialize a ``SalesPerson`` for the frontend (city only).
+
+    When ``include_totp`` is set the freshly created user's TOTP provisioning
+    URI is included so the caller can render a QR code for the new user. The
+    URI is only exposed at creation time.
+    """
     user = salesperson.user
-    return {
+    payload = {
         "id": salesperson.id,
         "name": user.name,
         "email": user.email,
@@ -106,6 +127,9 @@ def salesperson_payload(salesperson: SalesPerson) -> dict:
         "created_at": salesperson.created_at,
         "city": _city_ref(salesperson.city),
     }
+    if include_totp:
+        payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
+    return payload
 
 
 # -- Creation helpers ---------------------------------------------------------
