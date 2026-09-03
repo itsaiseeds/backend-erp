@@ -65,9 +65,7 @@ class AuditFieldsAdminMixin:
         """Drop ``created_by`` from the fieldsets, whatever the admin declared."""
         cleaned = []
         for name, options in fieldsets:
-            fields = tuple(
-                field for field in options.get("fields", ()) if field != "created_by"
-            )
+            fields = tuple(field for field in options.get("fields", ()) if field != "created_by")
             if fields:
                 cleaned.append((name, {**options, "fields": fields}))
         return tuple(cleaned)

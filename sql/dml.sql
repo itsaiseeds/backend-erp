@@ -121,14 +121,15 @@ ON CONFLICT DO NOTHING;
 SELECT setval('auth_permission_id_seq', 56);
 
 INSERT INTO public.authentication_user
-(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
-VALUES(1, 'pbkdf2_sha256$1000000$UGqt8oGnUaTMbuaqbfbc5N$gosDWLrsqUTN2ws6uEwb828K/FAkYHstAzNzhdevkbk=', NULL, true, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '9999999999', 'admin', 'admin@example.com', 'JBSWY3DPEHPK3PXP', true, true, true, true, '2026-08-27 23:52:54.057', 1, 1);
+(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
+VALUES(1, 'pbkdf2_sha256$1000000$UGqt8oGnUaTMbuaqbfbc5N$gosDWLrsqUTN2ws6uEwb828K/FAkYHstAzNzhdevkbk=', NULL, true, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '9999999999', 'admin', 'admin@example.com', 'JBSWY3DPEHPK3PXP', true, NULL, 0, NULL, true, true, true, '2026-08-27 23:52:54.057', 1, 1);
+
 
 -- A second user with NO TOTP set, used by integration tests to exercise the
 -- "TOTP not enrolled" negative path over HTTP (no ORM access in these tests).
 INSERT INTO public.authentication_user
-(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
-VALUES(2, '!unusable', NULL, false, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '8888888888', 'no totp user', NULL, NULL, false, false, false, true, '2026-08-27 23:52:54.057', 1, NULL);
+(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
+VALUES(2, '!unusable', NULL, false, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '8888888888', 'no totp user', NULL, NULL, false, NULL, 0, NULL, false, false, true, '2026-08-27 23:52:54.057', 1, NULL);
 
 -- The seed rows above are inserted with explicit ids, so advance the sequence
 -- to the highest id to keep ORM/admin-created rows from colliding.

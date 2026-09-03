@@ -31,12 +31,8 @@ class SoftDeletedModel(models.Model):
     this table, otherwise ``PermissionDenied`` is raised.
     """
 
-    is_deleted = models.BooleanField(
-        "deleted", default=False, editable=False, db_index=True
-    )
-    deleted_at = models.DateTimeField(
-        "deleted at", null=True, blank=True, editable=False
-    )
+    is_deleted = models.BooleanField("deleted", default=False, editable=False, db_index=True)
+    deleted_at = models.DateTimeField("deleted at", null=True, blank=True, editable=False)
     deleted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="deleted by",
@@ -68,14 +64,12 @@ class SoftDeletedModel(models.Model):
 
         if deleted_by is None:
             raise PermissionDenied(
-                "A user must be provided to soft delete this record "
-                "(deleted_by is required)."
+                "A user must be provided to soft delete this record (deleted_by is required)."
             )
 
         if not deleted_by.has_perm(self._delete_permission_codename()):
             raise PermissionDenied(
-                f"User '{deleted_by}' does not have permission to delete "
-                f"'{self._meta.model_name}'."
+                f"User '{deleted_by}' does not have permission to delete '{self._meta.model_name}'."
             )
 
         self.deleted_by = deleted_by

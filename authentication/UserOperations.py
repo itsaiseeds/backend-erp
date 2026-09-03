@@ -159,8 +159,24 @@ def create_verified_user(data: dict, actor: Any) -> Any:
 # -- Update validation serializers -------------------------------------------
 
 
+def _phone_number_taken(value: str, own_user_id: int | None) -> bool:
+    """True if the phone belongs to a *different* user than ``own_user_id``.
+
+    Without this the uniqueness check also matches the account being updated
+    itself, so a PATCH that leaves the phone unchanged always 400s.
+    """
+    qs = User.objects.filter(phone_number=value)
+    if own_user_id is not None:
+        qs = qs.exclude(pk=own_user_id)
+    return qs.exists()
+
+
 class UpdateAdminSerializer(serializers.Serializer):
-    """Request validation for updating an ``Admin`` (name/email/phone/stock flag)."""
+    """Request validation for updating an ``Admin`` (name/email/phone/stock flag).
+
+    Callers pass the ``Admin`` being edited as ``instance=`` so the phone
+    uniqueness check excludes that user's own row.
+    """
 
     name = serializers.CharField(max_length=255, required=False)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
@@ -170,28 +186,28 @@ class UpdateAdminSerializer(serializers.Serializer):
     can_update_stock_count = serializers.BooleanField(required=False)
 
     def validate_phone_number(self, value):
-        if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError(
-                "A user with this contact number already exists."
-            )
+        own_user_id = self.instance.user.id if self.instance is not None else None
+        if _phone_number_taken(value, own_user_id):
+            raise serializers.ValidationError("A user with this contact number already exists.")
         return value
 
 
 class UpdateSalesPersonSerializer(serializers.Serializer):
-    """Request validation for updating a ``SalesPerson`` (name/email/phone/city)."""
+    """Request validation for updating a ``SalesPerson`` (name/email/phone/city).
+
+    Callers pass the ``SalesPerson`` being edited as ``instance=`` so the
+    phone uniqueness check excludes that user's own row.
+    """
 
     name = serializers.CharField(max_length=255, required=False)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     phone_number = serializers.CharField(
         max_length=10, required=False, validators=[validate_phone_number]
     )
-    city = serializers.PrimaryKeyRelatedField(
-        queryset=City.objects.all(), required=False
-    )
+    city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), required=False)
 
     def validate_phone_number(self, value):
-        if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError(
-                "A user with this contact number already exists."
-            )
+        own_user_id = self.instance.user.id if self.instance is not None else None
+        if _phone_number_taken(value, own_user_id):
+            raise serializers.ValidationError("A user with this contact number already exists.")
         return value

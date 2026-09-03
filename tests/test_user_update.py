@@ -34,18 +34,12 @@ class UserUpdateTest(DMLTestCase):
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
 
-        cls.country = Country.objects.create(
-            name="India", iso_code="IN", created_by=cls.superuser
-        )
+        cls.country = Country.objects.create(name="India", iso_code="IN", created_by=cls.superuser)
         cls.state = State.objects.create(
             name="Maharashtra", code="MH", country=cls.country, created_by=cls.superuser
         )
-        cls.city = City.objects.create(
-            name="Pune", state=cls.state, created_by=cls.superuser
-        )
-        cls.city_2 = City.objects.create(
-            name="Mumbai", state=cls.state, created_by=cls.superuser
-        )
+        cls.city = City.objects.create(name="Pune", state=cls.state, created_by=cls.superuser)
+        cls.city_2 = City.objects.create(name="Mumbai", state=cls.state, created_by=cls.superuser)
 
         cls.seed_admin = User.objects.create_user(
             phone_number="7777777777",
@@ -211,9 +205,7 @@ class UserUpdateTest(DMLTestCase):
     def test_update_admin_empty_body_returns_unchanged(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_empty_body_returns_unchanged"""
         self._auth_as(self.superuser)
-        response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}", {}, format="json"
-        )
+        response = self.client.patch(f"/api/sales_admin/admins/{self.admin.id}", {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.assertEqual(response.data["name"], "seed admin")
 
@@ -265,6 +257,24 @@ class UserUpdateTest(DMLTestCase):
             ).status_code,
             status.HTTP_400_BAD_REQUEST,
         )
+
+    def test_update_admin_with_own_phone_number_is_allowed(self):
+        """PATCHing an admin with the phone they already have must succeed.
+
+        Regression: the uniqueness check previously matched the row being
+        edited itself, so an unchanged phone_number in the payload 400'd.
+
+        tests/test_user_update.py::UserUpdateTest::test_update_admin_with_own_phone_number_is_allowed
+        """
+        self._auth_as(self.superuser)
+        response = self.client.patch(
+            f"/api/sales_admin/admins/{self.admin.id}",
+            {"phone_number": self.seed_admin.phone_number, "name": "Same Phone"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.seed_admin.refresh_from_db()
+        self.assertEqual(self.seed_admin.name, "Same Phone")
 
     def test_update_admin_payload_shape(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_payload_shape"""
@@ -463,6 +473,24 @@ class UserUpdateTest(DMLTestCase):
             ).status_code,
             status.HTTP_400_BAD_REQUEST,
         )
+
+    def test_update_salesperson_with_own_phone_number_is_allowed(self):
+        """Same regression as for admins: unchanged own phone must not 400.
+
+        tests/test_user_update.py::UserUpdateTest::test_update_salesperson_with_own_phone_number_is_allowed
+        """
+        self._auth_as(self.seed_admin)
+        response = self.client.patch(
+            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            {
+                "phone_number": self.salesperson.user.phone_number,
+                "name": "Same Phone Person",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.salesperson.user.refresh_from_db()
+        self.assertEqual(self.salesperson.user.name, "Same Phone Person")
 
     def test_update_salesperson_payload_shape(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_payload_shape"""

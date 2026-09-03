@@ -1,2 +1,1 @@
-"""Android API v1 endpoints: ``/api/android/v1/...``.
-"""
+"""Android API v1 endpoints: ``/api/android/v1/...``."""

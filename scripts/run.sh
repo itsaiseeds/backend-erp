@@ -50,6 +50,7 @@ if [[ -z "$COMMAND" ]]; then
     echo "  test-unit   Run unit tests in web container"
     echo "  test-dml    Run DML-seeded Django tests in web container"
     echo "  lint        Run ruff check in web container"
+    echo "  format      Run ruff format + autofix in web container"
     echo "  typecheck   Run mypy in web container"
     echo "  hooks       Install git pre-commit hooks (ruff lint)"
     exit 1
@@ -235,7 +236,7 @@ cmd_test_unit() {
 
 cmd_test_dml() {
     echo "[test-dml] Running DML-seeded Django tests in web container ..."
-    webrun python -m pytest tests/test_verify_otp_view.py tests/test_auth_flow.py tests/test_user_creation.py tests/test_user_update.py tests/test_city_utilities.py -v
+    webrun python -m pytest tests/ -v
 }
 
 cmd_test() {
@@ -248,6 +249,12 @@ cmd_test() {
 cmd_lint() {
     echo "[lint] Running ruff check in web container ..."
     webrun ruff check .
+}
+
+cmd_format() {
+    echo "[format] Running ruff format + fix in web container ..."
+    webrun ruff format .
+    webrun ruff check --fix .
 }
 
 cmd_typecheck() {
@@ -282,6 +289,7 @@ case "$COMMAND" in
     test-unit)  cmd_test_unit ;;
     test-dml)   cmd_test_dml ;;
     lint)       cmd_lint ;;
+    format)     cmd_format ;;
     typecheck)  cmd_typecheck ;;
     hooks)      cmd_hooks ;;
     *)

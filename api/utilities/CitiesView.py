@@ -48,9 +48,10 @@ class CitiesView(APIView):
         responses={200: StateSerializer(many=True)},
     )
     def get(self, request):
-        india = Country.objects.filter(
-            name__iexact="India"
-        ).first() or Country.objects.filter(iso_code__in=("IN", "IND", "356")).first()
+        india = (
+            Country.objects.filter(name__iexact="India").first()
+            or Country.objects.filter(iso_code__in=("IN", "IND", "356")).first()
+        )
 
         states = (
             State.objects.filter(country=india).order_by("name")
@@ -64,9 +65,7 @@ class CitiesView(APIView):
                 {
                     "id": state.id,
                     "name": state.name,
-                    "cities": [
-                        {"id": city.id, "name": city.name} for city in cities
-                    ],
+                    "cities": [{"id": city.id, "name": city.name} for city in cities],
                 }
             )
         return Response(payload)

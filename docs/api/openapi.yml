@@ -52,6 +52,63 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminPayload'
           description: ''
+  /api/sales_admin/admins/{id}:
+    patch:
+      operationId: sales_admin_admins_partial_update
+      description: Update a single application admin (superuser only).
+      summary: Update an application admin
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sales_admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateAdminRequest'
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPayload'
+          description: ''
+  /api/sales_admin/auth/logout:
+    post:
+      operationId: sales_admin_auth_logout_create
+      description: Revoke the caller's session cookie and bearer token.
+      summary: Revoke the caller's credentials
+      tags:
+      - sales_admin
+      security:
+      - sessionAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: Credentials revoked.
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                description: Missing or invalid credentials.
+          description: ''
   /api/sales_admin/auth/otp/verify:
     post:
       operationId: sales_admin_auth_otp_verify_create
@@ -84,6 +141,12 @@ paths:
             application/json:
               schema:
                 description: Invalid phone number or TOTP code.
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                description: Too many requests from this IP; retry later.
           description: ''
   /api/sales_admin/sales-people:
     get:
@@ -132,6 +195,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/SalesPersonPayload'
           description: ''
+  /api/sales_admin/sales-people/{id}:
+    patch:
+      operationId: sales_admin_sales_people_partial_update
+      description: Update a single sales person (app admin only).
+      summary: Update a sales person
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sales_admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateSalesPersonRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateSalesPersonRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateSalesPersonRequest'
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesPersonPayload'
+          description: ''
   /api/utilities/cities:
     get:
       operationId: utilities_cities_list
@@ -150,6 +247,29 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/State'
+          description: ''
+  /api/utilities/reauthenticate:
+    get:
+      operationId: utilities_reauthenticate_retrieve
+      description: Confirm the caller's session cookie or bearer token is still valid.
+      summary: Check whether the caller's credential is still valid
+      tags:
+      - utilities
+      security:
+      - sessionAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReauthenticateResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                description: Missing, expired, or revoked credential.
           description: ''
 components:
   schemas:
@@ -268,6 +388,91 @@ components:
       - city
       - name
       - phone_number
+    PatchedUpdateAdminRequest:
+      type: object
+      description: |-
+        Request validation for updating an ``Admin`` (name/email/phone/stock flag).
+
+        Callers pass the ``Admin`` being edited as ``instance=`` so the phone
+        uniqueness check excludes that user's own row.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        can_update_stock_count:
+          type: boolean
+    PatchedUpdateSalesPersonRequest:
+      type: object
+      description: |-
+        Request validation for updating a ``SalesPerson`` (name/email/phone/city).
+
+        Callers pass the ``SalesPerson`` being edited as ``instance=`` so the
+        phone uniqueness check excludes that user's own row.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        city:
+          type: integer
+    ReauthenticateResponse:
+      type: object
+      description: |-
+        Mirrors the fields ``VerifyOTPView`` returns on a fresh login.
+
+        The client uses the capability booleans to decide which admin-management
+        UI to show; surfacing them here keeps a long-lived session in step with
+        a role change (e.g. an admin who was demoted after their initial login).
+      properties:
+        user:
+          $ref: '#/components/schemas/ReauthenticateUser'
+        can_create_admin:
+          type: boolean
+        can_create_sales_person:
+          type: boolean
+      required:
+      - can_create_admin
+      - can_create_sales_person
+      - user
+    ReauthenticateUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone_number:
+          type: string
+        role:
+          type: string
+      required:
+      - id
+      - name
+      - phone_number
+      - role
     SalesPersonPayload:
       type: object
       description: Swagger schema for one sales person row (city only).

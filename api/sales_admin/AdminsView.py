@@ -39,9 +39,7 @@ class CreateAdminSerializer(serializers.Serializer):
 
     name = serializers.CharField(max_length=255)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    phone_number = serializers.CharField(
-        max_length=10, validators=[validate_phone_number]
-    )
+    phone_number = serializers.CharField(max_length=10, validators=[validate_phone_number])
     can_update_stock_count = serializers.BooleanField(default=False)
     city = serializers.PrimaryKeyRelatedField(
         queryset=City.objects.all(),
@@ -50,9 +48,7 @@ class CreateAdminSerializer(serializers.Serializer):
 
     def validate_phone_number(self, value):
         if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError(
-                "A user with this contact number already exists."
-            )
+            raise serializers.ValidationError("A user with this contact number already exists.")
         return value
 
 
@@ -92,9 +88,7 @@ class AdminsView(APIView):
                 created_by=request.user,
             )
             # Fallback salesperson so the account can always use the sales app.
-            SalesPerson.objects.create(
-                user=user, city=data["city"], created_by=request.user
-            )
+            SalesPerson.objects.create(user=user, city=data["city"], created_by=request.user)
 
         return Response(
             admin_payload(admin, include_totp=True),
