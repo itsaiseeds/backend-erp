@@ -10,9 +10,7 @@ def indian_now():
 class TimeStampedModel(models.Model):
     """Adds ``created_at`` and ``updated_at`` columns to a model."""
 
-    created_at = models.DateTimeField(
-        "created at", default=indian_now, editable=False
-    )
+    created_at = models.DateTimeField("created at", default=indian_now, editable=False)
     updated_at = models.DateTimeField("updated at", auto_now=True, editable=False)
 
     class Meta:

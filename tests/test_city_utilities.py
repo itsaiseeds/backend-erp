@@ -42,15 +42,11 @@ class CityUtilitiesTest(DMLTestCase):
         Admin.objects.create(
             user=cls.seed_admin, can_update_stock_count=True, created_by=cls.superuser
         )
-        cls.country = Country.objects.create(
-            name="India", iso_code="IN", created_by=cls.superuser
-        )
+        cls.country = Country.objects.create(name="India", iso_code="IN", created_by=cls.superuser)
         cls.state = State.objects.create(
             name="Maharashtra", code="MH", country=cls.country, created_by=cls.superuser
         )
-        cls.pune = City.objects.create(
-            name="Pune", state=cls.state, created_by=cls.superuser
-        )
+        cls.pune = City.objects.create(name="Pune", state=cls.state, created_by=cls.superuser)
 
     def setUp(self):
         self.client = APIClient()
@@ -69,9 +65,7 @@ class CityUtilitiesTest(DMLTestCase):
         self.assertIn(self.client.get("/api/utilities/cities").status_code, (401, 403))
         # Superuser is allowed.
         self._auth_as(self.superuser)
-        self.assertEqual(
-            self.client.get("/api/utilities/cities").status_code, status.HTTP_200_OK
-        )
+        self.assertEqual(self.client.get("/api/utilities/cities").status_code, status.HTTP_200_OK)
 
     def test_cities_grouped_by_state(self):
         """tests/test_city_utilities.py::CityUtilitiesTest::test_cities_grouped_by_state"""

@@ -40,11 +40,9 @@ class UpdateAdminView(APIView):
         responses={200: AdminPayloadSerializer},
     )
     def patch(self, request, pk: int):
-        admin = get_object_or_404(
-            Admin.objects.select_related("user", "created_by"), pk=pk
-        )
+        admin = get_object_or_404(Admin.objects.select_related("user", "created_by"), pk=pk)
 
-        serializer = UpdateAdminSerializer(data=request.data, partial=True)
+        serializer = UpdateAdminSerializer(instance=admin, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 

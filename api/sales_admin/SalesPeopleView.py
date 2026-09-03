@@ -34,16 +34,12 @@ class CreateSalesPersonSerializer(serializers.Serializer):
 
     name = serializers.CharField(max_length=255)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    phone_number = serializers.CharField(
-        max_length=10, validators=[validate_phone_number]
-    )
+    phone_number = serializers.CharField(max_length=10, validators=[validate_phone_number])
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all())
 
     def validate_phone_number(self, value):
         if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError(
-                "A user with this contact number already exists."
-            )
+            raise serializers.ValidationError("A user with this contact number already exists.")
         return value
 
 
@@ -62,9 +58,8 @@ class SalesPeopleView(APIView):
         responses={200: SalesPersonPayloadSerializer(many=True)},
     )
     def get(self, request):
-        sales_people = (
-            SalesPerson.objects.select_related("user", "city", "created_by")
-            .order_by("-id")
+        sales_people = SalesPerson.objects.select_related("user", "city", "created_by").order_by(
+            "-id"
         )
         return Response([salesperson_payload(person) for person in sales_people])
 

@@ -45,11 +45,7 @@ class Address(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return (
-            f"{self.address_line_1}, {self.city}"
-            if self.city_id
-            else self.address_line_1
-        )
+        return f"{self.address_line_1}, {self.city}" if self.city_id else self.address_line_1
 
     def clean(self):
         super().clean()

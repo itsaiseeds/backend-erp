@@ -85,9 +85,7 @@ class UserChangeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         user_permissions = self.fields.get("user_permissions")
         if user_permissions:
-            user_permissions.queryset = user_permissions.queryset.select_related(
-                "content_type"
-            )
+            user_permissions.queryset = user_permissions.queryset.select_related("content_type")
 
 
 @admin.register(User)
@@ -176,9 +174,7 @@ class UserAdmin(AuditFieldsAdminMixin, BaseUserAdmin):
             uri = obj.totp_provisioning_uri()
             qr_b64 = _totp_qr_base64(uri)
         except Exception:
-            return format_html(
-                "<p style='color:#c62828;'>Could not render the QR code.</p>"
-            )
+            return format_html("<p style='color:#c62828;'>Could not render the QR code.</p>")
         status = (
             "<span style='color:#2e7d32; font-weight:600;'>Enabled</span>"
             if obj.totp_enabled

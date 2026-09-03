@@ -45,7 +45,9 @@ class UpdateSalesPersonView(APIView):
             SalesPerson.objects.select_related("user", "city", "created_by"), pk=pk
         )
 
-        serializer = UpdateSalesPersonSerializer(data=request.data, partial=True)
+        serializer = UpdateSalesPersonSerializer(
+            instance=salesperson, data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 

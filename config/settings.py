@@ -20,7 +20,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-4nct9v_(3h@+3ne00wl6dd#xpdjb+q7kz1*8)5v*n!*akv*$ja")  # noqa: E501
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY", "django-insecure-4nct9v_(3h@+3ne00wl6dd#xpdjb+q7kz1*8)5v*n!*akv*$ja"
+)  # noqa: E501
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
@@ -45,25 +47,25 @@ if SENTRY_DSN and not DEBUG:
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'corsheaders',
-    'rest_framework',
-    'rest_framework.authtoken',
-    'drf_spectacular',
-    'authentication',
-    'common',
-    'config',
-    'api',
-    'aggregator',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "corsheaders",
+    "rest_framework",
+    "rest_framework.authtoken",
+    "drf_spectacular",
+    "authentication",
+    "common",
+    "config",
+    "api",
+    "aggregator",
 ]
 
 # Custom user model for the whole project.
-AUTH_USER_MODEL = 'authentication.User'
+AUTH_USER_MODEL = "authentication.User"
 
 # Built-in Django apps' schema is managed via sql/ddl.sql -> keep their
 # migrations disabled so `migrate` never tries to create them. The project's
@@ -75,35 +77,35 @@ MIGRATION_MODULES = {
 }
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database
@@ -130,7 +132,6 @@ DATABASES = {
 }
 
 
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -138,26 +139,26 @@ DATABASES = {
 # new/updated password uses it. Old PBKDF2 hashes still verify (fallback order
 # below) until that account's password is next set or reset.
 PASSWORD_HASHERS = [
-    'django.contrib.auth.hashers.Argon2PasswordHasher',
-    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
-    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
-    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
-    'django.contrib.auth.hashers.ScryptPasswordHasher',
-    'django.contrib.auth.hashers.BCryptPasswordHasher',
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+    "django.contrib.auth.hashers.BCryptPasswordHasher",
 ]
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -165,9 +166,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'Asia/Kolkata'
+TIME_ZONE = "Asia/Kolkata"
 
 USE_I18N = True
 
@@ -177,8 +178,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
@@ -191,7 +192,7 @@ FLUTTER_BUILD_DIR = BASE_DIR / "web" / "build" / "web"
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # Django REST Framework
@@ -199,18 +200,24 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Default classes mirror the split the base views already hard-code per client:
 # admin = session, android = token. Override per-view where a flow differs.
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'api.authentication.SessionAuthentication',
-        'api.authentication.ExpiringTokenAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "api.authentication.SessionAuthentication",
+        "api.authentication.ExpiringTokenAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
     ],
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Per-scope throttle rates. Only ``verify_otp`` is scoped today: it caps a
+    # single IP at 40 login attempts per hour so an attacker cannot cheaply
+    # burn through every admin's account-lockout budget from one origin.
+    "DEFAULT_THROTTLE_RATES": {
+        "verify_otp": "1000/hour",
+    },
 }
 
 # Bearer (persistent-login) tokens are valid for this many hours from creation.
@@ -221,18 +228,67 @@ TOKEN_TTL_HOURS = int(os.environ.get("TOKEN_TTL_HOURS", "24"))
 SESSION_COOKIE_AGE = 24 * 60 * 60
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
+# TOTP brute-force lockout tunables (per user). Wrong TOTP submissions accrue
+# until the limit is hit, at which point the account is frozen for the
+# lockout window (``VerifyOTPView`` returns 429). See ``User.verify_totp``
+# and ``User.register_failed_totp``.
+TOTP_MAX_ATTEMPTS = int(os.environ.get("TOTP_MAX_ATTEMPTS", "5"))
+TOTP_LOCKOUT_MINUTES = int(os.environ.get("TOTP_LOCKOUT_MINUTES", "5"))
+
+# Cookie / transport hardening. Off by default (dev over http://localhost);
+# every deployment reachable over HTTPS must set these to "true" so the
+# session + csrf cookies never leak over cleartext, JS can't read the
+# session cookie, and cross-site POSTs can't ride the session.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
+
+# HSTS + related transport headers, opt-in via env so local http:// dev is
+# unaffected. Turn on in production; the middleware is already in MIDDLEWARE.
+SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get(
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS", "False"
+).lower() in ("true", "1", "yes")
+SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+SECURE_PROXY_SSL_HEADER = (
+    ("HTTP_X_FORWARDED_PROTO", "https")
+    if os.environ.get("SECURE_PROXY_SSL_HEADER", "False").lower() in ("true", "1", "yes")
+    else None
+)
+SECURE_REFERRER_POLICY = os.environ.get("SECURE_REFERRER_POLICY", "same-origin")
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
 # OpenAPI / Swagger documentation (drf-spectacular)
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'SaiSeeds ERP API',
-    'DESCRIPTION': (
-        'Backend API for the SaiSeeds sales admin website and salesperson '
-        'Android app. Auto-generated from the codebase.'
+    "TITLE": "SaiSeeds ERP API",
+    "DESCRIPTION": (
+        "Backend API for the SaiSeeds sales admin website and salesperson "
+        "Android app. Auto-generated from the codebase."
     ),
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'COMPONENT_SPLIT_REQUEST': True,
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
     # Group endpoints by the namespace they are mounted under.
-    'TAGS': [],
+    "TAGS": [],
 }
 
 # CORS

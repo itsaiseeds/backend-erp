@@ -46,8 +46,7 @@ class Command(BaseCommand):
                 email = DEV_SUPERUSER_EMAIL
                 password = DEV_SUPERUSER_PASSWORD
                 logger.warning(
-                    "Missing %s; using local fallback superuser "
-                    "(%s / %s) because DEBUG=True.",
+                    "Missing %s; using local fallback superuser (%s / %s) because DEBUG=True.",
                     ", ".join(missing),
                     username,
                     password,

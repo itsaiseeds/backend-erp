@@ -69,6 +69,9 @@ CREATE TABLE public.authentication_user (
 	email varchar(254) NULL,
 	totp_secret varchar(32) NULL,
 	totp_enabled bool NOT NULL,
+	totp_last_counter int8 NULL,
+	failed_totp_attempts int4 NOT NULL DEFAULT 0,
+	totp_lockout_until timestamptz NULL,
 	is_verified bool NOT NULL,
 	is_staff bool NOT NULL,
 	is_active bool NOT NULL,
@@ -88,6 +91,7 @@ CREATE TABLE public.authentication_user (
 	CONSTRAINT authentication_user_phone_number_not_null NOT NULL phone_number,
 	CONSTRAINT authentication_user_pkey PRIMARY KEY (id),
 	CONSTRAINT authentication_user_totp_enabled_not_null NOT NULL totp_enabled,
+	CONSTRAINT authentication_user_failed_totp_attempts_not_null NOT NULL failed_totp_attempts,
 	CONSTRAINT authentication_user_updated_at_not_null NOT NULL updated_at,
 	CONSTRAINT authentication_user_created_by_id_d3f2a616_fk_authentic FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED,
 	CONSTRAINT authentication_user_verified_by_id_e9e11f40_fk_authentic FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED

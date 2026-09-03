@@ -19,9 +19,7 @@ urlpatterns = [
     ),
     path(
         "api/docs/",
-        SpectacularSwaggerView.as_view(
-            permission_classes=[IsSuperUser], url_name="schema"
-        ),
+        SpectacularSwaggerView.as_view(permission_classes=[IsSuperUser], url_name="schema"),
         name="swagger-ui",
     ),
     re_path(r"^sales-admin(?:/(?P<path>.*))?$", flutter_catch_all),

@@ -10,18 +10,39 @@ A successful login issues both credential forms:
   Flutter admin website, and
 * a **bearer token** (24h, see ``TOKEN_TTL_HOURS``), used by the mobile app;
   re-login on a fresh verification.
+
+**Brute-force protection.** A 6-digit code is trivially guessable without
+throttling, so the endpoint runs three defenses together:
+
+* Per-IP throttle (``VerifyOTPThrottle``): a single origin cannot burn
+  through everyone's per-account lockout budget cheaply.
+* Per-user lockout: after ``TOTP_MAX_ATTEMPTS`` (5) consecutive wrong codes
+  the account is frozen for ``TOTP_LOCKOUT_MINUTES`` (5); during the window
+  the endpoint responds with the same generic ``400`` as a wrong code so
+  the caller cannot tell "I am locked" from "code was wrong" — that
+  distinction would leak account existence.
+* Replay refusal: ``User.verify_totp`` remembers the counter of every
+  accepted code and refuses to accept the same counter twice.
+
+The whole flow runs inside a ``transaction.atomic`` block with a
+``select_for_update`` on the user row, so concurrent requests for the same
+account cannot race the replay slot or the failure counter.
+
+Every successful login rotates the DRF ``Token`` (delete + create inside
+the same atomic block) so a leaked bearer cannot outlive a re-login.
 """
 
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model, login
+from django.db import transaction
 from django.middleware.csrf import get_token
-from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 User = get_user_model()
@@ -50,6 +71,23 @@ class VerifyOTPResponseSerializer(serializers.Serializer):
     can_create_sales_person = serializers.BooleanField()
 
 
+class VerifyOTPThrottle(AnonRateThrottle):
+    """Per-IP throttle for the pre-auth TOTP endpoint.
+
+    The rate lives in ``settings.REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']``
+    under ``verify_otp``. Purpose: stop a single origin from cheaply burning
+    through every admin's per-user lockout budget.
+    """
+
+    scope = "verify_otp"
+
+
+# Same generic body for every failure mode so a caller cannot tell "unknown
+# phone" from "wrong code" from "you are locked out" — all three collapse to
+# the same 400 response and reveal no account-existence signal.
+_GENERIC_FAILURE = {"detail": "Invalid phone number or TOTP code."}
+
+
 class VerifyOTPView(APIView):
     """Validate a TOTP code, then (re)issue credentials for that user."""
 
@@ -59,12 +97,14 @@ class VerifyOTPView(APIView):
     # for credentials, so it opts out of the global auth defaults.
     authentication_classes: list[type] = []
     permission_classes: list[type] = [AllowAny]
+    throttle_classes: list[type] = [VerifyOTPThrottle]
 
     @extend_schema(
         request=VerifyOTPSerializer,
         responses={
             200: VerifyOTPResponseSerializer,
             400: {"description": "Invalid phone number or TOTP code."},
+            429: {"description": "Too many requests from this IP; retry later."},
         },
     )
     def post(self, request):
@@ -72,18 +112,35 @@ class VerifyOTPView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        user = User.objects.filter(phone_number=data["phone_number"]).first()
+        # Serialize the whole login attempt for this user on the DB so two
+        # concurrent requests can't both spend the "same code, once only"
+        # replay slot, nor race the failed-attempt counter into an under-count.
+        # ``select_for_update`` requires an open transaction.
+        with transaction.atomic():
+            user = (
+                User.objects.select_for_update().filter(phone_number=data["phone_number"]).first()
+            )
+            if user is None or (not user.is_admin_user and not user.is_superuser):
+                return Response(_GENERIC_FAILURE, status=400)
 
-        if user is None or (not user.is_admin_user and not user.is_superuser):
-            return Response({"detail": "Invalid phone number or TOTP code."}, status=400)
+            # Return the same generic 400 whether the caller is locked or
+            # simply wrong: distinguishing them (e.g. via 429) tells an
+            # attacker "yes, this phone belongs to an admin".
+            if user.is_totp_locked():
+                return Response(_GENERIC_FAILURE, status=400)
 
-        if not user.totp_enabled or not user.verify_totp(data["otp"]):
-            return Response({"detail": "Invalid phone number or TOTP code."}, status=400)
+            if not user.totp_enabled or not user.verify_totp(data["otp"]):
+                user.register_failed_totp()
+                return Response(_GENERIC_FAILURE, status=400)
 
-        token, _ = Token.objects.get_or_create(user=user)
-        # Fresh login => restart the token's 24h clock.
-        token.created = timezone.now()
-        token.save(update_fields=["created"])
+            user.reset_totp_failures()
+            # Rotate the bearer token on every successful login so a
+            # previously leaked key is invalidated by a fresh sign-in instead
+            # of surviving for the whole TTL window. Delete+create must be
+            # atomic — a crash between them would leave the user tokenless
+            # even though their new session cookie is set.
+            Token.objects.filter(user=user).delete()
+            token = Token.objects.create(user=user)
         # Open a browser session for the Flutter admin site (same TOTP, one
         # flow). This rotates the session key and returns a sessionid cookie.
         login(request, user)
