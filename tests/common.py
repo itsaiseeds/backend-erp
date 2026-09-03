@@ -29,3 +29,5 @@ class DMLTestCase(TestCase):
         dml = re.sub(r"(?m)^(BEGIN|COMMIT);\s*$", "", dml)
         with connection.cursor() as cursor:
             cursor.execute(dml)
+
+
