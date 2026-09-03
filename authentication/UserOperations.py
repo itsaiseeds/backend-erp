@@ -1,11 +1,11 @@
-"""User creation and response-payload helpers for the user-management endpoints.
+"""User creation, update, and response-payload helpers for user-management endpoints.
 
-Account creation (``create_verified_user``) and the dict shapes / swagger
-schemas returned to clients for the ``authentication`` profiles (``Admin``,
-``SalesPerson``) live here so the views stay thin. Payloads never expose
-internal keys (``user_id``, ``is_deleted``/``deleted_by``/``deleted_at``); an
-admin carries no ``city`` or ``address`` and a sales person carries only its
-``city``.
+Account creation (``create_verified_user``), update validation serializers,
+and the dict shapes / swagger schemas returned to clients for the
+``authentication`` profiles (``Admin``, ``SalesPerson``) live here so the
+views stay thin. Payloads never expose internal keys (``user_id``,
+``is_deleted``/``deleted_by``/``deleted_at``); an admin carries no ``city``
+or ``address`` and a sales person carries only its ``city``.
 """
 
 from __future__ import annotations
@@ -16,7 +16,9 @@ import pyotp
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from aggregator.models import City
 from authentication.models import Admin, SalesPerson
+from authentication.validators import validate_phone_number
 
 User = get_user_model()
 
@@ -104,7 +106,7 @@ def admin_payload(admin: Admin, *, include_totp: bool = False) -> dict:
         "created_at": admin.created_at,
         "can_update_stock_count": admin.can_update_stock_count,
     }
-    if include_totp:
+    if include_totp and user.totp is not None:
         payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
     return payload
 
@@ -127,7 +129,7 @@ def salesperson_payload(salesperson: SalesPerson, *, include_totp: bool = False)
         "created_at": salesperson.created_at,
         "city": _city_ref(salesperson.city),
     }
-    if include_totp:
+    if include_totp and user.totp is not None:
         payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
     return payload
 
@@ -152,3 +154,44 @@ def create_verified_user(data: dict, actor: Any) -> Any:
         totp_secret=pyotp.random_base32(),
         totp_enabled=True,
     )
+
+
+# -- Update validation serializers -------------------------------------------
+
+
+class UpdateAdminSerializer(serializers.Serializer):
+    """Request validation for updating an ``Admin`` (name/email/phone/stock flag)."""
+
+    name = serializers.CharField(max_length=255, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    phone_number = serializers.CharField(
+        max_length=10, required=False, validators=[validate_phone_number]
+    )
+    can_update_stock_count = serializers.BooleanField(required=False)
+
+    def validate_phone_number(self, value):
+        if User.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(
+                "A user with this contact number already exists."
+            )
+        return value
+
+
+class UpdateSalesPersonSerializer(serializers.Serializer):
+    """Request validation for updating a ``SalesPerson`` (name/email/phone/city)."""
+
+    name = serializers.CharField(max_length=255, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    phone_number = serializers.CharField(
+        max_length=10, required=False, validators=[validate_phone_number]
+    )
+    city = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(), required=False
+    )
+
+    def validate_phone_number(self, value):
+        if User.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(
+                "A user with this contact number already exists."
+            )
+        return value

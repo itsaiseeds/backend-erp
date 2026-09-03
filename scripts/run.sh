@@ -235,7 +235,7 @@ cmd_test_unit() {
 
 cmd_test_dml() {
     echo "[test-dml] Running DML-seeded Django tests in web container ..."
-    webrun python -m pytest tests/test_verify_otp_view.py tests/test_auth_flow.py tests/test_user_creation.py tests/test_city_utilities.py -v
+    webrun python -m pytest tests/test_verify_otp_view.py tests/test_auth_flow.py tests/test_user_creation.py tests/test_user_update.py tests/test_city_utilities.py -v
 }
 
 cmd_test() {
