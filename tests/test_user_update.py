@@ -9,6 +9,7 @@ over the test :class:`~rest_framework.test.APIClient` with explicit bearer
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -506,3 +507,194 @@ class UserUpdateTest(DMLTestCase):
         self.assertIn("city", person)
         for key in ("user_id", "address", "is_deleted", "deleted_by", "totp"):
             self.assertNotIn(key, person)
+
+
+class UserDeleteTest(DMLTestCase):
+    """Cover delete permission gating and soft-delete behaviour for admin/salesperson.
+
+    tests/test_user_update.py::UserDeleteTest
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        """Build the geography tree, an app admin and a salesperson."""
+        super().setUpTestData()
+        cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
+
+        cls.country = Country.objects.create(name="India", iso_code="IN", created_by=cls.superuser)
+        cls.state = State.objects.create(
+            name="Maharashtra", code="MH", country=cls.country, created_by=cls.superuser
+        )
+        cls.city = City.objects.create(name="Pune", state=cls.state, created_by=cls.superuser)
+
+        cls.seed_admin = User.objects.create_user(
+            phone_number="7777777777",
+            name="seed admin",
+            is_verified=True,
+            created_by=cls.superuser,
+            verified_by=cls.superuser,
+        )
+        # Mirror the API create-admin flow, which grants the admin the
+        # permission required to soft-delete sales people.
+        cls.seed_admin.user_permissions.add(
+            Permission.objects.get(codename="delete_salesperson")
+        )
+        cls.admin = Admin.objects.create(
+            user=cls.seed_admin, can_update_stock_count=True, created_by=cls.superuser
+        )
+
+        cls.plain = User.objects.create_user(
+            phone_number="6666666666",
+            name="plain user",
+            is_verified=True,
+            created_by=cls.superuser,
+            verified_by=cls.superuser,
+        )
+
+        cls.salesperson = SalesPerson.objects.create(
+            user=User.objects.create_user(
+                phone_number="5555555555",
+                name="seed salesperson",
+                is_verified=True,
+                created_by=cls.superuser,
+                verified_by=cls.superuser,
+            ),
+            city=cls.city,
+            created_by=cls.superuser,
+        )
+
+    def setUp(self):
+        """Create an unauthenticated API client for every test in this class."""
+        self.client = APIClient()
+
+    def _auth_as(self, user) -> None:
+        token, _ = Token.objects.get_or_create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")  # type: ignore[attr-defined]
+
+    def _clear_auth(self) -> None:
+        self.client.credentials()  # type: ignore[attr-defined]
+
+    # -- permission gating (admin delete) -----------------------------------
+
+    def test_anonymous_admin_delete_rejected(self):
+        """tests/test_user_update.py::UserDeleteTest::test_anonymous_admin_delete_rejected"""
+        self._clear_auth()
+        response = self.client.delete(f"/api/sales_admin/admins/{self.admin.id}")
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_only_superuser_can_delete_admin(self):
+        """tests/test_user_update.py::UserDeleteTest::test_only_superuser_can_delete_admin"""
+        url = f"/api/sales_admin/admins/{self.admin.id}"
+        # A plain user, an app admin and a salesperson are all forbidden.
+        for user in (self.plain, self.seed_admin, self.salesperson.user):
+            self._auth_as(user)
+            self.assertEqual(
+                self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN
+            )
+
+        # A superuser may delete an admin.
+        self._auth_as(self.superuser)
+        self.assertEqual(
+            self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT
+        )
+
+    def test_delete_admin_not_found(self):
+        """tests/test_user_update.py::UserDeleteTest::test_delete_admin_not_found"""
+        self._auth_as(self.superuser)
+        self.assertEqual(
+            self.client.delete("/api/sales_admin/admins/999999").status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_delete_admin_soft_deletes_row(self):
+        """tests/test_user_update.py::UserDeleteTest::test_delete_admin_soft_deletes_row"""
+        self._auth_as(self.superuser)
+        self.assertEqual(
+            self.client.delete(f"/api/sales_admin/admins/{self.admin.id}").status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_deleted)
+        self.assertIsNotNone(self.admin.deleted_at)
+        self.assertEqual(self.admin.deleted_by_id, self.superuser.id)
+
+    def test_delete_soft_deleted_admin_not_found(self):
+        """tests/test_user_update.py::UserDeleteTest::test_delete_soft_deleted_admin_not_found"""
+        self._auth_as(self.superuser)
+        self.admin.delete(deleted_by=self.superuser)
+        self.assertEqual(
+            self.client.delete(f"/api/sales_admin/admins/{self.admin.id}").status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    # -- permission gating (salesperson delete) -----------------------------
+
+    def test_anonymous_salesperson_delete_rejected(self):
+        """tests/test_user_update.py::UserDeleteTest::test_anonymous_salesperson_delete_rejected"""
+        self._clear_auth()
+        response = self.client.delete(
+            f"/api/sales_admin/sales-people/{self.salesperson.id}"
+        )
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_admin_can_delete_salesperson(self):
+        """tests/test_user_update.py::UserDeleteTest::test_admin_can_delete_salesperson"""
+        self._auth_as(self.seed_admin)
+        self.assertEqual(
+            self.client.delete(
+                f"/api/sales_admin/sales-people/{self.salesperson.id}"
+            ).status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+    def test_superuser_can_delete_salesperson(self):
+        """tests/test_user_update.py::UserDeleteTest::test_superuser_can_delete_salesperson"""
+        self._auth_as(self.superuser)
+        self.assertEqual(
+            self.client.delete(
+                f"/api/sales_admin/sales-people/{self.salesperson.id}"
+            ).status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+    def test_plain_and_salesperson_cannot_delete_salesperson(self):
+        """tests/test_user_update.py::UserDeleteTest::test_plain_and_salesperson_cannot_delete_salesperson"""
+        url = f"/api/sales_admin/sales-people/{self.salesperson.id}"
+        for user in (self.plain, self.salesperson.user):
+            self._auth_as(user)
+            self.assertEqual(
+                self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN
+            )
+
+    def test_delete_salesperson_not_found(self):
+        """tests/test_user_update.py::UserDeleteTest::test_delete_salesperson_not_found"""
+        self._auth_as(self.seed_admin)
+        self.assertEqual(
+            self.client.delete("/api/sales_admin/sales-people/999999").status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_delete_salesperson_soft_deletes_row(self):
+        """tests/test_user_update.py::UserDeleteTest::test_delete_salesperson_soft_deletes_row"""
+        self._auth_as(self.seed_admin)
+        self.assertEqual(
+            self.client.delete(
+                f"/api/sales_admin/sales-people/{self.salesperson.id}"
+            ).status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+        self.salesperson.refresh_from_db()
+        self.assertTrue(self.salesperson.is_deleted)
+        self.assertIsNotNone(self.salesperson.deleted_at)
+        self.assertEqual(self.salesperson.deleted_by_id, self.seed_admin.id)
+
+    def test_delete_soft_deleted_salesperson_not_found(self):
+        """tests/test_user_update.py::UserDeleteTest::test_delete_soft_deleted_salesperson_not_found"""
+        self._auth_as(self.seed_admin)
+        self.salesperson.delete(deleted_by=self.superuser)
+        self.assertEqual(
+            self.client.delete(
+                f"/api/sales_admin/sales-people/{self.salesperson.id}"
+            ).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )

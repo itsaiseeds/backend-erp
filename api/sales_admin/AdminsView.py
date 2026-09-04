@@ -11,6 +11,7 @@ Soft-deleted admins are never returned.
 
 from __future__ import annotations
 
+from django.contrib.auth.models import Permission
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
@@ -89,6 +90,11 @@ class AdminsView(APIView):
             )
             # Fallback salesperson so the account can always use the sales app.
             SalesPerson.objects.create(user=user, city=data["city"], created_by=request.user)
+            # Grant the admin the permission needed to soft-delete sales people
+            # (SoftDeletedModel.delete requires the delete_salesperson permission).
+            user.user_permissions.add(
+                Permission.objects.get(codename="delete_salesperson")
+            )
 
         return Response(
             admin_payload(admin, include_totp=True),

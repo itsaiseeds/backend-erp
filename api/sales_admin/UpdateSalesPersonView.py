@@ -1,10 +1,11 @@
-"""Sales person update endpoint: ``PATCH`` ``/api/sales_admin/sales-people/<id>``.
+"""Sales person update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales_admin/sales-people/<id>``.
 
 Only an application Admin may update a sales person (enforced via the
 ``IsAdminUser`` permission, mirroring ``SalesPeopleView``). A sales person
 cannot update itself or others and a superuser only manages admins, so only
 an app admin can patch a sales person row. ``phone_number`` is validated for
-format and uniqueness.
+format and uniqueness. A sales person may be deleted by either an app admin or
+a Django superuser (``IsAdminOrSuperUser``).
 
 Soft-deleted sales people are never found (404).
 """
@@ -13,12 +14,13 @@ from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
-from api.permissions import IsAdminUser
+from api.permissions import IsAdminOrSuperUser, IsAdminUser
 from authentication.models import SalesPerson
 from authentication.UserOperations import (
     SalesPersonPayloadSerializer,
@@ -28,12 +30,19 @@ from authentication.UserOperations import (
 
 
 class UpdateSalesPersonView(APIView):
-    """Update a single sales person (app admin only)."""
+    """Update a sales person (app admin only) or delete one (admin or superuser)."""
 
     # Refer to api/sales_admin/VerifyOTPView.py for how a view declares its own
     # authentication / permission classes instead of the global defaults.
     authentication_classes: list[type] = [ExpiringTokenAuthentication, SessionAuthentication]
     permission_classes: list[type] = [IsAuthenticated, IsAdminUser]
+
+    def get_permissions(self):
+        # PATCH is app-admin only, but a sales person may be deleted by either
+        # an app admin or a Django superuser.
+        if self.request.method == "DELETE":
+            return [IsAuthenticated(), IsAdminOrSuperUser()]
+        return super().get_permissions()
 
     @extend_schema(
         summary="Update a sales person",
@@ -65,3 +74,14 @@ class UpdateSalesPersonView(APIView):
         )
 
         return Response(salesperson_payload(salesperson, include_totp=True))
+
+    @extend_schema(
+        summary="Delete a sales person",
+        responses={204: None},
+    )
+    def delete(self, request, pk: int):
+        salesperson = get_object_or_404(
+            SalesPerson.objects.select_related("user", "city", "created_by"), pk=pk
+        )
+        salesperson.delete(deleted_by=request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
