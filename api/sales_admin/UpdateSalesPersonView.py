@@ -4,8 +4,8 @@ Only an application Admin may update a sales person (enforced via the
 ``IsAdminUser`` permission, mirroring ``SalesPeopleView``). A sales person
 cannot update itself or others and a superuser only manages admins, so only
 an app admin can patch a sales person row. ``phone_number`` is validated for
-format and uniqueness. A sales person may be deleted by either an app admin or
-a Django superuser (``IsAdminOrSuperUser``).
+format and uniqueness. A sales person may be deleted by a Django superuser
+only (``IsSuperUser``), matching admin deletion.
 
 Soft-deleted sales people are never found (404).
 """
@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
-from api.permissions import IsAdminOrSuperUser, IsAdminUser
+from api.permissions import IsAdminUser, IsSuperUser
 from authentication.models import SalesPerson
 from authentication.UserOperations import (
     SalesPersonPayloadSerializer,
@@ -30,7 +30,7 @@ from authentication.UserOperations import (
 
 
 class UpdateSalesPersonView(APIView):
-    """Update a sales person (app admin only) or delete one (admin or superuser)."""
+    """Update a sales person (app admin only) or delete one (superuser only)."""
 
     # Refer to api/sales_admin/VerifyOTPView.py for how a view declares its own
     # authentication / permission classes instead of the global defaults.
@@ -38,10 +38,10 @@ class UpdateSalesPersonView(APIView):
     permission_classes: list[type] = [IsAuthenticated, IsAdminUser]
 
     def get_permissions(self):
-        # PATCH is app-admin only, but a sales person may be deleted by either
-        # an app admin or a Django superuser.
+        # PATCH is app-admin only; a sales person may be deleted by a superuser
+        # only.
         if self.request.method == "DELETE":
-            return [IsAuthenticated(), IsAdminOrSuperUser()]
+            return [IsAuthenticated(), IsSuperUser()]
         return super().get_permissions()
 
     @extend_schema(

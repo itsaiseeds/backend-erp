@@ -39,15 +39,6 @@ class IsSuperUser(IsRolePermission):
     role_property = "is_superuser"
 
 
-class IsAdminOrSuperUser(BasePermission):
-    """Allow users holding an ``Admin`` profile or a Django superuser."""
-
-    def has_permission(self, request, view) -> bool:
-        has_admin = IsAdminUser().has_permission(request, view)
-        has_superuser = IsSuperUser().has_permission(request, view)
-        return has_admin or has_superuser
-
-
 class IsSalesPerson(IsAuthenticated):
     """Allow only users holding a ``SalesPerson`` profile."""
 
