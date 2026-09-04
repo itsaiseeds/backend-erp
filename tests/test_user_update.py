@@ -9,6 +9,7 @@ over the test :class:`~rest_framework.test.APIClient` with explicit bearer
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -532,6 +533,11 @@ class UserDeleteTest(DMLTestCase):
             is_verified=True,
             created_by=cls.superuser,
             verified_by=cls.superuser,
+        )
+        # Mirror the API create-admin flow, which grants the admin the
+        # permission required to soft-delete sales people.
+        cls.seed_admin.user_permissions.add(
+            Permission.objects.get(codename="delete_salesperson")
         )
         cls.admin = Admin.objects.create(
             user=cls.seed_admin, can_update_stock_count=True, created_by=cls.superuser
