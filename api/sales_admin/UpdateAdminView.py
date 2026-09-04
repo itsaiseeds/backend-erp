@@ -1,9 +1,10 @@
-"""Admin update endpoint: ``PATCH`` ``/api/sales_admin/admins/<id>``.
+"""Admin update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales_admin/admins/<id>``.
 
-Only a Django superuser may update an application admin (enforced via the
-``IsSuperUser`` permission, mirroring ``AdminsView``). Extra ``pk`` kwargs are
-rejected at the URL resolver, so a superuser can only mutate the admin whose
-id is in the path. ``phone_number`` is validated for format and uniqueness.
+Only a Django superuser may update or delete an application admin (enforced via
+the ``IsSuperUser`` permission, mirroring ``AdminsView``). Extra ``pk`` kwargs
+are rejected at the URL resolver, so a superuser can only mutate the admin
+whose id is in the path. ``phone_number`` is validated for format and
+uniqueness.
 
 Soft-deleted admins are never found (404).
 """
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,7 +29,7 @@ from authentication.UserOperations import (
 
 
 class UpdateAdminView(APIView):
-    """Update a single application admin (superuser only)."""
+    """Update or delete a single application admin (superuser only)."""
 
     # Refer to api/sales_admin/VerifyOTPView.py for how a view declares its own
     # authentication / permission classes instead of the global defaults.
@@ -60,3 +62,14 @@ class UpdateAdminView(APIView):
         )
 
         return Response(admin_payload(admin, include_totp=True))
+
+    @extend_schema(
+        summary="Delete an application admin",
+        responses={204: None},
+    )
+    def delete(self, request, pk: int):
+        admin = get_object_or_404(
+            Admin.objects.select_related("user", "created_by"), pk=pk
+        )
+        admin.delete(deleted_by=request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
