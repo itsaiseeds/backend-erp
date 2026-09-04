@@ -642,14 +642,14 @@ class UserDeleteTest(DMLTestCase):
         )
         self.assertIn(response.status_code, (401, 403))
 
-    def test_admin_can_delete_salesperson(self):
-        """tests/test_user_update.py::UserDeleteTest::test_admin_can_delete_salesperson"""
+    def test_admin_cannot_delete_salesperson(self):
+        """tests/test_user_update.py::UserDeleteTest::test_admin_cannot_delete_salesperson"""
         self._auth_as(self.seed_admin)
         self.assertEqual(
             self.client.delete(
                 f"/api/sales_admin/sales-people/{self.salesperson.id}"
             ).status_code,
-            status.HTTP_204_NO_CONTENT,
+            status.HTTP_403_FORBIDDEN,
         )
 
     def test_superuser_can_delete_salesperson(self):
@@ -662,10 +662,10 @@ class UserDeleteTest(DMLTestCase):
             status.HTTP_204_NO_CONTENT,
         )
 
-    def test_plain_and_salesperson_cannot_delete_salesperson(self):
-        """tests/test_user_update.py::UserDeleteTest::test_plain_and_salesperson_cannot_delete_salesperson"""
+    def test_plain_admin_and_salesperson_cannot_delete_salesperson(self):
+        """tests/test_user_update.py::UserDeleteTest::test_plain_admin_and_salesperson_cannot_delete_salesperson"""
         url = f"/api/sales_admin/sales-people/{self.salesperson.id}"
-        for user in (self.plain, self.salesperson.user):
+        for user in (self.plain, self.seed_admin, self.salesperson.user):
             self._auth_as(user)
             self.assertEqual(
                 self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN
@@ -681,7 +681,7 @@ class UserDeleteTest(DMLTestCase):
 
     def test_delete_salesperson_soft_deletes_row(self):
         """tests/test_user_update.py::UserDeleteTest::test_delete_salesperson_soft_deletes_row"""
-        self._auth_as(self.seed_admin)
+        self._auth_as(self.superuser)
         self.assertEqual(
             self.client.delete(
                 f"/api/sales_admin/sales-people/{self.salesperson.id}"
@@ -691,7 +691,7 @@ class UserDeleteTest(DMLTestCase):
         self.salesperson.refresh_from_db()
         self.assertTrue(self.salesperson.is_deleted)
         self.assertIsNotNone(self.salesperson.deleted_at)
-        self.assertEqual(self.salesperson.deleted_by_id, self.seed_admin.id)
+        self.assertEqual(self.salesperson.deleted_by_id, self.superuser.id)
 
     def test_delete_soft_deleted_salesperson_not_found(self):
         """tests/test_user_update.py::UserDeleteTest::test_delete_soft_deleted_salesperson_not_found"""
