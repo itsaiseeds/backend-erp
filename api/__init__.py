@@ -1,13 +1,13 @@
-"""API layer.
-
-All HTTP endpoints live under ``/api/``.
+"""API layer for the sales admin website. Session-only; never touches tokens.
 
 Namespace layout
 ----------------
-* ``/api/auth/...``      : shared authentication endpoints (both clients).
-* ``/api/admin/...``     : the admin-facing Flutter web app.
-* ``/api/android/<v>/...``: the sales-person-facing Android app. ``<v>`` is a
-  major version bumped only on breaking changes (e.g. ``v1``).
+* ``/api/sales_admin/...`` : the sales admin website (TOTP login, admin /
+  sales-person management, logout).
+* ``/api/utilities/...``   : session-authenticated web helpers/look-ups.
+
+The sales-person Android app is a separate Django app and is token-only; see
+``android`` (served at ``/android/api/<version>/...``).
 """
 
 default_app_config = "api.apps.ApiConfig"

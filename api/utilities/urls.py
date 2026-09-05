@@ -1,7 +1,8 @@
-"""Routes for the ``/api/utilities/`` namespace (shared look-ups/helpers).
+"""Routes for the ``/api/utilities/`` namespace (session-only web helpers).
 
 Auth requirements are enforced per-view: ``cities`` is superuser-only,
-``reauthenticate`` accepts any authenticated caller (session or bearer token).
+``reauthenticate`` accepts any authenticated session. See
+``android.api.v1.routes`` for the Android app's token-only counterparts.
 """
 
 from django.urls import path

@@ -20,22 +20,28 @@ graph TD
         URLS --> SCHEMA["/api/schema/ + /api/docs/<br/>(drf-spectacular, superuser)"]
     end
 
-    subgraph AUTHCLASSES["Shared auth (api/authentication.py)"]
-        SESSAUTH["SessionAuthentication<br/>(sales admin — cookie, 401 semantics)"]
-        EXPTAUTH["ExpiringTokenAuthentication<br/>(Android — bearer token, 24h TTL)"]
+    subgraph AUTHCLASSES["Auth classes (api/authentication.py)"]
+        SESSAUTH["SessionAuthentication<br/>(web only — cookie, 401 semantics)"]
+        EXPTAUTH["ExpiringTokenAuthentication<br/>(Android only — bearer token, 24h TTL)"]
     end
 
-    subgraph API["API layer (api/)"]
+    subgraph API["Web API layer (api/) — session-only, never touches tokens"]
         URLS --> APIROOT["api/urls.py"]
         APIROOT --> SA["/api/sales_admin/"]
-        SA --> OTPVER["VerifyOTPView (TOTP login)"]
-        APIROOT --> AND["/api/android/v1/ (empty)"]
+        SA --> OTPVER["VerifyOTPView (TOTP login, session-only)"]
         APIROOT --> TSENTRY["TestSentryView<br/>(/api/test-sentry/, superuser)"]
         ADMINV["AdminApiView (session)"] --> BASE["BaseApiView<br/>(auth flags)"]
-        ANDV["AndroidBaseView (token)"] --> BASE
-        SESSAUTH --> BASE
-        EXPTAUTH --> BASE
+        SESSAUTH --> ADMINV
         OTPVER -. pre-auth .-> DB
+    end
+
+    subgraph ANDROIDAPP["Android app (android/) — token-only, never touches sessions"]
+        URLS --> ANDROOT["android/urls.py"]
+        ANDROOT --> AND["/android/api/v1/<br/>(routes.ROUTES, version-inherited)"]
+        AND --> ANDLOGIN["LoginView (TOTP login, token-only)"]
+        ANDV["AndroidBaseView (token)"] --> BASE
+        EXPTAUTH --> ANDV
+        ANDLOGIN -. pre-auth .-> DB
     end
 
     subgraph DOMAIN["Domain (authentication/)"]
@@ -144,29 +150,47 @@ graph TD
 | `db` service | `docker-compose.yml` | PostgreSQL 18, port 5432, named volume `postgres_data`; `pg_isready` healthcheck; `shared_buffers=128MB`; timezone UTC | provider ← web, tests, DBeaver |
 | Container entrypoint | `scripts/entrypoint.sh` | Starts collectstatic → `createsuperuser_if_not_exists` → then runs **dev `runserver`** when `DEBUG=true` (live reload on bind mount) or **gunicorn** otherwise (`--workers`/`--threads` env). **`migrate` is commented out** — the whole schema is pre-applied SQL (see `sql/` below). Invoked via `bash` (Dockerfile `ENTRYPOINT ["bash", ...]`) so it needs no `+x` | runs → `config.wsgi` / `manage.py runserver` |
 | WSGI / ASGI | `config/wsgi.py`, `config/asgi.py` | Gunicorn hooks in here | → `config.urls` |
-| Root URLconf | `config/urls.py` | Mounts `/admin/`, `/api/`, `/api/schema|docs/` (superuser-only), `/sales-admin/...` catch-all | → `api/urls.py`, `config.views.flutter_catch_all`, drf-spectacular views |
+| Root URLconf | `config/urls.py` | Mounts `/admin/`, `/api/` (web, session-only), `/android/` (Android app, token-only), `/api/schema|docs/` (superuser-only), `/sales-admin/...` catch-all | → `api/urls.py`, `android/urls.py`, `config.views.flutter_catch_all`, drf-spectacular views |
 | Flutter catch-all | `config/views.py` | Serves `web/build/web/` (committed build output) for all `/sales-admin/*` routes; SPA fallback to `index.html` | serves ← `web/` |
 
 ### Configuration
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `config/settings.py` | single settings module | env-driven (`SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS` have fallbacks); DRF default auth = `SessionAuthentication` + `ExpiringTokenAuthentication`, permission `IsAuthenticated`; Argon2-first password hashers; `CONN_MAX_AGE=60` + `CONN_HEALTH_CHECKS` + db `timezone=Asia/Kolkata`; WhiteNoise static with `STATIC_ROOT=staticfiles`; `SESSION_COOKIE_AGE=86400` + `TOKEN_TTL_HOURS=24`; `CORS_ALLOW_CREDENTIALS`; Sentry init when `SENTRY_DSN` set and not DEBUG | configures → all apps; reads → env vars |
+| `config/settings.py` | single settings module | env-driven (`SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS` have fallbacks); DRF default auth (`SessionAuthentication` + `ExpiringTokenAuthentication`) is only the fallback for views that don't pick one explicitly (e.g. the schema/docs views) — every real endpoint sets its own via `AdminApiView` (session-only) or `AndroidBaseView` (token-only); permission `IsAuthenticated`; Argon2-first password hashers; `CONN_MAX_AGE=60` + `CONN_HEALTH_CHECKS` + db `timezone=Asia/Kolkata`; WhiteNoise static with `STATIC_ROOT=staticfiles`; `SESSION_COOKIE_AGE=86400` + `TOKEN_TTL_HOURS=24`; `CORS_ALLOW_CREDENTIALS`; Sentry init when `SENTRY_DSN` set and not DEBUG | configures → all apps; reads → env vars |
 | Superuser bootstrap | `config/management/commands/createsuperuser_if_not_exists.py` | Idempotent superuser create; dev fallback `9999999999/admin` when `DEBUG=True`; `DJANGO_SUPERUSER_*` env otherwise | called by → entrypoint |
 
 ### API layer
 
+Strict client separation: the web (`api/`) app is **session-only** and never
+touches `authtoken_token`; the Android app (`android/`, a separate Django app)
+is **token-only** and never touches sessions. `BaseApiView` is the shared
+role-flag parent both client bases build on.
+
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `BaseApiView` | `api/views.py` | Flag-driven base (`auth_required`, `admin_required`, `superuser_required`) → DRF `get_permissions()`; also defines `fire_and_forget` (post-commit background thread) | base ← `AdminApiView`, `AndroidBaseView` |
-| Shared auth classes | `api/authentication.py` | `SessionAuthentication` (DRF session but with a real `WWW-Authenticate` challenge so anonymous = **401**, not 403) + `ExpiringTokenAuthentication` (24h TTL via `TOKEN_TTL_HOURS`; an expired token is deleted on first use) | used by → base views + `settings.REST_FRAMEWORK` defaults |
-| `AdminApiView` | `api/admin.py` | Sales-admin website base: **session cookie** auth + requires `Admin` profile | → `BaseApiView`, `.permissions.IsAdminUser` |
-| `AndroidBaseView` | `api/android/base.py` | Salesperson Android base: **bearer `ExpiringTokenAuthentication`** + requires `SalesPerson` profile | → `BaseApiView`, `.permissions.IsSalesPerson` |
+| `BaseApiView` | `api/views.py` | Flag-driven base (`auth_required`, `admin_required`, `superuser_required`) → DRF `get_permissions()`; does not itself pick an auth scheme; also defines `fire_and_forget` (post-commit background thread) | base ← `AdminApiView`, `AndroidBaseView` |
+| Auth classes | `api/authentication.py` | `SessionAuthentication` (DRF session but with a real `WWW-Authenticate` challenge so anonymous = **401**, not 403; used only by the web) + `ExpiringTokenAuthentication` (24h TTL via `TOKEN_TTL_HOURS`; an expired token is deleted on first use; used only by Android) | used by → `AdminApiView`, `AndroidBaseView` |
+| `AdminApiView` | `api/admin.py` | Sales-admin website base: **session cookie only** | → `BaseApiView` |
 | Permissions | `api/permissions.py` | `IsRolePermission` meta-class + `IsAdminUser`, `IsSuperUser`, `IsSalesPerson` | keyed off → `User.is_admin_user/is_superuser/is_salesperson` |
-| Top API router | `api/urls.py` | `/api/android/`, `/api/sales_admin/`, `/api/test-sentry/` | → namespace URLconfs, `TestSentryView` |
-| `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales_admin/auth/otp/verify` — pre-auth, `AllowAny`; verifies the user's **TOTP** code, issues credentials, returns `token` + user payload + `can_create_admin`/`can_create_sales_person` flags | reads → `User`, `rest_framework.authtoken`; calls → `login()` + `get_token()` (issues `sessionid` + `csrftoken` cookies) |
+| Top API router | `api/urls.py` | `/api/sales_admin/`, `/api/utilities/` (web, session-only) | → namespace URLconfs |
+| `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales_admin/auth/otp/verify` — pre-auth, `AllowAny`; verifies the user's **TOTP** code, opens a session, returns the user payload + `can_create_admin`/`can_create_sales_person` flags (no token) | reads → `User`; calls → `login()` + `get_token()` (issues `sessionid` + `csrftoken` cookies) |
 | `TestSentryView` | `api/test_sentry.py` | `GET/POST /api/test-sentry/` — raises on purpose to verify error tracking (GlitchTip/Sentry); superuser-only so it can't be abused | gated by → `IsSuperUser` permission |
-| Android v1 | `api/android/v1/urls.py` | Versioned namespace, currently empty (endpoints built out one module each) | — |
+
+### Android app (separate Django app: `android/`)
+
+Mounted at `/android/api/<version>/...` (`config/urls.py`). Version
+inheritance: a view introduced at `vX` is served under every later `vY`
+(`Y >= X`) unless that version overrides the same route — enforced by
+`android/api/routing.py`, not left as a convention.
+
+| Node | Path | Purpose | Edges |
+|---|---|---|---|
+| `AndroidBaseView` | `android/api/base.py` | Salesperson Android base: **bearer `ExpiringTokenAuthentication` only** + requires `SalesPerson` profile | → `BaseApiView`, `api.permissions.IsSalesPerson` |
+| Routing mechanism | `android/api/routing.py` | `merged_routes(versions)` merges each version's `routes.ROUTES` in order (later wins); `build_urlpatterns` turns the merge into urlpatterns | used by → `android/api/urls.py` |
+| Version router | `android/api/urls.py` | `VERSIONS = ["v1", ...]`; mounts `<version>/` with routes inherited from every earlier version | → `routing.build_urlpatterns` |
+| Android v1 | `android/api/v1/routes.py` | `ROUTES`: `auth/login` (`LoginView`), `auth/logout` (`LogoutView`), `auth/reauthenticate` (`ReauthenticateView`), `utilities/cities` (`CitiesView`) | → `AndroidBaseView` (except `LoginView`, pre-auth) |
+| `LoginView` | `android/api/v1/LoginView.py` | `POST /android/api/v1/auth/login` — pre-auth, `AllowAny`; TOTP login for sales persons, mints/rotates a bearer `Token` (mirrors `VerifyOTPView` but token-only, no session) | reads → `User`; writes → `rest_framework.authtoken.Token` |
 
 > Naming gotcha: `api/admin.py` defines the **`AdminApiView` base controller**, not
 > the Django admin site (which lives in `authentication/admin.py`).
@@ -309,36 +333,50 @@ erDiagram
 ```
 /                    -> 404
 /admin/              -> Django admin (authentication/admin.py + aggregator/admin.py)
-/api/
+/api/                                          (web, SESSION-ONLY, never touches tokens)
 ├── sales_admin/
-│   ├── auth/otp/verify      POST  VerifyOTPView          (AllowAny → TOTP login)
+│   ├── auth/otp/verify      POST  VerifyOTPView          (AllowAny → TOTP login, opens a session)
+│   ├── auth/logout          POST  LogoutView             (IsAuthenticated → flushes session)
 │   ├── admins               GET/POST  AdminsView         (IsSuperUser)
 │   ├── admins/<int:id>      PATCH/DELETE  UpdateAdminView (IsSuperUser)
 │   ├── sales-people         GET/POST  SalesPeopleView    (IsAdminUser)
 │   └── sales-people/<int:id> PATCH/DELETE  UpdateSalesPersonView (IsAdminUser)
-├── android/
-│   └── v1/               (empty — being built)
+├── utilities/
+│   ├── reauthenticate       GET   ReauthenticateView      (IsAuthenticated)
+│   └── cities               GET   CitiesView              (IsSuperUser)
 └── test-sentry/          GET/POST  TestSentryView (superuser → forced 500)
 /api/schema/         -> OpenAPI JSON   (drf-spectacular, superuser only)
 /api/docs/           -> Swagger UI
+/android/                                      (Android app, TOKEN-ONLY, never touches sessions)
+└── api/
+    └── v1/                    (routes.ROUTES; inherited by every later version)
+        ├── auth/login         POST  LoginView            (AllowAny → TOTP login, mints a token)
+        ├── auth/logout        POST  LogoutView           (IsSalesPerson → deletes the token)
+        ├── auth/reauthenticate GET  ReauthenticateView    (IsSalesPerson)
+        └── utilities/cities   GET   CitiesView            (IsSalesPerson)
 /sales-admin[/...]   -> Flutter build  (config/views.py catch-all)
 ```
 
 > Route convention: single-object URLs use `<int:id>` (never `<int:pk>`); the
 > view receives it as the `id` kwarg and looks the row up with `id=…`.
 
-> Auth model: default DRF global = `SessionAuthentication` + `ExpiringTokenAuthentication`, `IsAuthenticated`.
-> Pre-auth endpoints (TOTP login) opt out with `authentication_classes = []` and
-> `permission_classes = [AllowAny]`. Client base views pick credentials:
-> admin → session cookie; android → bearer token (24h TTL).
+> Auth model: **strict client separation**. `api/` (web) uses
+> `AdminApiView` → `SessionAuthentication` only; `android/` uses
+> `AndroidBaseView` → `ExpiringTokenAuthentication` only (24h TTL). The DRF
+> global default (`SessionAuthentication` + `ExpiringTokenAuthentication`,
+> `IsAuthenticated`) is only a fallback for views that pick neither base
+> explicitly (schema/docs). Pre-auth endpoints (`VerifyOTPView`,
+> `android.api.v1.LoginView`) opt out with `authentication_classes = []` and
+> `permission_classes = [AllowAny]`.
 >
 > **CSRF on API routes:** DRF `APIView` handlers are wrapped in `csrf_exempt`,
 > so the global `CsrfViewMiddleware` never gates DRF endpoints. CSRF is
 > enforced only by DRF `SessionAuthentication` on session-authenticated
-> state-changing requests. `VerifyOTPView` calls `get_token(request)` so the
-> login response ships a `csrftoken` cookie; the Flutter SPA must read that
-> cookie and echo it via the `X-CSRFToken` header on later POSTs (see
-> `skills/api.md` for the exact flow).
+> state-changing requests — i.e. only on the web side. `VerifyOTPView` calls
+> `get_token(request)` so the login response ships a `csrftoken` cookie; the
+> Flutter SPA must read that cookie and echo it via the `X-CSRFToken` header
+> on later POSTs (see `skills/api.md` for the exact flow). The Android side
+> has no session and therefore no CSRF concern.
 
 ## 5. Data & schema flow
 
@@ -377,11 +415,13 @@ master merged → Render auto-deploy (Docker build)
 - Prod (Neon) schema is applied **manually** — never rely on `migrate` in prod; never run `reload_db.sh` against prod.
 - `web/build/web/` (Flutter) is **committed**; rebuild with `bash scripts/run.sh flutter` before pushing Flutter changes.
 - Tests never boot gunicorn: they run in short-lived one-off `web` containers against the `db` service.
-- **Auth/TOTP:** non-staff users log in with an **authenticator app (TOTP)**, not SMS/OTP. Only `POST /api/sales_admin/auth/otp/verify` exists — there is no `otp/request`.
+- **Auth/TOTP:** non-staff users log in with an **authenticator app (TOTP)**, not SMS/OTP. Web login is `POST /api/sales_admin/auth/otp/verify` (admins/superusers, opens a session); Android login is `POST /android/api/v1/auth/login` (sales persons, mints a token). Neither has an `otp/request` step.
 - **Role creation:** only superusers can create Admins; superusers *and* Admins can create SalesPeople. `VerifyOTPView` exposes this to the SPA via `can_create_admin` / `can_create_sales_person`.
+- **Strict client separation:** the web (`api/`) is session-only and never touches `authtoken_token`; the Android app (`android/`) is token-only and never touches sessions/`django_session`. `AdminApiView` and `AndroidBaseView` are the two client base views that enforce this — no view should extend `BaseApiView` directly.
 - **Token TTL:** bearer tokens die `TOKEN_TTL_HOURS` (24) after their last "login"; `ExpiringTokenAuthentication` deletes an expired token on first use so the next request forces a fresh login. Session cookies share the same 24h through `SESSION_COOKIE_AGE`.
 - **401 vs 403:** the custom `SessionAuthentication`/`ExpiringTokenAuthentication` return a `WWW-Authenticate` challenge header, which is what keeps anonymous calls a **401** instead of DRF's default 403.
-- **CSRF is *not* enforced by the global middleware on DRF routes** (view handlers are `csrf_exempt`); only DRF `SessionAuthentication` enforces it, so the sales-admin SPA must send the `csrftoken` cookie value as `X-CSRFToken` on every session-authenticated POST/PUT/PATCH/DELETE.
+- **CSRF is *not* enforced by the global middleware on DRF routes** (view handlers are `csrf_exempt`); only DRF `SessionAuthentication` enforces it, so the sales-admin SPA must send the `csrftoken` cookie value as `X-CSRFToken` on every session-authenticated POST/PUT/PATCH/DELETE. Android's bearer-token requests carry no cookie and are unaffected.
+- **Android API versioning:** `android/api/routing.py` merges each version's `routes.py::ROUTES` in order, so a view introduced at `vX` is automatically served by every later `vY` (`Y >= X`) unless that version overrides the same route key.
 - **Sentry/GlitchTip** only initialises when `SENTRY_DSN` is set and `DEBUG` is false; `/api/test-sentry/` is the wired-up probe.
 - `api/admin.py` = `AdminApiView` base, not Django admin.
 

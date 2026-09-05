@@ -1,28 +1,27 @@
 """ORM-backed tests for the superuser-only grouped city list utility endpoint.
 
-These use the ``DMLTestCase`` baseline (superuser phone ``9999999999``) and add
+These use the ``WebApiTestCase`` baseline (DML-seeded, superuser phone ``9999999999``) and add
 their own geography + an application admin in ``setUpTestData``. Request/response
-flows are exercised over the test :class:`~rest_framework.test.APIClient` with
-explicit bearer ``Token`` credentials.
+flows are exercised over the test :class:`~rest_framework.test.APIClient` with a
+logged-in session, since this is a session-only web endpoint (see
+``tests/android/test_cities.py`` for the Android token-based counterpart).
 """
 
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient
 
 from aggregator.models import City, Country, State
 from authentication.models import Admin
-from tests.common import DMLTestCase
+from tests.common import WebApiTestCase
 
 User = get_user_model()
 
 SUPERUSER_PHONE = "9999999999"
 
 
-class CityUtilitiesTest(DMLTestCase):
+class CityUtilitiesTest(WebApiTestCase):
     """Cover the superuser-only grouped city list endpoint.
 
     tests/test_city_utilities.py::CityUtilitiesTest
@@ -48,28 +47,20 @@ class CityUtilitiesTest(DMLTestCase):
         )
         cls.pune = City.objects.create(name="Pune", state=cls.state, created_by=cls.superuser)
 
-    def setUp(self):
-        self.client = APIClient()
-
-    def _auth_as(self, user) -> None:
-        token, _ = Token.objects.get_or_create(user=user)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")  # type: ignore[attr-defined]
-
     def test_cities_requires_superuser(self):
         """tests/test_city_utilities.py::CityUtilitiesTest::test_cities_requires_superuser"""
         # Anonymous
-        self.client.credentials()
         self.assertIn(self.client.get("/api/utilities/cities").status_code, (401, 403))
         # App admin is still forbidden (superuser only).
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertIn(self.client.get("/api/utilities/cities").status_code, (401, 403))
         # Superuser is allowed.
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(self.client.get("/api/utilities/cities").status_code, status.HTTP_200_OK)
 
     def test_cities_grouped_by_state(self):
         """tests/test_city_utilities.py::CityUtilitiesTest::test_cities_grouped_by_state"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.get("/api/utilities/cities")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         payload = response.data

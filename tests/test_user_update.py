@@ -1,28 +1,26 @@
 """ORM-backed tests for the admin / salesperson update endpoints.
 
-These use the ``DMLTestCase`` baseline (superuser phone ``9999999999``) and add
+These use the ``WebApiTestCase`` baseline (DML-seeded, superuser phone ``9999999999``) and add
 their own geography + profiles in ``setUpTestData``. Update flows are exercised
-over the test :class:`~rest_framework.test.APIClient` with explicit bearer
-``Token`` credentials.
+over the test :class:`~rest_framework.test.APIClient` with a logged-in session,
+since these are session-only web endpoints.
 """
 
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient
 
 from aggregator.models import City, Country, State
 from authentication.models import Admin, SalesPerson
-from tests.common import DMLTestCase
+from tests.common import WebApiTestCase
 
 User = get_user_model()
 
 SUPERUSER_PHONE = "9999999999"
 
 
-class UserUpdateTest(DMLTestCase):
+class UserUpdateTest(WebApiTestCase):
     """Cover permission gating, field updates and payload shape for admin/salesperson.
 
     tests/test_user_update.py::UserUpdateTest
@@ -72,22 +70,11 @@ class UserUpdateTest(DMLTestCase):
             created_by=cls.superuser,
         )
 
-    def setUp(self):
-        """Create an unauthenticated API client for every test in this class."""
-        self.client = APIClient()
-
-    def _auth_as(self, user) -> None:
-        token, _ = Token.objects.get_or_create(user=user)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")  # type: ignore[attr-defined]
-
-    def _clear_auth(self) -> None:
-        self.client.credentials()  # type: ignore[attr-defined]
-
     # -- permission gating (admin) ------------------------------------------
 
     def test_anonymous_admin_update_rejected(self):
         """tests/test_user_update.py::UserUpdateTest::test_anonymous_admin_update_rejected"""
-        self._clear_auth()
+        self.clear_auth()
         response = self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}", {"name": "x"}, format="json"
         )
@@ -97,13 +84,13 @@ class UserUpdateTest(DMLTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_only_superuser_can_update_admin"""
         url = f"/api/sales_admin/admins/{self.admin.id}"
         for user in (self.plain, self.seed_admin, self.salesperson.user):
-            self._auth_as(user)
+            self.login_as(user)
             self.assertEqual(
                 self.client.patch(url, {"name": "x"}, format="json").status_code,
                 status.HTTP_403_FORBIDDEN,
             )
 
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(url, {"name": "Updated"}, format="json").status_code,
             status.HTTP_200_OK,
@@ -111,7 +98,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_not_found(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_not_found"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(
                 "/api/sales_admin/admins/999999", {"name": "x"}, format="json"
@@ -121,7 +108,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_soft_deleted_admin_not_found(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_soft_deleted_admin_not_found"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.admin.delete(deleted_by=self.superuser)
         self.assertEqual(
             self.client.patch(
@@ -134,7 +121,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_name(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_name"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}",
             {"name": "Updated Admin"},
@@ -147,7 +134,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_email(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_email"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}",
             {"email": "updated@example.com"},
@@ -160,7 +147,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_can_update_stock_count(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_can_update_stock_count"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(self.admin.can_update_stock_count, True)
         response = self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}",
@@ -174,7 +161,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_multiple_fields(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_multiple_fields"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}",
             {"name": "Bulk Updated", "email": "bulk@example.com", "can_update_stock_count": False},
@@ -192,7 +179,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_partial_body_leaves_others_unchanged(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_partial_body_leaves_others_unchanged"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}", {"name": "Only Name"}, format="json"
         )
@@ -204,14 +191,14 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_empty_body_returns_unchanged(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_empty_body_returns_unchanged"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.patch(f"/api/sales_admin/admins/{self.admin.id}", {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.assertEqual(response.data["name"], "seed admin")
 
     def test_update_admin_invalid_email_rejected(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_invalid_email_rejected"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(
                 f"/api/sales_admin/admins/{self.admin.id}",
@@ -223,7 +210,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_phone_number(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_phone_number"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}",
             {"phone_number": "9999999998"},
@@ -236,7 +223,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_invalid_phone_number_rejected(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_invalid_phone_number_rejected"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(
                 f"/api/sales_admin/admins/{self.admin.id}",
@@ -248,7 +235,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_duplicate_phone_number_rejected(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_duplicate_phone_number_rejected"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(
                 f"/api/sales_admin/admins/{self.admin.id}",
@@ -266,7 +253,7 @@ class UserUpdateTest(DMLTestCase):
 
         tests/test_user_update.py::UserUpdateTest::test_update_admin_with_own_phone_number_is_allowed
         """
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}",
             {"phone_number": self.seed_admin.phone_number, "name": "Same Phone"},
@@ -278,7 +265,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_admin_payload_shape(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_payload_shape"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.patch(
             f"/api/sales_admin/admins/{self.admin.id}",
             {"name": "Payload Check"},
@@ -297,7 +284,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_anonymous_salesperson_update_rejected(self):
         """tests/test_user_update.py::UserUpdateTest::test_anonymous_salesperson_update_rejected"""
-        self._clear_auth()
+        self.clear_auth()
         response = self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {"name": "x"},
@@ -310,20 +297,20 @@ class UserUpdateTest(DMLTestCase):
         url = f"/api/sales_admin/sales-people/{self.salesperson.id}"
         # A plain user and a salesperson are both forbidden.
         for user in (self.plain, self.salesperson.user):
-            self._auth_as(user)
+            self.login_as(user)
             self.assertEqual(
                 self.client.patch(url, {"name": "x"}, format="json").status_code,
                 status.HTTP_403_FORBIDDEN,
             )
         # A superuser only manages admins -> also forbidden here.
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(url, {"name": "x"}, format="json").status_code,
             status.HTTP_403_FORBIDDEN,
         )
 
         # An application admin may update a salesperson.
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(url, {"name": "Updated"}, format="json").status_code,
             status.HTTP_200_OK,
@@ -331,7 +318,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_not_found(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_not_found"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(
                 "/api/sales_admin/sales-people/999999", {"name": "x"}, format="json"
@@ -341,7 +328,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_soft_deleted_salesperson_not_found(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_soft_deleted_salesperson_not_found"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.salesperson.delete(deleted_by=self.superuser)
         self.assertEqual(
             self.client.patch(
@@ -356,7 +343,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_name(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_name"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         response = self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {"name": "Updated Person"},
@@ -369,7 +356,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_email(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_email"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         response = self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {"email": "person@example.com"},
@@ -382,7 +369,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_city(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_city"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         response = self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {"city": self.city_2.id},
@@ -395,7 +382,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_multiple_fields(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_multiple_fields"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         response = self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {"name": "Bulk Person", "email": "bulk@example.com", "city": self.city_2.id},
@@ -413,7 +400,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_partial_body_leaves_others_unchanged(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_partial_body_leaves_others_unchanged"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {"name": "Only Person"},
@@ -427,7 +414,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_invalid_city_rejected(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_invalid_city_rejected"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(
                 f"/api/sales_admin/sales-people/{self.salesperson.id}",
@@ -439,7 +426,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_phone_number(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_phone_number"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         response = self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {"phone_number": "9999999990"},
@@ -452,7 +439,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_invalid_phone_number_rejected(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_invalid_phone_number_rejected"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(
                 f"/api/sales_admin/sales-people/{self.salesperson.id}",
@@ -464,7 +451,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_duplicate_phone_number_rejected(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_duplicate_phone_number_rejected"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(
                 f"/api/sales_admin/sales-people/{self.salesperson.id}",
@@ -479,7 +466,7 @@ class UserUpdateTest(DMLTestCase):
 
         tests/test_user_update.py::UserUpdateTest::test_update_salesperson_with_own_phone_number_is_allowed
         """
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         response = self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {
@@ -494,7 +481,7 @@ class UserUpdateTest(DMLTestCase):
 
     def test_update_salesperson_payload_shape(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_payload_shape"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         response = self.client.patch(
             f"/api/sales_admin/sales-people/{self.salesperson.id}",
             {"name": "Payload Person"},
@@ -508,7 +495,7 @@ class UserUpdateTest(DMLTestCase):
             self.assertNotIn(key, person)
 
 
-class UserDeleteTest(DMLTestCase):
+class UserDeleteTest(WebApiTestCase):
     """Cover delete permission gating and soft-delete behaviour for admin/salesperson.
 
     tests/test_user_update.py::UserDeleteTest
@@ -560,22 +547,11 @@ class UserDeleteTest(DMLTestCase):
             created_by=cls.superuser,
         )
 
-    def setUp(self):
-        """Create an unauthenticated API client for every test in this class."""
-        self.client = APIClient()
-
-    def _auth_as(self, user) -> None:
-        token, _ = Token.objects.get_or_create(user=user)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")  # type: ignore[attr-defined]
-
-    def _clear_auth(self) -> None:
-        self.client.credentials()  # type: ignore[attr-defined]
-
     # -- permission gating (admin delete) -----------------------------------
 
     def test_anonymous_admin_delete_rejected(self):
         """tests/test_user_update.py::UserDeleteTest::test_anonymous_admin_delete_rejected"""
-        self._clear_auth()
+        self.clear_auth()
         response = self.client.delete(f"/api/sales_admin/admins/{self.admin.id}")
         self.assertIn(response.status_code, (401, 403))
 
@@ -584,20 +560,20 @@ class UserDeleteTest(DMLTestCase):
         url = f"/api/sales_admin/admins/{self.admin.id}"
         # A plain user, an app admin and a salesperson are all forbidden.
         for user in (self.plain, self.seed_admin, self.salesperson.user):
-            self._auth_as(user)
+            self.login_as(user)
             self.assertEqual(
                 self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN
             )
 
         # A superuser may delete an admin.
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT
         )
 
     def test_delete_admin_not_found(self):
         """tests/test_user_update.py::UserDeleteTest::test_delete_admin_not_found"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.delete("/api/sales_admin/admins/999999").status_code,
             status.HTTP_404_NOT_FOUND,
@@ -605,7 +581,7 @@ class UserDeleteTest(DMLTestCase):
 
     def test_delete_admin_soft_deletes_row(self):
         """tests/test_user_update.py::UserDeleteTest::test_delete_admin_soft_deletes_row"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.delete(f"/api/sales_admin/admins/{self.admin.id}").status_code,
             status.HTTP_204_NO_CONTENT,
@@ -617,7 +593,7 @@ class UserDeleteTest(DMLTestCase):
 
     def test_delete_soft_deleted_admin_not_found(self):
         """tests/test_user_update.py::UserDeleteTest::test_delete_soft_deleted_admin_not_found"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.admin.delete(deleted_by=self.superuser)
         self.assertEqual(
             self.client.delete(f"/api/sales_admin/admins/{self.admin.id}").status_code,
@@ -628,7 +604,7 @@ class UserDeleteTest(DMLTestCase):
 
     def test_anonymous_salesperson_delete_rejected(self):
         """tests/test_user_update.py::UserDeleteTest::test_anonymous_salesperson_delete_rejected"""
-        self._clear_auth()
+        self.clear_auth()
         response = self.client.delete(
             f"/api/sales_admin/sales-people/{self.salesperson.id}"
         )
@@ -636,7 +612,7 @@ class UserDeleteTest(DMLTestCase):
 
     def test_admin_can_delete_salesperson(self):
         """tests/test_user_update.py::UserDeleteTest::test_admin_can_delete_salesperson"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.delete(
                 f"/api/sales_admin/sales-people/{self.salesperson.id}"
@@ -646,7 +622,7 @@ class UserDeleteTest(DMLTestCase):
 
     def test_superuser_can_delete_salesperson(self):
         """tests/test_user_update.py::UserDeleteTest::test_superuser_can_delete_salesperson"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.delete(
                 f"/api/sales_admin/sales-people/{self.salesperson.id}"
@@ -658,14 +634,14 @@ class UserDeleteTest(DMLTestCase):
         """tests/test_user_update.py::UserDeleteTest::test_plain_and_salesperson_cannot_delete_salesperson"""
         url = f"/api/sales_admin/sales-people/{self.salesperson.id}"
         for user in (self.plain, self.salesperson.user):
-            self._auth_as(user)
+            self.login_as(user)
             self.assertEqual(
                 self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN
             )
 
     def test_delete_salesperson_not_found(self):
         """tests/test_user_update.py::UserDeleteTest::test_delete_salesperson_not_found"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.delete("/api/sales_admin/sales-people/999999").status_code,
             status.HTTP_404_NOT_FOUND,
@@ -673,7 +649,7 @@ class UserDeleteTest(DMLTestCase):
 
     def test_delete_salesperson_soft_deletes_row(self):
         """tests/test_user_update.py::UserDeleteTest::test_delete_salesperson_soft_deletes_row"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.delete(
                 f"/api/sales_admin/sales-people/{self.salesperson.id}"
@@ -687,7 +663,7 @@ class UserDeleteTest(DMLTestCase):
 
     def test_delete_soft_deleted_salesperson_not_found(self):
         """tests/test_user_update.py::UserDeleteTest::test_delete_soft_deleted_salesperson_not_found"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.salesperson.delete(deleted_by=self.superuser)
         self.assertEqual(
             self.client.delete(

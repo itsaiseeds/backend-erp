@@ -1,11 +1,13 @@
 """Sales person update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales_admin/sales-people/<id>``.
 
-Only an application Admin may update a sales person (enforced via the
-``IsAdminUser`` permission, mirroring ``SalesPeopleView``). A sales person
-cannot update itself or others and a superuser only manages admins, so only
-an app admin can patch a sales person row. ``phone_number`` is validated for
-format and uniqueness. A sales person may be deleted by any ``IsAdminUser``;
-superusers always hold an ``Admin`` profile, so the same gate covers them.
+Only an application Admin may update or delete a sales person
+(``admin_required`` on ``AdminApiView``, mirroring ``SalesPeopleView``). A
+sales person cannot update itself or others. A bare Django superuser does
+**not** hold an ``Admin`` profile (``is_admin_user`` requires an
+``admin_profile`` row -- see ``authentication.models.User.is_admin_user``),
+so a bare superuser is refused here; give the superuser an ``Admin`` profile
+if they should be able to hire/fire sales people. ``phone_number`` is
+validated for format and uniqueness.
 
 Soft-deleted sales people are never found (404).
 """
@@ -15,12 +17,9 @@ from __future__ import annotations
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
-from api.permissions import IsAdminUser
+from api.admin import AdminApiView
 from authentication.models import SalesPerson
 from authentication.UserOperations import (
     SalesPersonPayloadSerializer,
@@ -30,13 +29,10 @@ from authentication.UserOperations import (
 from common.models.timestamped import indian_now
 
 
-class UpdateSalesPersonView(APIView):
+class UpdateSalesPersonView(AdminApiView):
     """Update or delete a sales person (app admin only; superusers count as admins)."""
 
-    # Refer to api/sales_admin/VerifyOTPView.py for how a view declares its own
-    # authentication / permission classes instead of the global defaults.
-    authentication_classes: list[type] = [ExpiringTokenAuthentication, SessionAuthentication]
-    permission_classes: list[type] = [IsAuthenticated, IsAdminUser]
+    admin_required = True
 
     @extend_schema(
         summary="Update a sales person",
@@ -77,6 +73,14 @@ class UpdateSalesPersonView(APIView):
         salesperson = get_object_or_404(
             SalesPerson.objects.select_related("user", "city", "created_by"), id=id
         )
+        # Deliberately mutate the soft-delete fields directly rather than
+        # calling ``salesperson.delete(deleted_by=request.user)``:
+        # ``SoftDeletedModel.delete`` gates on Django auth's
+        # ``authentication.delete_salesperson`` permission, which application
+        # admins do not currently hold (perms are only granted to Django-admin
+        # staff via the admin UI). The API-level ``admin_required`` gate above
+        # is the intended access control here. If admins ever get the perm,
+        # this can collapse back to ``salesperson.delete(deleted_by=...)``.
         salesperson.is_deleted = True
         salesperson.deleted_at = indian_now()
         salesperson.deleted_by = request.user

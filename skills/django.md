@@ -30,12 +30,15 @@ INSTALLED_APPS = [
     "common",
     "config",
     "api",
+    "android",
     "aggregator",
 ]
 ```
 
 Project apps: `authentication` (User/Admin/SalesPerson + TOTP), `common` (abstract
-bases + admin helpers), `api` (REST layer), `aggregator` (geo master data).
+bases + admin helpers), `api` (session-only web REST layer), `android`
+(token-only sales-person app, versioned at `/android/api/<v>/...`),
+`aggregator` (geo master data).
 
 ---
 
@@ -131,8 +134,12 @@ REST_FRAMEWORK = {
 }
 ```
 
-- Default auth = session (admin web) + expiring bearer token (Android), both
-  custom classes from `api/authentication.py`.
+- This default is only the **fallback** for views that don't pick an
+  authentication scheme explicitly (e.g. the schema/docs views). Every real
+  endpoint sets its own via one of two client base views:
+  `api.admin.AdminApiView` (**session-only**, the web) or
+  `android.api.base.AndroidBaseView` (**token-only**, the Android app). Web
+  never touches `authtoken_token`; Android never touches sessions.
 - `TOKEN_TTL_HOURS` (default 24) and `SESSION_COOKIE_AGE` (86400) share the same
   login clock.
 - drf-spectacular generates OpenAPI at `/api/schema/` and Swagger at `/api/docs/`
@@ -155,7 +162,8 @@ it. In development there is no Sentry, so the probe just returns a Django 500.
 `config/urls.py`:
 
 - `/admin/` → Django admin
-- `/api/` → `api.urls` (sales_admin, android v1, test-sentry)
+- `/api/` → `api.urls` (sales_admin, utilities, test-sentry — session-only web)
+- `/android/` → `android.urls` (versioned `/android/api/<v>/...` — token-only)
 - `/api/schema/` + `/api/docs/` → drf-spectacular (superuser only)
 - `/sales-admin/...` → Flutter catch-all (`config/views.py`)
 

@@ -5,15 +5,124 @@ info:
   description: Backend API for the SaiSeeds sales admin website and salesperson Android
     app. Auto-generated from the codebase.
 paths:
+  /android/api/v1/auth/login:
+    post:
+      operationId: android_api_v1_auth_login_create
+      description: Validate a TOTP code, then issue a bearer token for that sales
+        person.
+      tags:
+      - android
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                description: Invalid phone number or TOTP code.
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                description: Too many requests from this IP; retry later.
+          description: ''
+  /android/api/v1/auth/logout:
+    post:
+      operationId: android_api_v1_auth_logout_create
+      description: |-
+        Revoke the caller's bearer token.
+
+        Logout must succeed for anyone the token authentication accepts, so this
+        view relaxes the ``salesperson_required`` gate inherited from
+        ``AndroidBaseView``. Otherwise a user whose ``SalesPerson`` profile has
+        been soft-deleted (or has already been logged out server-side) would be
+        unable to revoke their still-valid token, leaving it live for the rest of
+        ``TOKEN_TTL_HOURS``.
+      summary: Revoke the caller's bearer token
+      tags:
+      - android
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: Token revoked.
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                description: Missing or invalid token.
+          description: ''
+  /android/api/v1/auth/reauthenticate:
+    get:
+      operationId: android_api_v1_auth_reauthenticate_retrieve
+      description: Confirm the caller's bearer token is still valid.
+      summary: Check whether the caller's bearer token is still valid
+      tags:
+      - android
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AndroidReauthenticateResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                description: Missing, expired, or revoked token.
+          description: ''
+  /android/api/v1/utilities/cities:
+    get:
+      operationId: android_api_v1_utilities_cities_list
+      description: List Indian states, each with its cities, grouped by state.
+      summary: List Indian states grouped with their cities
+      tags:
+      - android
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AndroidState'
+          description: ''
   /api/sales_admin/admins:
     get:
-      operationId: sales_admin_admins_list
+      operationId: api_sales_admin_admins_list
       description: List (GET) or create (POST) application admins (superuser only).
       summary: List application admins
       tags:
-      - sales_admin
+      - api
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '200':
@@ -25,11 +134,11 @@ paths:
                   $ref: '#/components/schemas/AdminPayload'
           description: ''
     post:
-      operationId: sales_admin_admins_create
+      operationId: api_sales_admin_admins_create
       description: List (GET) or create (POST) application admins (superuser only).
       summary: Create an application admin (and a fallback sales person)
       tags:
-      - sales_admin
+      - api
       requestBody:
         content:
           application/json:
@@ -43,7 +152,6 @@ paths:
               $ref: '#/components/schemas/CreateAdminRequest'
         required: true
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '201':
@@ -54,7 +162,7 @@ paths:
           description: ''
   /api/sales_admin/admins/{id}:
     patch:
-      operationId: sales_admin_admins_partial_update
+      operationId: api_sales_admin_admins_partial_update
       description: Update or delete a single application admin (superuser only).
       summary: Update an application admin
       parameters:
@@ -64,7 +172,7 @@ paths:
           type: integer
         required: true
       tags:
-      - sales_admin
+      - api
       requestBody:
         content:
           application/json:
@@ -77,7 +185,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedUpdateAdminRequest'
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '200':
@@ -87,7 +194,7 @@ paths:
                 $ref: '#/components/schemas/AdminPayload'
           description: ''
     delete:
-      operationId: sales_admin_admins_destroy
+      operationId: api_sales_admin_admins_destroy
       description: Update or delete a single application admin (superuser only).
       summary: Delete an application admin
       parameters:
@@ -97,42 +204,40 @@ paths:
           type: integer
         required: true
       tags:
-      - sales_admin
+      - api
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '204':
           description: No response body
   /api/sales_admin/auth/logout:
     post:
-      operationId: sales_admin_auth_logout_create
-      description: Revoke the caller's session cookie and bearer token.
-      summary: Revoke the caller's credentials
+      operationId: api_sales_admin_auth_logout_create
+      description: Revoke the caller's session cookie.
+      summary: Revoke the caller's session
       tags:
-      - sales_admin
+      - api
       security:
       - sessionAuth: []
-      - bearerAuth: []
       responses:
         '204':
           content:
             application/json:
               schema:
-                description: Credentials revoked.
+                description: Session revoked.
           description: ''
         '401':
           content:
             application/json:
               schema:
-                description: Missing or invalid credentials.
+                description: Missing or invalid session.
           description: ''
   /api/sales_admin/auth/otp/verify:
     post:
-      operationId: sales_admin_auth_otp_verify_create
-      description: Validate a TOTP code, then (re)issue credentials for that user.
+      operationId: api_sales_admin_auth_otp_verify_create
+      description: Validate a TOTP code, then (re)open a session for that user.
       tags:
-      - sales_admin
+      - api
       requestBody:
         content:
           application/json:
@@ -168,13 +273,12 @@ paths:
           description: ''
   /api/sales_admin/sales-people:
     get:
-      operationId: sales_admin_sales_people_list
+      operationId: api_sales_admin_sales_people_list
       description: List (GET) or create (POST) sales people (app admin only).
       summary: List sales people
       tags:
-      - sales_admin
+      - api
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '200':
@@ -186,11 +290,11 @@ paths:
                   $ref: '#/components/schemas/SalesPersonPayload'
           description: ''
     post:
-      operationId: sales_admin_sales_people_create
+      operationId: api_sales_admin_sales_people_create
       description: List (GET) or create (POST) sales people (app admin only).
       summary: Create a sales person
       tags:
-      - sales_admin
+      - api
       requestBody:
         content:
           application/json:
@@ -204,7 +308,6 @@ paths:
               $ref: '#/components/schemas/CreateSalesPersonRequest'
         required: true
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '201':
@@ -215,7 +318,7 @@ paths:
           description: ''
   /api/sales_admin/sales-people/{id}:
     patch:
-      operationId: sales_admin_sales_people_partial_update
+      operationId: api_sales_admin_sales_people_partial_update
       description: Update or delete a sales person (app admin only; superusers count
         as admins).
       summary: Update a sales person
@@ -226,7 +329,7 @@ paths:
           type: integer
         required: true
       tags:
-      - sales_admin
+      - api
       requestBody:
         content:
           application/json:
@@ -239,7 +342,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedUpdateSalesPersonRequest'
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '200':
@@ -249,7 +351,7 @@ paths:
                 $ref: '#/components/schemas/SalesPersonPayload'
           description: ''
     delete:
-      operationId: sales_admin_sales_people_destroy
+      operationId: api_sales_admin_sales_people_destroy
       description: Update or delete a sales person (app admin only; superusers count
         as admins).
       summary: Delete a sales person
@@ -260,22 +362,20 @@ paths:
           type: integer
         required: true
       tags:
-      - sales_admin
+      - api
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '204':
           description: No response body
   /api/utilities/cities:
     get:
-      operationId: utilities_cities_list
+      operationId: api_utilities_cities_list
       description: List Indian states, each with its cities, grouped by state.
       summary: List Indian states grouped with their cities
       tags:
-      - utilities
+      - api
       security:
-      - bearerAuth: []
       - sessionAuth: []
       responses:
         '200':
@@ -288,14 +388,13 @@ paths:
           description: ''
   /api/utilities/reauthenticate:
     get:
-      operationId: utilities_reauthenticate_retrieve
-      description: Confirm the caller's session cookie or bearer token is still valid.
-      summary: Check whether the caller's credential is still valid
+      operationId: api_utilities_reauthenticate_retrieve
+      description: Confirm the caller's session cookie is still valid.
+      summary: Check whether the caller's session is still valid
       tags:
-      - utilities
+      - api
       security:
       - sessionAuth: []
-      - bearerAuth: []
       responses:
         '200':
           content:
@@ -307,7 +406,7 @@ paths:
           content:
             application/json:
               schema:
-                description: Missing, expired, or revoked credential.
+                description: Missing, expired, or revoked session.
           description: ''
 components:
   schemas:
@@ -344,6 +443,57 @@ components:
       - name
       - phone_number
       - role
+    AndroidCity:
+      type: object
+      description: Output shape for one city row (schema only; responses are built
+        by hand).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    AndroidReauthenticateResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AndroidReauthenticateUser'
+      required:
+      - user
+    AndroidReauthenticateUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone_number:
+          type: string
+        role:
+          type: string
+      required:
+      - id
+      - name
+      - phone_number
+      - role
+    AndroidState:
+      type: object
+      description: Output shape for a state and its cities (schema only).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        cities:
+          type: array
+          items:
+            $ref: '#/components/schemas/AndroidCity'
+      required:
+      - cities
+      - id
+      - name
     City:
       type: object
       description: Output shape for one city row (schema only; responses are built
@@ -426,6 +576,48 @@ components:
       - city
       - name
       - phone_number
+    LoginRequest:
+      type: object
+      properties:
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        otp:
+          type: string
+          minLength: 1
+          maxLength: 8
+      required:
+      - otp
+      - phone_number
+    LoginResponse:
+      type: object
+      description: Credentials returned after a successful TOTP exchange.
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/LoginUser'
+      required:
+      - token
+      - user
+    LoginUser:
+      type: object
+      description: The authenticated sales person, as returned by the login flow.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone_number:
+          type: string
+        role:
+          type: string
+      required:
+      - id
+      - name
+      - phone_number
+      - role
     PatchedUpdateAdminRequest:
       type: object
       description: |-
@@ -597,10 +789,12 @@ components:
       - phone_number
     VerifyOTPResponse:
       type: object
-      description: Credentials returned after a successful TOTP exchange.
+      description: |-
+        User payload returned after a successful TOTP exchange.
+
+        The session cookie itself is set via ``Set-Cookie`` (see ``login()``
+        below), not returned in the body.
       properties:
-        token:
-          type: string
         user:
           $ref: '#/components/schemas/VerifyOTPUser'
         can_create_admin:
@@ -610,7 +804,6 @@ components:
       required:
       - can_create_admin
       - can_create_sales_person
-      - token
       - user
     VerifyOTPUser:
       type: object

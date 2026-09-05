@@ -91,9 +91,9 @@ class SalesPersonPayloadSerializer(serializers.Serializer):
 def admin_payload(admin: Admin, *, include_totp: bool = False) -> dict:
     """Serialize an ``Admin`` for the frontend (no city, address or audit keys).
 
-    When ``include_totp`` is set the freshly created user's TOTP provisioning
-    URI is included so the caller can render a QR code for the new user. The
-    URI is only exposed at creation time.
+    When ``include_totp`` is set, the user's TOTP provisioning URI is included
+    so the caller can render/re-render an enrollment QR code. ``AdminsView``
+    passes this on both creation and listing.
     """
     user = admin.user
     payload = {
@@ -114,9 +114,9 @@ def admin_payload(admin: Admin, *, include_totp: bool = False) -> dict:
 def salesperson_payload(salesperson: SalesPerson, *, include_totp: bool = False) -> dict:
     """Serialize a ``SalesPerson`` for the frontend (city only).
 
-    When ``include_totp`` is set the freshly created user's TOTP provisioning
-    URI is included so the caller can render a QR code for the new user. The
-    URI is only exposed at creation time.
+    When ``include_totp`` is set, the user's TOTP provisioning URI is included
+    so the caller can render/re-render an enrollment QR code. ``SalesPeopleView``
+    passes this on both creation and listing.
     """
     user = salesperson.user
     payload = {

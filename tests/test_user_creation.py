@@ -1,28 +1,26 @@
 """ORM-backed tests for the admin / salesperson creation endpoints.
 
-These use the ``DMLTestCase`` baseline (superuser phone ``9999999999``) and add
+These use the ``WebApiTestCase`` baseline (DML-seeded, superuser phone ``9999999999``) and add
 their own geography + profiles in ``setUpTestData``. Request/response flows are
-exercised over the test :class:`~rest_framework.test.APIClient` with explicit
-bearer ``Token`` credentials.
+exercised over the test :class:`~rest_framework.test.APIClient` with a logged-in
+session, since these are session-only web endpoints.
 """
 
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient
 
 from aggregator.models import City, Country, State
 from authentication.models import Admin, SalesPerson
-from tests.common import DMLTestCase
+from tests.common import WebApiTestCase
 
 User = get_user_model()
 
 SUPERUSER_PHONE = "9999999999"
 
 
-class UserCreationTest(DMLTestCase):
+class UserCreationTest(WebApiTestCase):
     """Cover permission gating, creation and payload shape for admin/salesperson.
 
     tests/test_user_creation.py::UserCreationTest
@@ -71,22 +69,10 @@ class UserCreationTest(DMLTestCase):
             created_by=cls.superuser,
         )
 
-    def setUp(self):
-        """Create an unauthenticated API client for every test in this class."""
-        self.client = APIClient()
-
-    def _auth_as(self, user) -> None:
-        token, _ = Token.objects.get_or_create(user=user)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")  # type: ignore[attr-defined]
-
-    def _clear_auth(self) -> None:
-        self.client.credentials()  # type: ignore[attr-defined]
-
     # -- permission gating ----------------------------------------------------
 
     def test_anonymous_requests_are_rejected(self):
         """tests/test_user_creation.py::UserCreationTest::test_anonymous_requests_are_rejected"""
-        self._clear_auth()
         for path in ("/api/sales_admin/admins", "/api/sales_admin/sales-people"):
             self.assertIn(
                 self.client.post(path, {"name": "x"}, format="json").status_code,
@@ -102,13 +88,13 @@ class UserCreationTest(DMLTestCase):
             "city": self.city.id,
         }
         for user in (self.plain, self.seed_admin, self.salesperson.user):
-            self._auth_as(user)
+            self.login_as(user)
             self.assertEqual(
                 self.client.post("/api/sales_admin/admins", payload, format="json").status_code,
                 status.HTTP_403_FORBIDDEN,
             )
 
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.post("/api/sales_admin/admins", payload, format="json").status_code,
             status.HTTP_201_CREATED,
@@ -123,20 +109,20 @@ class UserCreationTest(DMLTestCase):
         }
         # A plain user and a salesperson are both forbidden.
         for user in (self.plain, self.salesperson.user):
-            self._auth_as(user)
+            self.login_as(user)
             status_code = self.client.post(
                 "/api/sales_admin/sales-people", payload, format="json"
             ).status_code
             self.assertEqual(status_code, status.HTTP_403_FORBIDDEN)
         # A superuser only creates admins -> also forbidden for sales-people.
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         self.assertEqual(
             self.client.post("/api/sales_admin/sales-people", payload, format="json").status_code,
             status.HTTP_403_FORBIDDEN,
         )
 
         # An application admin may create a salesperson.
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.post("/api/sales_admin/sales-people", payload, format="json").status_code,
             status.HTTP_201_CREATED,
@@ -146,7 +132,7 @@ class UserCreationTest(DMLTestCase):
 
     def test_create_admin_creates_fallback_salesperson_and_payload_shape(self):
         """tests/test_user_creation.py::UserCreationTest::test_create_admin_creates_fallback_salesperson_and_payload_shape"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         response = self.client.post(
             "/api/sales_admin/admins",
             {
@@ -176,7 +162,7 @@ class UserCreationTest(DMLTestCase):
 
     def test_create_admin_duplicate_phone_rejected(self):
         """tests/test_user_creation.py::UserCreationTest::test_create_admin_duplicate_phone_rejected"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         payload = {
             "name": "Duplicate",
             "phone_number": "9000000002",
@@ -193,7 +179,7 @@ class UserCreationTest(DMLTestCase):
 
     def test_create_admin_invalid_payload_rejected(self):
         """tests/test_user_creation.py::UserCreationTest::test_create_admin_invalid_payload_rejected"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         for payload in (
             {"name": "No Phone", "city": self.city.id},
             {"name": "Bad Phone", "phone_number": "12345", "city": self.city.id},
@@ -207,7 +193,7 @@ class UserCreationTest(DMLTestCase):
 
     def test_list_admins_excludes_deleted(self):
         """tests/test_user_creation.py::UserCreationTest::test_list_admins_excludes_deleted"""
-        self._auth_as(self.superuser)
+        self.login_as(self.superuser)
         created = self.client.post(
             "/api/sales_admin/admins",
             {"name": "Vikram Kumar", "phone_number": "9000000050", "city": self.city.id},
@@ -228,11 +214,29 @@ class UserCreationTest(DMLTestCase):
             for key in ("user_id", "city", "address", "is_deleted", "deleted_by"):
                 self.assertNotIn(key, item)
 
+    def test_list_admins_includes_totp_uri(self):
+        """The list endpoint returns each admin's TOTP provisioning URI, not just creation.
+
+        tests/test_user_creation.py::UserCreationTest::test_list_admins_includes_totp_uri
+        """
+        self.login_as(self.superuser)
+        created = self.client.post(
+            "/api/sales_admin/admins",
+            {"name": "Vikram Kumar", "phone_number": "9000000060", "city": self.city.id},
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+
+        response = self.client.get("/api/sales_admin/admins")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        vikram = next(item for item in response.data if item["name"] == "Vikram Kumar")
+        self.assertTrue(vikram["totp"]["provisioning_uri"])
+
     # -- salesperson creation ------------------------------------------------
 
     def test_create_salesperson_payload_shape(self):
         """tests/test_user_creation.py::UserCreationTest::test_create_salesperson_payload_shape"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         response = self.client.post(
             "/api/sales_admin/sales-people",
             {
@@ -254,7 +258,7 @@ class UserCreationTest(DMLTestCase):
 
     def test_list_sales_people_excludes_deleted(self):
         """tests/test_user_creation.py::UserCreationTest::test_list_sales_people_excludes_deleted"""
-        self._auth_as(self.seed_admin)
+        self.login_as(self.seed_admin)
         created = self.client.post(
             "/api/sales_admin/sales-people",
             {"name": "Ramesh Patil", "phone_number": "9000000051", "city": self.city.id},
@@ -274,3 +278,21 @@ class UserCreationTest(DMLTestCase):
             self.assertIn("city", item)
             for key in ("user_id", "address", "is_deleted", "deleted_by"):
                 self.assertNotIn(key, item)
+
+    def test_list_sales_people_includes_totp_uri(self):
+        """The list endpoint returns each sales person's TOTP provisioning URI.
+
+        tests/test_user_creation.py::UserCreationTest::test_list_sales_people_includes_totp_uri
+        """
+        self.login_as(self.seed_admin)
+        created = self.client.post(
+            "/api/sales_admin/sales-people",
+            {"name": "Ramesh Patil", "phone_number": "9000000061", "city": self.city.id},
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+
+        response = self.client.get("/api/sales_admin/sales-people")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ramesh = next(item for item in response.data if item["name"] == "Ramesh Patil")
+        self.assertTrue(ramesh["totp"]["provisioning_uri"])

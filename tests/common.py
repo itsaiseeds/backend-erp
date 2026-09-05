@@ -7,6 +7,7 @@ from pathlib import Path
 
 from django.db import connection
 from django.test import TestCase
+from rest_framework.test import APIClient
 
 
 class DMLTestCase(TestCase):
@@ -40,3 +41,27 @@ class DMLTestCase(TestCase):
             # dml.sql re-syncs the seeded tables' sequences itself, so ORM rows
             # created by subclass fixtures get ids after the seeded maximum.
             cursor.execute(dml)
+
+
+class WebApiTestCase(DMLTestCase):
+    """Base for session-only web (sales-admin) endpoint tests.
+
+    Provides an unauthenticated :class:`APIClient` per test and the one
+    credential mechanism the web side ever uses -- a logged-in browser
+    session -- so individual test modules don't hand-roll their own
+    ``_auth_as`` / ``_clear_auth`` helpers around ``force_login``. See
+    ``tests.android.common.AndroidApiTestCase`` for the token-based
+    counterpart.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+
+    def login_as(self, user) -> None:
+        """Authenticate ``self.client`` as ``user`` via a browser session."""
+        self.client.force_login(user)
+
+    def clear_auth(self) -> None:
+        """Drop the current session, leaving the client anonymous."""
+        self.client.logout()
