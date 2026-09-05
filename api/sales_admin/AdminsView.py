@@ -11,10 +11,6 @@ Soft-deleted admins are never returned.
 
 from __future__ import annotations
 
-import logging
-
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
@@ -32,8 +28,6 @@ from authentication.UserOperations import (
     create_verified_user,
 )
 from authentication.validators import validate_phone_number
-
-logger = logging.getLogger(__name__)
 
 
 class CreateAdminSerializer(serializers.Serializer):
@@ -95,24 +89,6 @@ class AdminsView(APIView):
             )
             # Fallback salesperson so the account can always use the sales app.
             SalesPerson.objects.create(user=user, city=data["city"], created_by=request.user)
-            # Grant the admin permission to soft-delete sales people
-            # (SoftDeletedModel.delete requires authentication.delete_salesperson).
-            # Use get_or_create (not get) so a missing permission row never 500s.
-            # If the permission infrastructure is missing or inconsistent the
-            # grant is skipped rather than failing admin creation; superusers
-            # can still delete sales people regardless.
-            try:
-                delete_salesperson, _ = Permission.objects.get_or_create(
-                    content_type=ContentType.objects.get_for_model(SalesPerson),
-                    codename="delete_salesperson",
-                    defaults={"name": "Can delete sales person"},
-                )
-                user.user_permissions.add(delete_salesperson)
-            except Exception:
-                logger.warning(
-                    "Could not grant delete_salesperson to admin user %s", user.id,
-                    exc_info=True,
-                )
 
         return Response(
             admin_payload(admin, include_totp=True),
