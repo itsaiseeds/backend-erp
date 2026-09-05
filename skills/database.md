@@ -100,7 +100,7 @@ that would fail against existing data), apply it in phases to cause **minimum do
 | File | Purpose |
 |---|---|
 | `sql/ddl.sql` | `CREATE TABLE` for **every** app — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), `authentication_user`, `authentication_user_groups/…_user_permissions`, `authentication_admin`, `authentication_salesperson`, `aggregator_*` (address/city/country/pincode/state), `authtoken_token` |
-| `sql/dml.sql` | Seeds content types (14) + permissions (56: add/change/delete/view × 14 models), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`) and a no-TOTP user (`8888888888`) used by the integration tests |
+| `sql/dml.sql` | Seeds content types (28) + permissions (112: add/change/delete/view × 28 models), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`) and a no-TOTP user (`8888888888`) used by the integration tests |
 | `sql/admin_perf.sql` | Prod DDL: `pg_trgm` extension + GIN indexes on `authentication_user(name, email)` for Django-admin `ILIKE` search (idempotent) |
 | `sql/session_auth_24h.sql` | Prod DDL: `authtoken_token.user_id` FK (DRF adds it only via migrate) + `created` index for the 24h TTL sweep (idempotent) |
 
@@ -120,10 +120,10 @@ drf-authtoken (`authtoken_token`). `auth_user`, `auth_user_groups`, and
 
 Seeds the reference data Django and the tests need:
 
-1. **14 content types** (auth user/group/permission, contenttypes, sessions,
+1. **28 content types** (auth user/group/permission, contenttypes, sessions,
    admin logentry, authentication user/admin/salesperson, aggregator
    country/state/city/pincode/address)
-2. **56 permissions** (add/change/delete/view × 14 models)
+2. **112 permissions** (add/change/delete/view × 28 models)
 3. **Reconciliation users**: superuser `9999999999`/`admin` (TOTP enabled,
    `created_by`/`verified_by` self-referenced) and non-TOTP user `8888888888`
    (used by the negative-path integration tests).
@@ -216,24 +216,24 @@ The `reload_db.sh` script always reads from `.env.dev` (localhost).
 ## Adding Content Types and Permissions for New Models
 
 `sql/dml.sql` seeds the content types and permissions for every SQL-managed
-model (currently 14 content types → 56 permissions). When adding a new
+model (currently 28 content types → 112 permissions). When adding a new
 SQL-managed model, append its content type and 4 CRUD permissions **after the
 current max IDs** (check `SELECT max(id), setval(...)` in `dml.sql`):
 
 ```sql
 INSERT INTO django_content_type (id, app_label, model) VALUES
-    (15, 'your_app', 'your_model')
+    (29, 'your_app', 'your_model')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO auth_permission (id, name, content_type_id, codename) VALUES
-    (57, 'Can add your model',    15, 'add_your_model'),
-    (58, 'Can change your model', 15, 'change_your_model'),
-    (59, 'Can delete your model', 15, 'delete_your_model'),
-    (60, 'Can view your model',   15, 'view_your_model')
+    (113, 'Can add your model',    29, 'add_your_model'),
+    (114, 'Can change your model', 29, 'change_your_model'),
+    (115, 'Can delete your model', 29, 'delete_your_model'),
+    (116, 'Can view your model',   29, 'view_your_model')
 ON CONFLICT DO NOTHING;
 
-SELECT setval('django_content_type_id_seq', 15);
-SELECT setval('auth_permission_id_seq', 60);
+SELECT setval('django_content_type_id_seq', 29);
+SELECT setval('auth_permission_id_seq', 116);
 ```
 
 ---
