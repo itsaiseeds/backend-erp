@@ -17,10 +17,10 @@ urlpatterns = [
     path("auth/otp/verify", VerifyOTPView.as_view(), name="verify-otp"),
     path("auth/logout", LogoutView.as_view(), name="logout"),
     path("admins", AdminsView.as_view(), name="admins"),
-    path("admins/<int:pk>", UpdateAdminView.as_view(), name="update-admin"),
+    path("admins/<int:id>", UpdateAdminView.as_view(), name="update-admin"),
     path("sales-people", SalesPeopleView.as_view(), name="sales-people"),
     path(
-        "sales-people/<int:pk>",
+        "sales-people/<int:id>",
         UpdateSalesPersonView.as_view(),
         name="update-sales-person",
     ),

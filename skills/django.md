@@ -7,7 +7,8 @@
 ## Settings Module
 
 `config/settings.py` — the single settings file. No settings split (base/dev/prod).
-Nearly every value is env-driven with sensible fallbacks.
+Nearly every value is env-driven with sensible fallbacks. **KISS:** one file to
+read, no inheritance chain to hunt through.
 
 ---
 
@@ -48,11 +49,13 @@ MIGRATION_MODULES = {
 }
 ```
 
-**Implication:** the project keeps **no migration files at all**. The whole
-schema — built-in and project apps — lives in `sql/ddl.sql` (plus `sql/dml.sql`
-seed data). `migrate` is commented out of `scripts/entrypoint.sh`; integration
-tests run `manage.py migrate --fake` against the pre-built DDL schema.
-Local DB rebuilds go through `bash scripts/reload_db.sh --step all`.
+**Implication:** the project keeps **no migration files at all** (YAGNI — no
+migration machinery to invent or maintain). The whole schema — built-in and
+project apps — lives in one authoritative `sql/ddl.sql` (plus `sql/dml.sql`
+seed data); `migrate` is commented out of `scripts/entrypoint.sh`. With no
+migrations, pytest-Django's test DB is synced straight from the models and
+`tests/common.py` re-seeds the `sql/dml.sql` rows. Local DB rebuilds go
+through `bash scripts/reload_db.sh --step all`.
 
 ---
 
@@ -171,8 +174,8 @@ it. In development there is no Sentry, so the probe just returns a Django 500.
 
 - **No migration files exist.** Don't reach for `makemigrations`/`migrate` to
   change schema — edit the model, then update `sql/ddl.sql`/`sql/dml.sql`.
-- `migrate --fake` is only used by the integration-test setup to mark the
-  pre-built `django_test` schema as applied.
+- The pytest test DB is synced straight from the models (no migrations);
+  `tests/common.py` re-seeds the `sql/dml.sql` rows.
 - `credentials`-style secrets (`SECRET_KEY`, `POSTGRES_PASSWORD`) come from env;
   `.env` (prod) is gitignored, `.env.dev` (dev) is committed with placeholders.
 - Old PBKDF2 hashes keep working; passphrases only move to Argon2 on the next

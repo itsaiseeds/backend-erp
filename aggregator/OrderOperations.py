@@ -19,12 +19,9 @@ from .models import (
     OrderItem,
     PrivateDispatchDetails,
     Status,
+    StatusIds,
 )
 from .ProductOperations import packaging_payload
-
-
-def _status(code: str) -> Status:
-    return Status.objects.get(code=code)
 
 
 @transaction.atomic
@@ -34,7 +31,7 @@ def create_order(
     delivery_address: Any,
     actor: Any,
     items: Iterable[dict],
-    status_code: str = "BOOKED",
+    status: StatusIds = StatusIds.BOOKED,
     special_comments: str = "",
     expected_delivery_date=None,
 ) -> Order:
@@ -46,7 +43,7 @@ def create_order(
     order = Order(
         client=client,
         delivery_address=delivery_address,
-        status=_status(status_code),
+        status=Status.by_id(status),
         created_by=actor,
         special_comments=special_comments,
     )
@@ -146,15 +143,15 @@ def attach_private_dispatch_details(
     return dispatch
 
 
-def update_order_status(order: Order, status_code: str) -> Order:
-    order.status = _status(status_code)
+def update_order_status(order: Order, status: StatusIds) -> Order:
+    order.status = Status.by_id(status)
     order.full_clean()
     order.save(update_fields=["status", "updated_at"])
     return order
 
 
 def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
-    order.status = _status("DELIVERED")
+    order.status = Status.by_id(StatusIds.DELIVERED)
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
     order.full_clean()
     order.save(update_fields=["status", "actual_delivery_date", "updated_at"])

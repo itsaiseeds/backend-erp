@@ -15,7 +15,7 @@ from .PrivateDispatchDetails import PrivateDispatchDetails
 from .Product import Product
 from .ProductPackaging import ProductPackaging
 from .State import State
-from .Status import Status
+from .Status import Status, StatusIds
 from .TransportAgency import TransportAgency
 
 __all__ = [
@@ -25,6 +25,7 @@ __all__ = [
     "Pincode",
     "Address",
     "Status",
+    "StatusIds",
     "TransportAgency",
     "Contact",
     "Crop",

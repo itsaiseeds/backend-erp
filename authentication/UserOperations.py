@@ -167,7 +167,7 @@ def _phone_number_taken(value: str, own_user_id: int | None) -> bool:
     """
     qs = User.objects.filter(phone_number=value)
     if own_user_id is not None:
-        qs = qs.exclude(pk=own_user_id)
+        qs = qs.exclude(id=own_user_id)
     return qs.exists()
 
 

@@ -14,11 +14,8 @@ from .models import (
     ClientContact,
     ClientTransportAgency,
     Status,
+    StatusIds,
 )
-
-
-def _status(code: str) -> Status:
-    return Status.objects.get(code=code)
 
 
 def create_client(
@@ -33,7 +30,7 @@ def create_client(
         company_name=company_name,
         company_phone=company_phone,
         gst_number=gst_number,
-        status=_status("VERIFICATION_PENDING"),
+        status=Status.by_id(StatusIds.VERIFICATION_PENDING),
         created_by=actor,
     )
     client.full_clean()
@@ -43,7 +40,7 @@ def create_client(
 
 def verify_client(client: Client, admin: Any) -> Client:
     """Mark ``client`` verified, recording the acting sales admin and time."""
-    client.status = _status("VERIFIED")
+    client.status = Status.by_id(StatusIds.VERIFIED)
     client.verified_by = admin
     client.verified_at = indian_now()
     client.full_clean()

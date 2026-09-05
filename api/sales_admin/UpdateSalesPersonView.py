@@ -43,9 +43,9 @@ class UpdateSalesPersonView(APIView):
         request=UpdateSalesPersonSerializer,
         responses={200: SalesPersonPayloadSerializer},
     )
-    def patch(self, request, pk: int):
+    def patch(self, request, id: int):
         salesperson = get_object_or_404(
-            SalesPerson.objects.select_related("user", "city", "created_by"), pk=pk
+            SalesPerson.objects.select_related("user", "city", "created_by"), id=id
         )
 
         serializer = UpdateSalesPersonSerializer(
@@ -73,9 +73,9 @@ class UpdateSalesPersonView(APIView):
         summary="Delete a sales person",
         responses={204: None},
     )
-    def delete(self, request, pk: int):
+    def delete(self, request, id: int):
         salesperson = get_object_or_404(
-            SalesPerson.objects.select_related("user", "city", "created_by"), pk=pk
+            SalesPerson.objects.select_related("user", "city", "created_by"), id=id
         )
         salesperson.is_deleted = True
         salesperson.deleted_at = indian_now()

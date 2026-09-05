@@ -4,6 +4,48 @@
 
 ---
 
+## Principles
+
+Three principles shape every decision in this codebase. When a shortcut seems
+to conflict with a rule below, the principles win.
+
+### DRY — Don't Repeat Yourself
+
+Keep **one source of truth per fact**:
+- The schema is defined once in `sql/ddl.sql`; models mirror it and there are
+  **no migration files** — never write a second schema definition.
+- Status CODE→id is defined once in `StatusIds`
+  (`aggregator/models/Status.py`); consumers derive their code sets from it
+  (`ORDER_STATUS_CODES = {s.name for s in StatusIds.order_statuses()}`) and
+  resolve via `Status.by_id()` — never hardcode codes or ids.
+- Reuse before reinvent: `common/` bases (`TimeStampedModel`,
+  `SoftDeletedModel`, `CreatedByModel`), model helpers (`is_verified`,
+  `is_dispatched`), and the operations layer (`OrderOperations`,
+  `ClientOperations`) keep logic out of views and out of other apps.
+- If you are about to paste a block for the third time, extract it.
+
+### YAGNI — You Aren't Gonna Need It
+
+- Build the simplest thing today's feature needs. Do not add endpoints,
+  models, columns, or abstraction layers "for later" — `android/v1/` stays
+  empty until an endpoint is actually needed, and `PublicIdModel` /
+  `RandomIdModel` are idle because nothing uses them.
+- No speculative machinery: one `config/settings.py` (no base/dev/prod split),
+  no migration tooling, no extra compose services, no unused parameters.
+- Add a parameter, flag, or configuration knob when a concrete caller exists.
+
+### KISS — Keep It Simple, Stupid
+
+- Prefer the plainest approach that works: raw SQL schema with no ORM
+  migrations, thin DRF views delegating to operations helpers, short focused
+  functions.
+- Keep tests behaviour-driven and simple: one behaviour per test, plain
+  `assert`, no over-mocking; assert outcomes, never restate the
+  implementation's arithmetic.
+- If the solution needs a diagram to be explained, simplify it.
+
+---
+
 ## Project Layout
 
 ```
@@ -19,7 +61,7 @@ backend-erp/
 ├── web/                # Flutter admin web app
 │   ├── lib/            # Flutter source code
 │   └── build/web/      # Flutter build output (committed to git)
-├── tests/              # pytest tests (unit + integration)
+├── tests/              # pytest tests (DML-seeded)
 ├── docs/               # knowledge graph + auto-generated OpenAPI spec
 ├── skills.md           # Skills index
 ├── .env                # Production env (gitignored)
@@ -76,9 +118,11 @@ backend-erp/
 ## Django Conventions
 
 ### Settings
-- Single `config/settings.py` file (no split base/dev/prod)
+- Single `config/settings.py` file (no split base/dev/prod) — KISS
 - All config from environment variables where possible
-- `MIGRATION_MODULES` disables migrations only for built-in `django.*` apps; project apps use normal migrations
+- `MIGRATION_MODULES` disables migrations for built-in `django.*` apps; project
+  apps ship **no migration files** either (YAGNI — the schema lives in
+  `sql/ddl.sql`)
 
 ### Apps
 - Use `python manage.py startapp <name>` to create
@@ -89,6 +133,28 @@ backend-erp/
 ### Models
 - Project-app models define the real schema, mirrored in `sql/ddl.sql`
 - Prod schema is applied manually (edit model → update SQL → DBeaver DDL → Neon)
+
+### Primary keys: `id`, not `pk`
+- Every table has an `id` `BIGSERIAL` PK, so reference rows as **`id`** in route
+  kwargs, ORM lookups, and attributes — never `pk` (`pk` is just Django's alias).
+- URL patterns for single objects use `<int:id>`, and the DRF view receives the
+  kwarg as `id` and looks the row up with `id=…`.
+
+### Enums & seeded statuses
+- Seed rows that act as enum values (e.g. `aggregator_status`, ids 1–9 in
+  `sql/dml.sql`) are mirrored by an `enum.IntEnum`
+  (`aggregator/models/Status.py::StatusIds`): member **name** == seeded
+  **code**, member **value** == row **id**. Members are usable directly in ORM
+  queries (`Status.objects.get(id=StatusIds.BOOKED)`).
+- The enum is the single source of truth for the CODE→id mapping — never
+  hardcode a status code string or an id in consumers. Derive sets such as
+  `Order.ORDER_STATUS_CODES` / `Client.CLIENT_STATUS_CODES` from it
+  (`{s.name for s in StatusIds.order_statuses()}`).
+- Resolve a member to its row via `Status.by_id(StatusIds.X)`, never
+  `Status.objects.get(code=...)`.
+- **Keep `StatusIds` in sync with `dml.sql`:** if a status row is added,
+  renamed, or renumbered there, update the enum (and the
+  `order_statuses()` / `client_statuses()` id ranges) in the same change.
 
 ### Auth / roles
 - Login is **TOTP** (authenticator app) for everyone except staff (Django admin
@@ -102,13 +168,15 @@ backend-erp/
 ### URLs
 - Each app defines its own `urls.py`
 - Include app URLs in `api/urls.py` / `config/urls.py`
+- Single-object routes use `<int:id>` (never `<int:pk>`; see "Primary keys" below)
 
 ---
 
 ## Code Style
 
+- Follow the DRY / YAGNI / KISS principles at the top of this page; style never justifies duplication or speculative complexity
 - Follow Django's coding style (PEP 8)
-- No comments unless the user explicitly asks for them
+- Uaw comments only when its complex or unclear from code why its written
 - Use meaningful variable/function names
 - Keep functions small and focused
 
@@ -149,6 +217,9 @@ backend-erp/
 ## Anti-Patterns to Avoid
 
 - Do not create migration files — the schema is managed entirely in `sql/ddl.sql`
+- Do not hardcode status codes or ids — use `StatusIds` / `Status.by_id()` (DRY)
+- Do not add models, endpoints, columns, or abstraction layers "for later" (YAGNI)
+- Do not reinvent existing machinery — reuse `common/` bases, the operations layer, and `scripts/run.sh` instead of duplicating them (DRY/KISS)
 - Do not rely on prod running `migrate` to change the schema — apply it manually to Neon
 - Do not apply a breaking/restrictive DDL (e.g. `NOT NULL` constraint) before the code and data are ready — deploy first, alter last
 - Do not hardcode database credentials in Python files
@@ -167,9 +238,9 @@ backend-erp/
 
 ### Running (via `scripts/run.sh`, inside the web container)
 ```bash
-bash scripts/run.sh test               # unit + integration
-bash scripts/run.sh test-unit          # unit only
-bash scripts/run.sh test-integration   # integration only
+bash scripts/run.sh test               # full pytest suite
+bash scripts/run.sh test-unit          # pytest -v (whole suite)
+bash scripts/run.sh test-dml           # pytest tests/ -v (whole suite, DML baseline)
 bash scripts/run.sh lint               # ruff
 bash scripts/run.sh typecheck          # mypy
 ```
@@ -181,10 +252,10 @@ bash scripts/run.sh typecheck          # mypy
 - Keep tests simple and focused — one assertion per test when possible
 - Every test class/method docstring must state its copy/paste pytest node id
   (see `.agents/skills/run-tests/SKILL.md`)
-- Integration tests use `tests/integration/base.py` helpers and build a
-  throwaway `django_test` DB from `sql/ddl.sql` + `dml.sql` (then `migrate --fake`)
+- DML-backed tests subclass `tests/common.py::DMLTestCase`, which re-seeds the
+  `sql/dml.sql` rows inside the test-class transaction.
 
 ### CI
-- `.github/workflows/tests.yml` runs `test-unit` + `test-integration` + `lint`
+- `.github/workflows/tests.yml` runs `test-unit` + `test-dml` + `lint`
   inside the web container on every PR to `master`
 - Branch protection requires the `Tests / test` check to pass

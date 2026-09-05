@@ -11,16 +11,10 @@ from common.models import (
     indian_now,
 )
 
-ORDER_STATUS_CODES = {
-    "BOOKED",
-    "UNDER_REVIEW",
-    "CONFIRMED",
-    "DISPATCHED",
-    "DELIVERED",
-    "ON_HOLD",
-    "REJECTED",
-}
-DISPATCH_REQUIRED_STATUS_CODES = {"DISPATCHED", "DELIVERED"}
+from .Status import StatusIds
+
+ORDER_STATUS_CODES = {s.name for s in StatusIds.order_statuses()}
+DISPATCH_REQUIRED_STATUS_CODES = {StatusIds.DISPATCHED.name, StatusIds.DELIVERED.name}
 
 
 def default_expected_delivery_date():

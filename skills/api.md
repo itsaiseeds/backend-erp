@@ -24,6 +24,18 @@
   `CsrfViewMiddleware` never gates DRF endpoints. CSRF is enforced **only** by
   DRF `SessionAuthentication` (on session-authenticated POST/PUT/PATCH/DELETE).
 
+## Design principles
+
+- **DRY:** every endpoint reuses the shared auth pair (`SessionAuthentication` +
+  `ExpiringTokenAuthentication`) and one of the base views (`AdminApiView` /
+  `AndroidBaseView`); views only redeclare auth/permission classes when they
+  deliberately differ (pre-auth endpoints, superuser/role gates).
+- **KISS:** views stay thin — validate with a serializer, then delegate writes
+  to the operations layer (`OrderOperations`, `ClientOperations`,
+  `UserOperations`).
+- **YAGNI:** `android/v1/` is empty on purpose; add endpoints only when a
+  client actually needs them.
+
 ## CSRF token flow — `get_token(request)` in `VerifyOTPView`
 
 `VerifyOTPView.post` does two things after a successful TOTP check:

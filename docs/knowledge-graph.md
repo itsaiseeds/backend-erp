@@ -61,7 +61,7 @@ graph TD
     end
 
     subgraph SALES["Sales domain (aggregator/)"]
-        STATUS["Status<br/>(generic enum: order + client)"]
+        STATUS["Status + StatusIds<br/>(generic enum: order + client)"]
         CROP["Crop"]
         CL["Client<br/>(created_by=salesperson,<br/>verified_by=sales admin)"]
         TA["TransportAgency"]
@@ -128,13 +128,10 @@ graph TD
     SPP --> TS
 
     subgraph QA["Quality (pytest → CI)"]
-        UNIT["tests/ (unit: sample, expiring token)"]
-        IT["tests/integration/ (django_test from ddl+dml)"]
+        UNIT["tests/ (DML-seeded pytest suite)"]
         CI["GitHub Actions: Tests / test<br/>gate on PR → master"]
     end
-    IT --> DB
     UNIT --> CI
-    IT --> CI
 ```
 
 ## 2. Node registry
@@ -195,6 +192,15 @@ graph TD
 | `Address` | `aggregator/models/Address.py` | Denormalised pincode/city/state/country chain so any level can be listed/filtered; `clean()` validates the chain matches | FK → all four geo nodes |
 | aggregator admin | `aggregator/admin.py` | `SoftDeleteModelAdmin` + `autocomplete_fields`/`list_select_related` so related picks don't N+1 | configures → Django `admin` |
 
+### Domain — aggregator (sales)
+
+| Node | Path | Purpose | Edges |
+|---|---|---|---|
+| `Status` | `aggregator/models/Status.py` | Generic enum-like status rows (ids 1–9, seeded in `sql/dml.sql`); hosts `StatusIds` and the `Status.by_id()` resolver. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Order.status`, `Client.status`, `OrderOperations`, `ClientOperations` |
+| `StatusIds` | `aggregator/models/Status.py` | `enum.IntEnum` — the single source of truth for the status CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`StatusIds.BOOKED.name == "BOOKED"`, `int(StatusIds.BOOKED) == 1`). `order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9. | derives → `Order.ORDER_STATUS_CODES`, `Client.CLIENT_STATUS_CODES`; used by → `OrderOperations`, `ClientOperations`, tests |
+| `Order` | `aggregator/models/Order.py` | Booked order exposed by `public_id` (`ORD-…`); lifecycle statuses limited to `StatusIds.order_statuses()` | FK → `Client`, `Address`, `Status`; 1:N → `OrderItem` |
+| `Client` | `aggregator/models/Client.py` | Customer company; verification statuses limited to `StatusIds.client_statuses()` | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
+
 ### Reusable bases — common
 
 | Node | Path | Purpose | Used by |
@@ -210,22 +216,20 @@ graph TD
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `sql/ddl.sql` | full schema | **Every** table — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), custom apps (`authentication_*`, `aggregator_*`), and `authtoken_token`. Dev/test reference; prod schema applied manually on Neon | consumed by → `reload_db.sh`, `integration_db.sh`, integration tests |
+| `sql/ddl.sql` | full schema | **Every** table — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), custom apps (`authentication_*`, `aggregator_*`), and `authtoken_token`. Dev/test reference; prod schema applied manually on Neon | consumed by → `reload_db.sh` |
 | `sql/dml.sql` | seed data | Content types (14) + permissions (56, 4 per model) + **reconciliation superuser** `9999999999` (with TOTP secret `JBSWY3DPEHPK3PXP`) + a no-TOTP user `8888888888` for the negative-path test. Idempotent `ON CONFLICT DO NOTHING`, `setval()` sequence resets, wrapped in txn | consumed by → same as above |
 | `sql/admin_perf.sql` | prod DDL | `pg_trgm` extension + GIN trigram indexes on `authentication_user(name, email)` for Django admin `ILIKE` search | applied to → local/test DBs, Neon (manual) |
 | `sql/session_auth_24h.sql` | prod DDL | `authtoken_token.user_id` FK (DRF only adds it via migrate) + `created` index for the TTL expiry sweep | applied to → Neon (manual) |
-| `MIGRATION_MODULES` | `config/settings.py` | Disables migrations for built-in `django.*` apps via a dict comprehension (settings comment additionally states the project apps are schema-managed). **No migration files exist** — the repo has one empty `authentication/migrations/` dir. The *entire* schema is SQL-managed; integration tests run `manage.py migrate --fake` to mark the pre-built tables as applied | drives → `migrate` behaviour |
+| `MIGRATION_MODULES` | `config/settings.py` | Disables migrations for built-in `django.*` apps via a dict comprehension (settings comment additionally states the project apps are schema-managed). **No migration files exist** — the repo has one empty `authentication/migrations/` dir. The *entire* schema is SQL-managed; with no migrations, Django's test runner syncs test tables straight from the models and `tests/common.py` seeds the `dml.sql` data | drives → `migrate` behaviour |
 
 ### Tooling & quality
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `scripts/run.sh` | single entry point | `build/up/down/restart/reload-db/logs/status/shell/psql/flutter/schema/test/test-unit/test-integration/lint/typecheck`. Tests/lint/typecheck run in **short-lived one-off `web` containers** (`compose run --rm --no-deps --entrypoint ""`) to avoid booting gunicorn | calls → `reload_db.sh`, `integration_db.sh`, compose |
+| `scripts/run.sh` | single entry point | `build/up/down/restart/reload-db/logs/status/shell/psql/flutter/schema/test/test-unit/test-dml/lint/typecheck`. Tests/lint/typecheck run in **short-lived one-off `web` containers** (`compose run --rm --no-deps --entrypoint ""`) to avoid booting gunicorn | calls → `reload_db.sh`, compose |
 | `scripts/reload_db.sh` | local DB reload | `--step all/ddl/dml`; **local Docker Postgres only, never prod** | reads → `sql/ddl.sql`, `sql/dml.sql`, `.env.dev` |
-| `scripts/integration_db.sh` | test DB builder | Build/drop throwaway `django_test` DB from DDL+DML | consumed by integration tests (now via `tests/integration/base.py`) |
-| Unit tests | `tests/test_sample.py`, `tests/test_expiring_token.py` | Sanity pytest + token-TTL unit test | none |
-| Integration framework | `tests/integration/` | `base.py` (`IntegrationDbContext`, `LiveServer`, `IntegrationTestCase`) + `conftest.py` fixtures; builds `django_test` from `sql/ddl.sql`+`dml.sql`+`admin_perf.sql`, `migrate --fake`, runs real `runserver` on `127.0.0.1:8001`, exercises HTTP via `requests.Session` | depends on → `db`; consumed by → `test_sentry_probe.py` |
-| CI | `.github/workflows/tests.yml` | Builds images, starts `db`, runs `test-unit` + `test-integration` + `lint` in one-off containers | gate on → PRs to `master`; renders check `Tests / test` |
+| Test suite | `tests/` | DML-seeded pytest suite (models, order/client operations, TOTP/auth flow, token TTL); every class/method carries its pytest node-id docstring | uses → `tests/common.py` (`DMLTestCase` re-seeds `sql/dml.sql`); run via → `test-unit` / `test-dml` |
+| CI | `.github/workflows/tests.yml` | Builds images, starts `db`, runs `test-unit` + `test-dml` + `lint` in one-off containers | gate on → PRs to `master`; renders check `Tests / test` |
 | Branch protection | GitHub settings | `master` requires `Tests / test` to pass + PR review | enforced by → GitHub |
 | Skills | `skills/*.md`, `.agents/skills/run-tests/SKILL.md` | Domain knowledge + test-run instructions (node-id docstring convention) | read before editing |
 
@@ -295,6 +299,11 @@ erDiagram
     }
 ```
 
+> Statuses are not drawn above: `aggregator_status` is a generic seed table
+> referenced via `Order.status` / `Client.status`. The seeded CODE→id mapping
+> lives in Python in `StatusIds` (`aggregator/models/Status.py`) and must be
+> kept in sync with the `sql/dml.sql` rows.
+
 ## 4. URL / routing map
 
 ```
@@ -302,7 +311,11 @@ erDiagram
 /admin/              -> Django admin (authentication/admin.py + aggregator/admin.py)
 /api/
 ├── sales_admin/
-│   └── auth/otp/verify   POST  VerifyOTPView      (AllowAny → TOTP login)
+│   ├── auth/otp/verify      POST  VerifyOTPView          (AllowAny → TOTP login)
+│   ├── admins               GET/POST  AdminsView         (IsSuperUser)
+│   ├── admins/<int:id>      PATCH/DELETE  UpdateAdminView (IsSuperUser)
+│   ├── sales-people         GET/POST  SalesPeopleView    (IsAdminUser)
+│   └── sales-people/<int:id> PATCH/DELETE  UpdateSalesPersonView (IsAdminUser)
 ├── android/
 │   └── v1/               (empty — being built)
 └── test-sentry/          GET/POST  TestSentryView (superuser → forced 500)
@@ -310,6 +323,9 @@ erDiagram
 /api/docs/           -> Swagger UI
 /sales-admin[/...]   -> Flutter build  (config/views.py catch-all)
 ```
+
+> Route convention: single-object URLs use `<int:id>` (never `<int:pk>`); the
+> view receives it as the `id` kwarg and looks the row up with `id=…`.
 
 > Auth model: default DRF global = `SessionAuthentication` + `ExpiringTokenAuthentication`, `IsAuthenticated`.
 > Pre-auth endpoints (TOTP login) opt out with `authentication_classes = []` and
@@ -333,19 +349,20 @@ models/*.py ----(DBeaver: copy table DDL)---->  Neon SQL Editor (prod, manual)
             sql/ddl.sql (full schema reference)
 
 sql/ddl.sql + sql/dml.sql + sql/admin_perf.sql
-    ----reload_db.sh / integration_db.sh / integration tests---->
-            local Docker "django" / "django_test" DB
+    ----reload_db.sh---->
+            local Docker "django" DB
 
 No migration files exist in the repo. `migrate` is commented out of the
-entrypoint; integration tests run `manage.py migrate --fake` to mark the
-pre-built SQL schema as applied.
+entrypoint; with no migrations, Django's test runner syncs the test tables
+straight from the models, and `tests/common.py` (`DMLTestCase`) re-seeds the
+`sql/dml.sql` rows so tests share the canonical seeded ids.
 ```
 
 ## 6. Test & release flow
 
 ```
 feature branch → PR to master
-  → GitHub Actions "Tests / test" (test-unit + test-integration + lint)
+  → GitHub Actions "Tests / test" (test-unit + test-dml + lint)
       ↑ branch protection blocks merge until it passes
 master merged → Render auto-deploy (Docker build)
   → entrypoint: collectstatic → createsuperuser_if_not_exists → runserver (dev) / gunicorn (prod)
@@ -355,11 +372,11 @@ master merged → Render auto-deploy (Docker build)
 ## 7. Gotchas / invariants
 
 - **No migrations anywhere.** The whole schema is SQL-managed: `sql/ddl.sql`
-  covers every table, `migrate` is commented out of the entrypoint, and tests
-  use `manage.py migrate --fake` against the pre-built DDL.
+  covers every table and `migrate` is commented out of the entrypoint; the
+  pytest test DB is synced from the models and `DMLTestCase` seeds `dml.sql`.
 - Prod (Neon) schema is applied **manually** — never rely on `migrate` in prod; never run `reload_db.sh` against prod.
 - `web/build/web/` (Flutter) is **committed**; rebuild with `bash scripts/run.sh flutter` before pushing Flutter changes.
-- Tests never boot gunicorn: they run in one-off containers and integration tests start their own `runserver` on `127.0.0.1:8001`.
+- Tests never boot gunicorn: they run in short-lived one-off `web` containers against the `db` service.
 - **Auth/TOTP:** non-staff users log in with an **authenticator app (TOTP)**, not SMS/OTP. Only `POST /api/sales_admin/auth/otp/verify` exists — there is no `otp/request`.
 - **Role creation:** only superusers can create Admins; superusers *and* Admins can create SalesPeople. `VerifyOTPView` exposes this to the SPA via `can_create_admin` / `can_create_sales_person`.
 - **Token TTL:** bearer tokens die `TOKEN_TTL_HOURS` (24) after their last "login"; `ExpiringTokenAuthentication` deletes an expired token on first use so the next request forces a fresh login. Session cookies share the same 24h through `SESSION_COOKIE_AGE`.
