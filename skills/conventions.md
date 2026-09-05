@@ -53,7 +53,7 @@ backend-erp/
   DB) and paste it into Neon; `migrate` is never part of the workflow.
 
 ### Seed Data (DML)
-- `sql/dml.sql` seeds content types (14) + permissions (56) + reconciliation
+- `sql/dml.sql` seeds content types (28) + permissions (112) + reconciliation
   users (superuser `9999999999` with TOTP, no-TOTP user `8888888888`).
 - Always use `ON CONFLICT DO NOTHING` for idempotency
 - Always reset sequences with `SELECT setval('table_id_seq', N);`

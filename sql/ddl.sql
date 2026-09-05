@@ -485,3 +485,438 @@ ALTER TABLE authentication_admin
     ADD COLUMN can_update_stock_count boolean NOT NULL DEFAULT false;
 
 
+
+-- =============================================================================
+-- Sales domain: clients, catalogue, dispatch and orders (aggregator app)
+-- Added tables. Reference tables first, then dependents.
+-- All FKs DEFERRABLE INITIALLY DEFERRED to match the rest of the schema.
+--   created_by_id -> ON DELETE RESTRICT (model PROTECT)
+--   deleted_by_id -> ON DELETE SET NULL (model SET_NULL)
+--   business FKs  -> ON DELETE RESTRICT (model PROTECT)
+-- =============================================================================
+
+-- aggregator_status ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_status (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	code varchar(32) NOT NULL,
+	"name" varchar(64) NOT NULL,
+	sequence int2 NOT NULL DEFAULT 0,
+	CONSTRAINT aggregator_status_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_status_code_key UNIQUE (code),
+	CONSTRAINT aggregator_status_sequence_check CHECK (sequence >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_status_code_like ON public.aggregator_status USING btree (code varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_status_is_deleted_idx ON public.aggregator_status USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_status_created_by_id_idx ON public.aggregator_status USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_status_deleted_by_id_idx ON public.aggregator_status USING btree (deleted_by_id);
+
+-- aggregator_transportagency --------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_transportagency (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	"name" varchar(255) NOT NULL,
+	CONSTRAINT aggregator_transportagency_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_transportagency_name UNIQUE (name)
+);
+CREATE INDEX IF NOT EXISTS aggregator_transportagency_is_deleted_idx ON public.aggregator_transportagency USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_transportagency_created_by_id_idx ON public.aggregator_transportagency USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_transportagency_deleted_by_id_idx ON public.aggregator_transportagency USING btree (deleted_by_id);
+
+-- aggregator_contact ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_contact (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	"name" varchar(255) NOT NULL,
+	phone_number varchar(10) NOT NULL,
+	CONSTRAINT aggregator_contact_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_contact_name_phone UNIQUE (name, phone_number)
+);
+CREATE INDEX IF NOT EXISTS aggregator_contact_is_deleted_idx ON public.aggregator_contact USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_contact_created_by_id_idx ON public.aggregator_contact USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_contact_deleted_by_id_idx ON public.aggregator_contact USING btree (deleted_by_id);
+
+-- aggregator_client -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_client (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	company_name varchar(255) NOT NULL,
+	company_phone varchar(10) NOT NULL,
+	gst_number varchar(15) NOT NULL,
+	status_id int8 NOT NULL,
+	verified_by_id int8 NULL,
+	verified_at timestamptz NULL,
+	CONSTRAINT aggregator_client_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_client_gst_number_key UNIQUE (gst_number)
+);
+CREATE INDEX IF NOT EXISTS aggregator_client_gst_number_like ON public.aggregator_client USING btree (gst_number varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_client_status_id_idx ON public.aggregator_client USING btree (status_id);
+CREATE INDEX IF NOT EXISTS aggregator_client_verified_by_id_idx ON public.aggregator_client USING btree (verified_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_client_is_deleted_idx ON public.aggregator_client USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_client_created_by_id_idx ON public.aggregator_client USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_client_deleted_by_id_idx ON public.aggregator_client USING btree (deleted_by_id);
+
+-- aggregator_clientaddress ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_clientaddress (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	client_id int8 NOT NULL,
+	address_id int8 NOT NULL,
+	label varchar(64) NOT NULL,
+	is_primary bool NOT NULL DEFAULT false,
+	CONSTRAINT aggregator_clientaddress_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_clientaddress_client_address UNIQUE (client_id, address_id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_clientaddress_client_id_idx ON public.aggregator_clientaddress USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientaddress_address_id_idx ON public.aggregator_clientaddress USING btree (address_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientaddress_is_deleted_idx ON public.aggregator_clientaddress USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_clientaddress_created_by_id_idx ON public.aggregator_clientaddress USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientaddress_deleted_by_id_idx ON public.aggregator_clientaddress USING btree (deleted_by_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_clientaddress_one_primary ON public.aggregator_clientaddress USING btree (client_id) WHERE (is_primary AND NOT is_deleted);
+
+-- aggregator_clientcontact ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_clientcontact (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	client_id int8 NOT NULL,
+	contact_id int8 NOT NULL,
+	"role" varchar(64) NOT NULL,
+	is_primary bool NOT NULL DEFAULT false,
+	CONSTRAINT aggregator_clientcontact_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_clientcontact_client_contact UNIQUE (client_id, contact_id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_clientcontact_client_id_idx ON public.aggregator_clientcontact USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientcontact_contact_id_idx ON public.aggregator_clientcontact USING btree (contact_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientcontact_is_deleted_idx ON public.aggregator_clientcontact USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_clientcontact_created_by_id_idx ON public.aggregator_clientcontact USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientcontact_deleted_by_id_idx ON public.aggregator_clientcontact USING btree (deleted_by_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_clientcontact_one_primary ON public.aggregator_clientcontact USING btree (client_id) WHERE (is_primary AND NOT is_deleted);
+
+-- aggregator_clienttransportagency --------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_clienttransportagency (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	client_id int8 NOT NULL,
+	transport_agency_id int8 NOT NULL,
+	is_primary bool NOT NULL DEFAULT false,
+	CONSTRAINT aggregator_clienttransportagency_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_clienttransportagency_client_agency UNIQUE (client_id, transport_agency_id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_clienttransportagency_client_id_idx ON public.aggregator_clienttransportagency USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_clienttransportagency_transport_agency_id_idx ON public.aggregator_clienttransportagency USING btree (transport_agency_id);
+CREATE INDEX IF NOT EXISTS aggregator_clienttransportagency_is_deleted_idx ON public.aggregator_clienttransportagency USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_clienttransportagency_created_by_id_idx ON public.aggregator_clienttransportagency USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_clienttransportagency_deleted_by_id_idx ON public.aggregator_clienttransportagency USING btree (deleted_by_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_clienttransportagency_one_primary ON public.aggregator_clienttransportagency USING btree (client_id) WHERE (is_primary AND NOT is_deleted);
+
+-- aggregator_crop -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_crop (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	"name" varchar(255) NOT NULL,
+	CONSTRAINT aggregator_crop_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_crop_name UNIQUE (name)
+);
+CREATE INDEX IF NOT EXISTS aggregator_crop_is_deleted_idx ON public.aggregator_crop USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_crop_created_by_id_idx ON public.aggregator_crop USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_crop_deleted_by_id_idx ON public.aggregator_crop USING btree (deleted_by_id);
+
+-- aggregator_product ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_product (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	crop_id int8 NOT NULL,
+	buying_price numeric(12, 2) NOT NULL,
+	selling_price numeric(12, 2) NOT NULL,
+	CONSTRAINT aggregator_product_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_product_public_id_key UNIQUE (public_id),
+	CONSTRAINT uniq_product_name_crop UNIQUE (name, crop_id),
+	CONSTRAINT ck_product_prices_non_negative CHECK (buying_price >= 0 AND selling_price >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_product_public_id_like ON public.aggregator_product USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_product_crop_id_idx ON public.aggregator_product USING btree (crop_id);
+CREATE INDEX IF NOT EXISTS aggregator_product_is_deleted_idx ON public.aggregator_product USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_product_created_by_id_idx ON public.aggregator_product USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_product_deleted_by_id_idx ON public.aggregator_product USING btree (deleted_by_id);
+
+-- aggregator_productpackaging -------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_productpackaging (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	product_id int8 NOT NULL,
+	packing_bag_weight numeric(8, 3) NOT NULL,
+	packing_bags int8 NOT NULL,
+	CONSTRAINT aggregator_productpackaging_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_productpackaging_public_id_key UNIQUE (public_id),
+	CONSTRAINT uniq_productpackaging_product_weight_bags UNIQUE (product_id, packing_bag_weight, packing_bags),
+	CONSTRAINT ck_productpackaging_positive CHECK (packing_bag_weight > 0 AND packing_bags > 0),
+	CONSTRAINT aggregator_productpackaging_packing_bags_check CHECK (packing_bags >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_productpackaging_public_id_like ON public.aggregator_productpackaging USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_productpackaging_product_id_idx ON public.aggregator_productpackaging USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_productpackaging_is_deleted_idx ON public.aggregator_productpackaging USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_productpackaging_created_by_id_idx ON public.aggregator_productpackaging USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_productpackaging_deleted_by_id_idx ON public.aggregator_productpackaging USING btree (deleted_by_id);
+
+-- aggregator_dispatchdetails --------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_dispatchdetails (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	client_id int8 NOT NULL,
+	dispatched_by_id int8 NOT NULL,
+	dispatch_date date NOT NULL,
+	from_city_id int8 NOT NULL,
+	to_city_id int8 NOT NULL,
+	lr_number varchar(64) NOT NULL,
+	CONSTRAINT aggregator_dispatchdetails_pkey PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_client_id_idx ON public.aggregator_dispatchdetails USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_dispatched_by_id_idx ON public.aggregator_dispatchdetails USING btree (dispatched_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_from_city_id_idx ON public.aggregator_dispatchdetails USING btree (from_city_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_to_city_id_idx ON public.aggregator_dispatchdetails USING btree (to_city_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_is_deleted_idx ON public.aggregator_dispatchdetails USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_deleted_by_id_idx ON public.aggregator_dispatchdetails USING btree (deleted_by_id);
+
+-- aggregator_privatedispatchdetails -------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_privatedispatchdetails (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	client_id int8 NOT NULL,
+	dispatched_by_id int8 NOT NULL,
+	dispatch_date date NOT NULL,
+	from_city_id int8 NOT NULL,
+	to_city_id int8 NOT NULL,
+	vehicle_number varchar(32) NOT NULL,
+	driver_number varchar(10) NOT NULL,
+	CONSTRAINT aggregator_privatedispatchdetails_pkey PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_privatedispatchdetails_client_id_idx ON public.aggregator_privatedispatchdetails USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_privatedispatchdetails_dispatched_by_id_idx ON public.aggregator_privatedispatchdetails USING btree (dispatched_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_privatedispatchdetails_from_city_id_idx ON public.aggregator_privatedispatchdetails USING btree (from_city_id);
+CREATE INDEX IF NOT EXISTS aggregator_privatedispatchdetails_to_city_id_idx ON public.aggregator_privatedispatchdetails USING btree (to_city_id);
+CREATE INDEX IF NOT EXISTS aggregator_privatedispatchdetails_is_deleted_idx ON public.aggregator_privatedispatchdetails USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_privatedispatchdetails_deleted_by_id_idx ON public.aggregator_privatedispatchdetails USING btree (deleted_by_id);
+
+-- aggregator_order ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_order (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	client_id int8 NOT NULL,
+	delivery_address_id int8 NOT NULL,
+	status_id int8 NOT NULL,
+	expected_delivery_date date NOT NULL,
+	actual_delivery_date date NULL,
+	dispatch_details_id int8 NULL,
+	private_dispatch_details_id int8 NULL,
+	special_comments text NOT NULL,
+	CONSTRAINT aggregator_order_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_order_public_id_key UNIQUE (public_id),
+	CONSTRAINT ck_order_not_both_dispatch_details CHECK (NOT (dispatch_details_id IS NOT NULL AND private_dispatch_details_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS aggregator_order_public_id_like ON public.aggregator_order USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_order_client_id_idx ON public.aggregator_order USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_delivery_address_id_idx ON public.aggregator_order USING btree (delivery_address_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_status_id_idx ON public.aggregator_order USING btree (status_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_dispatch_details_id_idx ON public.aggregator_order USING btree (dispatch_details_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_private_dispatch_details_id_idx ON public.aggregator_order USING btree (private_dispatch_details_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_is_deleted_idx ON public.aggregator_order USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_order_created_by_id_idx ON public.aggregator_order USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_deleted_by_id_idx ON public.aggregator_order USING btree (deleted_by_id);
+
+-- aggregator_orderitem --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_orderitem (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	order_id int8 NOT NULL,
+	product_packaging_id int8 NOT NULL,
+	negotiated_selling_price numeric(12, 2) NOT NULL,
+	quantity int8 NOT NULL,
+	CONSTRAINT aggregator_orderitem_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_orderitem_order_packaging UNIQUE (order_id, product_packaging_id),
+	CONSTRAINT ck_orderitem_positive CHECK (negotiated_selling_price >= 0 AND quantity > 0),
+	CONSTRAINT aggregator_orderitem_quantity_check CHECK (quantity >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_orderitem_order_id_idx ON public.aggregator_orderitem USING btree (order_id);
+CREATE INDEX IF NOT EXISTS aggregator_orderitem_product_packaging_id_idx ON public.aggregator_orderitem USING btree (product_packaging_id);
+CREATE INDEX IF NOT EXISTS aggregator_orderitem_is_deleted_idx ON public.aggregator_orderitem USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_orderitem_created_by_id_idx ON public.aggregator_orderitem USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_orderitem_deleted_by_id_idx ON public.aggregator_orderitem USING btree (deleted_by_id);
+
+-- Foreign keys for the sales-domain tables ------------------------------------
+ALTER TABLE public.aggregator_status ADD CONSTRAINT aggregator_status_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_status ADD CONSTRAINT aggregator_status_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_transportagency ADD CONSTRAINT aggregator_transportagency_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_transportagency ADD CONSTRAINT aggregator_transportagency_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_contact ADD CONSTRAINT aggregator_contact_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_contact ADD CONSTRAINT aggregator_contact_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_client ADD CONSTRAINT aggregator_client_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_client ADD CONSTRAINT aggregator_client_verified_by_id_fk FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_client ADD CONSTRAINT aggregator_client_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_client ADD CONSTRAINT aggregator_client_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_clientaddress ADD CONSTRAINT aggregator_clientaddress_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientaddress ADD CONSTRAINT aggregator_clientaddress_address_id_fk FOREIGN KEY (address_id) REFERENCES public.aggregator_address(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientaddress ADD CONSTRAINT aggregator_clientaddress_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientaddress ADD CONSTRAINT aggregator_clientaddress_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_clientcontact ADD CONSTRAINT aggregator_clientcontact_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientcontact ADD CONSTRAINT aggregator_clientcontact_contact_id_fk FOREIGN KEY (contact_id) REFERENCES public.aggregator_contact(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientcontact ADD CONSTRAINT aggregator_clientcontact_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientcontact ADD CONSTRAINT aggregator_clientcontact_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_clienttransportagency ADD CONSTRAINT aggregator_clienttransportagency_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clienttransportagency ADD CONSTRAINT aggregator_clienttransportagency_agency_id_fk FOREIGN KEY (transport_agency_id) REFERENCES public.aggregator_transportagency(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clienttransportagency ADD CONSTRAINT aggregator_clienttransportagency_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clienttransportagency ADD CONSTRAINT aggregator_clienttransportagency_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_crop ADD CONSTRAINT aggregator_crop_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_crop ADD CONSTRAINT aggregator_crop_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_product ADD CONSTRAINT aggregator_product_crop_id_fk FOREIGN KEY (crop_id) REFERENCES public.aggregator_crop(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_product ADD CONSTRAINT aggregator_product_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_product ADD CONSTRAINT aggregator_product_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_productpackaging ADD CONSTRAINT aggregator_productpackaging_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_productpackaging ADD CONSTRAINT aggregator_productpackaging_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_productpackaging ADD CONSTRAINT aggregator_productpackaging_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_dispatchdetails ADD CONSTRAINT aggregator_dispatchdetails_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_dispatchdetails ADD CONSTRAINT aggregator_dispatchdetails_dispatched_by_id_fk FOREIGN KEY (dispatched_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_dispatchdetails ADD CONSTRAINT aggregator_dispatchdetails_from_city_id_fk FOREIGN KEY (from_city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_dispatchdetails ADD CONSTRAINT aggregator_dispatchdetails_to_city_id_fk FOREIGN KEY (to_city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_dispatchdetails ADD CONSTRAINT aggregator_dispatchdetails_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_privatedispatchdetails ADD CONSTRAINT aggregator_privatedispatchdetails_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_privatedispatchdetails ADD CONSTRAINT aggregator_privatedispatchdetails_dispatched_by_id_fk FOREIGN KEY (dispatched_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_privatedispatchdetails ADD CONSTRAINT aggregator_privatedispatchdetails_from_city_id_fk FOREIGN KEY (from_city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_privatedispatchdetails ADD CONSTRAINT aggregator_privatedispatchdetails_to_city_id_fk FOREIGN KEY (to_city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_privatedispatchdetails ADD CONSTRAINT aggregator_privatedispatchdetails_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_delivery_address_id_fk FOREIGN KEY (delivery_address_id) REFERENCES public.aggregator_address(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_dispatch_details_id_fk FOREIGN KEY (dispatch_details_id) REFERENCES public.aggregator_dispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_private_dispatch_details_id_fk FOREIGN KEY (private_dispatch_details_id) REFERENCES public.aggregator_privatedispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_order_id_fk FOREIGN KEY (order_id) REFERENCES public.aggregator_order(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_product_packaging_id_fk FOREIGN KEY (product_packaging_id) REFERENCES public.aggregator_productpackaging(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+
+-- =============================================================================
+-- Django admin search performance (merged from admin_perf.sql)
+-- =============================================================================
+-- The two GIN indexes back the Django admin's ILIKE '%term%' search on the user
+-- directory (name/email); without them those searches fall back to a full table
+-- scan as the table grows. phone_number is already covered by its unique btree
+-- index. The pg_trgm extension is required before the gin_trgm_ops indexes can
+-- exist. Idempotent: safe to re-run.
+--
+-- NOTE: CREATE EXTENSION cannot run inside a transaction block in some SQL
+-- tools. If yours complains, run just the next line on its own, then re-run.
+--
+-- Login speed: settings.PASSWORD_HASHERS prefers Argon2, which verifies ~5-10x
+-- faster than the seeded PBKDF2 hashes. Existing hashes only move to Argon2 on
+-- the next password set/reset, so reset the admin password once after deploying.
+-- =============================================================================
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX IF NOT EXISTS authentication_user_name_trgm_idx
+    ON public.authentication_user USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS authentication_user_email_trgm_idx
+    ON public.authentication_user USING gin (email gin_trgm_ops);
+
+
+-- =============================================================================
+-- 24h session/token authentication support (merged from session_auth_24h.sql)
+-- =============================================================================
+-- Reuses the tables DRF/Django already create (authtoken_token, django_session);
+-- no new table -- just the FK + expiry-sweep indexes the 24h cleanup filters on.
+-- Idempotent: safe to re-run.
+--
+-- authtoken_token.user_id -> authentication_user.id (ON DELETE CASCADE) is
+-- already declared above; django_session (expire_date) index is already created
+-- above. Only the authtoken (created) sweep index is added here.
+-- =============================================================================
+
+CREATE INDEX IF NOT EXISTS authtoken_token_created_idx
+    ON public.authtoken_token (created);

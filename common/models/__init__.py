@@ -7,8 +7,10 @@ subclass.
 
 from .created_by import CreatedByModel
 from .public_id import (
+    PREFIXED_PUBLIC_ID_MAX_LENGTH,
     PUBLIC_ID_ALPHABET,
     PUBLIC_ID_LENGTH,
+    PrefixedPublicIdModel,
     PublicIdModel,
     generate_public_id,
 )
@@ -23,9 +25,11 @@ __all__ = [
     "AllObjectsManager",
     "RandomIdModel",
     "PublicIdModel",
+    "PrefixedPublicIdModel",
     "CreatedByModel",
     "generate_public_id",
     "PUBLIC_ID_ALPHABET",
     "PUBLIC_ID_LENGTH",
+    "PREFIXED_PUBLIC_ID_MAX_LENGTH",
     "indian_now",
 ]

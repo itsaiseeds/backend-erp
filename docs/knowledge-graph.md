@@ -60,6 +60,42 @@ graph TD
         SPP --> CIT
     end
 
+    subgraph SALES["Sales domain (aggregator/)"]
+        STATUS["Status<br/>(generic enum: order + client)"]
+        CROP["Crop"]
+        CL["Client<br/>(created_by=salesperson,<br/>verified_by=sales admin)"]
+        TA["TransportAgency"]
+        CON["Contact"]
+        CA["ClientAddress (link)"]
+        CC["ClientContact (link)"]
+        CTA["ClientTransportAgency (link)"]
+        PROD["Product<br/>(public_id P-…)"]
+        PP["ProductPackaging<br/>(public_id PP-…)"]
+        DD["DispatchDetails<br/>(dispatched_by=sales admin)"]
+        PDD["PrivateDispatchDetails<br/>(dispatched_by=sales admin)"]
+        ORD["Order<br/>(public_id ORD-…)"]
+        OI["OrderItem"]
+
+        CL --> CA --> ADDR
+        CL --> CC --> CON
+        CL --> CTA --> TA
+        CL --> STATUS
+        CROP --> PROD --> PP
+        ORD --> CL
+        ORD --> ADDR
+        ORD --> STATUS
+        ORD --> DD
+        ORD --> PDD
+        ORD --> OI --> PP
+        DD --> CIT
+        PDD --> CIT
+        SPP --> CL
+        SPP --> ORD
+        ADMINP --> CL
+        ADMINP --> DD
+        ADMINP --> PDD
+    end
+
     subgraph COMMON["Reusable bases (common/)"]
         TS["TimeStampedModel"]
         SD["SoftDeletedModel"]

@@ -28,4 +28,15 @@ class DMLTestCase(TestCase):
         # standalone transaction statements inside it.
         dml = re.sub(r"(?m)^(BEGIN|COMMIT);\s*$", "", dml)
         with connection.cursor() as cursor:
+            # Django's post_migrate signal already populated
+            # django_content_type and auth_permission with auto-assigned ids
+            # when the test database was built. dml.sql re-seeds both with the
+            # canonical production ids, so drop the migration-generated rows
+            # first to avoid primary-key collisions. auth_permission is deleted
+            # before django_content_type to respect the FK.
+            cursor.execute(
+                "DELETE FROM auth_permission; DELETE FROM django_content_type;"
+            )
+            # dml.sql re-syncs the seeded tables' sequences itself, so ORM rows
+            # created by subclass fixtures get ids after the seeded maximum.
             cursor.execute(dml)
