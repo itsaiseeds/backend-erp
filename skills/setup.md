@@ -308,10 +308,13 @@ python manage.py startapp <app_name>
 
 ### Running tests / lint / typecheck
 
+All commands go through the single `scripts/run.sh` entry point (DRY — one
+wrapper, no repeated docker-compose invocations scattered through docs/scripts):
+
 ```bash
-bash scripts/run.sh test               # unit + integration (web container)
-bash scripts/run.sh test-unit          # unit only
-bash scripts/run.sh test-integration   # integration only
+bash scripts/run.sh test               # full pytest suite (web container)
+bash scripts/run.sh test-unit          # pytest -v (whole suite)
+bash scripts/run.sh test-dml           # pytest tests/ -v (whole suite, DML baseline)
 bash scripts/run.sh lint               # ruff
 bash scripts/run.sh typecheck          # mypy
 ```

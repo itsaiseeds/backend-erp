@@ -6,8 +6,9 @@ from authentication.validators import validate_phone_number
 from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
 
 from ..validators import validate_gst_number
+from .Status import StatusIds
 
-CLIENT_STATUS_CODES = {"VERIFICATION_PENDING", "VERIFIED"}
+CLIENT_STATUS_CODES = {s.name for s in StatusIds.client_statuses()}
 
 
 class Client(TimeStampedModel, SoftDeletedModel, CreatedByModel):
@@ -88,7 +89,9 @@ class Client(TimeStampedModel, SoftDeletedModel, CreatedByModel):
 
     @property
     def is_verified(self):
-        return self.status.code == "VERIFIED" if self.status_id else False
+        return (
+            self.status.code == StatusIds.VERIFIED.name if self.status_id else False
+        )
 
     def clean(self):
         super().clean()
@@ -103,12 +106,15 @@ class Client(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         if self.status_id:
             if self.status.code not in CLIENT_STATUS_CODES:
                 errors["status"] = "Invalid status for a client."
-            elif self.status.code == "VERIFIED":
+            elif self.status.code == StatusIds.VERIFIED.name:
                 if self.verified_by_id is None or self.verified_at is None:
                     errors["status"] = (
                         "A verified client must record who verified it and when."
                     )
-            elif self.status.code == "VERIFICATION_PENDING" and self.verified_by_id:
+            elif (
+                self.status.code == StatusIds.VERIFICATION_PENDING.name
+                and self.verified_by_id
+            ):
                 errors["verified_by"] = (
                     "A pending client cannot have verification details."
                 )

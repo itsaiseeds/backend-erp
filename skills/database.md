@@ -25,8 +25,16 @@ MIGRATION_MODULES = {
 `MIGRATION_MODULES` only disables the built-in `django.*` apps, but the project
 apps ship **no migration files** either (the single `authentication/migrations/`
 directory is empty). `migrate` is commented out of `scripts/entrypoint.sh`;
-integration tests run `manage.py migrate --fake` so Django thinks the pre-built
-DDL schema has been migrated.
+with no migrations to apply, Django's test runner syncs each `django_test` DB
+straight from the models and the suites seed `dml.sql` via `tests/common.py`.
+
+## Why raw SQL (KISS + DRY / YAGNI)
+
+The schema is managed as plain SQL with **no migration machinery** — no
+`makemigrations`, no per-app migration history to keep in sync (YAGNI), one
+authoritative schema definition in `sql/ddl.sql` (DRY), and the simplest
+possible change flow (KISS): edit model → update `sql/ddl.sql` / `sql/dml.sql`
+→ reload locally → copy the DDL to Neon.
 
 ---
 
@@ -100,7 +108,7 @@ that would fail against existing data), apply it in phases to cause **minimum do
 | File | Purpose |
 |---|---|
 | `sql/ddl.sql` | `CREATE TABLE` for **every** app — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), `authentication_user`, `authentication_user_groups/…_user_permissions`, `authentication_admin`, `authentication_salesperson`, `aggregator_*` (address/city/country/pincode/state), `authtoken_token` |
-| `sql/dml.sql` | Seeds content types (28) + permissions (112: add/change/delete/view × 28 models), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`) and a no-TOTP user (`8888888888`) used by the integration tests |
+| `sql/dml.sql` | Seeds content types (28) + permissions (112: add/change/delete/view × 28 models), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`), a no-TOTP user (`8888888888`), and the `aggregator_status` rows (ids 1–9) mirrored by `StatusIds` — used by the DML-seeded tests |
 | `sql/admin_perf.sql` | Prod DDL: `pg_trgm` extension + GIN indexes on `authentication_user(name, email)` for Django-admin `ILIKE` search (idempotent) |
 | `sql/session_auth_24h.sql` | Prod DDL: `authtoken_token.user_id` FK (DRF adds it only via migrate) + `created` index for the 24h TTL sweep (idempotent) |
 
@@ -126,7 +134,7 @@ Seeds the reference data Django and the tests need:
 2. **112 permissions** (add/change/delete/view × 28 models)
 3. **Reconciliation users**: superuser `9999999999`/`admin` (TOTP enabled,
    `created_by`/`verified_by` self-referenced) and non-TOTP user `8888888888`
-   (used by the negative-path integration tests).
+   (used by the DML-seeded tests).
 
 The runtime `createsuperuser_if_not_exists` command is what guarantees a
 superuser exists on a fresh prod deploy; the SQL rows are reconciliation seeds
@@ -136,6 +144,14 @@ Key details:
 - All `ON CONFLICT DO NOTHING` — idempotent
 - Sequence values explicitly reset via `setval()` after inserts
 - Wrapped in `BEGIN` / `COMMIT`
+- **`aggregator_status` rows (ids 1–9)** are the canonical status seed
+  (`1–7` order lifecycle, `8–9` client verification). They are mirrored by the
+  `StatusIds` `IntEnum` in `aggregator/models/Status.py`, where member **name**
+  == seeded `code` and member **value** == row `id`
+  (`order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9). The enum is
+  the CODE→id source of truth the code and tests read from — whenever a status
+  row is added, renamed, or renumbered in `dml.sql`, update `StatusIds` in the
+  same change.
 
 ---
 

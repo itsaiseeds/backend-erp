@@ -22,6 +22,7 @@ from aggregator.models import (
     Pincode,
     PrivateDispatchDetails,
     State,
+    StatusIds,
 )
 from aggregator.OrderOperations import (
     attach_dispatch_details,
@@ -38,7 +39,7 @@ class OrderModelTest(DMLTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.su = User.objects.get(pk=1)
+        cls.su = User.objects.get(id=1)
         cls.sp_user = User.objects.create_user(
             "9000000001", "Sales Person", created_by=cls.su, verified_by=cls.su, is_verified=True
         )
@@ -139,7 +140,7 @@ class OrderModelTest(DMLTestCase):
         )
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                Order.objects.filter(pk=order.pk).update(
+                Order.objects.filter(id=order.id).update(
                     dispatch_details=d, private_dispatch_details=pd
                 )
 
@@ -147,7 +148,7 @@ class OrderModelTest(DMLTestCase):
         """tests/test_order_model.py::OrderModelTest::test_dispatched_status_requires_dispatch"""
         order = self._order()
         with self.assertRaises(ValidationError):
-            update_order_status(order, "DISPATCHED")
+            update_order_status(order, StatusIds.DISPATCHED)
 
     def test_attach_dispatch_then_dispatch(self):
         """tests/test_order_model.py::OrderModelTest::test_attach_dispatch_then_dispatch"""
@@ -156,7 +157,7 @@ class OrderModelTest(DMLTestCase):
             order, dispatched_by=self.adm_user, dispatch_date=datetime.date.today(),
             from_city=self.city, to_city=self.city2, lr_number="LR100",
         )
-        update_order_status(order, "DISPATCHED")
+        update_order_status(order, StatusIds.DISPATCHED)
         assert order.status.code == "DISPATCHED"
         assert order.active_dispatch is not None
 

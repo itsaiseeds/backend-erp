@@ -25,6 +25,7 @@ from aggregator.models import (
     Pincode,
     State,
     Status,
+    StatusIds,
     TransportAgency,
 )
 from authentication.models import Admin, SalesPerson, User
@@ -35,7 +36,7 @@ class ClientModelTest(DMLTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.su = User.objects.get(pk=1)
+        cls.su = User.objects.get(id=1)
         cls.sp_user = User.objects.create_user(
             "9000000001", "Sales Person", created_by=cls.su, verified_by=cls.su, is_verified=True
         )
@@ -105,7 +106,7 @@ class ClientModelTest(DMLTestCase):
         client = Client(
             company_name="Acme",
             gst_number="27AAPFU0939F1ZV",
-            status=Status.objects.get(code="VERIFIED"),
+            status=Status.by_id(StatusIds.VERIFIED),
             created_by=self.sp_user,
         )
         with self.assertRaises(ValidationError):

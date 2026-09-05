@@ -1,7 +1,7 @@
 """Admin update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales_admin/admins/<id>``.
 
 Only a Django superuser may update or delete an application admin (enforced via
-the ``IsSuperUser`` permission, mirroring ``AdminsView``). Extra ``pk`` kwargs
+the ``IsSuperUser`` permission, mirroring ``AdminsView``). Extra ``id`` kwargs
 are rejected at the URL resolver, so a superuser can only mutate the admin
 whose id is in the path. ``phone_number`` is validated for format and
 uniqueness.
@@ -41,8 +41,10 @@ class UpdateAdminView(APIView):
         request=UpdateAdminSerializer,
         responses={200: AdminPayloadSerializer},
     )
-    def patch(self, request, pk: int):
-        admin = get_object_or_404(Admin.objects.select_related("user", "created_by"), pk=pk)
+    def patch(self, request, id: int):
+        admin = get_object_or_404(
+            Admin.objects.select_related("user", "created_by"), id=id
+        )
 
         serializer = UpdateAdminSerializer(instance=admin, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -67,9 +69,9 @@ class UpdateAdminView(APIView):
         summary="Delete an application admin",
         responses={204: None},
     )
-    def delete(self, request, pk: int):
+    def delete(self, request, id: int):
         admin = get_object_or_404(
-            Admin.objects.select_related("user", "created_by"), pk=pk
+            Admin.objects.select_related("user", "created_by"), id=id
         )
         admin.delete(deleted_by=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

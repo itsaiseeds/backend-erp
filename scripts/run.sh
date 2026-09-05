@@ -16,7 +16,7 @@
 #   bash scripts/run.sh flutter-prod # Build Flutter web app pointing at the prod API
 #   bash scripts/run.sh schema       # Regenerate docs/api/openapi.yml
 #   bash scripts/run.sh test         # All tests (in web container)
-#   bash scripts/run.sh test-unit    # Only non-integration tests (in web container)
+#   bash scripts/run.sh test-unit    # Run the pytest suite (in web container)
 #   bash scripts/run.sh test-dml     # DML-seeded Django tests (in web container)
 #   bash scripts/run.sh lint         # ruff check (in web container)
 #   bash scripts/run.sh typecheck    # mypy (in web container)

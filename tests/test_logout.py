@@ -51,7 +51,7 @@ class LogoutTest(DMLTestCase):
 
         response = self.client.post(self.URL)
         self.assertEqual(response.status_code, 204)
-        self.assertFalse(Token.objects.filter(pk=token.pk).exists())
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
 
         # Re-using the same key is rejected.
         followup = self.client.get("/api/utilities/reauthenticate")

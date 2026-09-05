@@ -65,13 +65,13 @@ class ReauthenticateTest(DMLTestCase):
         token = Token.objects.create(user=self.superuser)
         # Age the token past the 24h TTL. ``ExpiringTokenAuthentication`` must
         # both reject and delete it.
-        Token.objects.filter(pk=token.pk).update(created=timezone.now() - timedelta(hours=48))
+        Token.objects.filter(key=token.key).update(created=timezone.now() - timedelta(hours=48))
 
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
         response = self.client.get(self.URL)
 
         self.assertEqual(response.status_code, 401)
-        self.assertFalse(Token.objects.filter(pk=token.pk).exists())
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
 
     def test_unknown_token_is_rejected(self):
         """tests/test_reauthenticate.py::ReauthenticateTest::test_unknown_token_is_rejected"""

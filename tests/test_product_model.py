@@ -17,7 +17,7 @@ class ProductModelTest(DMLTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.su = User.objects.get(pk=1)
+        cls.su = User.objects.get(id=1)
 
     def test_create_product_makes_crop_and_public_id(self):
         """tests/test_product_model.py::ProductModelTest::test_create_product_makes_crop_and_public_id"""

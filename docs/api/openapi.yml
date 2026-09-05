@@ -55,7 +55,7 @@ paths:
   /api/sales_admin/admins/{id}:
     patch:
       operationId: sales_admin_admins_partial_update
-      description: Update a single application admin (superuser only).
+      description: Update or delete a single application admin (superuser only).
       summary: Update an application admin
       parameters:
       - in: path
@@ -86,6 +86,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminPayload'
           description: ''
+    delete:
+      operationId: sales_admin_admins_destroy
+      description: Update or delete a single application admin (superuser only).
+      summary: Delete an application admin
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sales_admin
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/sales_admin/auth/logout:
     post:
       operationId: sales_admin_auth_logout_create
@@ -198,7 +216,8 @@ paths:
   /api/sales_admin/sales-people/{id}:
     patch:
       operationId: sales_admin_sales_people_partial_update
-      description: Update a single sales person (app admin only).
+      description: Update or delete a sales person (app admin only; superusers count
+        as admins).
       summary: Update a sales person
       parameters:
       - in: path
@@ -229,6 +248,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/SalesPersonPayload'
           description: ''
+    delete:
+      operationId: sales_admin_sales_people_destroy
+      description: Update or delete a sales person (app admin only; superusers count
+        as admins).
+      summary: Delete a sales person
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sales_admin
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/utilities/cities:
     get:
       operationId: utilities_cities_list

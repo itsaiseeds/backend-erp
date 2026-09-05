@@ -79,7 +79,7 @@ class SessionAuthFlowTest(DMLTestCase):
         Token.objects.filter(key=first_key).update(created=timezone.now() - timedelta(hours=25))
         # Un-burn the accepted counter so the same OTP can succeed again,
         # isolating "token rotation" from "replay defense".
-        User.objects.filter(pk=self.superuser.pk).update(totp_last_counter=None)
+        User.objects.filter(id=self.superuser.id).update(totp_last_counter=None)
 
         second = self._login()
 

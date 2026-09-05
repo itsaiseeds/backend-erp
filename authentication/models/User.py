@@ -201,7 +201,7 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
         # ModelForm._post_clean would crash the view with "'UserForm' has no
         # field named 'created_by'". Both the admin add flow (request.user) and
         # create_superuser (self) set these before the final save.
-        if self.pk is not None:
+        if self.id is not None:
             # Every user — including superusers — must have a creator. Only
             # superusers self-reference; everyone else is created by an admin.
             if self.created_by_id is None:

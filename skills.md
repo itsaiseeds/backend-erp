@@ -13,7 +13,7 @@
 | **Database** | PostgreSQL 18 |
 | **Python** | 3.14 |
 | **Container** | Docker Compose (web + db) |
-| **Schema management** | **Raw SQL only** — `sql/ddl.sql` holds the full schema; no migration files exist (`migrate` is commented out, tests use `migrate --fake`) |
+| **Schema management** | **Raw SQL only** — `sql/ddl.sql` holds the full schema; no migration files exist (`migrate` is commented out; the pytest test DB is synced from the models) |
 | **Seed data** | Raw SQL, dev-only — `sql/dml.sql` (content types + permissions + reconciliation superuser) |
 | **Testing** | pytest + pytest-django |
 | **CI/CD** | GitHub Actions → Render |
@@ -31,7 +31,7 @@
 | [skills/setup.md](skills/setup.md) | Environment files, first-time setup, daily workflow |
 | [skills/django.md](skills/django.md) | Settings, apps, middleware, MIGRATION_MODULES |
 | [skills/docker.md](skills/docker.md) | Dockerfile, docker-compose, services, volumes |
-| [skills/conventions.md](skills/conventions.md) | Code style, patterns, naming, adding new features |
+| [skills/conventions.md](skills/conventions.md) | DRY / YAGNI / KISS principles, code style, patterns, naming, adding new features |
 
 ---
 
@@ -109,9 +109,9 @@ docker compose exec web python manage.py collectstatic
 
 ### Run tests (inside the Docker web container)
 ```bash
-bash scripts/run.sh test               # unit + integration
-bash scripts/run.sh test-unit          # unit only
-bash scripts/run.sh test-integration   # integration only
+bash scripts/run.sh test               # full pytest suite
+bash scripts/run.sh test-unit          # pytest -v (whole suite)
+bash scripts/run.sh test-dml           # pytest tests/ -v (whole suite, DML baseline)
 bash scripts/run.sh lint               # ruff check
 bash scripts/run.sh typecheck          # mypy
 ```
