@@ -24,9 +24,9 @@ class StandardPageNumberPagination(PageNumberPagination):
     returns DRF's standard ``{count, next, previous, results}`` envelope.
     """
 
-    page_size = 20
+    page_size = 10
     page_size_query_param = "page_size"
-    max_page_size = 100
+    max_page_size = 30
 
 
 class DateRangeQuerySerializer(serializers.Serializer):

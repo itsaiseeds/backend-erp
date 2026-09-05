@@ -114,7 +114,7 @@ Both compose the private mixin in
 
 - `start_date_time` and `end_date_time` (ISO 8601) are **required**; missing,
   invalid, or `start > end` returns **400**.
-- `page` (default `1`) and `page_size` (default `20`, capped at `100`) are
+- `page` (default `1`) and `page_size` (default `10`, capped at `30`) are
   optional.
 
 ### Response shape
