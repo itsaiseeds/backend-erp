@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin
 
 from common.admin import AUDIT_FIELDS, SoftDeleteModelAdmin
@@ -211,8 +212,44 @@ class ProductAdmin(SoftDeleteModelAdmin):
     ordering = ("name",)
 
 
+class ProductPackagingAdminForm(forms.ModelForm):
+    """Admin form for ``ProductPackaging``.
+
+    ``selling_price`` is ``NOT NULL`` at the DB and model level, but this form
+    lets an admin leave it blank -- when it does, ``clean_selling_price``
+    fills in ``packing_bags * product.selling_price`` so the underlying
+    ``ModelForm._post_clean`` sees a valid value and the model's ``full_clean``
+    passes. This fallback is intentionally scoped to the admin: programmatic
+    callers (``ProductOperations.add_packaging``) already handle the default.
+    """
+
+    class Meta:
+        model = ProductPackaging
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        selling_price = self.fields["selling_price"]
+        selling_price.required = False
+        selling_price.help_text = (
+            "Leave blank to default to packing_bags × product.selling_price."
+        )
+
+    def clean_selling_price(self):
+        value = self.cleaned_data.get("selling_price")
+        if value not in (None, ""):
+            return value
+        product = self.cleaned_data.get("product")
+        packing_bags = self.cleaned_data.get("packing_bags")
+        if product is None or packing_bags is None:
+            # Let the other fields' own validation surface first.
+            return value
+        return packing_bags * product.selling_price
+
+
 @admin.register(ProductPackaging)
 class ProductPackagingAdmin(SoftDeleteModelAdmin):
+    form = ProductPackagingAdminForm
     list_display = (
         "public_id",
         "product",
