@@ -238,7 +238,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `PublicIdModel` | `common/models/public_id.py` | 12-char `public_id` for user-facing refs (intended for orders/invoices) | (no concrete use yet) |
 | `RandomIdModel` | `common/models/random_id.py` | random `UUIDField` column | (no concrete use yet) |
 | `_PaginatedDateRangeListMixin` | `common/views/paginated_date_range.py` | Provides `GET` for a paginated list view filtered by required `start_date_time`..`end_date_time` on `date_field` (default `"created_at"`, supports `__` lookups); subclass implements `get_queryset` + `serialize_page` | used by → `AdminPaginatedDateRangeListView`, `AndroidPaginatedDateRangeListView` |
-| `StandardPageNumberPagination` | `common/views/paginated_date_range.py` | Project default `PageNumberPagination` (`?page=`, `?page_size=`, default 20, max 100); DRF `{count,next,previous,results}` envelope | used by → `_PaginatedDateRangeListMixin` |
+| `StandardPageNumberPagination` | `common/views/paginated_date_range.py` | Project default `PageNumberPagination` (`?page=`, `?page_size=`, default 10, max 30); DRF `{count,next,previous,results}` envelope | used by → `_PaginatedDateRangeListMixin` |
 | `DateRangeQuerySerializer` | `common/views/paginated_date_range.py` | Validates required `start_date_time` / `end_date_time` query params (ISO datetimes, `start <= end`) | used by → `_PaginatedDateRangeListMixin` |
 
 ### Schema & data
