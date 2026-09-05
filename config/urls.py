@@ -11,6 +11,7 @@ from config.views import flutter_catch_all
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("api.urls")),
+    path("android/", include("android.urls")),
     # Auto-generated API docs for the frontend (Flutter) team — superuser only.
     path(
         "api/schema/",

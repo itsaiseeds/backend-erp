@@ -7,6 +7,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import BaseUserCreationForm, ReadOnlyPasswordHashField
 from django.contrib.auth.models import Group
+from django.contrib.sessions.models import Session
 from django.utils.html import format_html
 
 from common.admin import AuditFieldsAdminMixin, SoftDeleteModelAdmin
@@ -228,3 +229,25 @@ class SalesPersonAdmin(SoftDeleteModelAdmin):
 # Hide the default Django auth groups config in favour of our role groups
 # (we still keep groups usable, but the default model admin for Group is off).
 admin.site.unregister(Group)
+
+
+@admin.register(Session)
+class SessionAdmin(admin.ModelAdmin):
+    """Read-only visibility into active web (sales-admin) browser sessions.
+
+    Django doesn't register this by default. ``session_data`` is opaque
+    (base64-encoded, not the raw ``_auth_user_id`` dict), so this is for
+    seeing which sessions exist and when they expire -- not for editing.
+    Deleting a row here force-logs-out that session, the same effect as
+    ``POST /api/sales_admin/auth/logout``.
+    """
+
+    list_display = ("session_key", "expire_date")
+    ordering = ("-expire_date",)
+    readonly_fields = ("session_key", "session_data", "expire_date")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

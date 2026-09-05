@@ -1,9 +1,9 @@
 """Admin update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales_admin/admins/<id>``.
 
-Only a Django superuser may update or delete an application admin (enforced via
-the ``IsSuperUser`` permission, mirroring ``AdminsView``). Extra ``id`` kwargs
-are rejected at the URL resolver, so a superuser can only mutate the admin
-whose id is in the path. ``phone_number`` is validated for format and
+Only a Django superuser may update or delete an application admin
+(``superuser_required`` on ``AdminApiView``, mirroring ``AdminsView``). Extra
+``id`` kwargs are rejected at the URL resolver, so a superuser can only mutate
+the admin whose id is in the path. ``phone_number`` is validated for format and
 uniqueness.
 
 Soft-deleted admins are never found (404).
@@ -14,12 +14,9 @@ from __future__ import annotations
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
-from api.permissions import IsSuperUser
+from api.admin import AdminApiView
 from authentication.models import Admin
 from authentication.UserOperations import (
     AdminPayloadSerializer,
@@ -28,13 +25,10 @@ from authentication.UserOperations import (
 )
 
 
-class UpdateAdminView(APIView):
+class UpdateAdminView(AdminApiView):
     """Update or delete a single application admin (superuser only)."""
 
-    # Refer to api/sales_admin/VerifyOTPView.py for how a view declares its own
-    # authentication / permission classes instead of the global defaults.
-    authentication_classes: list[type] = [ExpiringTokenAuthentication, SessionAuthentication]
-    permission_classes: list[type] = [IsAuthenticated, IsSuperUser]
+    superuser_required = True
 
     @extend_schema(
         summary="Update an application admin",

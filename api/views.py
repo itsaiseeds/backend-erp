@@ -20,8 +20,7 @@ from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from .authentication import ExpiringTokenAuthentication, SessionAuthentication
-from .permissions import IsAdminUser, IsSuperUser
+from .permissions import IsAdminUser, IsSalesPerson, IsSuperUser
 
 
 def fire_and_forget(func: Callable[[], Any]) -> None:
@@ -44,18 +43,24 @@ class BaseApiView(APIView):
     * ``auth_required``    - require an authenticated user (default ``True``).
     * ``admin_required``   - additionally require an ``Admin`` profile.
     * ``superuser_required`` - additionally require a Django superuser.
+    * ``salesperson_required`` - additionally require a ``SalesPerson`` profile.
 
-    The concrete client bases (:class:`~api.admin.AdminApiView` and
-    :class:`~api.android.AndroidBaseView`) fix which *credentials* authenticate
-    a request (session cookie vs. bearer token). This class only combines the
-    role flags into ready-made permission checks.
+    The concrete client bases (:class:`~api.admin.AdminApiView` for the
+    session-only web app and :class:`~android.api.base.AndroidBaseView` for
+    the token-only Android app) fix which *credentials* authenticate a
+    request; this class only combines the role flags into ready-made
+    permission checks and does not itself pick an authentication scheme --
+    every concrete view must go through one of those two bases.
+
+    Because :meth:`get_permissions` is overridden here, a subclass's
+    ``permission_classes`` attribute (the normal DRF hook) is never
+    consulted -- express every role requirement as one of the flags above.
     """
 
     auth_required = True
     admin_required = False
     superuser_required = False
-
-    authentication_classes = [SessionAuthentication, ExpiringTokenAuthentication]
+    salesperson_required = False
 
     def get_permissions(self):
         permissions = []
@@ -65,4 +70,6 @@ class BaseApiView(APIView):
             permissions.append(IsAdminUser())
         if self.superuser_required:
             permissions.append(IsSuperUser())
+        if self.salesperson_required:
+            permissions.append(IsSalesPerson())
         return permissions

@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = payload['user'] as Map<String, dynamic>;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => HomeScreen(user: user, token: payload['token'] as String),
+          builder: (_) => HomeScreen(user: user),
         ),
       );
     } on ApiException catch (e) {
@@ -174,10 +174,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
 /// Landing screen shown after a successful TOTP sign in.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.user, required this.token});
+  const HomeScreen({super.key, required this.user});
 
   final Map<String, dynamic> user;
-  final String token;
 
   @override
   Widget build(BuildContext context) {

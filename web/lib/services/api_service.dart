@@ -18,7 +18,7 @@ class ApiService {
   final String baseUrl;
 
   Uri _uri(String path) {
-    // Normalise so both "https://host" and "https://host/" work, avoiding
+    // Normalize so both "https://host" and "https://host/" work, avoiding
     // double slashes when concatenating "/api/...".
     final base = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
@@ -26,9 +26,11 @@ class ApiService {
     return Uri.parse('$base$path');
   }
 
-  /// Exchange a phone number + authenticator-app TOTP code for credentials.
+  /// Exchange a phone number + authenticator-app TOTP code for a session.
   ///
-  /// Returns the raw payload `{token, user}` or throws [ApiException].
+  /// The server sets the session cookie itself (`Set-Cookie: sessionid`); this
+  /// only returns the raw payload `{user, can_create_admin,
+  /// can_create_sales_person}`, or throws [ApiException].
   Future<Map<String, dynamic>> verifyOtp({
     required String phoneNumber,
     required String otp,

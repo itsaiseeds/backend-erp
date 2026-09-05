@@ -1,10 +1,9 @@
 """Admin management endpoint: ``GET``/``POST`` ``/api/sales_admin/admins``.
 
-Only a Django superuser may create an application admin (enforced via the
-``IsSuperUser`` permission, mirroring how ``VerifyOTPView`` declares its own
-``authentication_classes`` / ``permission_classes``). Creating an admin also
-creates a fallback ``SalesPerson`` profile for the same user (same contact
-number) so the account can still operate from the salesperson app if needed.
+Only a Django superuser may create an application admin (``superuser_required``
+on ``AdminApiView``, the session-only web base). Creating an admin also creates
+a fallback ``SalesPerson`` profile for the same user (same contact number) so
+the account can still operate from the salesperson app if needed.
 
 Soft-deleted admins are never returned.
 """
@@ -14,13 +13,10 @@ from __future__ import annotations
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from aggregator.models import City
-from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
-from api.permissions import IsSuperUser
+from api.admin import AdminApiView
 from authentication.models import Admin, SalesPerson, User
 from authentication.UserOperations import (
     AdminPayloadSerializer,
@@ -52,15 +48,11 @@ class CreateAdminSerializer(serializers.Serializer):
         return value
 
 
-class AdminsView(APIView):
+class AdminsView(AdminApiView):
     """List (GET) or create (POST) application admins (superuser only)."""
 
     serializer_class = CreateAdminSerializer
-
-    # Refer to api/sales_admin/VerifyOTPView.py for how a view declares its own
-    # authentication / permission classes instead of the global defaults.
-    authentication_classes: list[type] = [ExpiringTokenAuthentication, SessionAuthentication]
-    permission_classes: list[type] = [IsAuthenticated, IsSuperUser]
+    superuser_required = True
 
     @extend_schema(
         summary="List application admins",
@@ -68,7 +60,9 @@ class AdminsView(APIView):
     )
     def get(self, request):
         admins = Admin.objects.select_related("user", "created_by").order_by("-id")
-        return Response([admin_payload(admin) for admin in admins])
+        return Response(
+            [admin_payload(admin, include_totp=True) for admin in admins]
+        )
 
     @extend_schema(
         summary="Create an application admin (and a fallback sales person)",

@@ -1,9 +1,8 @@
 """Sales person management endpoint: ``GET``/``POST`` ``/api/sales_admin/sales-people``.
 
-Only an application Admin may hire a sales person (enforced via the
-``IsAdminUser`` permission, mirroring how ``VerifyOTPView`` declares its own
-``authentication_classes`` / ``permission_classes``). A sales person cannot
-create another sales person or an admin, and a superuser only creates admins.
+Only an application Admin may hire a sales person (``admin_required`` on
+``AdminApiView``, the session-only web base). A sales person cannot create
+another sales person or an admin, and a superuser only creates admins.
 
 Soft-deleted sales people are never returned.
 """
@@ -13,13 +12,10 @@ from __future__ import annotations
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from aggregator.models import City
-from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
-from api.permissions import IsAdminUser
+from api.admin import AdminApiView
 from authentication.models import SalesPerson, User
 from authentication.UserOperations import (
     SalesPersonPayloadSerializer,
@@ -43,15 +39,11 @@ class CreateSalesPersonSerializer(serializers.Serializer):
         return value
 
 
-class SalesPeopleView(APIView):
+class SalesPeopleView(AdminApiView):
     """List (GET) or create (POST) sales people (app admin only)."""
 
     serializer_class = CreateSalesPersonSerializer
-
-    # Refer to api/sales_admin/VerifyOTPView.py for how a view declares its own
-    # authentication / permission classes instead of the global defaults.
-    authentication_classes: list[type] = [ExpiringTokenAuthentication, SessionAuthentication]
-    permission_classes: list[type] = [IsAuthenticated, IsAdminUser]
+    admin_required = True
 
     @extend_schema(
         summary="List sales people",
@@ -61,7 +53,9 @@ class SalesPeopleView(APIView):
         sales_people = SalesPerson.objects.select_related("user", "city", "created_by").order_by(
             "-id"
         )
-        return Response([salesperson_payload(person) for person in sales_people])
+        return Response(
+            [salesperson_payload(person, include_totp=True) for person in sales_people]
+        )
 
     @extend_schema(
         summary="Create a sales person",

@@ -1,15 +1,10 @@
 """TOTP login endpoint used by the sales admin website.
 
 Verifies a 6-digit authenticator-app code against the user's enrolled TOTP
-secret and issues credentials for the matching user so their session is
-authenticated (replaces the old SMS/email OTP flow).
-
-A successful login issues both credential forms:
-
-* a browser **session cookie** (24h, see ``SESSION_COOKIE_AGE``), used by the
-  Flutter admin website, and
-* a **bearer token** (24h, see ``TOKEN_TTL_HOURS``), used by the mobile app;
-  re-login on a fresh verification.
+secret and opens a browser session for the matching user (replaces the old
+SMS/email OTP flow). Session-only: never mints a bearer token (see
+``android.api.v1.LoginView`` for the Android counterpart, which mints a token
+and never opens a session).
 
 **Brute-force protection.** A 6-digit code is trivially guessable without
 throttling, so the endpoint runs three defenses together:
@@ -27,9 +22,6 @@ throttling, so the endpoint runs three defenses together:
 The whole flow runs inside a ``transaction.atomic`` block with a
 ``select_for_update`` on the user row, so concurrent requests for the same
 account cannot race the replay slot or the failure counter.
-
-Every successful login rotates the DRF ``Token`` (delete + create inside
-the same atomic block) so a leaked bearer cannot outlive a re-login.
 """
 
 from __future__ import annotations
@@ -39,7 +31,6 @@ from django.db import transaction
 from django.middleware.csrf import get_token
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
-from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -63,9 +54,12 @@ class VerifyOTPUserSerializer(serializers.Serializer):
 
 
 class VerifyOTPResponseSerializer(serializers.Serializer):
-    """Credentials returned after a successful TOTP exchange."""
+    """User payload returned after a successful TOTP exchange.
 
-    token = serializers.CharField()
+    The session cookie itself is set via ``Set-Cookie`` (see ``login()``
+    below), not returned in the body.
+    """
+
     user = VerifyOTPUserSerializer()
     can_create_admin = serializers.BooleanField()
     can_create_sales_person = serializers.BooleanField()
@@ -89,12 +83,12 @@ _GENERIC_FAILURE = {"detail": "Invalid phone number or TOTP code."}
 
 
 class VerifyOTPView(APIView):
-    """Validate a TOTP code, then (re)issue credentials for that user."""
+    """Validate a TOTP code, then (re)open a session for that user."""
 
     serializer_class = VerifyOTPSerializer
 
     # Pre-auth endpoint: lets an unauthenticated user exchange a TOTP code
-    # for credentials, so it opts out of the global auth defaults.
+    # for a session, so it opts out of the global auth defaults.
     authentication_classes: list[type] = []
     permission_classes: list[type] = [AllowAny]
     throttle_classes: list[type] = [VerifyOTPThrottle]
@@ -134,15 +128,8 @@ class VerifyOTPView(APIView):
                 return Response(_GENERIC_FAILURE, status=400)
 
             user.reset_totp_failures()
-            # Rotate the bearer token on every successful login so a
-            # previously leaked key is invalidated by a fresh sign-in instead
-            # of surviving for the whole TTL window. Delete+create must be
-            # atomic — a crash between them would leave the user tokenless
-            # even though their new session cookie is set.
-            Token.objects.filter(user=user).delete()
-            token = Token.objects.create(user=user)
-        # Open a browser session for the Flutter admin site (same TOTP, one
-        # flow). This rotates the session key and returns a sessionid cookie.
+        # Open a browser session for the Flutter admin site. This rotates the
+        # session key and returns a sessionid cookie.
         login(request, user)
         # Session ("cookie") auth enforces CSRF on non-GET requests, so make
         # sure the response carries a csrftoken cookie the SPA can echo back
@@ -150,7 +137,6 @@ class VerifyOTPView(APIView):
         get_token(request)
         return Response(
             {
-                "token": token.key,
                 "user": {
                     "id": user.id,
                     "name": user.name,

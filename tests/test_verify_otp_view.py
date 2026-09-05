@@ -7,16 +7,14 @@ from unittest.mock import patch
 
 from django.core.cache import cache
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient
 
 from aggregator.models import City, Country, State
 from api.sales_admin.VerifyOTPView import VerifyOTPThrottle
 from authentication.models import SalesPerson, User
-from tests.common import DMLTestCase
+from tests.common import WebApiTestCase
 
 
-class VerifyOTPTest(DMLTestCase):
+class VerifyOTPTest(WebApiTestCase):
     """Cover successful and rejected sales-admin TOTP verification.
 
     tests/test_verify_otp_view.py::VerifyOTPTest
@@ -60,8 +58,7 @@ class VerifyOTPTest(DMLTestCase):
         )
 
     def setUp(self):
-        """Create an unauthenticated API client for every test in this class."""
-        self.client = APIClient()
+        super().setUp()
         # DRF throttles store per-IP counters in the default cache; without
         # clearing between tests one test's requests would count against the
         # next test's budget on the shared 127.0.0.1 origin.
@@ -79,10 +76,11 @@ class VerifyOTPTest(DMLTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.data["token"])
+        self.assertNotIn("token", response.data)
         self.assertEqual(response.data["user"]["phone_number"], self.superuser.phone_number)
         self.assertTrue(response.data["can_create_admin"])
         self.assertTrue(response.data["can_create_sales_person"])
+        self.assertIn("sessionid", response.cookies)
 
     def test_invalid_otp_is_rejected(self):
         """tests/test_verify_otp_view.py::VerifyOTPTest::test_invalid_otp_is_rejected"""
@@ -242,17 +240,3 @@ class VerifyOTPTest(DMLTestCase):
 
         self.assertEqual(locked.status_code, unknown.status_code)
         self.assertEqual(locked.data, unknown.data)
-
-    def test_token_rotates_on_relogin(self):
-        """A fresh login invalidates the previous DRF token.
-
-        tests/test_verify_otp_view.py::VerifyOTPTest::test_token_rotates_on_relogin
-        """
-        Token.objects.filter(user=self.superuser).delete()
-        stale = Token.objects.create(user=self.superuser)
-        stale_key = stale.key
-
-        response = self._verify(self.superuser.phone_number, self.superuser.totp.now())
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertNotEqual(response.data["token"], stale_key)
-        self.assertFalse(Token.objects.filter(key=stale_key).exists())

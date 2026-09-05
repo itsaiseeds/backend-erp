@@ -1,30 +1,23 @@
-"""Reauthenticate endpoint: does the caller's credential still work?
+"""Reauthenticate endpoint: does the caller's session still work?
 
-Clients (Flutter admin site via session cookie, Android app via bearer token)
-call ``GET /api/utilities/reauthenticate`` on startup / resume to check
-whether their stored credential is still valid without having to make a real
-business request first.
+The Flutter admin site calls ``GET /api/utilities/reauthenticate`` on startup
+/ resume to check whether its session cookie is still valid without having to
+make a real business request first. Session-only: never touches bearer tokens
+(see ``android.api.v1.ReauthenticateView`` for the Android counterpart).
 
 Behaviour
 ---------
-* Valid credential -> ``200`` with the current user payload.
-* Missing / expired / revoked credential -> ``401`` (surfaced by DRF from the
-  configured authenticators; ``ExpiringTokenAuthentication`` additionally
-  deletes an expired token as a side effect).
-
-The view accepts either authentication scheme so the same URL serves both
-clients.
+* Valid session -> ``200`` with the current user payload.
+* Missing / expired / revoked session -> ``401``.
 """
 
 from __future__ import annotations
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
+from api.admin import AdminApiView
 
 
 class ReauthenticateUserSerializer(serializers.Serializer):
@@ -47,20 +40,14 @@ class ReauthenticateResponseSerializer(serializers.Serializer):
     can_create_sales_person = serializers.BooleanField()
 
 
-class ReauthenticateView(APIView):
-    """Confirm the caller's session cookie or bearer token is still valid."""
-
-    authentication_classes: list[type] = [
-        SessionAuthentication,
-        ExpiringTokenAuthentication,
-    ]
-    permission_classes: list[type] = [IsAuthenticated]
+class ReauthenticateView(AdminApiView):
+    """Confirm the caller's session cookie is still valid."""
 
     @extend_schema(
-        summary="Check whether the caller's credential is still valid",
+        summary="Check whether the caller's session is still valid",
         responses={
             200: ReauthenticateResponseSerializer,
-            401: {"description": "Missing, expired, or revoked credential."},
+            401: {"description": "Missing, expired, or revoked session."},
         },
     )
     def get(self, request):

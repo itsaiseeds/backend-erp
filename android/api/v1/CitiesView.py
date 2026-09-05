@@ -1,13 +1,12 @@
 """Utility endpoint: Indian states with their cities, grouped by state.
 
-``GET /api/utilities/cities`` returns ``[{id, name, cities: [{id, name}, ...]},
-...]`` -- one block per state, each state listing its cities -- so the frontend
-can render hierarchical state -> city pickers and submit the matching ``city``
-ids to the admin / sales-person creation endpoints.
-
-Restricted to a Django superuser authenticated with the web session.
-Session-only: never touches bearer tokens (see ``android.api.v1.CitiesView``
-for the Android counterpart). Soft-deleted states and cities are excluded.
+``GET /android/api/v1/utilities/cities`` returns ``[{id, name, cities: [{id,
+name}, ...]}, ...]`` -- one block per state, each state listing its cities --
+so the sales person app can render hierarchical state -> city pickers.
+Token-only (see
+``api.utilities.CitiesView`` for the web counterpart, which is session-only and
+superuser-restricted there); here any authenticated sales person may look up
+cities. Soft-deleted states and cities are excluded.
 """
 
 from __future__ import annotations
@@ -17,32 +16,30 @@ from rest_framework import serializers
 from rest_framework.response import Response
 
 from aggregator.models import City, Country, State
-from api.admin import AdminApiView
+from android.api.base import AndroidBaseView
 
 
-class CitySerializer(serializers.Serializer):
+class AndroidCitySerializer(serializers.Serializer):
     """Output shape for one city row (schema only; responses are built by hand)."""
 
     id = serializers.IntegerField()
     name = serializers.CharField()
 
 
-class StateSerializer(serializers.Serializer):
+class AndroidStateSerializer(serializers.Serializer):
     """Output shape for a state and its cities (schema only)."""
 
     id = serializers.IntegerField()
     name = serializers.CharField()
-    cities = CitySerializer(many=True)
+    cities = AndroidCitySerializer(many=True)
 
 
-class CitiesView(AdminApiView):
+class CitiesView(AndroidBaseView):
     """List Indian states, each with its cities, grouped by state."""
-
-    superuser_required = True
 
     @extend_schema(
         summary="List Indian states grouped with their cities",
-        responses={200: StateSerializer(many=True)},
+        responses={200: AndroidStateSerializer(many=True)},
     )
     def get(self, request):
         india = (

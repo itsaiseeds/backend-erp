@@ -1,4 +1,8 @@
-"""ORM-backed session and token lifecycle tests for sales-admin TOTP login."""
+"""ORM-backed session lifecycle tests for sales-admin TOTP login.
+
+See ``tests/android/test_login.py`` for the Android app's bearer-token
+lifecycle counterpart -- the web login here never touches tokens.
+"""
 
 from __future__ import annotations
 
@@ -8,14 +12,13 @@ from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient
 
 from authentication.models import User
-from tests.common import DMLTestCase
+from tests.common import WebApiTestCase
 
 
-class SessionAuthFlowTest(DMLTestCase):
-    """Cover the session and bearer-token behavior after successful TOTP login.
+class SessionAuthFlowTest(WebApiTestCase):
+    """Cover the session behavior after successful TOTP login.
 
     tests/test_auth_flow.py::SessionAuthFlowTest
     """
@@ -27,8 +30,7 @@ class SessionAuthFlowTest(DMLTestCase):
         cls.superuser = User.objects.get(phone_number="9999999999")
 
     def setUp(self):
-        """Create an unauthenticated API client for every test in this class."""
-        self.client = APIClient()
+        super().setUp()
         cache.clear()  # reset the verify_otp per-IP throttle counter
 
     def _login(self):
@@ -62,29 +64,31 @@ class SessionAuthFlowTest(DMLTestCase):
 
         self.assertEqual(self.client.get("/api/schema/").status_code, 401)
 
-    def test_verify_rotates_token_and_starts_fresh_clock(self):
-        """A fresh login discards the old token and issues a new key.
+    def test_verify_does_not_issue_a_token(self):
+        """Web login never touches ``authtoken_token`` -- session cookie only.
 
-        Also documents the replay-defence knock-on: within one 30s window
-        the same OTP would be refused, so this test resets ``totp_last_counter``
-        between logins to isolate rotation behaviour.
-
-        tests/test_auth_flow.py::SessionAuthFlowTest::test_verify_rotates_token_and_starts_fresh_clock
+        tests/test_auth_flow.py::SessionAuthFlowTest::test_verify_does_not_issue_a_token
         """
-        first = self._login()
-        self.assertEqual(first.status_code, 200, first.content)
-        first_key = first.data["token"]
-        # Age the token so we can prove the follow-up login re-created it
-        # (a rotated token has a brand-new ``created`` at "now").
-        Token.objects.filter(key=first_key).update(created=timezone.now() - timedelta(hours=25))
-        # Un-burn the accepted counter so the same OTP can succeed again,
-        # isolating "token rotation" from "replay defense".
-        User.objects.filter(id=self.superuser.id).update(totp_last_counter=None)
+        response = self._login()
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertNotIn("token", response.data)
+        self.assertFalse(Token.objects.filter(user=self.superuser).exists())
 
-        second = self._login()
+    def test_session_expiry_is_fixed_from_creation_not_sliding(self):
+        """The 24h window is set once at login and never extended by activity.
 
-        self.assertEqual(second.status_code, 200, second.content)
-        self.assertNotEqual(second.data["token"], first_key)
-        self.assertFalse(Token.objects.filter(key=first_key).exists())
-        new_token = Token.objects.get(key=second.data["token"])
-        self.assertGreater(new_token.created, timezone.now() - timedelta(minutes=1))
+        ``SESSION_SAVE_EVERY_REQUEST`` is not set (defaults to ``False``), so
+        Django only re-saves -- and thus only re-stamps ``expire_date`` -- when
+        session *data* changes, not merely when it is read. A later
+        authenticated request must therefore leave ``expire_date`` untouched.
+
+        tests/test_auth_flow.py::SessionAuthFlowTest::test_session_expiry_is_fixed_from_creation_not_sliding
+        """
+        self.assertEqual(self._login().status_code, 200)
+        session = Session.objects.get()
+        expire_date_at_login = session.expire_date
+
+        # An authenticated request some time later must not push the expiry out.
+        self.assertEqual(self.client.get("/api/schema/").status_code, 200)
+        session.refresh_from_db()
+        self.assertEqual(session.expire_date, expire_date_at_login)

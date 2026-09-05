@@ -1,8 +1,10 @@
 """Base view for the sales admin website.
 
-Admin views authenticate via the browser session cookie (``SessionAuthentication``)
-and demand an application ``Admin`` profile. Set ``superuser_required = True``
-on a subclass to additionally require a Django superuser.
+Admin views authenticate via the browser session cookie only
+(``SessionAuthentication``) -- the web side never touches bearer tokens (see
+``android.api.base.AndroidBaseView`` for the Android app's token-only
+counterpart). Role is expressed per-view via ``BaseApiView``'s flags
+(``admin_required`` / ``superuser_required``); this base does not assume one.
 """
 
 from __future__ import annotations
@@ -14,11 +16,10 @@ from .views import BaseApiView
 class AdminApiView(BaseApiView):
     """Base for every sales admin website endpoint.
 
-    - Authenticates via the browser session (no token needed).
-    - Requires an authenticated user with an application ``Admin`` profile
-      (``admin_required`` is ``True`` by default here).
-    - Set ``superuser_required = True`` to restrict to superusers.
+    - Authenticates via the browser session only (no token needed).
+    - Requires an authenticated user by default (``auth_required = True``,
+      inherited from ``BaseApiView``); set ``admin_required = True`` or
+      ``superuser_required = True`` on a subclass to further restrict.
     """
 
     authentication_classes = [SessionAuthentication]
-    admin_required = True

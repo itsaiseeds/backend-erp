@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "common",
     "config",
     "api",
+    "android",
     "aggregator",
 ]
 
@@ -197,12 +198,18 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django REST Framework
 # ---------------------
-# Default classes mirror the split the base views already hard-code per client:
-# admin = session, android = token. Override per-view where a flow differs.
+# Every real endpoint sets its own authentication_classes via one of the two
+# client base views (api.admin.AdminApiView = session-only for the web,
+# android.api.base.AndroidBaseView = token-only for Android) -- see
+# docs/knowledge-graph.md. This default is only the fallback for views that
+# don't pick one explicitly (today: the schema/docs views in config/urls.py,
+# which live under /api/ and are therefore web-side). Keep the default
+# session-only so the "web = session, android = token" rule holds even for
+# views that forget to declare an authenticator; anything token-only must
+# opt in via ``AndroidBaseView``.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "api.authentication.SessionAuthentication",
-        "api.authentication.ExpiringTokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -212,11 +219,12 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.BrowsableAPIRenderer",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    # Per-scope throttle rates. Only ``verify_otp`` is scoped today: it caps a
-    # single IP at 40 login attempts per hour so an attacker cannot cheaply
-    # burn through every admin's account-lockout budget from one origin.
+    # Per-scope throttle rates. ``verify_otp`` (web) and ``android_login``
+    # (Android) each cap a single IP's login attempts per hour so an attacker
+    # cannot cheaply burn through every account's lockout budget from one origin.
     "DEFAULT_THROTTLE_RATES": {
         "verify_otp": "1000/hour",
+        "android_login": "1000/hour",
     },
 }
 
