@@ -67,7 +67,7 @@ class VerifyOTPTest(WebApiTestCase):
     def test_superuser_can_verify_otp_and_receive_credentials(self):
         """tests/test_verify_otp_view.py::VerifyOTPTest::test_superuser_can_verify_otp_and_receive_credentials"""
         response = self.client.post(
-            "/api/sales_admin/auth/otp/verify",
+            "/api/sales-admin/auth/otp/verify",
             {
                 "phone_number": self.superuser.phone_number,
                 "otp": self.superuser.totp.now(),
@@ -85,7 +85,7 @@ class VerifyOTPTest(WebApiTestCase):
     def test_invalid_otp_is_rejected(self):
         """tests/test_verify_otp_view.py::VerifyOTPTest::test_invalid_otp_is_rejected"""
         response = self.client.post(
-            "/api/sales_admin/auth/otp/verify",
+            "/api/sales-admin/auth/otp/verify",
             {"phone_number": self.superuser.phone_number, "otp": "000000"},
             format="json",
         )
@@ -95,7 +95,7 @@ class VerifyOTPTest(WebApiTestCase):
     def test_unenrolled_user_cannot_verify_otp(self):
         """tests/test_verify_otp_view.py::VerifyOTPTest::test_unenrolled_user_cannot_verify_otp"""
         response = self.client.post(
-            "/api/sales_admin/auth/otp/verify",
+            "/api/sales-admin/auth/otp/verify",
             {"phone_number": self.unenrolled_user.phone_number, "otp": "000000"},
             format="json",
         )
@@ -105,7 +105,7 @@ class VerifyOTPTest(WebApiTestCase):
     def test_normal_user_cannot_verify_otp(self):
         """tests/test_verify_otp_view.py::VerifyOTPTest::test_normal_user_cannot_verify_otp"""
         response = self.client.post(
-            "/api/sales_admin/auth/otp/verify",
+            "/api/sales-admin/auth/otp/verify",
             {
                 "phone_number": self.normal_user.phone_number,
                 "otp": self.normal_user.totp.now(),
@@ -118,7 +118,7 @@ class VerifyOTPTest(WebApiTestCase):
     def test_salesperson_cannot_verify_otp(self):
         """tests/test_verify_otp_view.py::VerifyOTPTest::test_salesperson_cannot_verify_otp"""
         response = self.client.post(
-            "/api/sales_admin/auth/otp/verify",
+            "/api/sales-admin/auth/otp/verify",
             {
                 "phone_number": self.salesperson.user.phone_number,
                 "otp": self.salesperson.user.totp.now(),
@@ -132,7 +132,7 @@ class VerifyOTPTest(WebApiTestCase):
 
     def _verify(self, phone: str, otp: str):
         return self.client.post(
-            "/api/sales_admin/auth/otp/verify",
+            "/api/sales-admin/auth/otp/verify",
             {"phone_number": phone, "otp": otp},
             format="json",
         )

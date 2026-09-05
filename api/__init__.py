@@ -2,7 +2,7 @@
 
 Namespace layout
 ----------------
-* ``/api/sales_admin/...`` : the sales admin website (TOTP login, admin /
+* ``/api/sales-admin/...`` : the sales admin website (TOTP login, admin /
   sales-person management, logout).
 * ``/api/utilities/...``   : session-authenticated web helpers/look-ups.
 

@@ -133,7 +133,7 @@ See [skills/database.md](skills/database.md) for the full workflow.
 
 - Custom `User` with `phone_number` (10 digits) as the login username.
 - Non-staff users log in with a **TOTP code**: `POST
-  /api/sales_admin/auth/otp/verify` (body `phone_number` + `otp`) returns a DRF
+  /api/sales-admin/auth/otp/verify` (body `phone_number` + `otp`) returns a DRF
   `Token`, opens a browser session (`sessionid` + `csrftoken` cookies), and
   reports the SPA's role-creation rights (`can_create_admin`,
   `can_create_sales_person`). There is no SMS/OTP request endpoint.

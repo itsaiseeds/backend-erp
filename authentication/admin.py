@@ -239,7 +239,7 @@ class SessionAdmin(admin.ModelAdmin):
     (base64-encoded, not the raw ``_auth_user_id`` dict), so this is for
     seeing which sessions exist and when they expire -- not for editing.
     Deleting a row here force-logs-out that session, the same effect as
-    ``POST /api/sales_admin/auth/logout``.
+    ``POST /api/sales-admin/auth/logout``.
     """
 
     list_display = ("session_key", "expire_date")

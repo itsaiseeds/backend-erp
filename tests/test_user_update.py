@@ -76,13 +76,13 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_anonymous_admin_update_rejected"""
         self.clear_auth()
         response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}", {"name": "x"}, format="json"
+            f"/api/sales-admin/admins/{self.admin.id}", {"name": "x"}, format="json"
         )
         self.assertIn(response.status_code, (401, 403))
 
     def test_only_superuser_can_update_admin(self):
         """tests/test_user_update.py::UserUpdateTest::test_only_superuser_can_update_admin"""
-        url = f"/api/sales_admin/admins/{self.admin.id}"
+        url = f"/api/sales-admin/admins/{self.admin.id}"
         for user in (self.plain, self.seed_admin, self.salesperson.user):
             self.login_as(user)
             self.assertEqual(
@@ -101,7 +101,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(
-                "/api/sales_admin/admins/999999", {"name": "x"}, format="json"
+                "/api/sales-admin/admins/999999", {"name": "x"}, format="json"
             ).status_code,
             status.HTTP_404_NOT_FOUND,
         )
@@ -112,7 +112,7 @@ class UserUpdateTest(WebApiTestCase):
         self.admin.delete(deleted_by=self.superuser)
         self.assertEqual(
             self.client.patch(
-                f"/api/sales_admin/admins/{self.admin.id}", {"name": "x"}, format="json"
+                f"/api/sales-admin/admins/{self.admin.id}", {"name": "x"}, format="json"
             ).status_code,
             status.HTTP_404_NOT_FOUND,
         )
@@ -123,7 +123,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_name"""
         self.login_as(self.superuser)
         response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}",
+            f"/api/sales-admin/admins/{self.admin.id}",
             {"name": "Updated Admin"},
             format="json",
         )
@@ -136,7 +136,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_email"""
         self.login_as(self.superuser)
         response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}",
+            f"/api/sales-admin/admins/{self.admin.id}",
             {"email": "updated@example.com"},
             format="json",
         )
@@ -150,7 +150,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.superuser)
         self.assertEqual(self.admin.can_update_stock_count, True)
         response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}",
+            f"/api/sales-admin/admins/{self.admin.id}",
             {"can_update_stock_count": False},
             format="json",
         )
@@ -163,7 +163,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_multiple_fields"""
         self.login_as(self.superuser)
         response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}",
+            f"/api/sales-admin/admins/{self.admin.id}",
             {"name": "Bulk Updated", "email": "bulk@example.com", "can_update_stock_count": False},
             format="json",
         )
@@ -181,7 +181,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_partial_body_leaves_others_unchanged"""
         self.login_as(self.superuser)
         self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}", {"name": "Only Name"}, format="json"
+            f"/api/sales-admin/admins/{self.admin.id}", {"name": "Only Name"}, format="json"
         )
         self.seed_admin.refresh_from_db()
         self.assertEqual(self.seed_admin.name, "Only Name")
@@ -192,7 +192,7 @@ class UserUpdateTest(WebApiTestCase):
     def test_update_admin_empty_body_returns_unchanged(self):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_empty_body_returns_unchanged"""
         self.login_as(self.superuser)
-        response = self.client.patch(f"/api/sales_admin/admins/{self.admin.id}", {}, format="json")
+        response = self.client.patch(f"/api/sales-admin/admins/{self.admin.id}", {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.assertEqual(response.data["name"], "seed admin")
 
@@ -201,7 +201,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(
-                f"/api/sales_admin/admins/{self.admin.id}",
+                f"/api/sales-admin/admins/{self.admin.id}",
                 {"email": "not-an-email"},
                 format="json",
             ).status_code,
@@ -212,7 +212,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_phone_number"""
         self.login_as(self.superuser)
         response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}",
+            f"/api/sales-admin/admins/{self.admin.id}",
             {"phone_number": "9999999998"},
             format="json",
         )
@@ -226,7 +226,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(
-                f"/api/sales_admin/admins/{self.admin.id}",
+                f"/api/sales-admin/admins/{self.admin.id}",
                 {"phone_number": "12345"},
                 format="json",
             ).status_code,
@@ -238,7 +238,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(
-                f"/api/sales_admin/admins/{self.admin.id}",
+                f"/api/sales-admin/admins/{self.admin.id}",
                 {"phone_number": "5555555555"},
                 format="json",
             ).status_code,
@@ -255,7 +255,7 @@ class UserUpdateTest(WebApiTestCase):
         """
         self.login_as(self.superuser)
         response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}",
+            f"/api/sales-admin/admins/{self.admin.id}",
             {"phone_number": self.seed_admin.phone_number, "name": "Same Phone"},
             format="json",
         )
@@ -267,7 +267,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_admin_payload_shape"""
         self.login_as(self.superuser)
         response = self.client.patch(
-            f"/api/sales_admin/admins/{self.admin.id}",
+            f"/api/sales-admin/admins/{self.admin.id}",
             {"name": "Payload Check"},
             format="json",
         )
@@ -286,7 +286,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_anonymous_salesperson_update_rejected"""
         self.clear_auth()
         response = self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {"name": "x"},
             format="json",
         )
@@ -294,7 +294,7 @@ class UserUpdateTest(WebApiTestCase):
 
     def test_only_admin_can_update_salesperson(self):
         """tests/test_user_update.py::UserUpdateTest::test_only_admin_can_update_salesperson"""
-        url = f"/api/sales_admin/sales-people/{self.salesperson.id}"
+        url = f"/api/sales-admin/sales-people/{self.salesperson.id}"
         # A plain user and a salesperson are both forbidden.
         for user in (self.plain, self.salesperson.user):
             self.login_as(user)
@@ -321,7 +321,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(
-                "/api/sales_admin/sales-people/999999", {"name": "x"}, format="json"
+                "/api/sales-admin/sales-people/999999", {"name": "x"}, format="json"
             ).status_code,
             status.HTTP_404_NOT_FOUND,
         )
@@ -332,7 +332,7 @@ class UserUpdateTest(WebApiTestCase):
         self.salesperson.delete(deleted_by=self.superuser)
         self.assertEqual(
             self.client.patch(
-                f"/api/sales_admin/sales-people/{self.salesperson.id}",
+                f"/api/sales-admin/sales-people/{self.salesperson.id}",
                 {"name": "x"},
                 format="json",
             ).status_code,
@@ -345,7 +345,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_name"""
         self.login_as(self.seed_admin)
         response = self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {"name": "Updated Person"},
             format="json",
         )
@@ -358,7 +358,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_email"""
         self.login_as(self.seed_admin)
         response = self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {"email": "person@example.com"},
             format="json",
         )
@@ -371,7 +371,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_city"""
         self.login_as(self.seed_admin)
         response = self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {"city": self.city_2.id},
             format="json",
         )
@@ -384,7 +384,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_multiple_fields"""
         self.login_as(self.seed_admin)
         response = self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {"name": "Bulk Person", "email": "bulk@example.com", "city": self.city_2.id},
             format="json",
         )
@@ -402,7 +402,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_partial_body_leaves_others_unchanged"""
         self.login_as(self.seed_admin)
         self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {"name": "Only Person"},
             format="json",
         )
@@ -417,7 +417,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(
-                f"/api/sales_admin/sales-people/{self.salesperson.id}",
+                f"/api/sales-admin/sales-people/{self.salesperson.id}",
                 {"city": 999999},
                 format="json",
             ).status_code,
@@ -428,7 +428,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_phone_number"""
         self.login_as(self.seed_admin)
         response = self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {"phone_number": "9999999990"},
             format="json",
         )
@@ -442,7 +442,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(
-                f"/api/sales_admin/sales-people/{self.salesperson.id}",
+                f"/api/sales-admin/sales-people/{self.salesperson.id}",
                 {"phone_number": "12345"},
                 format="json",
             ).status_code,
@@ -454,7 +454,7 @@ class UserUpdateTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.patch(
-                f"/api/sales_admin/sales-people/{self.salesperson.id}",
+                f"/api/sales-admin/sales-people/{self.salesperson.id}",
                 {"phone_number": "7777777777"},
                 format="json",
             ).status_code,
@@ -468,7 +468,7 @@ class UserUpdateTest(WebApiTestCase):
         """
         self.login_as(self.seed_admin)
         response = self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {
                 "phone_number": self.salesperson.user.phone_number,
                 "name": "Same Phone Person",
@@ -483,7 +483,7 @@ class UserUpdateTest(WebApiTestCase):
         """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_payload_shape"""
         self.login_as(self.seed_admin)
         response = self.client.patch(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}",
+            f"/api/sales-admin/sales-people/{self.salesperson.id}",
             {"name": "Payload Person"},
             format="json",
         )
@@ -552,12 +552,12 @@ class UserDeleteTest(WebApiTestCase):
     def test_anonymous_admin_delete_rejected(self):
         """tests/test_user_update.py::UserDeleteTest::test_anonymous_admin_delete_rejected"""
         self.clear_auth()
-        response = self.client.delete(f"/api/sales_admin/admins/{self.admin.id}")
+        response = self.client.delete(f"/api/sales-admin/admins/{self.admin.id}")
         self.assertIn(response.status_code, (401, 403))
 
     def test_only_superuser_can_delete_admin(self):
         """tests/test_user_update.py::UserDeleteTest::test_only_superuser_can_delete_admin"""
-        url = f"/api/sales_admin/admins/{self.admin.id}"
+        url = f"/api/sales-admin/admins/{self.admin.id}"
         # A plain user, an app admin and a salesperson are all forbidden.
         for user in (self.plain, self.seed_admin, self.salesperson.user):
             self.login_as(user)
@@ -575,7 +575,7 @@ class UserDeleteTest(WebApiTestCase):
         """tests/test_user_update.py::UserDeleteTest::test_delete_admin_not_found"""
         self.login_as(self.superuser)
         self.assertEqual(
-            self.client.delete("/api/sales_admin/admins/999999").status_code,
+            self.client.delete("/api/sales-admin/admins/999999").status_code,
             status.HTTP_404_NOT_FOUND,
         )
 
@@ -583,7 +583,7 @@ class UserDeleteTest(WebApiTestCase):
         """tests/test_user_update.py::UserDeleteTest::test_delete_admin_soft_deletes_row"""
         self.login_as(self.superuser)
         self.assertEqual(
-            self.client.delete(f"/api/sales_admin/admins/{self.admin.id}").status_code,
+            self.client.delete(f"/api/sales-admin/admins/{self.admin.id}").status_code,
             status.HTTP_204_NO_CONTENT,
         )
         self.admin.refresh_from_db()
@@ -596,7 +596,7 @@ class UserDeleteTest(WebApiTestCase):
         self.login_as(self.superuser)
         self.admin.delete(deleted_by=self.superuser)
         self.assertEqual(
-            self.client.delete(f"/api/sales_admin/admins/{self.admin.id}").status_code,
+            self.client.delete(f"/api/sales-admin/admins/{self.admin.id}").status_code,
             status.HTTP_404_NOT_FOUND,
         )
 
@@ -606,7 +606,7 @@ class UserDeleteTest(WebApiTestCase):
         """tests/test_user_update.py::UserDeleteTest::test_anonymous_salesperson_delete_rejected"""
         self.clear_auth()
         response = self.client.delete(
-            f"/api/sales_admin/sales-people/{self.salesperson.id}"
+            f"/api/sales-admin/sales-people/{self.salesperson.id}"
         )
         self.assertIn(response.status_code, (401, 403))
 
@@ -615,7 +615,7 @@ class UserDeleteTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.delete(
-                f"/api/sales_admin/sales-people/{self.salesperson.id}"
+                f"/api/sales-admin/sales-people/{self.salesperson.id}"
             ).status_code,
             status.HTTP_204_NO_CONTENT,
         )
@@ -625,14 +625,14 @@ class UserDeleteTest(WebApiTestCase):
         self.login_as(self.superuser)
         self.assertEqual(
             self.client.delete(
-                f"/api/sales_admin/sales-people/{self.salesperson.id}"
+                f"/api/sales-admin/sales-people/{self.salesperson.id}"
             ).status_code,
             status.HTTP_204_NO_CONTENT,
         )
 
     def test_plain_and_salesperson_cannot_delete_salesperson(self):
         """tests/test_user_update.py::UserDeleteTest::test_plain_and_salesperson_cannot_delete_salesperson"""
-        url = f"/api/sales_admin/sales-people/{self.salesperson.id}"
+        url = f"/api/sales-admin/sales-people/{self.salesperson.id}"
         for user in (self.plain, self.salesperson.user):
             self.login_as(user)
             self.assertEqual(
@@ -643,7 +643,7 @@ class UserDeleteTest(WebApiTestCase):
         """tests/test_user_update.py::UserDeleteTest::test_delete_salesperson_not_found"""
         self.login_as(self.superuser)
         self.assertEqual(
-            self.client.delete("/api/sales_admin/sales-people/999999").status_code,
+            self.client.delete("/api/sales-admin/sales-people/999999").status_code,
             status.HTTP_404_NOT_FOUND,
         )
 
@@ -652,7 +652,7 @@ class UserDeleteTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.delete(
-                f"/api/sales_admin/sales-people/{self.salesperson.id}"
+                f"/api/sales-admin/sales-people/{self.salesperson.id}"
             ).status_code,
             status.HTTP_204_NO_CONTENT,
         )
@@ -667,7 +667,7 @@ class UserDeleteTest(WebApiTestCase):
         self.salesperson.delete(deleted_by=self.superuser)
         self.assertEqual(
             self.client.delete(
-                f"/api/sales_admin/sales-people/{self.salesperson.id}"
+                f"/api/sales-admin/sales-people/{self.salesperson.id}"
             ).status_code,
             status.HTTP_404_NOT_FOUND,
         )

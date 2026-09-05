@@ -35,7 +35,7 @@ class SessionAuthFlowTest(WebApiTestCase):
 
     def _login(self):
         return self.client.post(
-            "/api/sales_admin/auth/otp/verify",
+            "/api/sales-admin/auth/otp/verify",
             {
                 "phone_number": self.superuser.phone_number,
                 "otp": self.superuser.totp.now(),

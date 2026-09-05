@@ -22,7 +22,7 @@ No cookies. No CSRF header. No refresh token (a fresh login gives a fresh token)
 - **Login returns a token, not a cookie.** The app stores it and echoes it on every later call.
 - **One token per user, ever.** Logging in on device B invalidates the token on device A — the server deletes the old row and creates a new one on every successful login. If a user swaps phones, the old phone will start getting `401`s on its next request; that is expected. Route it back to the login screen.
 - **Fixed 24-hour lifetime**, measured from the moment the token was issued. **Not sliding** — making requests does not extend it. A token issued at `T` is dead at `T + 24h` regardless of usage, and the very request that finds it expired also causes the server to delete it. There is no refresh flow; expired means the user must log in again.
-- **Android never touches sessions.** Do not send cookies. Do not call any URL that starts with `/api/sales_admin/…` or `/api/utilities/…` — those are session-only and will refuse a bearer token.
+- **Android never touches sessions.** Do not send cookies. Do not call any URL that starts with `/api/sales-admin/…` or `/api/utilities/…` — those are session-only and will refuse a bearer token.
 
 ---
 
@@ -168,5 +168,5 @@ Any endpoint that returns `401` on an authenticated request means the token is n
 
 ## Out of scope (do not touch)
 
-- The sales-admin website has an entirely separate flow — see [`frontend-auth-sales-admin.md`](./frontend-auth-sales-admin.md). Do not touch anything under `/api/sales_admin/…` or `/api/utilities/…`; those refuse bearer tokens.
+- The sales-admin website has an entirely separate flow — see [`frontend-auth-sales-admin.md`](./frontend-auth-sales-admin.md). Do not touch anything under `/api/sales-admin/…` or `/api/utilities/…`; those refuse bearer tokens.
 - There is no `refresh_token` endpoint. A user whose 24-hour window has elapsed re-logs in with phone + TOTP; that's the entire refresh flow.

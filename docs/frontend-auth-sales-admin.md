@@ -34,23 +34,23 @@ Base URL is whatever `API_BASE_URL` resolves to at build time (e.g. `http://loca
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/sales_admin/auth/otp/verify` | Login: exchange phone + TOTP → session cookie |
-| `POST` | `/api/sales_admin/auth/logout` | Logout: flush session |
+| `POST` | `/api/sales-admin/auth/otp/verify` | Login: exchange phone + TOTP → session cookie |
+| `POST` | `/api/sales-admin/auth/logout` | Logout: flush session |
 | `GET`  | `/api/utilities/reauthenticate` | On startup / resume, "is my cookie still valid?" |
-| `GET/POST` | `/api/sales_admin/admins` | List / create app admins (superuser only) |
-| `PATCH/DELETE` | `/api/sales_admin/admins/<id>` | Update / delete an admin (superuser only) |
-| `GET/POST` | `/api/sales_admin/sales-people` | List / create sales-people (admin only) |
-| `PATCH/DELETE` | `/api/sales_admin/sales-people/<id>` | Update / delete a sales-person (admin only) |
+| `GET/POST` | `/api/sales-admin/admins` | List / create app admins (superuser only) |
+| `PATCH/DELETE` | `/api/sales-admin/admins/<id>` | Update / delete an admin (superuser only) |
+| `GET/POST` | `/api/sales-admin/sales-people` | List / create sales-people (admin only) |
+| `PATCH/DELETE` | `/api/sales-admin/sales-people/<id>` | Update / delete a sales-person (admin only) |
 | `GET`  | `/api/utilities/cities` | Grouped state → city picker data (superuser only) |
 
-Anything not listed here that lives under `/api/sales_admin/…` or `/api/utilities/…` follows the same session rules.
+Anything not listed here that lives under `/api/sales-admin/…` or `/api/utilities/…` follows the same session rules.
 
 ---
 
 ## 1. Login
 
 ```
-POST /api/sales_admin/auth/otp/verify
+POST /api/sales-admin/auth/otp/verify
 Content-Type: application/json
 
 {"phone_number": "9999999999", "otp": "123456"}
@@ -129,7 +129,7 @@ The response body has the same shape as login's, including `can_create_admin` / 
 ## 4. Logout
 
 ```
-POST /api/sales_admin/auth/logout
+POST /api/sales-admin/auth/logout
 ```
 
 - `204 No Content` on success. The server flushes the session row and clears the cookie via `Set-Cookie: sessionid=; Max-Age=0`.
@@ -171,7 +171,7 @@ There is no refresh token and no silent-renewal flow — expired means expired.
 - [ ] All non-GET calls send `X-CSRFToken` sourced from the `csrftoken` cookie.
 - [ ] `BrowserClient.withCredentials = true` (or equivalent) is set so cookies are sent cross-origin.
 - [ ] App boot calls `GET /api/utilities/reauthenticate` and routes based on `200` vs `401`.
-- [ ] Sign-out button calls `POST /api/sales_admin/auth/logout` **before** navigating away.
+- [ ] Sign-out button calls `POST /api/sales-admin/auth/logout` **before** navigating away.
 - [ ] Any `401` on a business call kicks the user back to login.
 - [ ] No token is stored in `localStorage`, `sessionStorage`, or in-memory state.
 

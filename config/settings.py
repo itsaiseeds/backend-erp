@@ -214,9 +214,17 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
+        # Until we are developing, use the following to see the browseable API in the browser
         "rest_framework.renderers.BrowsableAPIRenderer",
+        # Use this when development is done..
+        # *(
+        #     ["rest_framework.renderers.BrowsableAPIRenderer"]
+        #     if DEBUG
+        #     else []
+        # ),
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # Per-scope throttle rates. ``verify_otp`` (web) and ``android_login``

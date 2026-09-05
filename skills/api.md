@@ -84,6 +84,58 @@ it in the response body — e.g. `"csrf_token": get_token(request)` in the
 `VerifyOTPView` payload — so the SPA can grab it straight from the JSON instead
 of parsing cookies. Do not mix the two approaches across endpoints.
 
+## Paginated date-range list views
+
+For any `GET` list endpoint whose results must be filtered by a required
+`start_date_time`..`end_date_time` window (on the object's own `created_at`,
+or on a related object's timestamp), subclass one of the two concrete bases
+instead of hand-rolling pagination and query-param parsing:
+
+- Web: `api.paginated_views.AdminPaginatedDateRangeListView`
+  (defaults to `admin_required = True`; tighten with `superuser_required =
+  True` or relax by setting `admin_required = False` on the subclass).
+- Android: `android.api.paginated_views.AndroidPaginatedDateRangeListView`
+  (inherits `salesperson_required = True` from `AndroidBaseView`).
+
+Both compose the private mixin in
+`common/views/paginated_date_range.py` and only override `get()`.
+
+### What a subclass must provide
+
+- `get_queryset(self, request) -> QuerySet` — the base queryset (pre
+  date-filter).
+- `serialize_page(self, page_items, request) -> list | dict` — turn one
+  page of ORM objects into the JSON payload (project's hand-built-dict style).
+- Optional `date_field` (default `"created_at"`) — the ORM path used for the
+  range filter, supports Django `__` lookups for related fields, e.g.
+  `date_field = "order__created_at"`.
+
+### Query contract
+
+- `start_date_time` and `end_date_time` (ISO 8601) are **required**; missing,
+  invalid, or `start > end` returns **400**.
+- `page` (default `1`) and `page_size` (default `10`, capped at `30`) are
+  optional.
+
+### Response shape
+
+DRF standard envelope: `{count, next, previous, results}` (from
+`StandardPageNumberPagination`).
+
+### Minimal subclass (illustrative)
+
+```python
+from api.paginated_views import AdminPaginatedDateRangeListView
+
+class OrdersView(AdminPaginatedDateRangeListView):
+    # date_field defaults to "created_at" — override for related lookups.
+    def get_queryset(self, request):
+        return Order.objects.select_related("customer").order_by("-id")
+
+    def serialize_page(self, page_items, request):
+        return [order_payload(o) for o in page_items]
+```
+
 ## The pre-auth TOTP login POST needs no X-CSRFToken
 
 The verify-OTP POST itself works without a CSRF header: DRF never runs the

@@ -1,4 +1,4 @@
-"""Admin management endpoint: ``GET``/``POST`` ``/api/sales_admin/admins``.
+"""Admin management endpoint: ``GET``/``POST`` ``/api/sales-admin/admins``.
 
 Only a Django superuser may create an application admin (``superuser_required``
 on ``AdminApiView``, the session-only web base). Creating an admin also creates

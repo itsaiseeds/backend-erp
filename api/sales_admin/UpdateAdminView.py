@@ -1,4 +1,4 @@
-"""Admin update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales_admin/admins/<id>``.
+"""Admin update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales-admin/admins/<id>``.
 
 Only a Django superuser may update or delete an application admin
 (``superuser_required`` on ``AdminApiView``, mirroring ``AdminsView``). Extra

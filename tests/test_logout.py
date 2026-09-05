@@ -1,4 +1,4 @@
-"""ORM-backed tests for ``POST /api/sales_admin/auth/logout``.
+"""ORM-backed tests for ``POST /api/sales-admin/auth/logout``.
 
 Web logout is session-only: it must flush the browser session, refuse
 anonymous callers, and be safe to call more than once. See
@@ -23,7 +23,7 @@ class LogoutTest(WebApiTestCase):
     tests/test_logout.py::LogoutTest
     """
 
-    URL = "/api/sales_admin/auth/logout"
+    URL = "/api/sales-admin/auth/logout"
 
     @classmethod
     def setUpTestData(cls):
