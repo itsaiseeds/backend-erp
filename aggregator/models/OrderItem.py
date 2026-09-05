@@ -19,9 +19,14 @@ class OrderItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         related_name="order_items",
     )
     negotiated_selling_price = models.DecimalField(
-        "negotiated selling price per bag",
+        "negotiated selling price per packaging",
         max_digits=12,
         decimal_places=2,
+        help_text=(
+            "Whole-packaging price for this line (matches ProductPackaging.selling_price's "
+            "unit, not the product's per-bag price). ``OrderOperations.add_order_item`` "
+            "defaults it to the linked ``ProductPackaging.selling_price`` when omitted."
+        ),
     )
     quantity = models.PositiveIntegerField("quantity")
 
@@ -47,8 +52,4 @@ class OrderItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
 
     @property
     def line_total(self):
-        return (
-            self.negotiated_selling_price
-            * self.quantity
-            * self.product_packaging.packing_bags
-        )
+        return self.negotiated_selling_price * self.quantity

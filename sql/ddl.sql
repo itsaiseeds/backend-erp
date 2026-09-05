@@ -699,10 +699,11 @@ CREATE TABLE IF NOT EXISTS public.aggregator_productpackaging (
 	product_id int8 NOT NULL,
 	packing_bag_weight numeric(8, 3) NOT NULL,
 	packing_bags int8 NOT NULL,
+	selling_price numeric(12, 2) NOT NULL,
 	CONSTRAINT aggregator_productpackaging_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_productpackaging_public_id_key UNIQUE (public_id),
 	CONSTRAINT uniq_productpackaging_product_weight_bags UNIQUE (product_id, packing_bag_weight, packing_bags),
-	CONSTRAINT ck_productpackaging_positive CHECK (packing_bag_weight > 0 AND packing_bags > 0),
+	CONSTRAINT ck_productpackaging_positive CHECK (packing_bag_weight > 0 AND packing_bags > 0 AND selling_price >= 0),
 	CONSTRAINT aggregator_productpackaging_packing_bags_check CHECK (packing_bags >= 0)
 );
 CREATE INDEX IF NOT EXISTS aggregator_productpackaging_public_id_like ON public.aggregator_productpackaging USING btree (public_id varchar_pattern_ops);

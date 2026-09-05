@@ -48,11 +48,21 @@ def add_packaging(
     packing_bag_weight,
     packing_bags: int,
     actor: Any,
+    selling_price=None,
 ) -> ProductPackaging:
+    """Create a packaging for ``product``.
+
+    ``selling_price`` is the whole-packaging price. If omitted it defaults to
+    ``packing_bags * product.selling_price`` (captured at creation time --
+    later changes to the product's price do not propagate here).
+    """
+    if selling_price is None:
+        selling_price = packing_bags * product.selling_price
     packaging = ProductPackaging(
         product=product,
         packing_bag_weight=packing_bag_weight,
         packing_bags=packing_bags,
+        selling_price=selling_price,
         created_by=actor,
     )
     packaging.full_clean()
@@ -70,6 +80,7 @@ def packaging_payload(packaging: ProductPackaging) -> dict:
         "packing_bag_weight": str(packaging.packing_bag_weight),
         "packing_bags": packaging.packing_bags,
         "total_weight": str(packaging.total_weight),
+        "selling_price": str(packaging.selling_price),
     }
 
 

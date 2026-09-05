@@ -218,6 +218,7 @@ class ProductPackagingAdmin(SoftDeleteModelAdmin):
         "product",
         "packing_bag_weight",
         "packing_bags",
+        "selling_price",
         "created_at",
     )
     search_fields = ("public_id", "product__name", "product__crop__name")
