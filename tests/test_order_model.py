@@ -101,7 +101,9 @@ class OrderModelTest(DMLTestCase):
         assert len(order.public_id) == 16
         assert order.status.code == "BOOKED"
         assert order.expected_delivery_date == datetime.date.today() + datetime.timedelta(days=1)
-        assert order.total_amount == Decimal("1680.00")
+        # negotiated_selling_price (140) is now per-packaging (was per-bag);
+        # line_total = 140 * 3 quantity = 420. total_bags still counts bags.
+        assert order.total_amount == Decimal("420.00")
         assert order.total_bags == 12
 
     def test_delivery_address_must_belong_to_client(self):

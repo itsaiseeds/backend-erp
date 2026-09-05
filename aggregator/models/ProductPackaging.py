@@ -32,6 +32,18 @@ class ProductPackaging(
         help_text="Weight of a single bag, in kilograms.",
     )
     packing_bags = models.PositiveIntegerField("packing bags")
+    selling_price = models.DecimalField(
+        "selling price",
+        max_digits=12,
+        decimal_places=2,
+        help_text=(
+            "Whole-packaging price (not per-bag). Downstream OrderItems default "
+            "their negotiated price to this value. Set explicitly, or leave to "
+            "ProductOperations.add_packaging which fills it with "
+            "packing_bags * product.selling_price. Frozen at the value stored "
+            "here -- it does not track later changes to the product's per-bag price."
+        ),
+    )
 
     class Meta:
         verbose_name = "product packaging"
@@ -43,7 +55,11 @@ class ProductPackaging(
                 name="uniq_productpackaging_product_weight_bags",
             ),
             models.CheckConstraint(
-                condition=models.Q(packing_bag_weight__gt=0) & models.Q(packing_bags__gt=0),
+                condition=(
+                    models.Q(packing_bag_weight__gt=0)
+                    & models.Q(packing_bags__gt=0)
+                    & models.Q(selling_price__gte=0)
+                ),
                 name="ck_productpackaging_positive",
             ),
         ]

@@ -156,6 +156,25 @@ backend-erp/
   renamed, or renumbered there, update the enum (and the
   `order_statuses()` / `client_statuses()` id ranges) in the same change.
 
+### Pricing units: `Product` is per-bag, `ProductPackaging` and `OrderItem` are per-packaging
+- `Product.selling_price` (and `buying_price`) is the **per-bag** rate. It never
+  appears in totals math directly — packaging is the pricing unit downstream.
+- `ProductPackaging.selling_price` is the **whole-packaging** list price
+  (Decimal 12,2, `NOT NULL`, stored). Create packagings via
+  `ProductOperations.add_packaging(...)`; omit the kwarg and it defaults to
+  `packing_bags * product.selling_price` at creation time. Value is **frozen**
+  once stored — later edits to `product.selling_price` do not propagate.
+- `OrderItem.negotiated_selling_price` is the **per-packaging** rate for that
+  line (same unit as `ProductPackaging.selling_price`). Create items via
+  `OrderOperations.add_order_item(...)` / `create_order(items=[...])`; omit the
+  kwarg and it defaults to the linked `ProductPackaging.selling_price`.
+- `OrderItem.line_total == negotiated_selling_price * quantity` — no
+  `packing_bags` multiplier. `Order.total_amount` sums line totals; `total_bags`
+  still counts bags (`quantity * packing_bags`).
+- When you touch this math, remember the unit shift: **any** value that flows
+  into `line_total` is per-packaging. Multiplying by `packing_bags` again is
+  a bug.
+
 ### Auth / roles
 - Login is **TOTP** (authenticator app) for everyone except staff (Django admin
   password login). There is no SMS/OTP request endpoint.

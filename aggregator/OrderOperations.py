@@ -37,8 +37,10 @@ def create_order(
 ) -> Order:
     """Create an order and its items atomically.
 
-    Each entry in ``items`` is ``{"product_packaging", "negotiated_selling_price",
-    "quantity"}``.
+    Each entry in ``items`` is ``{"product_packaging", "quantity"}`` plus an
+    optional ``"negotiated_selling_price"``. When omitted, the item line uses
+    ``product_packaging.selling_price`` (the whole-packaging price captured on
+    the packaging at creation).
     """
     order = Order(
         client=client,
@@ -56,7 +58,7 @@ def create_order(
         add_order_item(
             order,
             product_packaging=item["product_packaging"],
-            negotiated_selling_price=item["negotiated_selling_price"],
+            negotiated_selling_price=item.get("negotiated_selling_price"),
             quantity=item["quantity"],
             actor=actor,
         )
@@ -67,10 +69,17 @@ def add_order_item(
     order: Order,
     *,
     product_packaging: Any,
-    negotiated_selling_price,
     quantity: int,
     actor: Any,
+    negotiated_selling_price=None,
 ) -> OrderItem:
+    """Add a line to ``order``.
+
+    ``negotiated_selling_price`` overrides the packaging's list price for this
+    line only; omit it to charge ``product_packaging.selling_price``.
+    """
+    if negotiated_selling_price is None:
+        negotiated_selling_price = product_packaging.selling_price
     item = OrderItem(
         order=order,
         product_packaging=product_packaging,
