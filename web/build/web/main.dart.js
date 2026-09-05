@@ -39288,7 +39288,7 @@ var $async$z4=A.S(function(c,d){if(c===1){o.push(d)
 s=p}for(;;)switch(s){case 0:g=null
 p=4
 m=n.a
-l=A.fH((B.c.jz(m,"/")?B.c.U(m,0,m.length-1):m)+"/api/sales_admin/auth/otp/verify")
+l=A.fH((B.c.jz(m,"/")?B.c.U(m,0,m.length-1):m)+"/api/sales-admin/auth/otp/verify")
 k=t.N
 j=A.ah(["Content-Type","application/json"],k,k)
 s=7

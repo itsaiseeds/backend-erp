@@ -1,4 +1,4 @@
-"""Sales person update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales_admin/sales-people/<id>``.
+"""Sales person update/delete endpoint: ``PATCH``/``DELETE`` ``/api/sales-admin/sales-people/<id>``.
 
 Only an application Admin may update or delete a sales person
 (``admin_required`` on ``AdminApiView``, mirroring ``SalesPeopleView``). A

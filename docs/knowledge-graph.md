@@ -27,7 +27,7 @@ graph TD
 
     subgraph API["Web API layer (api/) — session-only, never touches tokens"]
         URLS --> APIROOT["api/urls.py"]
-        APIROOT --> SA["/api/sales_admin/"]
+        APIROOT --> SA["/api/sales-admin/"]
         SA --> OTPVER["VerifyOTPView (TOTP login, session-only)"]
         APIROOT --> TSENTRY["TestSentryView<br/>(/api/test-sentry/, superuser)"]
         ADMINV["AdminApiView (session)"] --> BASE["BaseApiView<br/>(auth flags)"]
@@ -172,9 +172,10 @@ role-flag parent both client bases build on.
 | `BaseApiView` | `api/views.py` | Flag-driven base (`auth_required`, `admin_required`, `superuser_required`) → DRF `get_permissions()`; does not itself pick an auth scheme; also defines `fire_and_forget` (post-commit background thread) | base ← `AdminApiView`, `AndroidBaseView` |
 | Auth classes | `api/authentication.py` | `SessionAuthentication` (DRF session but with a real `WWW-Authenticate` challenge so anonymous = **401**, not 403; used only by the web) + `ExpiringTokenAuthentication` (24h TTL via `TOKEN_TTL_HOURS`; an expired token is deleted on first use; used only by Android) | used by → `AdminApiView`, `AndroidBaseView` |
 | `AdminApiView` | `api/admin.py` | Sales-admin website base: **session cookie only** | → `BaseApiView` |
+| `AdminPaginatedDateRangeListView` | `api/paginated_views.py` | Sales-admin `GET` list base: paginated + required `start_date_time`..`end_date_time` filter (default `admin_required = True`); subclass sets `get_queryset` / `serialize_page` / optional `date_field` | → `AdminApiView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
 | Permissions | `api/permissions.py` | `IsRolePermission` meta-class + `IsAdminUser`, `IsSuperUser`, `IsSalesPerson` | keyed off → `User.is_admin_user/is_superuser/is_salesperson` |
-| Top API router | `api/urls.py` | `/api/sales_admin/`, `/api/utilities/` (web, session-only) | → namespace URLconfs |
-| `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales_admin/auth/otp/verify` — pre-auth, `AllowAny`; verifies the user's **TOTP** code, opens a session, returns the user payload + `can_create_admin`/`can_create_sales_person` flags (no token) | reads → `User`; calls → `login()` + `get_token()` (issues `sessionid` + `csrftoken` cookies) |
+| Top API router | `api/urls.py` | `/api/sales-admin/`, `/api/utilities/` (web, session-only) | → namespace URLconfs |
+| `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales-admin/auth/otp/verify` — pre-auth, `AllowAny`; verifies the user's **TOTP** code, opens a session, returns the user payload + `can_create_admin`/`can_create_sales_person` flags (no token) | reads → `User`; calls → `login()` + `get_token()` (issues `sessionid` + `csrftoken` cookies) |
 | `TestSentryView` | `api/test_sentry.py` | `GET/POST /api/test-sentry/` — raises on purpose to verify error tracking (GlitchTip/Sentry); superuser-only so it can't be abused | gated by → `IsSuperUser` permission |
 
 ### Android app (separate Django app: `android/`)
@@ -187,6 +188,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
 | `AndroidBaseView` | `android/api/base.py` | Salesperson Android base: **bearer `ExpiringTokenAuthentication` only** + requires `SalesPerson` profile | → `BaseApiView`, `api.permissions.IsSalesPerson` |
+| `AndroidPaginatedDateRangeListView` | `android/api/paginated_views.py` | Android `GET` list base: paginated + required `start_date_time`..`end_date_time` filter (inherits `salesperson_required`); subclass sets `get_queryset` / `serialize_page` / optional `date_field` | → `AndroidBaseView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
 | Routing mechanism | `android/api/routing.py` | `merged_routes(versions)` merges each version's `routes.ROUTES` in order (later wins); `build_urlpatterns` turns the merge into urlpatterns | used by → `android/api/urls.py` |
 | Version router | `android/api/urls.py` | `VERSIONS = ["v1", ...]`; mounts `<version>/` with routes inherited from every earlier version | → `routing.build_urlpatterns` |
 | Android v1 | `android/api/v1/routes.py` | `ROUTES`: `auth/login` (`LoginView`), `auth/logout` (`LogoutView`), `auth/reauthenticate` (`ReauthenticateView`), `utilities/cities` (`CitiesView`) | → `AndroidBaseView` (except `LoginView`, pre-auth) |
@@ -235,6 +237,9 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | Admin helpers | `common/admin.py`, `common/models/` | `AuditFieldsAdminMixin` (read-only audit fieldsets, auto `created_by`) + `SoftDeleteModelAdmin` (soft delete through the admin) | aggregator + auth admins |
 | `PublicIdModel` | `common/models/public_id.py` | 12-char `public_id` for user-facing refs (intended for orders/invoices) | (no concrete use yet) |
 | `RandomIdModel` | `common/models/random_id.py` | random `UUIDField` column | (no concrete use yet) |
+| `_PaginatedDateRangeListMixin` | `common/views/paginated_date_range.py` | Provides `GET` for a paginated list view filtered by required `start_date_time`..`end_date_time` on `date_field` (default `"created_at"`, supports `__` lookups); subclass implements `get_queryset` + `serialize_page` | used by → `AdminPaginatedDateRangeListView`, `AndroidPaginatedDateRangeListView` |
+| `StandardPageNumberPagination` | `common/views/paginated_date_range.py` | Project default `PageNumberPagination` (`?page=`, `?page_size=`, default 20, max 100); DRF `{count,next,previous,results}` envelope | used by → `_PaginatedDateRangeListMixin` |
+| `DateRangeQuerySerializer` | `common/views/paginated_date_range.py` | Validates required `start_date_time` / `end_date_time` query params (ISO datetimes, `start <= end`) | used by → `_PaginatedDateRangeListMixin` |
 
 ### Schema & data
 
@@ -334,7 +339,7 @@ erDiagram
 /                    -> 404
 /admin/              -> Django admin (authentication/admin.py + aggregator/admin.py)
 /api/                                          (web, SESSION-ONLY, never touches tokens)
-├── sales_admin/
+├── sales-admin/
 │   ├── auth/otp/verify      POST  VerifyOTPView          (AllowAny → TOTP login, opens a session)
 │   ├── auth/logout          POST  LogoutView             (IsAuthenticated → flushes session)
 │   ├── admins               GET/POST  AdminsView         (IsSuperUser)
@@ -415,7 +420,7 @@ master merged → Render auto-deploy (Docker build)
 - Prod (Neon) schema is applied **manually** — never rely on `migrate` in prod; never run `reload_db.sh` against prod.
 - `web/build/web/` (Flutter) is **committed**; rebuild with `bash scripts/run.sh flutter` before pushing Flutter changes.
 - Tests never boot gunicorn: they run in short-lived one-off `web` containers against the `db` service.
-- **Auth/TOTP:** non-staff users log in with an **authenticator app (TOTP)**, not SMS/OTP. Web login is `POST /api/sales_admin/auth/otp/verify` (admins/superusers, opens a session); Android login is `POST /android/api/v1/auth/login` (sales persons, mints a token). Neither has an `otp/request` step.
+- **Auth/TOTP:** non-staff users log in with an **authenticator app (TOTP)**, not SMS/OTP. Web login is `POST /api/sales-admin/auth/otp/verify` (admins/superusers, opens a session); Android login is `POST /android/api/v1/auth/login` (sales persons, mints a token). Neither has an `otp/request` step.
 - **Role creation:** only superusers can create Admins; superusers *and* Admins can create SalesPeople. `VerifyOTPView` exposes this to the SPA via `can_create_admin` / `can_create_sales_person`.
 - **Strict client separation:** the web (`api/`) is session-only and never touches `authtoken_token`; the Android app (`android/`) is token-only and never touches sessions/`django_session`. `AdminApiView` and `AndroidBaseView` are the two client base views that enforce this — no view should extend `BaseApiView` directly.
 - **Token TTL:** bearer tokens die `TOKEN_TTL_HOURS` (24) after their last "login"; `ExpiringTokenAuthentication` deletes an expired token on first use so the next request forces a fresh login. Session cookies share the same 24h through `SESSION_COOKIE_AGE`.

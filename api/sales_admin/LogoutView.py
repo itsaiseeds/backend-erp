@@ -1,6 +1,6 @@
 """Logout endpoint: revoke the caller's session.
 
-``POST /api/sales_admin/auth/logout`` flushes the Django session and clears
+``POST /api/sales-admin/auth/logout`` flushes the Django session and clears
 the ``sessionid`` / ``csrftoken`` cookies, so the Flutter admin site's cookie
 stops working immediately. Session-only: never touches bearer tokens (see
 ``android.api.v1.LogoutView`` for the Android counterpart).

@@ -1,4 +1,4 @@
-"""Sales person management endpoint: ``GET``/``POST`` ``/api/sales_admin/sales-people``.
+"""Sales person management endpoint: ``GET``/``POST`` ``/api/sales-admin/sales-people``.
 
 Only an application Admin may hire a sales person (``admin_required`` on
 ``AdminApiView``, the session-only web base). A sales person cannot create

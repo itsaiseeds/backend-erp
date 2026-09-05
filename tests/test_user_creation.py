@@ -73,7 +73,7 @@ class UserCreationTest(WebApiTestCase):
 
     def test_anonymous_requests_are_rejected(self):
         """tests/test_user_creation.py::UserCreationTest::test_anonymous_requests_are_rejected"""
-        for path in ("/api/sales_admin/admins", "/api/sales_admin/sales-people"):
+        for path in ("/api/sales-admin/admins", "/api/sales-admin/sales-people"):
             self.assertIn(
                 self.client.post(path, {"name": "x"}, format="json").status_code,
                 (401, 403),
@@ -90,13 +90,13 @@ class UserCreationTest(WebApiTestCase):
         for user in (self.plain, self.seed_admin, self.salesperson.user):
             self.login_as(user)
             self.assertEqual(
-                self.client.post("/api/sales_admin/admins", payload, format="json").status_code,
+                self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
                 status.HTTP_403_FORBIDDEN,
             )
 
         self.login_as(self.superuser)
         self.assertEqual(
-            self.client.post("/api/sales_admin/admins", payload, format="json").status_code,
+            self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
             status.HTTP_201_CREATED,
         )
 
@@ -111,20 +111,20 @@ class UserCreationTest(WebApiTestCase):
         for user in (self.plain, self.salesperson.user):
             self.login_as(user)
             status_code = self.client.post(
-                "/api/sales_admin/sales-people", payload, format="json"
+                "/api/sales-admin/sales-people", payload, format="json"
             ).status_code
             self.assertEqual(status_code, status.HTTP_403_FORBIDDEN)
         # A superuser only creates admins -> also forbidden for sales-people.
         self.login_as(self.superuser)
         self.assertEqual(
-            self.client.post("/api/sales_admin/sales-people", payload, format="json").status_code,
+            self.client.post("/api/sales-admin/sales-people", payload, format="json").status_code,
             status.HTTP_403_FORBIDDEN,
         )
 
         # An application admin may create a salesperson.
         self.login_as(self.seed_admin)
         self.assertEqual(
-            self.client.post("/api/sales_admin/sales-people", payload, format="json").status_code,
+            self.client.post("/api/sales-admin/sales-people", payload, format="json").status_code,
             status.HTTP_201_CREATED,
         )
 
@@ -134,7 +134,7 @@ class UserCreationTest(WebApiTestCase):
         """tests/test_user_creation.py::UserCreationTest::test_create_admin_creates_fallback_salesperson_and_payload_shape"""
         self.login_as(self.superuser)
         response = self.client.post(
-            "/api/sales_admin/admins",
+            "/api/sales-admin/admins",
             {
                 "name": "Vikram Kumar",
                 "email": "vikram@example.com",
@@ -169,11 +169,11 @@ class UserCreationTest(WebApiTestCase):
             "city": self.city.id,
         }
         self.assertEqual(
-            self.client.post("/api/sales_admin/admins", payload, format="json").status_code,
+            self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
             status.HTTP_201_CREATED,
         )
         self.assertEqual(
-            self.client.post("/api/sales_admin/admins", payload, format="json").status_code,
+            self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
             status.HTTP_400_BAD_REQUEST,
         )
 
@@ -186,7 +186,7 @@ class UserCreationTest(WebApiTestCase):
             {"name": "No City", "phone_number": "9000000003"},
         ):
             self.assertEqual(
-                self.client.post("/api/sales_admin/admins", payload, format="json").status_code,
+                self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
                 status.HTTP_400_BAD_REQUEST,
                 payload,
             )
@@ -195,7 +195,7 @@ class UserCreationTest(WebApiTestCase):
         """tests/test_user_creation.py::UserCreationTest::test_list_admins_excludes_deleted"""
         self.login_as(self.superuser)
         created = self.client.post(
-            "/api/sales_admin/admins",
+            "/api/sales-admin/admins",
             {"name": "Vikram Kumar", "phone_number": "9000000050", "city": self.city.id},
             format="json",
         )
@@ -204,7 +204,7 @@ class UserCreationTest(WebApiTestCase):
         # Soft-delete the seed admin; it must disappear from the list.
         Admin.objects.get(user=self.seed_admin).delete(deleted_by=self.superuser)
 
-        response = self.client.get("/api/sales_admin/admins")
+        response = self.client.get("/api/sales-admin/admins")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         admins = response.data
         self.assertTrue(any(item["name"] == "Vikram Kumar" for item in admins))
@@ -221,13 +221,13 @@ class UserCreationTest(WebApiTestCase):
         """
         self.login_as(self.superuser)
         created = self.client.post(
-            "/api/sales_admin/admins",
+            "/api/sales-admin/admins",
             {"name": "Vikram Kumar", "phone_number": "9000000060", "city": self.city.id},
             format="json",
         )
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
 
-        response = self.client.get("/api/sales_admin/admins")
+        response = self.client.get("/api/sales-admin/admins")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         vikram = next(item for item in response.data if item["name"] == "Vikram Kumar")
         self.assertTrue(vikram["totp"]["provisioning_uri"])
@@ -238,7 +238,7 @@ class UserCreationTest(WebApiTestCase):
         """tests/test_user_creation.py::UserCreationTest::test_create_salesperson_payload_shape"""
         self.login_as(self.seed_admin)
         response = self.client.post(
-            "/api/sales_admin/sales-people",
+            "/api/sales-admin/sales-people",
             {
                 "name": "Ramesh Patil",
                 "phone_number": "9000000011",
@@ -260,7 +260,7 @@ class UserCreationTest(WebApiTestCase):
         """tests/test_user_creation.py::UserCreationTest::test_list_sales_people_excludes_deleted"""
         self.login_as(self.seed_admin)
         created = self.client.post(
-            "/api/sales_admin/sales-people",
+            "/api/sales-admin/sales-people",
             {"name": "Ramesh Patil", "phone_number": "9000000051", "city": self.city.id},
             format="json",
         )
@@ -268,7 +268,7 @@ class UserCreationTest(WebApiTestCase):
 
         self.salesperson.delete(deleted_by=self.superuser)
 
-        response = self.client.get("/api/sales_admin/sales-people")
+        response = self.client.get("/api/sales-admin/sales-people")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         people = response.data
         self.assertTrue(any(item["name"] == "Ramesh Patil" for item in people))
@@ -286,13 +286,13 @@ class UserCreationTest(WebApiTestCase):
         """
         self.login_as(self.seed_admin)
         created = self.client.post(
-            "/api/sales_admin/sales-people",
+            "/api/sales-admin/sales-people",
             {"name": "Ramesh Patil", "phone_number": "9000000061", "city": self.city.id},
             format="json",
         )
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
 
-        response = self.client.get("/api/sales_admin/sales-people")
+        response = self.client.get("/api/sales-admin/sales-people")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ramesh = next(item for item in response.data if item["name"] == "Ramesh Patil")
         self.assertTrue(ramesh["totp"]["provisioning_uri"])

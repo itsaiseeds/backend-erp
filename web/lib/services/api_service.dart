@@ -39,7 +39,7 @@ class ApiService {
     try {
       response = await http
           .post(
-            _uri('/api/sales_admin/auth/otp/verify'),
+            _uri('/api/sales-admin/auth/otp/verify'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'phone_number': phoneNumber,
