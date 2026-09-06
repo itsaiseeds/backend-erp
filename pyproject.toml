@@ -8,7 +8,7 @@ python_classes = ["Test*", "*Test"]
 line-length = 100
 target-version = "py311"
 src = ["."]
-exclude = ["*migrations*", "staticfiles", "web"]
+exclude = ["*migrations*", "staticfiles", "admin_saiseeds"]
 
 [tool.ruff.lint]
 select = [

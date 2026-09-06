@@ -104,11 +104,11 @@ find_flutter() {
 cmd_flutter() {
     find_flutter
     echo "[flutter] Building Flutter web app ..."
-    cd "$REPO_ROOT/web"
+    cd "$REPO_ROOT/admin_saiseeds"
     "$FLUTTER_CMD" pub get
     MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release --base-href /sales-admin/
     cd "$REPO_ROOT"
-    echo "[flutter] Build complete: web/build/web/"
+    echo "[flutter] Build complete: admin_saiseeds/build/web/"
 }
 
 # ---------------------------------------------------------------------------
@@ -123,13 +123,13 @@ cmd_flutter_prod() {
     local prod_url
     prod_url="${API_BASE_URL:-https://backend-erp-jlt9.onrender.com/}"
     echo "[flutter-prod] Building Flutter web app for prod API: $prod_url"
-    cd "$REPO_ROOT/web"
+    cd "$REPO_ROOT/admin_saiseeds"
     "$FLUTTER_CMD" pub get
     MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release \
         --base-href /sales-admin/ \
         --dart-define=API_BASE_URL="$prod_url"
     cd "$REPO_ROOT"
-    echo "[flutter-prod] Build complete: web/build/web/"
+    echo "[flutter-prod] Build complete: admin_saiseeds/build/web/"
 }
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ cmd_build() {
 # ---------------------------------------------------------------------------
 cmd_up() {
     # Auto-build Flutter if build output is missing
-    if [ ! -f "$REPO_ROOT/web/build/web/index.html" ]; then
+    if [ ! -f "$REPO_ROOT/admin_saiseeds/build/web/index.html" ]; then
         cmd_flutter
     fi
     echo "[up] Starting services ..."

@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -188,7 +190,7 @@ STORAGES = {
 }
 
 # Flutter build directory (served by catch-all view, not collectstatic)
-FLUTTER_BUILD_DIR = BASE_DIR / "web" / "build" / "web"
+FLUTTER_BUILD_DIR = BASE_DIR / "admin_saiseeds" / "build" / "web"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -313,8 +315,23 @@ SPECTACULAR_SETTINGS = {
 # cookie cross-origin, so allow credentials. The Android app talks JSON (no
 # cookies) and is unaffected.
 CORS_ALLOW_CREDENTIALS = True
+
+# The admin SPA tags every request with X-Client. It is not in
+# django-cors-headers' default allow-list, so without it here the browser fails
+# the preflight and blocks the request before it is ever sent.
+CORS_ALLOW_HEADERS = (*default_headers, "x-client")
+
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+
+# `flutter run -d chrome` serves the dev build on a random localhost port, so an
+# exact-origin list cannot be pinned. Allow any localhost port, but only under
+# DEBUG — in production CORS_ALLOWED_ORIGINS is the sole source.
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://localhost:\d+$",
+        r"^http://127\.0\.0\.1:\d+$",
+    ]
