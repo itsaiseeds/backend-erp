@@ -44,6 +44,45 @@ if SENTRY_DSN and not DEBUG:
     )
 
 
+# Logging
+# -------
+# Console-only logging (stdout) so Render/Docker capture it. LOG_LEVEL tunes the
+# project's own loggers; Django's internal logs stay at INFO (WARNING for the
+# noisy request logger) unless raised. Set LOG_LEVEL=DEBUG locally to see
+# management-command / app logging.info() output.
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "()": "config.logging_utils.ISTFormatter",
+            "format": "[{asctime}:{msecs:03.0f} {levelname} {filename}] {message}",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    # Root catches everything (bare logging.info(), third-party libs, our apps).
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
+    },
+    "loggers": {
+        # Django emits SQL at DEBUG and per-request lines that get noisy; keep
+        # it slightly quieter than root unless LOG_LEVEL is already higher.
+        "django.db.backends": {"level": "INFO"},
+        "django.request": {"level": "WARNING"},
+    },
+}
+
+
 # Application definition
 
 INSTALLED_APPS = [
