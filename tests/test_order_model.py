@@ -49,7 +49,9 @@ class OrderModelTest(DMLTestCase):
         cls.plain_user = User.objects.create_user(
             "9000000003", "Plain User", created_by=cls.su, verified_by=cls.su, is_verified=True
         )
-        cls.country = Country.objects.create(name="India", iso_code="IN", created_by=cls.su)
+        cls.country, _ = Country.objects.get_or_create(
+            name="India", defaults={"iso_code": "IN", "created_by": cls.su}
+        )
         cls.state = State.objects.create(name="Maharashtra", country=cls.country, created_by=cls.su)
         cls.city = City.objects.create(name="Pune", state=cls.state, created_by=cls.su)
         cls.city2 = City.objects.create(name="Mumbai", state=cls.state, created_by=cls.su)
