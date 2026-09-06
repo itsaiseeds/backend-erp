@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/presentation/bloc/session_cubit.dart';
 import '../../../core/routing/route_constants.dart';
 import '../../../core/utils/responsive/responsive_helper.dart';
 import '../../../core/widgets/layout/app_shell.dart';
@@ -81,16 +83,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final bool isCollapsed = _resolveIsCollapsed();
 
-    return AppShell(
-      isCollapsed: isCollapsed,
-      sidebar: DashboardSidebar(
-        items: SidebarItems.ITEMS,
-        activeItemId: _activeItemId,
-        onItemSelected: _onItemSelected,
-        isCollapsed: isCollapsed,
-        onToggleCollapse: _onToggleCollapse,
-      ),
-      content: DashboardContentSwitcher.screenFor(_activeItemId),
+    return BlocBuilder<SessionCubit, SessionState>(
+      builder: (context, state) {
+        final String? role = state.session?.role;
+        final bool isResolved = state.status == SessionStatus.loaded;
+
+        final String activeId =
+            !isResolved ||
+                SidebarItems.isAccessible(_activeItemId, role: role)
+            ? _activeItemId
+            : SidebarItems.DEFAULT_ITEM_ID;
+
+        if (activeId != _activeItemId) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            setState(() => _activeItemId = activeId);
+            _syncUrl();
+          });
+        }
+
+        return AppShell(
+          isCollapsed: isCollapsed,
+          sidebar: DashboardSidebar(
+            items: SidebarItems.visibleItems(role: role),
+            activeItemId: activeId,
+            onItemSelected: _onItemSelected,
+            isCollapsed: isCollapsed,
+            onToggleCollapse: _onToggleCollapse,
+          ),
+          content: DashboardContentSwitcher.screenFor(activeId),
+        );
+      },
     );
   }
 }

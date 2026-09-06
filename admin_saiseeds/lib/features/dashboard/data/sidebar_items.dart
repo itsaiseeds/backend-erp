@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/tab_ids.dart';
+import '../../../core/constants/user_roles.dart';
 import '../../../core/models/sidebar_item_model.dart';
 
 class SidebarItems {
@@ -23,14 +24,37 @@ class SidebarItems {
       icon: Icons.groups_outlined,
     ),
     SidebarItemModel(
-      id: TabIds.PROFILE,
-      label: AppStrings.PROFILE,
-      icon: Icons.person_outline_rounded,
+      id: TabIds.PRODUCTS,
+      label: AppStrings.PRODUCTS,
+      icon: Icons.inventory_2_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.PRODUCT_PACKAGINGS,
+      label: AppStrings.PRODUCT_PACKAGINGS,
+      icon: Icons.inventory_outlined,
     ),
   ];
 
   static const String DEFAULT_ITEM_ID = TabIds.DASHBOARD;
 
+  static const List<String> _NON_NAV_TAB_IDS = [TabIds.PROFILE];
+
+  static List<SidebarItemModel> visibleItems({required String? role}) {
+    return ITEMS.where((item) => _isPermitted(item.id, role: role)).toList();
+  }
+
+  static bool _isPermitted(String id, {required String? role}) {
+    if (!UserRoles.canAccessPortal(role)) return false;
+    if (id == TabIds.ADMINS) return UserRoles.isSuperuser(role);
+    return true;
+  }
+
+  static bool isAccessible(String? id, {required String? role}) {
+    if (!isKnown(id)) return false;
+    return _isPermitted(id!, role: role);
+  }
+
   static bool isKnown(String? id) =>
-      id != null && ITEMS.any((item) => item.id == id);
+      id != null &&
+      (ITEMS.any((item) => item.id == id) || _NON_NAV_TAB_IDS.contains(id));
 }

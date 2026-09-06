@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/bloc/safe_cubit.dart';
 import '../../data/auth_repository.dart';
 import '../../data/models/auth_session.dart';
 
@@ -22,7 +22,7 @@ class SessionState extends Equatable {
   List<Object?> get props => [status, session];
 }
 
-class SessionCubit extends Cubit<SessionState> {
+class SessionCubit extends SafeCubit<SessionState> {
   final AuthRepository _authRepository;
 
   SessionCubit({required AuthRepository authRepository})

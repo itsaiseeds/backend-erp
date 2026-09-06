@@ -1,3 +1,5 @@
+import '../../../core/constants/app_strings.dart';
+import '../../../core/constants/user_roles.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/endpoints/auth_endpoints.dart';
@@ -20,10 +22,18 @@ class AuthRepository {
     );
 
     if (response is! Map) {
-      throw const ApiException(message: 'Unexpected response from server.');
+      throw const ApiException(
+        message: AppStrings.ERROR_UNEXPECTED_RESPONSE,
+      );
     }
 
     final session = AuthSession.fromJson(Map<String, dynamic>.from(response));
+
+    if (!UserRoles.canAccessPortal(session.role)) {
+      await SessionGuard.endSession();
+      throw const ApiException(message: AppStrings.LOGIN_NOT_AUTHORISED);
+    }
+
     await _persistSession(session);
     return session;
   }

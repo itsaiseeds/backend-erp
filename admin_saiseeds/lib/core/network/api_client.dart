@@ -156,9 +156,7 @@ class ApiClient {
     }
     throw ApiException(
       statusCode: statusCode ?? 500,
-      message: statusCode == _rateLimitedStatus
-          ? AppStrings.ERROR_RATE_LIMITED
-          : _extractErrorMessage(response.data, statusCode),
+      message: _extractErrorMessage(response.data, statusCode),
     );
   }
 
@@ -168,9 +166,7 @@ class ApiClient {
       final int? statusCode = response.statusCode;
       return ApiException(
         statusCode: statusCode ?? 500,
-        message: statusCode == _rateLimitedStatus
-            ? AppStrings.ERROR_RATE_LIMITED
-            : _extractErrorMessage(response.data, statusCode),
+        message: _extractErrorMessage(response.data, statusCode),
       );
     }
 
@@ -198,8 +194,23 @@ class ApiClient {
       if (message is String && message.isNotEmpty) return message;
       final error = data['error'];
       if (error is String && error.isNotEmpty) return error;
+      final String? fieldError = _extractFieldError(data);
+      if (fieldError != null) return fieldError;
     }
     return _fallbackMessageFor(statusCode);
+  }
+
+  static String? _extractFieldError(Map data) {
+    for (final dynamic value in data.values) {
+      if (value is String && value.isNotEmpty) return value;
+      if (value is List) {
+        final Iterable<String> messages = value
+            .whereType<String>()
+            .where((entry) => entry.isNotEmpty);
+        if (messages.isNotEmpty) return messages.join('\n');
+      }
+    }
+    return null;
   }
 
   String _fallbackMessageFor(int? statusCode) {

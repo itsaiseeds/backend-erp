@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../network/api_client.dart';
+import '../constants/user_roles.dart';
 import '../network/endpoints/utilities_endpoints.dart';
 import 'storage_service.dart';
 
@@ -15,6 +16,12 @@ class SessionGuard {
   static ValueListenable<bool> get sessionListenable => _hasSession;
 
   static bool get hasSessionSync => _hasSession.value;
+
+  static bool _wasRoleRejected = false;
+
+  static bool get wasRoleRejected => _wasRoleRejected;
+
+  static void clearRoleRejection() => _wasRoleRejected = false;
 
   static set apiClient(ApiClient client) => _apiClient = client;
 
@@ -46,6 +53,12 @@ class SessionGuard {
     }
 
     if (result.isSuccess) {
+      if (!_hasPortalRole(result.data)) {
+        _wasRoleRejected = true;
+        await StorageService.clearSession();
+        return false;
+      }
+      _wasRoleRejected = false;
       await _cacheProfileFrom(result.data);
       return true;
     }
@@ -56,6 +69,17 @@ class SessionGuard {
     }
 
     return _cachedProfileFallback();
+  }
+
+  static bool _hasPortalRole(dynamic data) {
+    if (data is! Map) return false;
+    final Map<String, dynamic> payload = Map<String, dynamic>.from(data);
+    final dynamic user = payload['user'];
+    final Map<String, dynamic> userMap = user is Map
+        ? Map<String, dynamic>.from(user)
+        : payload;
+    final dynamic role = userMap['role'];
+    return UserRoles.canAccessPortal(role is String ? role : null);
   }
 
   static Future<bool> _cachedProfileFallback() async {

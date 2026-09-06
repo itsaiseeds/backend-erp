@@ -271,6 +271,291 @@ paths:
               schema:
                 description: Too many requests from this IP; retry later.
           description: ''
+  /api/sales-admin/crops:
+    get:
+      operationId: api_sales_admin_crops_list
+      description: List (GET) or create (POST) crops (app admin only).
+      summary: List crops
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CropPayload'
+          description: ''
+    post:
+      operationId: api_sales_admin_crops_create
+      description: List (GET) or create (POST) crops (app admin only).
+      summary: Create a crop
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCropRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateCropRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateCropRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CropPayload'
+          description: ''
+  /api/sales-admin/crops/{id}:
+    patch:
+      operationId: api_sales_admin_crops_partial_update
+      description: Update or delete a single crop (app admin only).
+      summary: Update a crop
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCropRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCropRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCropRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CropPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_crops_destroy
+      description: Update or delete a single crop (app admin only).
+      summary: Delete a crop
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/product-packagings:
+    get:
+      operationId: api_sales_admin_product_packagings_list
+      description: List (GET) or create (POST) product packagings (app admin only).
+      summary: List product packagings
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductPackagingPayload'
+          description: ''
+    post:
+      operationId: api_sales_admin_product_packagings_create
+      description: List (GET) or create (POST) product packagings (app admin only).
+      summary: Create a product packaging
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductPackagingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateProductPackagingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateProductPackagingRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPackagingPayload'
+          description: ''
+  /api/sales-admin/product-packagings/{public_id}:
+    patch:
+      operationId: api_sales_admin_product_packagings_partial_update
+      description: Update or delete a single product packaging (app admin only).
+      summary: Update a product packaging
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateProductPackagingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateProductPackagingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateProductPackagingRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPackagingPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_product_packagings_destroy
+      description: Update or delete a single product packaging (app admin only).
+      summary: Delete a product packaging
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/products:
+    get:
+      operationId: api_sales_admin_products_list
+      description: List (GET) or create (POST) products (app admin only).
+      summary: List products
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductPayload'
+          description: ''
+    post:
+      operationId: api_sales_admin_products_create
+      description: List (GET) or create (POST) products (app admin only).
+      summary: Create a product
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPayload'
+          description: ''
+  /api/sales-admin/products/{public_id}:
+    patch:
+      operationId: api_sales_admin_products_partial_update
+      description: Update or delete a single product (app admin only).
+      summary: Update a product
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateProductRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_products_destroy
+      description: Update or delete a single product (app admin only).
+      summary: Delete a product
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/sales-admin/sales-people:
     get:
       operationId: api_sales_admin_sales_people_list
@@ -551,6 +836,67 @@ components:
       - city
       - name
       - phone_number
+    CreateCropRequest:
+      type: object
+      description: Request validation for creating a new ``Crop``.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+      required:
+      - name
+    CreateProductPackagingRequest:
+      type: object
+      description: |-
+        Request validation for creating a new ``ProductPackaging``.
+
+        ``product`` is addressed by its ``public_id`` (``P-…``). ``selling_price``
+        is the whole-packaging price; when omitted it is frozen to
+        ``packing_bags * product.selling_price`` (see
+        ``aggregator.ProductOperations.add_packaging``).
+      properties:
+        product:
+          type: string
+          minLength: 1
+        packing_bag_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        packing_bags:
+          type: integer
+          minimum: 1
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - packing_bag_weight
+      - packing_bags
+      - product
+    CreateProductRequest:
+      type: object
+      description: Request validation for creating a new ``Product``.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        crop:
+          type: integer
+        buying_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - buying_price
+      - crop
+      - name
+      - selling_price
     CreateSalesPersonRequest:
       type: object
       description: Request validation for creating a new ``SalesPerson`` (city only).
@@ -576,6 +922,28 @@ components:
       - city
       - name
       - phone_number
+    CropPayload:
+      type: object
+      description: Output shape for one crop row.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    CropRef:
+      type: object
+      description: Output shape for the ``crop`` reference on a product.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     LoginRequest:
       type: object
       properties:
@@ -643,6 +1011,51 @@ components:
           maxLength: 10
         can_update_stock_count:
           type: boolean
+    PatchedUpdateCropRequest:
+      type: object
+      description: Request validation for updating a ``Crop`` (name only).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+    PatchedUpdateProductPackagingRequest:
+      type: object
+      description: Request validation for updating a ``ProductPackaging`` (all fields
+        optional).
+      properties:
+        product:
+          type: string
+          minLength: 1
+        packing_bag_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        packing_bags:
+          type: integer
+          minimum: 1
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+    PatchedUpdateProductRequest:
+      type: object
+      description: Request validation for updating a ``Product`` (all fields optional).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        crop:
+          type: integer
+        buying_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
     PatchedUpdateSalesPersonRequest:
       type: object
       description: |-
@@ -668,6 +1081,76 @@ components:
           maxLength: 10
         city:
           type: integer
+    ProductPackagingPayload:
+      type: object
+      description: Output shape for one packaging row.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/ProductRef'
+        packing_bag_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        packing_bags:
+          type: integer
+          minimum: 1
+        total_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,3})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - packing_bag_weight
+      - packing_bags
+      - product
+      - public_id
+      - selling_price
+      - total_weight
+    ProductPayload:
+      type: object
+      description: Output shape for one product row.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        crop:
+          $ref: '#/components/schemas/CropRef'
+        buying_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        margin_per_bag:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - buying_price
+      - crop
+      - margin_per_bag
+      - name
+      - public_id
+      - selling_price
+    ProductRef:
+      type: object
+      description: Output shape for the ``product`` reference on a packaging.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
     ReauthenticateResponse:
       type: object
       description: |-

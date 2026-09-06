@@ -20,6 +20,7 @@ class AppColors {
   static const Color BORDER_STRONG = Color(0xFFC3C9C4);
   static const Color BORDER_FOCUSED = Color(0xFF1E7A34);
   static const Color DIVIDER = Color(0xFFE2E5E2);
+  static const Color HAIRLINE = Color(0xFFEDEFED);
 
   static const Color TEXT_PRIMARY = Color(0xFF1A1E1B);
   static const Color TEXT_SECONDARY = Color(0xFF5B635C);
@@ -59,4 +60,13 @@ class AppColors {
 
   static const Color OVERLAY = Color(0x80000000);
   static const Color TRANSPARENT = Color(0x00000000);
+
+  static const Color TABLE_HEADER_BG = Color(0xFF1E7A34);
+  static const Color TABLE_HEADER_DIVIDER = Color(0xFF4CA35E);
+  static const Color TABLE_HEADER_PIN_IDLE = Color(0xFF9CC7A6);
+  static const Color TABLE_ROW_HOVER = Color(0xFFF4F8F4);
+  static const Color TABLE_ROW_DIVIDER = Color(0xFFECEFEC);
+  static const Color TABLE_SCROLL_TRACK = Color(0xFFEDEFED);
+  static const Color TABLE_SCROLL_THUMB = Color(0xFF4CA35E);
+  static const Color TABLE_SCROLL_THUMB_ACTIVE = Color(0xFF1E7A34);
 }

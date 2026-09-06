@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:admin_saiseeds/core/constants/user_roles.dart';
 import 'package:admin_saiseeds/core/network/api_client.dart';
 import 'package:admin_saiseeds/core/routing/app_router.dart';
 import 'package:admin_saiseeds/core/routing/route_constants.dart';
@@ -23,9 +24,22 @@ Future<void> _boot(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+const Map<String, dynamic> _superuserPayload = {
+  'user': {
+    'id': 1,
+    'name': 'admin',
+    'phone_number': '9999999999',
+    'role': UserRoles.SUPERUSER,
+  },
+  'can_create_admin': true,
+  'can_create_sales_person': true,
+};
+
 void _respondWith(int statusCode, {dynamic data}) {
-  SessionGuard.prober = (_) async =>
-      ApiProbeResult(statusCode: statusCode, data: data);
+  SessionGuard.prober = (_) async => ApiProbeResult(
+    statusCode: statusCode,
+    data: data ?? (statusCode == 200 ? _superuserPayload : null),
+  );
 }
 
 void main() {

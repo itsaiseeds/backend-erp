@@ -66,11 +66,16 @@ void main() {
     expect(error.message, 'Invalid phone number or TOTP code.');
   });
 
-  test('429 always uses the rate-limit message', () async {
+  test('429 surfaces the server detail verbatim', () async {
     final error = await _captureError(
       _clientReturning(429, detail: 'Request was throttled. Expected in 51s.'),
     );
     expect(error.statusCode, 429);
+    expect(error.message, 'Request was throttled. Expected in 51s.');
+  });
+
+  test('429 without a body falls back to the rate-limit message', () async {
+    final error = await _captureError(_clientReturning(429));
     expect(error.message, AppStrings.ERROR_RATE_LIMITED);
   });
 

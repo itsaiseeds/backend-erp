@@ -9,9 +9,11 @@ import 'core/config/observability_config.dart';
 import 'core/constants/app_strings.dart';
 import 'core/network/api_client.dart';
 import 'core/routing/app_router.dart';
+import 'core/services/metadata_service.dart';
 import 'core/services/session_guard.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/app_scroll_behavior.dart';
+import 'core/utils/history/history_guard.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/session_cubit.dart';
@@ -19,17 +21,24 @@ import 'features/auth/presentation/bloc/session_cubit.dart';
 Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
-
-  await dotenv.load(fileName: AppConfigKeys.ENV_FILE);
+  blockBackNavigation();
 
   final apiClient = ApiClient();
   SessionGuard.apiClient = apiClient;
-  await SessionGuard.refresh();
+  MetadataService.instance.apiClient = apiClient;
+
+  final bool hasSession = await SessionGuard.refresh();
+  if (hasSession) {
+    await MetadataService.instance.loadCities();
+  }
 
   runApp(AdminSaiseedsApp(apiClient: apiClient));
 }
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: AppConfigKeys.envFile);
+
   if (!ObservabilityConfig.isEnabled) {
     await _bootstrap();
     return;
@@ -53,12 +62,14 @@ class AdminSaiseedsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authRepository = AuthRepository(
-      apiClient: apiClient ?? ApiClient(),
-    );
+    final ApiClient client = apiClient ?? ApiClient();
+    final authRepository = AuthRepository(apiClient: client);
 
-    return RepositoryProvider<AuthRepository>.value(
-      value: authRepository,
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<ApiClient>.value(value: client),
+        RepositoryProvider<AuthRepository>.value(value: authRepository),
+      ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider(create: (_) => AuthBloc(authRepository: authRepository)),

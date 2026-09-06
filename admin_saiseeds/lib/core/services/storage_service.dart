@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
@@ -9,6 +11,7 @@ class StorageService {
   static const String _userRoleKey = 'user_role';
   static const String _canCreateAdminKey = 'can_create_admin';
   static const String _canCreateSalesPersonKey = 'can_create_sales_person';
+  static const String _tableConfigKeyPrefix = 'table_config_';
 
   static const List<String> _sessionKeys = [
     _userIdKey,
@@ -93,6 +96,34 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     for (final key in _sessionKeys) {
       await prefs.remove(key);
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getTableConfig(String tableKey) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? raw = prefs.getString('$_tableConfigKeyPrefix$tableKey');
+      if (raw == null || raw.isEmpty) return null;
+      final dynamic decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return Map<String, dynamic>.from(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveTableConfig(
+    String tableKey,
+    Map<String, dynamic> config,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        '$_tableConfigKeyPrefix$tableKey',
+        jsonEncode(config),
+      );
+    } catch (_) {
+      return;
     }
   }
 }

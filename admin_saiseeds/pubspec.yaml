@@ -49,6 +49,7 @@ dependencies:
   shimmer: ^3.0.0
   toastification: ^3.2.0
   jwt_decoder: ^2.0.1
+  qr_flutter: ^4.1.0
 
   web: ^1.1.0
   sentry_flutter: ^8.14.2
@@ -78,7 +79,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - .env
+    - .env.dev
+    - .env.prod
     - assets/logo/
 
   # To add assets to your application, add an assets section, like this:

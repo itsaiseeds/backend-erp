@@ -9,6 +9,7 @@ class IconActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final String? tooltip;
   final IconActionType type;
+  final bool expand;
 
   const IconActionButton({
     super.key,
@@ -16,6 +17,7 @@ class IconActionButton extends StatelessWidget {
     required this.onPressed,
     this.tooltip,
     this.type = IconActionType.neutral,
+    this.expand = false,
   });
 
   Color get _color {
@@ -40,18 +42,27 @@ class IconActionButton extends StatelessWidget {
 
     final Widget button = MouseRegion(
       cursor: isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
-      child: InkWell(
+      child: Padding(
+        padding: EdgeInsets.all(
+          expand ? AppSizes.actionButtonInset : 0,
+        ),
+        child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Container(
-          width: AppSpacing.xl,
-          height: AppSpacing.xl,
+          width: expand ? double.infinity : AppSpacing.xl,
+          height: expand ? double.infinity : AppSpacing.xl,
           decoration: BoxDecoration(
             border: Border.all(color: isDisabled ? AppColors.BORDER : color),
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           alignment: Alignment.center,
-          child: Icon(icon, size: AppSpacing.md, color: color),
+          child: Icon(
+            icon,
+            size: expand ? AppSizes.iconLg : AppSpacing.md,
+            color: color,
+          ),
+        ),
         ),
       ),
     );

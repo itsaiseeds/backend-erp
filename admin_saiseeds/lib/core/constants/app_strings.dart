@@ -29,6 +29,11 @@ class AppStrings {
 
   static const String LOGIN_FAILED = 'Unable to sign in. Please try again.';
   static const String LOGIN_FAILED_TITLE = 'Sign in failed';
+  static const String LOGIN_NOT_AUTHORISED =
+      'You are not authorised to access this portal. Contact an administrator '
+      'if you believe this is a mistake.';
+  static const String ERROR_UNEXPECTED_RESPONSE =
+      'Unexpected response from server.';
 
   static const String LOGIN_BRAND_HEADLINE = 'Grown with precision.';
   static const String LOGIN_BRAND_TAGLINE =
@@ -44,23 +49,18 @@ class AppStrings {
 
   static const String SIDEBAR_COLLAPSE = 'Collapse sidebar';
   static const String SIDEBAR_EXPAND = 'Expand sidebar';
-  static const String SIDEBAR_NAVIGATION = 'Navigation';
-  static const String SIDEBAR_ACCOUNT = 'Account';
 
-  static const String DASHBOARD_OVERVIEW_TITLE = 'Overview';
-  static const String DASHBOARD_OVERVIEW_SUBTITLE =
-      'Operational snapshot of the Saiseeds admin workspace.';
-  static const String DASHBOARD_STAT_ADMINS = 'Administrators';
-  static const String DASHBOARD_STAT_SALES_PEOPLE = 'Sales People';
-  static const String DASHBOARD_STAT_ACTIVE_SESSION = 'Active Session';
-  static const String DASHBOARD_STAT_PENDING = 'Awaiting Data';
-  static const String DASHBOARD_STAT_PLACEHOLDER = '—';
-  static const String DASHBOARD_STAT_NOT_WIRED = 'Not connected';
-  static const String DASHBOARD_STAT_SIGNED_IN = 'Signed in';
-  static const String DASHBOARD_NOTICE_TITLE = 'Live data pending';
-  static const String DASHBOARD_NOTICE_BODY =
-      'Reporting endpoints are not connected yet. Figures appear here once the '
-      'backend metrics API is available.';
+  static const String SENTRY_TEST_BUTTON = 'Send test error';
+  static const String SENTRY_TEST_SENT_TITLE = 'Test error sent';
+  static const String SENTRY_TEST_SENT_BODY =
+      'A sample error was reported. Check GlitchTip to confirm it arrived.';
+  static const String SENTRY_TEST_EXCEPTION =
+      'Saiseeds admin test error: triggered from the dashboard.';
+  static const String DASHBOARD_LAUNCHING_SOON_TITLE = 'Launching soon';
+  static const String DASHBOARD_LAUNCHING_SOON_BODY =
+      'The overview dashboard is being built. Live metrics for administrators, '
+      'sales people, and platform activity will appear here once the reporting '
+      'endpoints go live.';
 
   static const String ADMINS_EMPTY_TITLE = 'No administrators loaded';
   static const String ADMINS_EMPTY_BODY =
@@ -69,34 +69,32 @@ class AppStrings {
   static const String SALES_PEOPLE_EMPTY_BODY =
       'The sales team directory is not connected yet.';
 
-  static const String PROFILE_EYEBROW = 'ACCOUNT PROFILE';
-  static const String PROFILE_SUBHEADING =
-      'Your identity, contact details, and platform permissions.';
-  static const String PROFILE_ACCOUNT_DETAILS = 'Account Details';
-  static const String PROFILE_ACCOUNT_DETAILS_HINT =
-      'Sourced from your authenticated session.';
+  static const String PROFILE_SIGNED_IN_AS = 'SIGNED IN AS';
   static const String PROFILE_PERMISSIONS = 'Permissions';
-  static const String PROFILE_PERMISSIONS_HINT =
-      'What this account is authorised to do.';
-  static const String PROFILE_FIELD_NAME = 'Full Name';
-  static const String PROFILE_FIELD_PHONE = 'Phone Number';
-  static const String PROFILE_FIELD_ROLE = 'Role';
-  static const String PROFILE_FIELD_USER_ID = 'User ID';
   static const String PROFILE_PERMISSION_CREATE_ADMIN =
       'Create administrator accounts';
   static const String PROFILE_PERMISSION_CREATE_SALES_PERSON =
       'Create sales person accounts';
   static const String PROFILE_PERMISSION_GRANTED = 'Granted';
   static const String PROFILE_PERMISSION_RESTRICTED = 'Restricted';
-  static const String PROFILE_SESSION_SECTION = 'Session';
-  static const String PROFILE_SESSION_HINT =
-      'Sign out to clear this session from the browser.';
   static const String PROFILE_UNAVAILABLE_TITLE = 'Profile unavailable';
   static const String PROFILE_UNAVAILABLE_BODY =
       'No account details are stored for this session. Sign in again to '
       'continue.';
   static const String PROFILE_VALUE_UNKNOWN = 'Not available';
   static const String PROFILE_ROLE_UNKNOWN = 'Unassigned';
+  static const String PROFILE_SESSION_SIGN_OUT_HINT =
+      'Ends this browser session and returns you to the sign-in screen.';
+  static const String PROFILE_PERMISSION_CREATE_ADMIN_HINT =
+      'Invite new administrators and issue their authenticator setup.';
+  static const String PROFILE_PERMISSION_CREATE_SALES_PERSON_HINT =
+      'Onboard sales people and manage their directory records.';
+  static const String PROFILE_PERMISSION_SUMMARY_ALL =
+      'Full access across both account directories.';
+  static const String PROFILE_PERMISSION_SUMMARY_PARTIAL =
+      'Access is limited to one account directory.';
+  static const String PROFILE_PERMISSION_SUMMARY_NONE =
+      'No account creation rights on this platform.';
 
   static const String LOGOUT_CONFIRM_TITLE = 'Sign out';
   static const String LOGOUT_CONFIRM_BODY =
@@ -136,4 +134,272 @@ class AppStrings {
   static const String MOBILE_BLOCK_BODY =
       'This portal is optimized for desktop and tablet screens. '
       'Please switch to a larger device for the best experience.';
+
+  static const String TABLE_SEARCH = 'Search';
+  static const String TABLE_SEARCH_WITHIN_RESULTS = 'Search within results...';
+  static const String TABLE_ADD_FILTER = 'Add Filter';
+  static const String TABLE_FILTER_VALUE_HINT = 'Value';
+  static const String TABLE_APPLY_FILTER = 'Apply filter';
+  static const String TABLE_DISCARD_FILTER = 'Discard filter';
+  static const String TABLE_REMOVE_FILTER = 'Remove filter';
+  static const String TABLE_CLEAR_SEARCH = 'Clear search';
+  static const String TABLE_SORT_ASCENDING = 'Sort ascending';
+  static const String TABLE_SORT_DESCENDING = 'Sort descending';
+  static const String TABLE_TOGGLE_SORT_ORDER = 'Toggle sort order';
+  static const String TABLE_PIN_COLUMN = 'Pin column';
+  static const String TABLE_UNPIN_COLUMN = 'Unpin column';
+  static const String TABLE_RESIZE_COLUMN = 'Resize column';
+  static const String TABLE_SELECT_COLUMN_LABEL = 'Select';
+  static const String TABLE_ACTIONS_COLUMN_LABEL = 'Actions';
+  static const String TABLE_SELECT_ALL_ON_PAGE = 'Select all on this page';
+  static const String TABLE_SELECT_ROW = 'Select row';
+  static const String TABLE_CLEAR_SELECTION = 'Clear selection';
+  static const String TABLE_SCROLL_HINT = 'Scroll for more columns';
+  static const String TABLE_ITEM_SELECTED_SINGULAR = 'item selected';
+  static const String TABLE_ITEM_SELECTED_PLURAL = 'items selected';
+  static const String TABLE_PIN_LIMIT_TITLE = 'Pin limit reached';
+  static const String TABLE_PIN_LIMIT_BODY =
+      'Unpin another column before pinning a new one.';
+  static const String TABLE_EMPTY_TITLE = 'No records found';
+  static const String TABLE_EMPTY_BODY =
+      'No records match the current search and filters.';
+  static const String TABLE_COLUMN_SETTINGS = 'Column settings';
+  static const String TABLE_COLUMN_SETTINGS_TITLE = 'Display preferences';
+  static const String TABLE_COLUMN_SETTINGS_SUBTITLE =
+      'Choose which columns appear in the table.';
+  static const String TABLE_COLUMN_SETTINGS_DONE = 'Done';
+  static const String TABLE_BULK_DELETE = 'Delete';
+  static const String TABLE_REFRESH = 'Refresh';
+  static const String TABLE_VALUE_UNAVAILABLE = '—';
+
+  static const String ADMINS_TABLE_SEARCH_HINT = 'Search administrators...';
+  static const String SALES_PEOPLE_TABLE_SEARCH_HINT = 'Search sales people...';
+  static const String COLUMN_NAME = 'Name';
+  static const String COLUMN_PHONE_NUMBER = 'Phone Number';
+  static const String COLUMN_ROLE = 'Role';
+  static const String COLUMN_STATUS = 'Status';
+  static const String ADMINS_SUBTITLE =
+      'Administrator accounts with access to the Saiseeds admin platform.';
+  static const String SALES_PEOPLE_SUBTITLE =
+      'Field sales accounts registered on the Saiseeds platform.';
+  static const String STATUS_ACTIVE = 'Active';
+  static const String STATUS_INACTIVE = 'Inactive';
+  static const String SORT_BY_NAME = 'name';
+  static const String SORT_BY_CREATED_AT = 'created_at';
+  static const String FILTER_BY_NAME = 'name';
+  static const String FILTER_BY_PHONE_NUMBER = 'phone_number';
+  static const String FILTER_BY_ROLE = 'role';
+  static const String SORT_LABEL_CREATED_AT = 'Created At';
+  static const String TABLE_BULK_DELETE_TITLE = 'Delete selected records';
+  static const String TABLE_BULK_DELETE_BODY =
+      'This permanently removes the selected records. This cannot be undone.';
+  static const String TABLE_BULK_DELETE_DONE_TITLE = 'Delete complete';
+  static const String TABLE_BULK_DELETE_FAILED_TITLE = 'Delete failed';
+  static const String TABLE_BULK_DELETE_FAILED_BODY =
+      'One or more records could not be deleted.';
+
+  static const String ADD_ADMIN = 'Add Administrator';
+  static const String EDIT_ADMIN = 'Edit Administrator';
+  static const String ADD_SALES_PERSON = 'Add Sales Person';
+  static const String EDIT_SALES_PERSON = 'Edit Sales Person';
+  static const String ADD_ADMIN_SUBTITLE =
+      'Create an administrator account with platform access.';
+  static const String EDIT_ADMIN_SUBTITLE =
+      'Update the administrator account details.';
+  static const String ADD_SALES_PERSON_SUBTITLE =
+      'Register a field sales account on the platform.';
+  static const String EDIT_SALES_PERSON_SUBTITLE =
+      'Update the sales person account details.';
+
+  static const String FIELD_NAME = 'Name';
+  static const String FIELD_NAME_HINT = 'Full name';
+  static const String FIELD_EMAIL = 'Email';
+  static const String FIELD_EMAIL_HINT = 'name@example.com';
+  static const String FIELD_EMAIL_OPTIONAL = 'Email (optional)';
+  static const String FIELD_PHONE_HINT = '10-digit mobile number';
+  static const String FIELD_CITY = 'City';
+  static const String FIELD_CITY_HINT = 'Select a city';
+  static const String FIELD_STOCK_PERMISSION = 'Can update stock count';
+  static const String FIELD_STOCK_PERMISSION_HINT =
+      'Allows this administrator to adjust inventory counts.';
+
+  static const String VALIDATION_NAME_REQUIRED = 'Name is required.';
+  static const String VALIDATION_PHONE_REQUIRED = 'Phone number is required.';
+  static const String VALIDATION_PHONE_INVALID =
+      'Enter a valid 10-digit phone number.';
+  static const String VALIDATION_EMAIL_INVALID =
+      'Enter a valid email address.';
+  static const String VALIDATION_CITY_REQUIRED = 'City is required.';
+
+  static const String CREATE = 'Create';
+  static const String UPDATE = 'Update';
+  static const String CLOSE = 'Close';
+  static const String VIEW_DETAILS = 'View details';
+
+  static const String ADMIN_CREATED_TITLE = 'Administrator created';
+  static const String ADMIN_UPDATED_TITLE = 'Administrator updated';
+  static const String ADMIN_DELETED_TITLE = 'Administrator deleted';
+  static const String SALES_PERSON_CREATED_TITLE = 'Sales person created';
+  static const String SALES_PERSON_UPDATED_TITLE = 'Sales person updated';
+  static const String SALES_PERSON_DELETED_TITLE = 'Sales person deleted';
+
+  static const String DELETE_ADMIN_TITLE = 'Delete administrator';
+  static const String DELETE_ADMIN_BODY =
+      'This permanently removes the administrator account. This cannot be '
+      'undone.';
+  static const String DELETE_SALES_PERSON_TITLE = 'Delete sales person';
+  static const String DELETE_SALES_PERSON_BODY =
+      'This permanently removes the sales person account. This cannot be '
+      'undone.';
+
+  static const String ADMIN_DETAIL_TITLE = 'Administrator details';
+  static const String SALES_PERSON_DETAIL_TITLE = 'Sales person details';
+  static const String DETAIL_SECTION_ACCOUNT = 'Account';
+  static const String DETAIL_SECTION_ACCOUNT_HINT =
+      'Identity and contact details on record.';
+  static const String DETAIL_SECTION_AUTHENTICATOR = 'Authenticator';
+  static const String DETAIL_SECTION_AUTHENTICATOR_HINT =
+      'Scan this code in an authenticator app to enable sign-in.';
+  static const String DETAIL_FIELD_CREATED_BY = 'Created By';
+  static const String DETAIL_FIELD_CREATED_AT = 'Created At';
+  static const String TOTP_MANUAL_ENTRY = 'Setup key';
+  static const String TOTP_UNAVAILABLE =
+      'No authenticator setup code is available for this account.';
+
+  static const String COLUMN_EMAIL = 'Email';
+  static const String COLUMN_CITY = 'City';
+  static const String COLUMN_CREATED_BY = 'Created By';
+  static const String COLUMN_CREATED_AT = 'Created At';
+  static const String COLUMN_STOCK_PERMISSION = 'Stock Access';
+  static const String PERMISSION_ALLOWED = 'Allowed';
+  static const String PERMISSION_DENIED = 'Denied';
+
+  static const String ADMINS_LOAD_FAILED_TITLE = 'Could not load administrators';
+  static const String SALES_PEOPLE_LOAD_FAILED_TITLE =
+      'Could not load sales people';
+  static const String ADMINS_EMPTY_STATE_TITLE = 'No administrators yet';
+  static const String ADMINS_EMPTY_STATE_BODY =
+      'Add an administrator to give someone access to this platform.';
+  static const String SALES_PEOPLE_EMPTY_STATE_TITLE = 'No sales people yet';
+  static const String SALES_PEOPLE_EMPTY_STATE_BODY =
+      'Add a sales person to register a field account.';
+  static const String CITIES_UNAVAILABLE =
+      'City list is unavailable. Refresh the page and try again.';
+  static const String SORT_BY_EMAIL = 'email';
+  static const String FILTER_BY_EMAIL = 'email';
+  static const String FILTER_BY_CITY = 'city';
+
+  static const String PRODUCTS = 'Products';
+  static const String PRODUCTS_TABLE_SEARCH_HINT = 'Search products...';
+  static const String PRODUCTS_LOAD_FAILED_TITLE = 'Could not load products';
+  static const String PRODUCTS_EMPTY_STATE_TITLE = 'No products yet';
+  static const String PRODUCTS_EMPTY_STATE_BODY =
+      'Add a product to make it available for orders.';
+  static const String ADD_PRODUCT = 'Add Product';
+  static const String EDIT_PRODUCT = 'Edit Product';
+  static const String ADD_PRODUCT_SUBTITLE =
+      'Register a product against a crop with its pricing.';
+  static const String EDIT_PRODUCT_SUBTITLE =
+      'Update the product name, crop, or pricing.';
+  static const String PRODUCT_CREATED_TITLE = 'Product created';
+  static const String PRODUCT_UPDATED_TITLE = 'Product updated';
+  static const String PRODUCT_DELETED_TITLE = 'Product deleted';
+  static const String DELETE_PRODUCT_TITLE = 'Delete product';
+  static const String DELETE_PRODUCT_BODY =
+      'This product will be removed permanently. This action cannot be undone.';
+  static const String PRODUCT_DETAIL_TITLE = 'Product details';
+  static const String PRODUCT_DETAIL_SUBTITLE =
+      'Crop association and pricing on record.';
+
+  static const String COLUMN_CROP = 'Crop';
+  static const String COLUMN_BUYING_PRICE = 'Buying Price';
+  static const String COLUMN_SELLING_PRICE = 'Selling Price';
+  static const String COLUMN_MARGIN_PER_BAG = 'Margin Per Bag';
+
+  static const String SORT_BY_BUYING_PRICE = 'buying_price';
+  static const String SORT_BY_SELLING_PRICE = 'selling_price';
+  static const String SORT_BY_MARGIN_PER_BAG = 'margin_per_bag';
+  static const String FILTER_BY_CROP = 'crop';
+
+  static const String FIELD_PRODUCT_NAME = 'Product Name';
+  static const String FIELD_PRODUCT_NAME_HINT = 'Enter product name';
+  static const String FIELD_BUYING_PRICE = 'Buying Price';
+  static const String FIELD_BUYING_PRICE_HINT = 'Enter buying price';
+  static const String FIELD_SELLING_PRICE = 'Selling Price';
+  static const String FIELD_SELLING_PRICE_HINT = 'Enter selling price';
+  static const String FIELD_CROP = 'Crop';
+  static const String FIELD_CROP_HINT = 'Select a crop';
+
+  static const String VALIDATION_CROP_REQUIRED = 'Crop is required.';
+  static const String VALIDATION_PRICE_REQUIRED = 'Price is required.';
+  static const String VALIDATION_PRICE_INVALID =
+      'Enter a valid amount of 0 or more.';
+
+  static const String CROPS_UNAVAILABLE =
+      'Crop list is unavailable. Refresh the page and try again.';
+  static const String CROP_CREATE_OPTION_PREFIX = 'Create crop';
+  static const String CROP_CREATE_CONFIRM_TITLE = 'Create new crop';
+  static const String CROP_CREATE_CONFIRM_BODY_PREFIX =
+      'This crop does not exist yet. Create';
+  static const String CROP_CREATE_CONFIRM_BODY_SUFFIX =
+      'and use it for this product?';
+  static const String CROP_CREATED_TITLE = 'Crop created';
+  static const String CROP_CREATE_FAILED_TITLE = 'Could not create crop';
+
+  static const String PRODUCT_PACKAGINGS = 'Product Packagings';
+  static const String PRODUCT_PACKAGINGS_TABLE_SEARCH_HINT =
+      'Search packagings...';
+  static const String PRODUCT_PACKAGINGS_LOAD_FAILED_TITLE =
+      'Could not load product packagings';
+  static const String PRODUCT_PACKAGINGS_EMPTY_STATE_TITLE =
+      'No product packagings yet';
+  static const String PRODUCT_PACKAGINGS_EMPTY_STATE_BODY =
+      'Add a packaging to define how a product is sold in bags.';
+  static const String ADD_PRODUCT_PACKAGING = 'Add Packaging';
+  static const String EDIT_PRODUCT_PACKAGING = 'Edit Packaging';
+  static const String ADD_PRODUCT_PACKAGING_SUBTITLE =
+      'Define the bag weight, bag count, and price for a product.';
+  static const String EDIT_PRODUCT_PACKAGING_SUBTITLE =
+      'Update the bag weight, bag count, or price of this packaging.';
+  static const String PRODUCT_PACKAGING_CREATED_TITLE = 'Packaging created';
+  static const String PRODUCT_PACKAGING_UPDATED_TITLE = 'Packaging updated';
+  static const String PRODUCT_PACKAGING_DELETED_TITLE = 'Packaging deleted';
+  static const String DELETE_PRODUCT_PACKAGING_TITLE = 'Delete packaging';
+  static const String DELETE_PRODUCT_PACKAGING_BODY =
+      'This packaging will be removed permanently. '
+      'This action cannot be undone.';
+  static const String PRODUCT_PACKAGING_DETAIL_TITLE = 'Packaging details';
+  static const String PRODUCT_PACKAGING_DETAIL_SUBTITLE =
+      'Bag configuration and pricing on record.';
+
+  static const String COLUMN_PRODUCT = 'Product';
+  static const String COLUMN_PACKING_BAG_WEIGHT = 'Bag Weight (kg)';
+  static const String COLUMN_PACKING_BAGS = 'Bags';
+  static const String COLUMN_TOTAL_WEIGHT = 'Total Weight (kg)';
+
+  static const String SORT_BY_PRODUCT = 'product';
+  static const String SORT_BY_PACKING_BAG_WEIGHT = 'packing_bag_weight';
+  static const String SORT_BY_PACKING_BAGS = 'packing_bags';
+  static const String SORT_BY_TOTAL_WEIGHT = 'total_weight';
+  static const String FILTER_BY_PRODUCT = 'product';
+
+  static const String FIELD_PRODUCT = 'Product';
+  static const String FIELD_PRODUCT_HINT = 'Select a product';
+  static const String FIELD_PACKING_BAG_WEIGHT = 'Packing Bag Weight (kg)';
+  static const String FIELD_PACKING_BAG_WEIGHT_HINT =
+      'Enter the weight of one bag';
+  static const String FIELD_PACKING_BAGS = 'Packing Bags';
+  static const String FIELD_PACKING_BAGS_HINT = 'Enter the number of bags';
+
+  static const String VALIDATION_PRODUCT_REQUIRED = 'Product is required.';
+  static const String VALIDATION_POSITIVE_AMOUNT_REQUIRED =
+      'This value is required.';
+  static const String VALIDATION_POSITIVE_AMOUNT_INVALID =
+      'Enter a valid amount greater than 0.';
+  static const String VALIDATION_COUNT_INVALID =
+      'Enter a whole number of 1 or more.';
+
+  static const String PRODUCTS_UNAVAILABLE =
+      'Product list is unavailable. Refresh the page and try again.';
+  static const String SELECTED_PRODUCT_SUMMARY_TITLE = 'Selected product';
 }

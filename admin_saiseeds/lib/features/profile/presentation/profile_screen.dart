@@ -6,15 +6,14 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/formatters/role_formatter.dart';
 import '../../../core/widgets/buttons/secondary_button.dart';
+import '../../../core/widgets/feedback/app_badge.dart';
 import '../../../core/widgets/feedback/empty_state.dart';
+import '../../../core/widgets/layout/app_hairline.dart';
 import '../../../core/widgets/loaders/shimmer_rows.dart';
 import '../../auth/data/models/auth_session.dart';
 import '../../auth/presentation/bloc/session_cubit.dart';
 import '../../auth/presentation/logout_action.dart';
-import 'widgets/profile_detail_field.dart';
-import 'widgets/profile_identity_card.dart';
 import 'widgets/profile_permission_row.dart';
-import 'widgets/profile_section.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -48,181 +47,175 @@ class _ProfileContent extends StatelessWidget {
 
   const _ProfileContent({required this.session});
 
+  String get _displayName => session.name.isEmpty
+      ? AppStrings.PROFILE_VALUE_UNKNOWN
+      : session.name;
+
+  String get _displayPhone => session.phoneNumber.isEmpty
+      ? AppStrings.PROFILE_VALUE_UNKNOWN
+      : session.phoneNumber;
+
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isCompact =
-            constraints.maxWidth < AppSizes.profileContentMaxWidth;
-
-        return SingleChildScrollView(
-          padding: EdgeInsets.all(isCompact ? AppSpacing.md : AppSpacing.lg),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: AppSizes.profileContentMaxWidth,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ProfileIdentityCard(
-                    name: _displayName,
-                    roleLabel: RoleFormatter.label(session.role),
-                    phoneNumber: _displayPhone,
-                    isCompact: isCompact,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  ProfileSection(
-                    title: AppStrings.PROFILE_ACCOUNT_DETAILS,
-                    subtitle: AppStrings.PROFILE_ACCOUNT_DETAILS_HINT,
-                    child: _DetailGrid(
-                      fields: [
-                        ProfileDetailField(
-                          icon: Icons.badge_outlined,
-                          label: AppStrings.PROFILE_FIELD_NAME,
-                          value: _displayName,
-                        ),
-                        ProfileDetailField(
-                          icon: Icons.call_outlined,
-                          label: AppStrings.PROFILE_FIELD_PHONE,
-                          value: _displayPhone,
-                        ),
-                        ProfileDetailField(
-                          icon: Icons.workspace_premium_outlined,
-                          label: AppStrings.PROFILE_FIELD_ROLE,
-                          value: RoleFormatter.label(session.role),
-                        ),
-                        ProfileDetailField(
-                          icon: Icons.tag_rounded,
-                          label: AppStrings.PROFILE_FIELD_USER_ID,
-                          value: session.userId > 0
-                              ? '${session.userId}'
-                              : AppStrings.PROFILE_VALUE_UNKNOWN,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  ProfileSection(
-                    title: AppStrings.PROFILE_PERMISSIONS,
-                    subtitle: AppStrings.PROFILE_PERMISSIONS_HINT,
-                    child: _PermissionGrid(
-                      rows: [
-                        ProfilePermissionRow(
-                          label:
-                              AppStrings.PROFILE_PERMISSION_CREATE_ADMIN,
-                          isGranted: session.canCreateAdmin,
-                        ),
-                        ProfilePermissionRow(
-                          label: AppStrings
-                              .PROFILE_PERMISSION_CREATE_SALES_PERSON,
-                          isGranted: session.canCreateSalesPerson,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  ProfileSection(
-                    title: AppStrings.PROFILE_SESSION_SECTION,
-                    subtitle: AppStrings.PROFILE_SESSION_HINT,
-                    child: const _LogoutRow(),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
-              ),
-            ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: AppSizes.profileContentMaxWidth,
           ),
-        );
-      },
-    );
-  }
-
-  String get _displayName => session.name.trim().isEmpty
-      ? AppStrings.PROFILE_VALUE_UNKNOWN
-      : session.name.trim();
-
-  String get _displayPhone => session.phoneNumber.trim().isEmpty
-      ? AppStrings.PROFILE_VALUE_UNKNOWN
-      : session.phoneNumber.trim();
-}
-
-class _DetailGrid extends StatelessWidget {
-  final List<Widget> fields;
-
-  const _DetailGrid({required this.fields});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isTwoColumn =
-            constraints.maxWidth >= AppSizes.profileDetailMinWidth * 2;
-        final double itemWidth = isTwoColumn
-            ? (constraints.maxWidth - AppSpacing.smd) / 2
-            : constraints.maxWidth;
-
-        return Wrap(
-          spacing: AppSpacing.smd,
-          runSpacing: AppSpacing.smd,
-          children: fields
-              .map((field) => SizedBox(width: itemWidth, child: field))
-              .toList(),
-        );
-      },
-    );
-  }
-}
-
-class _PermissionGrid extends StatelessWidget {
-  final List<Widget> rows;
-
-  const _PermissionGrid({required this.rows});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isTwoColumn =
-            constraints.maxWidth >= AppSizes.profilePermissionMinWidth * 2;
-        final double itemWidth = isTwoColumn
-            ? (constraints.maxWidth - AppSpacing.smd) / 2
-            : constraints.maxWidth;
-
-        return Wrap(
-          spacing: AppSpacing.smd,
-          runSpacing: AppSpacing.smd,
-          children: rows
-              .map((row) => SizedBox(width: itemWidth, child: row))
-              .toList(),
-        );
-      },
-    );
-  }
-}
-
-class _LogoutRow extends StatelessWidget {
-  const _LogoutRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Text(
-            AppStrings.LOGOUT_CONFIRM_BODY,
-            style: AppTypography.bodySmall.copyWith(
-              color: AppColors.TEXT_SECONDARY,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: AppColors.SURFACE,
+              border: Border.fromBorderSide(
+                BorderSide(color: AppColors.BORDER),
+              ),
+              borderRadius: BorderRadius.all(Radius.circular(AppRadius.lg)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _Identity(
+                  name: _displayName,
+                  phone: _displayPhone,
+                  role: RoleFormatter.label(session.role),
+                ),
+                const AppHairline(),
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        AppStrings.PROFILE_PERMISSIONS,
+                        style: AppTypography.titleMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      ProfilePermissionRow(
+                        label: AppStrings.PROFILE_PERMISSION_CREATE_ADMIN,
+                        description:
+                            AppStrings.PROFILE_PERMISSION_CREATE_ADMIN_HINT,
+                        icon: Icons.admin_panel_settings_outlined,
+                        isGranted: session.canCreateAdmin,
+                      ),
+                      const AppHairline(),
+                      ProfilePermissionRow(
+                        label:
+                            AppStrings.PROFILE_PERMISSION_CREATE_SALES_PERSON,
+                        description: AppStrings
+                            .PROFILE_PERMISSION_CREATE_SALES_PERSON_HINT,
+                        icon: Icons.groups_outlined,
+                        isGranted: session.canCreateSalesPerson,
+                      ),
+                    ],
+                  ),
+                ),
+                const AppHairline(),
+                _SessionFooter(onLogout: () => LogoutAction.run(context)),
+              ],
             ),
           ),
         ),
-        const SizedBox(width: AppSpacing.md),
-        SecondaryButton(
-          label: AppStrings.LOGOUT,
-          icon: Icons.logout_rounded,
-          onPressed: () => LogoutAction.run(context),
+      ),
+    );
+  }
+}
+
+class _Identity extends StatelessWidget {
+  final String name;
+  final String phone;
+  final String role;
+
+  const _Identity({
+    required this.name,
+    required this.phone,
+    required this.role,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppColors.PRIMARY_SURFACE,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              AppStrings.PROFILE_SIGNED_IN_AS,
+              style: AppTypography.overline.copyWith(
+                color: AppColors.PRIMARY,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.headingSmall,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                const Icon(
+                  Icons.phone_outlined,
+                  size: AppSizes.iconSm,
+                  color: AppColors.TEXT_SECONDARY,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    phone,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.TEXT_SECONDARY,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                AppBadge(label: role, variant: AppBadgeVariant.success),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _SessionFooter extends StatelessWidget {
+  final VoidCallback onLogout;
+
+  const _SessionFooter({required this.onLogout});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              AppStrings.PROFILE_SESSION_SIGN_OUT_HINT,
+              style: AppTypography.caption,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          SecondaryButton(
+            label: AppStrings.LOGOUT,
+            icon: Icons.logout_rounded,
+            onPressed: onLogout,
+          ),
+        ],
+      ),
     );
   }
 }

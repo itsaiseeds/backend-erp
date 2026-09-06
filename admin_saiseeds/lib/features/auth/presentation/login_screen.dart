@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/routing/route_constants.dart';
+import '../../../core/services/metadata_service.dart';
 import '../../../core/services/session_guard.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -15,13 +16,33 @@ import 'widgets/login_brand_panel.dart';
 import 'widgets/login_card_header.dart';
 import 'widgets/login_form.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
   static const int _brandPanelFlex = 1;
   static const int _formPanelFlex = 1;
   static const double _formMaxWidth = 420.0;
   static const double _compactBrandHeight = 120.0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!SessionGuard.wasRoleRejected) return;
+    SessionGuard.clearRoleRejection();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ToastUtils.showError(
+        context,
+        AppStrings.LOGIN_FAILED_TITLE,
+        description: AppStrings.LOGIN_NOT_AUTHORISED,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +51,10 @@ class LoginScreen extends StatelessWidget {
         if (state.status == AuthStatus.success) {
           context.read<SessionCubit>().load();
           final router = GoRouter.of(context);
-          SessionGuard.refresh().then((_) => router.go(Routes.DASHBOARD));
+          SessionGuard.refresh().then((_) {
+            MetadataService.instance.loadCities(forceRefresh: true);
+            router.go(Routes.DASHBOARD);
+          });
           return;
         }
         if (state.status == AuthStatus.failure && state.errorMessage != null) {
