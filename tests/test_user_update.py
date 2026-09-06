@@ -32,7 +32,9 @@ class UserUpdateTest(WebApiTestCase):
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
 
-        cls.country = Country.objects.create(name="India", iso_code="IN", created_by=cls.superuser)
+        cls.country, _ = Country.objects.get_or_create(
+            name="India", defaults={"iso_code": "IN", "created_by": cls.superuser}
+        )
         cls.state = State.objects.create(
             name="Maharashtra", code="MH", country=cls.country, created_by=cls.superuser
         )
@@ -507,7 +509,9 @@ class UserDeleteTest(WebApiTestCase):
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
 
-        cls.country = Country.objects.create(name="India", iso_code="IN", created_by=cls.superuser)
+        cls.country, _ = Country.objects.get_or_create(
+            name="India", defaults={"iso_code": "IN", "created_by": cls.superuser}
+        )
         cls.state = State.objects.create(
             name="Maharashtra", code="MH", country=cls.country, created_by=cls.superuser
         )

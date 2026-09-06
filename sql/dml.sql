@@ -182,18 +182,35 @@ INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, de
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(8, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'VERIFICATION_PENDING', 'Verification pending', 1);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(9, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'VERIFIED', 'Verified', 2);
 
+INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(2, '!unusable', NULL, false, '2026-08-28 05:22:53.878', '2026-08-28 05:22:54.057', '8888888888', 'no totp user', NULL, NULL, false, NULL, 0, NULL, false, false, true, '2026-08-28 05:22:54.057', 1, NULL);
+INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(1, 'argon2$argon2id$v=19$m=102400,t=2,p=8$R2xUZXNHM2JtQkFhaVhtTjdHTjNZdw$sSm84Zeic9+weLp+hLiBDHtXZDOrKSYeVSmsaR9l/CA', '2026-09-07 00:18:33.996', true, '2026-08-28 05:22:53.878', '2026-08-28 05:22:54.057', '9999999999', 'admin', 'admin@example.com', 'JBSWY3DPEHPK3PXP', true, NULL, 0, NULL, true, true, true, '2026-08-28 05:22:54.057', 1, 1);
+INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(3, '!Jg4RntBkly091ZH8an1YkFdBcN3iw6etycyxC71q', NULL, false, '2026-09-07 00:33:09.852', '2026-09-07 00:33:09.857', '0000000000', 'Sales Person User', 'test.salesperson@gmail.com', 'U52KNHEOJXHW4UJZNX7EJNFZXS3S5VUI', true, NULL, 0, NULL, true, false, true, '2026-09-07 00:33:09.857', 1, 1);
+INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(4, '!NZUkIEOkrZZK6I49TejjY9YFn1UlA3lxcTyPnVU3', NULL, false, '2026-09-07 00:34:08.192', '2026-09-07 00:34:08.195', '1111111111', 'Sales Admin User', 'test.salesadmin@gmail.com', 'TR4JC6LNBAMKUTV2YGLBVSKUFIPUF7KH', true, NULL, 0, NULL, true, false, true, '2026-09-07 00:34:08.195', 1, 1);
+INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(5, '!BLcRI0WOkSbBDCT9rPbsRoSrksTpJctSSDUA1CbC', NULL, false, '2026-09-07 00:36:06.723', '2026-09-07 00:36:06.727', '2222222222', 'Sales Admin User - Stock', 'test.salesadmin.stock@gmail.com', '6MOWDDABZGOL6LN5TCCIW5PGCMSG6SVR', true, NULL, 0, NULL, true, false, true, '2026-09-07 00:36:06.727', 1, 1);
 
--- Two base USERS, please dont remove these rows; 
-INSERT INTO public.authentication_user
-(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
-VALUES(1, 'pbkdf2_sha256$1000000$UGqt8oGnUaTMbuaqbfbc5N$gosDWLrsqUTN2ws6uEwb828K/FAkYHstAzNzhdevkbk=', NULL, true, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '9999999999', 'admin', 'admin@example.com', 'JBSWY3DPEHPK3PXP', true, NULL, 0, NULL, true, true, true, '2026-08-27 23:52:54.057', 1, 1);
+INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count) VALUES(1, '2026-09-07 00:34:36.434', '2026-09-07 00:36:17.156', false, NULL, NULL, 1, 4, false);
+INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count) VALUES(2, '2026-09-07 00:36:25.485', '2026-09-07 00:36:25.487', false, NULL, NULL, 1, 5, true);
 
--- A second user with NO TOTP set, used by integration tests to exercise the
--- "TOTP not enrolled" negative path over HTTP (no ORM access in these tests).
-INSERT INTO public.authentication_user
-(id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id)
-VALUES(2, '!unusable', NULL, false, '2026-08-27 23:52:53.878', '2026-08-27 23:52:54.057', '8888888888', 'no totp user', NULL, NULL, false, NULL, 0, NULL, false, false, true, '2026-08-27 23:52:54.057', 1, NULL);
+INSERT INTO public.aggregator_country (id, created_at, updated_at, is_deleted, deleted_at, "name", iso_code, created_by_id, deleted_by_id) VALUES(1, '2026-09-07 00:23:22.143', '2026-09-07 00:23:22.145', false, NULL, 'India', 'IN', 1, NULL);
+INSERT INTO public.aggregator_state (id, created_at, updated_at, is_deleted, deleted_at, "name", code, country_id, created_by_id, deleted_by_id) VALUES(1, '2026-09-07 00:23:44.551', '2026-09-07 00:23:44.553', false, NULL, 'Gujarat', 'GJ', 1, 1, NULL);
+INSERT INTO public.aggregator_state (id, created_at, updated_at, is_deleted, deleted_at, "name", code, country_id, created_by_id, deleted_by_id) VALUES(2, '2026-09-07 00:23:57.717', '2026-09-07 00:23:57.720', false, NULL, 'Rajasthan', 'RJ', 1, 1, NULL);
 
+INSERT INTO public.aggregator_city (id, created_at, updated_at, is_deleted, deleted_at, "name", created_by_id, deleted_by_id, state_id) VALUES(1, '2026-09-07 00:24:32.835', '2026-09-07 00:24:32.839', false, NULL, 'Surat', 1, NULL, 1);
+INSERT INTO public.aggregator_city (id, created_at, updated_at, is_deleted, deleted_at, "name", created_by_id, deleted_by_id, state_id) VALUES(2, '2026-09-07 00:24:41.255', '2026-09-07 00:24:41.259', false, NULL, 'Ahmedabad', 1, NULL, 1);
+INSERT INTO public.aggregator_city (id, created_at, updated_at, is_deleted, deleted_at, "name", created_by_id, deleted_by_id, state_id) VALUES(3, '2026-09-07 00:24:50.456', '2026-09-07 00:24:50.459', false, NULL, 'Rajkot', 1, NULL, 1);
+INSERT INTO public.aggregator_city (id, created_at, updated_at, is_deleted, deleted_at, "name", created_by_id, deleted_by_id, state_id) VALUES(4, '2026-09-07 00:25:00.461', '2026-09-07 00:25:00.464', false, NULL, 'Jaipur', 1, NULL, 2);
+INSERT INTO public.aggregator_city (id, created_at, updated_at, is_deleted, deleted_at, "name", created_by_id, deleted_by_id, state_id) VALUES(5, '2026-09-07 00:25:55.888', '2026-09-07 00:25:55.892', false, NULL, 'Jaisalmer', 1, NULL, 2);
+
+INSERT INTO public.authentication_salesperson (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, city_id) VALUES(1, '2026-09-07 00:33:35.796', '2026-09-07 00:33:35.801', false, NULL, NULL, 1, 3, 2);
+
+INSERT INTO public.aggregator_crop (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name") VALUES(1, '2026-09-07 00:26:28.109', '2026-09-07 00:26:28.111', false, NULL, NULL, 1, 'Castor');
+INSERT INTO public.aggregator_crop (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name") VALUES(2, '2026-09-07 00:26:42.132', '2026-09-07 00:26:42.133', false, NULL, NULL, 1, 'Bajari');
+
+INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, buying_price, selling_price) VALUES(1, '2026-09-07 00:28:02.358', '2026-09-07 00:28:12.045', false, NULL, NULL, 1, 'P-I34V7RI1JPUH', 'SAI-33', 1, 100.00, 120.00);
+INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, buying_price, selling_price) VALUES(2, '2026-09-07 00:28:40.714', '2026-09-07 00:28:40.718', false, NULL, NULL, 1, 'P-NQ8N4LF7MJYQ', 'SAI-3353', 2, 210.00, 250.00);
+
+INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packing_bag_weight, packing_bags, selling_price) VALUES(1, '2026-09-07 00:29:08.487', '2026-09-07 00:29:15.227', false, NULL, NULL, 1, 'PP-U4UYPFOF08NZ', 1, 1.000, 40, 4800.00);
+INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packing_bag_weight, packing_bags, selling_price) VALUES(2, '2026-09-07 00:29:29.899', '2026-09-07 00:29:29.904', false, NULL, NULL, 1, 'PP-5SVE39LY2XEI', 2, 1.500, 20, 5000.00);
 -- -------------------------------------------------------------------------
 -- Sequence sync
 -- -------------------------------------------------------------------------
@@ -201,9 +218,17 @@ VALUES(2, '!unusable', NULL, false, '2026-08-27 23:52:53.878', '2026-08-27 23:52
 -- table's identity/serial sequence. Re-sync every seeded table so the next
 -- row created through the ORM/API gets an id after the seeded maximum instead
 -- of colliding from id=1.
-SELECT setval(pg_get_serial_sequence('public.django_content_type', 'id'), (SELECT MAX(id) FROM public.django_content_type));
-SELECT setval(pg_get_serial_sequence('public.auth_permission', 'id'),     (SELECT MAX(id) FROM public.auth_permission));
-SELECT setval(pg_get_serial_sequence('public.aggregator_status', 'id'),   (SELECT MAX(id) FROM public.aggregator_status));
-SELECT setval(pg_get_serial_sequence('public.authentication_user', 'id'), (SELECT MAX(id) FROM public.authentication_user));
+SELECT setval(pg_get_serial_sequence('public.django_content_type', 'id'),         (SELECT MAX(id) FROM public.django_content_type));
+SELECT setval(pg_get_serial_sequence('public.auth_permission', 'id'),             (SELECT MAX(id) FROM public.auth_permission));
+SELECT setval(pg_get_serial_sequence('public.aggregator_status', 'id'),           (SELECT MAX(id) FROM public.aggregator_status));
+SELECT setval(pg_get_serial_sequence('public.authentication_user', 'id'),         (SELECT MAX(id) FROM public.authentication_user));
+SELECT setval(pg_get_serial_sequence('public.authentication_admin', 'id'),        (SELECT MAX(id) FROM public.authentication_admin));
+SELECT setval(pg_get_serial_sequence('public.authentication_salesperson', 'id'),  (SELECT MAX(id) FROM public.authentication_salesperson));
+SELECT setval(pg_get_serial_sequence('public.aggregator_country', 'id'),          (SELECT MAX(id) FROM public.aggregator_country));
+SELECT setval(pg_get_serial_sequence('public.aggregator_state', 'id'),            (SELECT MAX(id) FROM public.aggregator_state));
+SELECT setval(pg_get_serial_sequence('public.aggregator_city', 'id'),             (SELECT MAX(id) FROM public.aggregator_city));
+SELECT setval(pg_get_serial_sequence('public.aggregator_crop', 'id'),             (SELECT MAX(id) FROM public.aggregator_crop));
+SELECT setval(pg_get_serial_sequence('public.aggregator_product', 'id'),          (SELECT MAX(id) FROM public.aggregator_product));
+SELECT setval(pg_get_serial_sequence('public.aggregator_productpackaging', 'id'), (SELECT MAX(id) FROM public.aggregator_productpackaging));
 
 COMMIT;
