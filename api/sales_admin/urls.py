@@ -9,10 +9,12 @@ from django.urls import path
 from .AdminsView import AdminsView
 from .CropsView import CropsView
 from .LogoutView import LogoutView
+from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
 from .SalesPeopleView import SalesPeopleView
 from .UpdateAdminView import UpdateAdminView
 from .UpdateCropView import UpdateCropView
+from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateSalesPersonView import UpdateSalesPersonView
 from .VerifyOTPView import VerifyOTPView
@@ -26,6 +28,12 @@ urlpatterns = [
     path("crops/<int:id>", UpdateCropView.as_view(), name="update-crop"),
     path("products", ProductsView.as_view(), name="products"),
     path("products/<str:public_id>", UpdateProductView.as_view(), name="update-product"),
+    path("product-packagings", ProductPackagingsView.as_view(), name="product-packagings"),
+    path(
+        "product-packagings/<str:public_id>",
+        UpdateProductPackagingView.as_view(),
+        name="update-product-packaging",
+    ),
     path("sales-people", SalesPeopleView.as_view(), name="sales-people"),
     path(
         "sales-people/<int:id>",
