@@ -271,6 +271,16 @@ CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "False").lower() in (
 SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 
+# `flutter run -d chrome` serves the SPA from a random localhost port, which is
+# a different origin from this API. SameSite=Lax withholds both cookies on those
+# cross-origin POSTs, so the session never reaches the server and every mutating
+# request fails (403 on logout, CSRF failures elsewhere). SameSite=None normally
+# demands Secure=True, but browsers treat localhost as a trustworthy origin and
+# accept it over plain http. DEBUG-only: production keeps Lax + Secure above.
+if DEBUG:
+    SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "None")
+    CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "None")
+
 # HSTS + related transport headers, opt-in via env so local http:// dev is
 # unaffected. Turn on in production; the middleware is already in MIDDLEWARE.
 SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))
