@@ -39,7 +39,7 @@ common/            Abstract base models + admin mixes (timestamp, soft delete, c
 sql/               ddl.sql (full schema) + dml.sql (seed data) — dev reference
 scripts/           run.sh (all commands), reload_db.sh, entrypoint.sh
 tests/             pytest unit and DML-backed Django tests
-web/               Flutter admin app source + committed build output
+admin_saiseeds/    Flutter admin app source + committed build output
 docs/              knowledge graph + auto-generated API reference
 skills/            domain knowledge (setup, database, conventions, …)
 ```
@@ -56,7 +56,7 @@ map and relationships.
 ## Quickstart
 
 ```bash
-# 1. Build the Flutter admin web app (once, or after web/lib changes)
+# 1. Build the Flutter admin web app (once, or after admin_saiseeds/lib changes)
 bash scripts/run.sh flutter
 
 # 2. Build + start everything (Django + PostgreSQL)
@@ -151,7 +151,7 @@ See [skills/database.md](skills/database.md) for the full workflow.
   `Tests / test` status check passes (and requires a PR approval).
 - **Deploy** — push to `master` → Render auto-deploys the Docker image
   (gunicorn). A keep-alive cron pings the app every 10 minutes to avoid cold starts.
-- **Flutter** — the build in `web/build/web/` is committed; always rebuild it
+- **Flutter** — the build in `admin_saiseeds/build/web/` is committed; always rebuild it
   before pushing Flutter changes.
 
 ## Environment variables

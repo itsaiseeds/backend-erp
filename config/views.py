@@ -6,7 +6,7 @@ from django.http import FileResponse, HttpResponseNotFound
 
 def flutter_catch_all(request, path=""):
     """Serve the Flutter web app for /sales-admin/* routes."""
-    build_dir = os.path.join(settings.BASE_DIR, "web", "build", "web")
+    build_dir = os.path.join(settings.BASE_DIR, "admin_saiseeds", "build", "web")
 
     # Try to serve the requested file directly (JS, CSS, images, etc.)
     if path:
@@ -43,5 +43,5 @@ def flutter_catch_all(request, path=""):
         return FileResponse(open(index_path, "rb"), content_type="text/html")
 
     return HttpResponseNotFound(
-        "Flutter build not found. Run: cd web && flutter build web --release"
+        "Flutter build not found. Run: cd admin_saiseeds && flutter build web --release"
     )

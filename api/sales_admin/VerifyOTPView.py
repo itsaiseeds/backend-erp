@@ -29,6 +29,8 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model, login
 from django.db import transaction
 from django.middleware.csrf import get_token
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.permissions import AllowAny
@@ -82,6 +84,7 @@ class VerifyOTPThrottle(AnonRateThrottle):
 _GENERIC_FAILURE = {"detail": "Invalid phone number or TOTP code."}
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class VerifyOTPView(APIView):
     """Validate a TOTP code, then (re)open a session for that user."""
 

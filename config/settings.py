@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -227,7 +229,7 @@ STORAGES = {
 }
 
 # Flutter build directory (served by catch-all view, not collectstatic)
-FLUTTER_BUILD_DIR = BASE_DIR / "web" / "build" / "web"
+FLUTTER_BUILD_DIR = BASE_DIR / "admin_saiseeds" / "build" / "web"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -308,6 +310,38 @@ CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "False").lower() in (
 SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 
+# Do NOT switch these to "None" for local dev. SameSite=None is only honoured
+# alongside Secure=True, and browsers silently DROP a `SameSite=None; Secure`
+# cookie served over plain http - login appears to succeed while the session
+# cookie is never stored, so every later request is unauthenticated. Lax is
+# correct here because SameSite compares *sites*, not origins, and ports are not
+# part of a site: localhost:5173 and localhost:8000 are same-site, so the cookie
+# flows normally. Cross-origin still needs CORS credentials + CSRF_TRUSTED_ORIGINS,
+# which are configured above.
+
+# CsrfViewMiddleware checks the Origin header on every non-GET request and
+# rejects anything not listed here, independently of the CSRF token. Django's
+# wildcard syntax covers subdomains but NOT ports, so "http://localhost:*" never
+# matches - each dev origin must be listed exactly. Run the SPA on a fixed port
+# to keep this stable:
+#     flutter run -d chrome --web-port 5173
+# Override with DEV_SPA_PORT if you need a different one. DEBUG-only; production
+# supplies its real origins through the CSRF_TRUSTED_ORIGINS env var.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+if DEBUG:
+    DEV_SPA_PORT = os.environ.get("DEV_SPA_PORT", "5173").strip()
+    CSRF_TRUSTED_ORIGINS += [
+        f"http://localhost:{DEV_SPA_PORT}",
+        f"http://127.0.0.1:{DEV_SPA_PORT}",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+
 # HSTS + related transport headers, opt-in via env so local http:// dev is
 # unaffected. Turn on in production; the middleware is already in MIDDLEWARE.
 SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))
@@ -352,8 +386,23 @@ SPECTACULAR_SETTINGS = {
 # cookie cross-origin, so allow credentials. The Android app talks JSON (no
 # cookies) and is unaffected.
 CORS_ALLOW_CREDENTIALS = True
+
+# The admin SPA tags every request with X-Client. It is not in
+# django-cors-headers' default allow-list, so without it here the browser fails
+# the preflight and blocks the request before it is ever sent.
+CORS_ALLOW_HEADERS = (*default_headers, "x-client")
+
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+
+# `flutter run -d chrome` serves the dev build on a random localhost port, so an
+# exact-origin list cannot be pinned. Allow any localhost port, but only under
+# DEBUG — in production CORS_ALLOWED_ORIGINS is the sole source.
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://localhost:\d+$",
+        r"^http://127\.0\.0\.1:\d+$",
+    ]
