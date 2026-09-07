@@ -37,13 +37,24 @@ class ProductPayloadSerializer(serializers.Serializer):
 class CreateProductSerializer(serializers.Serializer):
     """Request validation for creating a new ``Product``."""
 
-    name = serializers.CharField(max_length=255)
-    crop = serializers.PrimaryKeyRelatedField(queryset=Crop.objects.all())
+    name = serializers.CharField(
+        max_length=255,
+        error_messages={
+            "blank": "Product name is required.",
+            "required": "Product name is required.",
+        },
+    )
+    crop = serializers.PrimaryKeyRelatedField(
+        queryset=Crop.objects.all(),
+        error_messages={"required": "Crop is required."},
+    )
     buying_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0
+        max_digits=12, decimal_places=2, min_value=0,
+        error_messages={"required": "Buying price is required."},
     )
     selling_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0
+        max_digits=12, decimal_places=2, min_value=0,
+        error_messages={"required": "Selling price is required."},
     )
 
     def validate(self, attrs):
@@ -54,7 +65,7 @@ class CreateProductSerializer(serializers.Serializer):
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError(
-                {"name": "A product with this name and crop already exists."}
+                "A product with this name and crop already exists."
             )
         return attrs
 

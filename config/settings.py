@@ -249,6 +249,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # views that forget to declare an authenticator; anything token-only must
 # opt in via ``AndroidBaseView``.
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "api.exceptions.custom_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "api.authentication.SessionAuthentication",
     ],

@@ -33,12 +33,23 @@ class CreateAdminSerializer(serializers.Serializer):
     ``SalesPerson`` profile, which needs a city.
     """
 
-    name = serializers.CharField(max_length=255)
+    name = serializers.CharField(
+        max_length=255,
+        error_messages={"blank": "Name is required.", "required": "Name is required."},
+    )
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    phone_number = serializers.CharField(max_length=10, validators=[validate_phone_number])
+    phone_number = serializers.CharField(
+        max_length=10,
+        validators=[validate_phone_number],
+        error_messages={
+            "blank": "Phone number is required.",
+            "required": "Phone number is required.",
+        },
+    )
     can_update_stock_count = serializers.BooleanField(default=False)
     city = serializers.PrimaryKeyRelatedField(
         queryset=City.objects.all(),
+        error_messages={"required": "City is required."},
         help_text="City for the fallback salesperson profile created with this admin.",
     )
 

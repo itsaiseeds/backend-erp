@@ -22,7 +22,11 @@ from .CropsView import CropPayloadSerializer
 class UpdateCropSerializer(serializers.Serializer):
     """Request validation for updating a ``Crop`` (name only)."""
 
-    name = serializers.CharField(max_length=255, required=False)
+    name = serializers.CharField(
+        max_length=255,
+        required=False,
+        error_messages={"blank": "Crop name may not be blank."},
+    )
 
     def validate_name(self, value):
         name = value.strip()

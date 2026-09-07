@@ -23,7 +23,11 @@ from .ProductsView import ProductPayloadSerializer, product_payload
 class UpdateProductSerializer(serializers.Serializer):
     """Request validation for updating a ``Product`` (all fields optional)."""
 
-    name = serializers.CharField(max_length=255, required=False)
+    name = serializers.CharField(
+        max_length=255,
+        required=False,
+        error_messages={"blank": "Product name may not be blank."},
+    )
     crop = serializers.PrimaryKeyRelatedField(
         queryset=Crop.objects.all(), required=False
     )
@@ -44,7 +48,7 @@ class UpdateProductSerializer(serializers.Serializer):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError(
-                    {"name": "A product with this name and crop already exists."}
+                    "A product with this name and crop already exists."
                 )
             attrs["name"] = name
         return attrs

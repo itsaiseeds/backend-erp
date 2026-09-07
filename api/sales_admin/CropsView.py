@@ -25,7 +25,13 @@ class CropPayloadSerializer(serializers.Serializer):
 class CreateCropSerializer(serializers.Serializer):
     """Request validation for creating a new ``Crop``."""
 
-    name = serializers.CharField(max_length=255)
+    name = serializers.CharField(
+        max_length=255,
+        error_messages={
+            "blank": "Crop name is required.",
+            "required": "Crop name is required.",
+        },
+    )
 
     def validate_name(self, value):
         name = value.strip()
