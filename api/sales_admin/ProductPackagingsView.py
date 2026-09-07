@@ -44,10 +44,19 @@ class CreateProductPackagingSerializer(serializers.Serializer):
     """
 
     product = serializers.SlugRelatedField(
-        slug_field="public_id", queryset=Product.objects.all()
+        slug_field="public_id",
+        queryset=Product.objects.all(),
+        error_messages={"required": "Product is required."},
     )
-    packing_bag_weight = serializers.DecimalField(max_digits=8, decimal_places=3)
-    packing_bags = serializers.IntegerField(min_value=1)
+    packing_bag_weight = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=3,
+        error_messages={"required": "Packing bag weight is required."},
+    )
+    packing_bags = serializers.IntegerField(
+        min_value=1,
+        error_messages={"required": "Packing bag count is required."},
+    )
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, min_value=0
     )
@@ -55,7 +64,7 @@ class CreateProductPackagingSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs["packing_bag_weight"] <= 0:
             raise serializers.ValidationError(
-                {"packing_bag_weight": "Packing bag weight must be positive."}
+                "Packing bag weight must be positive."
             )
         qs = ProductPackaging.all_objects.filter(
             product=attrs["product"],

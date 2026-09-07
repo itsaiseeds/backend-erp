@@ -28,10 +28,23 @@ from authentication.validators import validate_phone_number
 class CreateSalesPersonSerializer(serializers.Serializer):
     """Request validation for creating a new ``SalesPerson`` (city only)."""
 
-    name = serializers.CharField(max_length=255)
+    name = serializers.CharField(
+        max_length=255,
+        error_messages={"blank": "Name is required.", "required": "Name is required."},
+    )
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    phone_number = serializers.CharField(max_length=10, validators=[validate_phone_number])
-    city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all())
+    phone_number = serializers.CharField(
+        max_length=10,
+        validators=[validate_phone_number],
+        error_messages={
+            "blank": "Phone number is required.",
+            "required": "Phone number is required.",
+        },
+    )
+    city = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        error_messages={"required": "City is required."},
+    )
 
     def validate_phone_number(self, value):
         if User.objects.filter(phone_number=value).exists():
