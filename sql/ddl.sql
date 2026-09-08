@@ -697,14 +697,14 @@ CREATE TABLE IF NOT EXISTS public.aggregator_productpackaging (
 	created_by_id int8 NULL,
 	public_id varchar(20) NOT NULL,
 	product_id int8 NOT NULL,
-	packing_bag_weight numeric(8, 3) NOT NULL,
-	packing_bags int8 NOT NULL,
+	packet_weight numeric(8, 3) NOT NULL,
+	packets int8 NOT NULL,
 	selling_price numeric(12, 2) NOT NULL,
 	CONSTRAINT aggregator_productpackaging_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_productpackaging_public_id_key UNIQUE (public_id),
-	CONSTRAINT uniq_productpackaging_product_weight_bags UNIQUE (product_id, packing_bag_weight, packing_bags),
-	CONSTRAINT ck_productpackaging_positive CHECK (packing_bag_weight > 0 AND packing_bags > 0 AND selling_price >= 0),
-	CONSTRAINT aggregator_productpackaging_packing_bags_check CHECK (packing_bags >= 0)
+	CONSTRAINT uniq_productpackaging_product_weight_packets UNIQUE (product_id, packet_weight, packets),
+	CONSTRAINT ck_productpackaging_positive CHECK (packet_weight > 0 AND packets > 0 AND selling_price >= 0),
+	CONSTRAINT aggregator_productpackaging_packets_check CHECK (packets >= 0)
 );
 CREATE INDEX IF NOT EXISTS aggregator_productpackaging_public_id_like ON public.aggregator_productpackaging USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_productpackaging_product_id_idx ON public.aggregator_productpackaging USING btree (product_id);
@@ -777,12 +777,15 @@ CREATE TABLE IF NOT EXISTS public.aggregator_order (
 	dispatch_details_id int8 NULL,
 	private_dispatch_details_id int8 NULL,
 	special_comments text NOT NULL,
+	verified_by_id int8 NULL,
+	verified_at timestamptz NULL,
 	CONSTRAINT aggregator_order_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_order_public_id_key UNIQUE (public_id),
 	CONSTRAINT ck_order_not_both_dispatch_details CHECK (NOT (dispatch_details_id IS NOT NULL AND private_dispatch_details_id IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS aggregator_order_public_id_like ON public.aggregator_order USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_order_client_id_idx ON public.aggregator_order USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_verified_by_id_idx ON public.aggregator_order USING btree (verified_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_delivery_address_id_idx ON public.aggregator_order USING btree (delivery_address_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_status_id_idx ON public.aggregator_order USING btree (status_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_dispatch_details_id_idx ON public.aggregator_order USING btree (dispatch_details_id);
@@ -814,6 +817,102 @@ CREATE INDEX IF NOT EXISTS aggregator_orderitem_product_packaging_id_idx ON publ
 CREATE INDEX IF NOT EXISTS aggregator_orderitem_is_deleted_idx ON public.aggregator_orderitem USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_orderitem_created_by_id_idx ON public.aggregator_orderitem USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_orderitem_deleted_by_id_idx ON public.aggregator_orderitem USING btree (deleted_by_id);
+
+-- aggregator_inventorysnapshot ------------------------------------------------
+-- The day's physical stock count, one row per (snapshot_date, product_packaging).
+-- Two pools that never mix: sealed `bags` (consumed by normal order items)
+-- and unpacked `loose_packets` (reserved for the future custom-order flow).
+-- Only the latest snapshot_date is retained; recording a newer date hard-deletes
+-- every earlier row (see aggregator/InventoryOperations.py).
+CREATE TABLE IF NOT EXISTS public.aggregator_inventorysnapshot (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	snapshot_date date NOT NULL,
+	product_packaging_id int8 NOT NULL,
+	bags int8 NOT NULL,
+	loose_packets int8 NOT NULL DEFAULT 0,
+	CONSTRAINT aggregator_inventorysnapshot_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_inventorysnapshot_public_id_key UNIQUE (public_id),
+	CONSTRAINT uniq_inventorysnapshot_date_packaging UNIQUE (snapshot_date, product_packaging_id),
+	CONSTRAINT aggregator_inventorysnapshot_bags_check CHECK (bags >= 0),
+	CONSTRAINT aggregator_inventorysnapshot_loose_packets_check CHECK (loose_packets >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_public_id_like ON public.aggregator_inventorysnapshot USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_snapshot_date_idx ON public.aggregator_inventorysnapshot USING btree (snapshot_date);
+CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_product_packaging_id_idx ON public.aggregator_inventorysnapshot USING btree (product_packaging_id);
+CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_is_deleted_idx ON public.aggregator_inventorysnapshot USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_created_by_id_idx ON public.aggregator_inventorysnapshot USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_deleted_by_id_idx ON public.aggregator_inventorysnapshot USING btree (deleted_by_id);
+
+-- aggregator_customorder ------------------------------------------------------
+-- A loose-packet order, the admin-only counterpart of aggregator_order. Standalone
+-- (no FK to aggregator_order); its lines (aggregator_customorderitem) reference
+-- a raw product and a packet count, drawing on the product loose-packet pool.
+CREATE TABLE IF NOT EXISTS public.aggregator_customorder (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	client_id int8 NOT NULL,
+	delivery_address_id int8 NOT NULL,
+	status_id int8 NOT NULL,
+	expected_delivery_date date NOT NULL,
+	actual_delivery_date date NULL,
+	dispatch_details_id int8 NULL,
+	private_dispatch_details_id int8 NULL,
+	special_comments text NOT NULL,
+	verified_by_id int8 NULL,
+	verified_at timestamptz NULL,
+	CONSTRAINT aggregator_customorder_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_customorder_public_id_key UNIQUE (public_id),
+	CONSTRAINT ck_customorder_not_both_dispatch_details CHECK (NOT (dispatch_details_id IS NOT NULL AND private_dispatch_details_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_public_id_like ON public.aggregator_customorder USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_client_id_idx ON public.aggregator_customorder USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_verified_by_id_idx ON public.aggregator_customorder USING btree (verified_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_delivery_address_id_idx ON public.aggregator_customorder USING btree (delivery_address_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_status_id_idx ON public.aggregator_customorder USING btree (status_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_dispatch_details_id_idx ON public.aggregator_customorder USING btree (dispatch_details_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_private_dispatch_details_id_idx ON public.aggregator_customorder USING btree (private_dispatch_details_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_is_deleted_idx ON public.aggregator_customorder USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_created_by_id_idx ON public.aggregator_customorder USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_deleted_by_id_idx ON public.aggregator_customorder USING btree (deleted_by_id);
+
+-- aggregator_customorderitem --------------------------------------------------
+-- One custom-order line: a raw product and a packet count at a per-packet price. No
+-- product_packaging: a custom order bypasses packaging entirely.
+CREATE TABLE IF NOT EXISTS public.aggregator_customorderitem (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	custom_order_id int8 NOT NULL,
+	product_id int8 NOT NULL,
+	negotiated_selling_price numeric(12, 2) NOT NULL,
+	packets int8 NOT NULL,
+	CONSTRAINT aggregator_customorderitem_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_customorderitem_order_product UNIQUE (custom_order_id, product_id),
+	CONSTRAINT ck_customorderitem_positive CHECK (negotiated_selling_price >= 0 AND packets > 0),
+	CONSTRAINT aggregator_customorderitem_packets_check CHECK (packets >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_customorderitem_custom_order_id_idx ON public.aggregator_customorderitem USING btree (custom_order_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorderitem_product_id_idx ON public.aggregator_customorderitem USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorderitem_is_deleted_idx ON public.aggregator_customorderitem USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_customorderitem_created_by_id_idx ON public.aggregator_customorderitem USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorderitem_deleted_by_id_idx ON public.aggregator_customorderitem USING btree (deleted_by_id);
 
 -- Foreign keys for the sales-domain tables ------------------------------------
 ALTER TABLE public.aggregator_status ADD CONSTRAINT aggregator_status_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
@@ -874,12 +973,31 @@ ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_status_id_fk
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_dispatch_details_id_fk FOREIGN KEY (dispatch_details_id) REFERENCES public.aggregator_dispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_private_dispatch_details_id_fk FOREIGN KEY (private_dispatch_details_id) REFERENCES public.aggregator_privatedispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_verified_by_id_fk FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_order_id_fk FOREIGN KEY (order_id) REFERENCES public.aggregator_order(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_product_packaging_id_fk FOREIGN KEY (product_packaging_id) REFERENCES public.aggregator_productpackaging(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_inventorysnapshot ADD CONSTRAINT aggregator_inventorysnapshot_product_packaging_id_fk FOREIGN KEY (product_packaging_id) REFERENCES public.aggregator_productpackaging(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inventorysnapshot ADD CONSTRAINT aggregator_inventorysnapshot_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inventorysnapshot ADD CONSTRAINT aggregator_inventorysnapshot_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_delivery_address_id_fk FOREIGN KEY (delivery_address_id) REFERENCES public.aggregator_address(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_dispatch_details_id_fk FOREIGN KEY (dispatch_details_id) REFERENCES public.aggregator_dispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_private_dispatch_details_id_fk FOREIGN KEY (private_dispatch_details_id) REFERENCES public.aggregator_privatedispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_verified_by_id_fk FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_custom_order_id_fk FOREIGN KEY (custom_order_id) REFERENCES public.aggregator_customorder(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 
 -- =============================================================================

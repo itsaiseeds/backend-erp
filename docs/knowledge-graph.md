@@ -81,6 +81,9 @@ graph TD
         PDD["PrivateDispatchDetails<br/>(dispatched_by=sales admin)"]
         ORD["Order<br/>(public_id ORD-…)"]
         OI["OrderItem"]
+        INV["InventorySnapshot<br/>(public_id INV-…, daily count)"]
+        CORD["CustomOrder<br/>(public_id CORD-…, admin-only)"]
+        COI["CustomOrderItem<br/>(raw product + packets)"]
 
         CL --> CA --> ADDR
         CL --> CC --> CON
@@ -93,6 +96,11 @@ graph TD
         ORD --> DD
         ORD --> PDD
         ORD --> OI --> PP
+        INV --> PP
+        CORD --> CL
+        CORD --> ADDR
+        CORD --> STATUS
+        CORD --> COI --> PROD
         DD --> CIT
         PDD --> CIT
         SPP --> CL
@@ -202,7 +210,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
 | `User` | `authentication/models/User.py` | Custom user (`AbstractBaseUser` + `PermissionsMixin`); `phone_number` is `USERNAME_FIELD` (10 digits, no country code); password only for staff; everyone else logs in via **TOTP authenticator app**; `created_by`/`verified_by` self-FK invariants (superusers self-reference); TOTP helpers (`generate_totp_secret`, `enable_totp`, `verify_totp`, provisioning URI); role helpers `role`, `is_salesperson`, `is_admin_user`, `is_verified_user`, `can_login_with_password` | extends → `TimeStampedModel`; related ← `Admin`, `SalesPerson` |
-| `Admin` | `authentication/models/Admin.py` | Application admin profile (1:1). Only a superuser may create one; `can_update_stock_count` flag | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
+| `Admin` | `authentication/models/Admin.py` | Application admin profile (1:1). Only a superuser may create one; `can_update_stock_count` gates writing an `InventorySnapshot` (the day's stock count) and nothing else — it does **not** gate order verification | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
 | `SalesPerson` | `authentication/models/SalesPerson.py` | Salesperson profile (1:1). Only an Admin (or superuser) may create one; `city` FK | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User`; FK → `aggregator.City` |
 | Admin site | `authentication/admin.py` | Registers `User`, `Admin`, `SalesPerson`; enforces who may grant `Admin`/`SalesPerson` roles; unregisters stock `Group` admin | configures → Django `admin` |
 | Validator | `authentication/validators.py` | `^\d{10}$` 10-digit phone validator | used by → `User.phone_number` |
@@ -224,10 +232,13 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 |---|---|---|---|
 | `Status` | `aggregator/models/Status.py` | Generic enum-like status rows (ids 1–9, seeded in `sql/dml.sql`); hosts `StatusIds` and the `Status.by_id()` resolver. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Order.status`, `Client.status`, `OrderOperations`, `ClientOperations` |
 | `StatusIds` | `aggregator/models/Status.py` | `enum.IntEnum` — the single source of truth for the status CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`StatusIds.BOOKED.name == "BOOKED"`, `int(StatusIds.BOOKED) == 1`). `order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9. | derives → `Order.ORDER_STATUS_CODES`, `Client.CLIENT_STATUS_CODES`; used by → `OrderOperations`, `ClientOperations`, tests |
-| `Order` | `aggregator/models/Order.py` | Booked order exposed by `public_id` (`ORD-…`); lifecycle statuses limited to `StatusIds.order_statuses()`. No stored total — `total_amount` and `total_bags` are `@property`s summed from `items` | FK → `Client`, `Address`, `Status`; 1:N → `OrderItem` |
-| `OrderItem` | `aggregator/models/OrderItem.py` | One order line: a `ProductPackaging` at a `negotiated_selling_price` (**per-packaging**, not per-bag) × `quantity`; `line_total = negotiated_selling_price * quantity` (no `packing_bags` multiplier). Defaulted to `packaging.selling_price` when omitted at creation via `OrderOperations.add_order_item` | FK → `Order`, `ProductPackaging` |
-| `Product` | `aggregator/models/Product.py` | Sellable product exposed by `public_id` (`P-…`); `selling_price`/`buying_price` are **per-bag** rates (never used directly in order totals — see `ProductPackaging`) | FK → `Crop`; 1:N → `ProductPackaging` |
-| `ProductPackaging` | `aggregator/models/ProductPackaging.py` | Bag-weight × bag-count variant of a `Product` (`PP-…`); stores a **whole-packaging** `selling_price` (Decimal 12,2, NOT NULL). `ProductOperations.add_packaging(...)` defaults it to `packing_bags * product.selling_price` when omitted; **frozen** once stored. Downstream `OrderItem.negotiated_selling_price` defaults to this value | FK → `Product`; 1:N → `OrderItem` |
+| `Order` | `aggregator/models/Order.py` | Booked order exposed by `public_id` (`ORD-…`); `verified_by`/`verified_at` record the verifying sales admin (required once the status is `CONFIRMED`); lifecycle statuses limited to `StatusIds.order_statuses()`. No stored total — `total_amount` and `total_bags` are `@property`s summed from `items` | FK → `Client`, `Address`, `Status`; 1:N → `OrderItem` |
+| `OrderItem` | `aggregator/models/OrderItem.py` | One order line: a `ProductPackaging` (a bag) at a `negotiated_selling_price` (**per-bag**) × `quantity`; `line_total = negotiated_selling_price * quantity`. Defaulted to `packaging.selling_price` when omitted at creation via `OrderOperations.add_order_item` | FK → `Order`, `ProductPackaging` |
+| `Product` | `aggregator/models/Product.py` | Sellable product exposed by `public_id` (`P-…`); `selling_price`/`buying_price` are **per-packet** rates (never used directly in order totals — see `ProductPackaging`); `margin_per_packet = selling_price - buying_price` | FK → `Crop`; 1:N → `ProductPackaging` |
+| `ProductPackaging` | `aggregator/models/ProductPackaging.py` | A **bag**: a container of `packets` small units, each `packet_weight` kg, for a `Product` (`PP-…`). Stores a **whole-bag** `selling_price` (Decimal 12,2, NOT NULL); `ProductOperations.add_packaging(...)` defaults it to `packets * product.selling_price` when omitted; **frozen** once stored. Downstream `OrderItem.negotiated_selling_price` defaults to this value | FK → `Product`; 1:N → `OrderItem` |
+| `InventorySnapshot` | `aggregator/models/InventorySnapshot.py` | The day's physical stock count, one row per (`snapshot_date`, `product_packaging`) (`INV-…`). Two pools that never mix: whole `bags` (per packaging, the unit `OrderItem.quantity` uses, consumed by `Order`) and loose `loose_packets` (default 0, aggregated **per product** for availability, consumed by `CustomOrder`). Written only by an admin with `can_update_stock_count`. Only the latest `snapshot_date` survives — a newer count hard-deletes every earlier row. Reserved/consumed are **derived** from order status, never stored, which is what makes verification and dispatch reversible | FK → `ProductPackaging`, `User` (`created_by`) |
+| `CustomOrder` | `aggregator/models/CustomOrder.py` | Loose-packet order (`CORD-…`), the **admin-only** counterpart of `Order`. Mirrors `Order`'s fields but is **standalone — no FK to `Order`**. **No verification step**: `create_custom_order` auto-confirms it (born `CONFIRMED`, `verified_by`/`verified_at` set), and creation is **blocked unless enough loose packets are in stock**. `created_by` must be an admin. `total_packets` sums line packets directly | FK → `Client`, `Address`, `Status`, `DispatchDetails`; 1:N → `CustomOrderItem` |
+| `CustomOrderItem` | `aggregator/models/CustomOrderItem.py` | One custom-order line: a raw `Product` and a `packets` count at a **per-packet** `negotiated_selling_price` (defaults to `product.selling_price`). Deliberately has **no `ProductPackaging`** — a custom order bypasses packaging and draws on the product's loose-packet pool; `line_total = negotiated_selling_price * packets` | FK → `CustomOrder`, `Product` |
 | `Client` | `aggregator/models/Client.py` | Customer company; verification statuses limited to `StatusIds.client_statuses()` | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
 
 ### Reusable bases — common
@@ -294,7 +305,7 @@ erDiagram
     }
     ADMIN {
         fk user "1:1, CASCADE"
-        bool can_update_stock_count
+        bool can_update_stock_count "gates writing an InventorySnapshot"
         fk created_by "PROTECT; acting request.user"
         bool is_deleted "soft delete"
     }
@@ -432,6 +443,6 @@ master merged → Render auto-deploy (Docker build)
 - **Android API versioning:** `android/api/routing.py` merges each version's `routes.py::ROUTES` in order, so a view introduced at `vX` is automatically served by every later `vY` (`Y >= X`) unless that version overrides the same route key.
 - **Sentry/GlitchTip** only initialises when `SENTRY_DSN` is set and `DEBUG` is false; `/api/test-sentry/` is the wired-up probe.
 - `api/admin.py` = `AdminApiView` base, not Django admin.
-- **Pricing units** — `Product.selling_price` is **per-bag**; `ProductPackaging.selling_price` and `OrderItem.negotiated_selling_price` are **per-packaging**. `OrderItem.line_total = negotiated_selling_price * quantity` — no `packing_bags` multiplier. `ProductPackaging.selling_price` defaults to `packing_bags * product.selling_price` at creation and is frozen thereafter; `OrderItem.negotiated_selling_price` defaults to `packaging.selling_price`. See `skills/conventions.md` § "Pricing units".
+- **Pricing units** — `Product.selling_price` is **per-packet**; `ProductPackaging.selling_price` and `OrderItem.negotiated_selling_price` are **per-bag**. `OrderItem.line_total = negotiated_selling_price * quantity`. `ProductPackaging.selling_price` defaults to `packets * product.selling_price` at creation and is frozen thereafter; `OrderItem.negotiated_selling_price` defaults to `packaging.selling_price`. See `skills/conventions.md` § "Pricing units".
 
 _Keep this graph in sync when adding apps, endpoints, models, or schema flows._

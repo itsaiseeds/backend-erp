@@ -15,16 +15,16 @@ class PackagingProductRef {
 class ProductPackagingModel {
   final String publicId;
   final PackagingProductRef? product;
-  final String packingBagWeight;
-  final int packingBags;
+  final String packetWeight;
+  final int packets;
   final String totalWeight;
   final String sellingPrice;
 
   const ProductPackagingModel({
     required this.publicId,
     this.product,
-    this.packingBagWeight = '',
-    this.packingBags = 0,
+    this.packetWeight = '',
+    this.packets = 0,
     this.totalWeight = '',
     this.sellingPrice = '',
   });
@@ -37,8 +37,8 @@ class ProductPackagingModel {
       product: product is Map
           ? PackagingProductRef.fromJson(Map<String, dynamic>.from(product))
           : null,
-      packingBagWeight: _decimalOf(json['packing_bag_weight']),
-      packingBags: _countOf(json['packing_bags']),
+      packetWeight: _decimalOf(json['packet_weight']),
+      packets: _countOf(json['packets']),
       totalWeight: _decimalOf(json['total_weight']),
       sellingPrice: _decimalOf(json['selling_price']),
     );
@@ -48,9 +48,9 @@ class ProductPackagingModel {
 
   String get productPublicId => product?.publicId ?? '';
 
-  String get packingBagsLabel => packingBags == 0 ? '' : '$packingBags';
+  String get packetsLabel => packets == 0 ? '' : '$packets';
 
-  num? get packingBagWeightValue => num.tryParse(packingBagWeight);
+  num? get packetWeightValue => num.tryParse(packetWeight);
 
   num? get totalWeightValue => num.tryParse(totalWeight);
 

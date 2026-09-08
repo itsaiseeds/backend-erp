@@ -8,8 +8,8 @@ void main() {
         const {
           'public_id': 'PP-7f3a91c2',
           'product': {'public_id': 'P-4b21ee90', 'name': 'Super Hybrid 101'},
-          'packing_bag_weight': '25.000',
-          'packing_bags': 5,
+          'packet_weight': '25.000',
+          'packets': 5,
           'total_weight': '125.000',
           'selling_price': '6000.00',
         },
@@ -21,9 +21,9 @@ void main() {
       expect(packaging.product!.name, 'Super Hybrid 101');
       expect(packaging.productPublicId, 'P-4b21ee90');
       expect(packaging.productName, 'Super Hybrid 101');
-      expect(packaging.packingBagWeight, '25.000');
-      expect(packaging.packingBags, 5);
-      expect(packaging.packingBagsLabel, '5');
+      expect(packaging.packetWeight, '25.000');
+      expect(packaging.packets, 5);
+      expect(packaging.packetsLabel, '5');
       expect(packaging.totalWeight, '125.000');
       expect(packaging.sellingPrice, '6000.00');
     });
@@ -33,14 +33,14 @@ void main() {
         const {
           'public_id': 'PP-1',
           'product': {'public_id': 'P-1', 'name': 'Priced'},
-          'packing_bag_weight': '12.500',
-          'packing_bags': 4,
+          'packet_weight': '12.500',
+          'packets': 4,
           'total_weight': '50.000',
           'selling_price': '4800.75',
         },
       );
 
-      expect(packaging.packingBagWeightValue, 12.5);
+      expect(packaging.packetWeightValue, 12.5);
       expect(packaging.totalWeightValue, 50);
       expect(packaging.sellingPriceValue, 4800.75);
     });
@@ -50,15 +50,15 @@ void main() {
         const {
           'public_id': 'PP-numeric',
           'product': {'public_id': 'P-2', 'name': 'Numeric'},
-          'packing_bag_weight': 25.0,
-          'packing_bags': 2,
+          'packet_weight': 25.0,
+          'packets': 2,
           'total_weight': 50.0,
           'selling_price': 3000.5,
         },
       );
 
-      expect(packaging.packingBagWeight, '25.0');
-      expect(packaging.packingBagWeightValue, 25);
+      expect(packaging.packetWeight, '25.0');
+      expect(packaging.packetWeightValue, 25);
       expect(packaging.totalWeight, '50.0');
       expect(packaging.sellingPrice, '3000.5');
       expect(packaging.sellingPriceValue, 3000.5);
@@ -73,10 +73,10 @@ void main() {
       expect(packaging.product, isNull);
       expect(packaging.productName, '');
       expect(packaging.productPublicId, '');
-      expect(packaging.packingBagWeight, '');
-      expect(packaging.packingBagWeightValue, isNull);
-      expect(packaging.packingBags, 0);
-      expect(packaging.packingBagsLabel, '');
+      expect(packaging.packetWeight, '');
+      expect(packaging.packetWeightValue, isNull);
+      expect(packaging.packets, 0);
+      expect(packaging.packetsLabel, '');
       expect(packaging.totalWeight, '');
       expect(packaging.sellingPrice, '');
     });
@@ -86,16 +86,16 @@ void main() {
         {
           'public_id': 'PP-aaa',
           'product': {'public_id': 'P-aaa', 'name': 'Alpha'},
-          'packing_bag_weight': '25.000',
-          'packing_bags': 5,
+          'packet_weight': '25.000',
+          'packets': 5,
           'total_weight': '125.000',
           'selling_price': '6000.00',
         },
         {
           'public_id': 'PP-bbb',
           'product': {'public_id': 'P-bbb', 'name': 'Beta'},
-          'packing_bag_weight': '50.000',
-          'packing_bags': 2,
+          'packet_weight': '50.000',
+          'packets': 2,
           'total_weight': '100.000',
           'selling_price': '3000.00',
         },
@@ -107,7 +107,7 @@ void main() {
 
       expect(packagings, hasLength(2));
       expect(packagings.first.productName, 'Alpha');
-      expect(packagings.first.packingBags, 5);
+      expect(packagings.first.packets, 5);
       expect(packagings.last.totalWeightValue, 100);
       expect(packagings.last.sellingPriceValue, 3000);
     });

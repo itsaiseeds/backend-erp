@@ -31,7 +31,7 @@ class ProductPayloadSerializer(serializers.Serializer):
     crop = CropRefSerializer()
     buying_price = serializers.DecimalField(max_digits=12, decimal_places=2)
     selling_price = serializers.DecimalField(max_digits=12, decimal_places=2)
-    margin_per_bag = serializers.DecimalField(max_digits=12, decimal_places=2)
+    margin_per_packet = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
 class CreateProductSerializer(serializers.Serializer):
@@ -78,7 +78,7 @@ def product_payload(product):
         "crop": {"id": product.crop_id, "name": product.crop.name},
         "buying_price": product.buying_price,
         "selling_price": product.selling_price,
-        "margin_per_bag": product.margin_per_bag,
+        "margin_per_packet": product.margin_per_packet,
     }
 
 

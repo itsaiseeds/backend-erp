@@ -156,24 +156,64 @@ backend-erp/
   renamed, or renumbered there, update the enum (and the
   `order_statuses()` / `client_statuses()` id ranges) in the same change.
 
-### Pricing units: `Product` is per-bag, `ProductPackaging` and `OrderItem` are per-packaging
-- `Product.selling_price` (and `buying_price`) is the **per-bag** rate. It never
-  appears in totals math directly — packaging is the pricing unit downstream.
-- `ProductPackaging.selling_price` is the **whole-packaging** list price
-  (Decimal 12,2, `NOT NULL`, stored). Create packagings via
-  `ProductOperations.add_packaging(...)`; omit the kwarg and it defaults to
-  `packing_bags * product.selling_price` at creation time. Value is **frozen**
-  once stored — later edits to `product.selling_price` do not propagate.
-- `OrderItem.negotiated_selling_price` is the **per-packaging** rate for that
-  line (same unit as `ProductPackaging.selling_price`). Create items via
-  `OrderOperations.add_order_item(...)` / `create_order(items=[...])`; omit the
-  kwarg and it defaults to the linked `ProductPackaging.selling_price`.
-- `OrderItem.line_total == negotiated_selling_price * quantity` — no
-  `packing_bags` multiplier. `Order.total_amount` sums line totals; `total_bags`
-  still counts bags (`quantity * packing_bags`).
-- When you touch this math, remember the unit shift: **any** value that flows
-  into `line_total` is per-packaging. Multiplying by `packing_bags` again is
-  a bug.
+### Unit model: a **packet** is the small unit; a **bag** is the container
+A `ProductPackaging` **is a bag** — a container of `packets` small units, each of
+`packet_weight` kg (fields `ProductPackaging.packets` and `.packet_weight`). A
+bag holds N packets. (This inverts an earlier model where a "packet" held
+"bags"; the two nouns were swapped wholesale.)
+
+### Pricing units: `Product` is per-packet, `ProductPackaging` and `OrderItem` are per-bag
+- `Product.selling_price` (and `buying_price`) is the **per-packet** rate. It
+  never appears in totals math directly — the bag (packaging) is the pricing
+  unit downstream. `Product.margin_per_packet = selling_price - buying_price`.
+- `ProductPackaging.selling_price` is the **whole-bag** list price (Decimal
+  12,2, `NOT NULL`, stored). `ProductOperations.add_packaging(...)` defaults it
+  to `packets * product.selling_price` at creation; **frozen** once stored.
+- `OrderItem.negotiated_selling_price` is the **per-bag** rate for that line
+  (same unit as `ProductPackaging.selling_price`), defaulting to the packaging's
+  `selling_price`.
+- `OrderItem.line_total == negotiated_selling_price * quantity` (quantity counts
+  bags). `Order.total_amount` sums line totals; `Order.total_packets` counts
+  small units (`quantity * packets`).
+
+### Stock units: two pools — whole bags per packaging, loose packets per product
+- Stock is a **daily physical count**, not a running ledger:
+  `InventorySnapshot` holds one row per (`snapshot_date`, `product_packaging`).
+- Two pools, in two different units, that never mix, tracked at **different
+  grains**:
+  - `bags` — sealed whole packagings, tracked **per `ProductPackaging`**. Same
+    unit as `OrderItem.quantity`, so packaged-order demand compares directly
+    with no conversion. Consumed by normal `Order`s.
+  - `loose_packets` — unpacked single packets, tracked **per `Product`**.
+    Counted per packaging in the snapshot but aggregated to the product for
+    availability (`on_hand_loose_packets(product)` sums a product's packaging
+    rows), because a `CustomOrder` names a raw product and a packet count —
+    never a packaging. Optional (defaults to 0). Consumed only by `CustomOrder`s.
+- A packaged order can never be filled from loose stock, and a custom order
+  deals only in loose packets — it never breaks open a bag. Moving stock between
+  the pools is a physical act recorded by **re-uploading the count**
+  (`bags - 1`, `loose_packets + N`) — never by a synthetic movement row.
+- **Only the latest `snapshot_date` is retained.** Recording a count for a newer
+  date hard-deletes every earlier row (a queryset delete, which bypasses
+  `SoftDeletedModel`'s instance-level soft delete by design).
+- Reserved and consumed quantities are **derived from order status** (`Order`
+  for bags, `CustomOrder` for loose packets), never stored. That is what makes
+  verification and dispatch reversible, and what lets outstanding reservations
+  survive the daily purge. Do not add counter columns.
+
+### Order verification & custom orders
+- `OrderOperations.verify_order` has **three** gates: (1) the actor is an admin
+  (or superuser); (2) today's stock count is complete for every packaging
+  (`is_stock_count_complete`); (3) **enough available bags** exist for every
+  packaging on the order (`available_bags` ≥ needed). Any shortfall blocks it.
+- `Admin.can_update_stock_count` gates **writing a stock count and nothing
+  else** — it does *not* gate order verification.
+- `CustomOrder` is **standalone** (no FK to `Order`), booked **only by a sales
+  admin**, and has **no verification step**: `create_custom_order` auto-confirms
+  it (born `CONFIRMED`, `verified_by`/`verified_at` set to the creating admin).
+  Creation is **blocked unless enough loose packets are in stock**
+  (`available_loose_packets` ≥ requested). Its `CustomOrderItem` lines carry
+  (`product`, `packets`) — no packaging.
 
 ### Auth / roles
 - Login is **TOTP** (authenticator app) for everyone except staff (Django admin

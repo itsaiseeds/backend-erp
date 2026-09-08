@@ -45,23 +45,23 @@ def create_product(
 def add_packaging(
     product: Product,
     *,
-    packing_bag_weight,
-    packing_bags: int,
+    packet_weight,
+    packets: int,
     actor: Any,
     selling_price=None,
 ) -> ProductPackaging:
     """Create a packaging for ``product``.
 
     ``selling_price`` is the whole-packaging price. If omitted it defaults to
-    ``packing_bags * product.selling_price`` (captured at creation time --
+    ``packets * product.selling_price`` (captured at creation time --
     later changes to the product's price do not propagate here).
     """
     if selling_price is None:
-        selling_price = packing_bags * product.selling_price
+        selling_price = packets * product.selling_price
     packaging = ProductPackaging(
         product=product,
-        packing_bag_weight=packing_bag_weight,
-        packing_bags=packing_bags,
+        packet_weight=packet_weight,
+        packets=packets,
         selling_price=selling_price,
         created_by=actor,
     )
@@ -77,8 +77,8 @@ def packaging_payload(packaging: ProductPackaging) -> dict:
             "public_id": packaging.product.public_id,
             "name": packaging.product.name,
         },
-        "packing_bag_weight": str(packaging.packing_bag_weight),
-        "packing_bags": packaging.packing_bags,
+        "packet_weight": str(packaging.packet_weight),
+        "packets": packaging.packets,
         "total_weight": str(packaging.total_weight),
         "selling_price": str(packaging.selling_price),
     }
@@ -91,7 +91,7 @@ def product_payload(product: Product) -> dict:
         "crop": product.crop.name if product.crop_id else None,
         "buying_price": str(product.buying_price),
         "selling_price": str(product.selling_price),
-        "margin_per_bag": str(product.margin_per_bag),
+        "margin_per_packet": str(product.margin_per_packet),
         "packagings": [
             packaging_payload(p) for p in product.packagings.all()
         ],

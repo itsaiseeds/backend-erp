@@ -46,6 +46,9 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(25, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(26, 'aggregator', 'order');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(27, 'aggregator', 'orderitem');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(28, 'aggregator', 'crop');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(34, 'aggregator', 'inventorysnapshot');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(35, 'aggregator', 'customorder');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(36, 'aggregator', 'customorderitem');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -167,6 +170,18 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(110, 'Can change permission', 33, 'change_permission');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(111, 'Can delete permission', 33, 'delete_permission');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(112, 'Can view permission', 33, 'view_permission');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(113, 'Can add inventory snapshot', 34, 'add_inventorysnapshot');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(114, 'Can change inventory snapshot', 34, 'change_inventorysnapshot');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(115, 'Can delete inventory snapshot', 34, 'delete_inventorysnapshot');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(116, 'Can view inventory snapshot', 34, 'view_inventorysnapshot');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(117, 'Can add custom order', 35, 'add_customorder');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(118, 'Can change custom order', 35, 'change_customorder');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(119, 'Can delete custom order', 35, 'delete_customorder');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(120, 'Can view custom order', 35, 'view_customorder');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(121, 'Can add custom order item', 36, 'add_customorderitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(122, 'Can change custom order item', 36, 'change_customorderitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(123, 'Can delete custom order item', 36, 'delete_customorderitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(124, 'Can view custom order item', 36, 'view_customorderitem');
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)
@@ -190,6 +205,7 @@ INSERT INTO public.authentication_user (id, "password", last_login, is_superuser
 
 INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count) VALUES(1, '2026-09-07 00:34:36.434', '2026-09-07 00:36:17.156', false, NULL, NULL, 1, 4, false);
 INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count) VALUES(2, '2026-09-07 00:36:25.485', '2026-09-07 00:36:25.487', false, NULL, NULL, 1, 5, true);
+INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count) VALUES(3, '2026-09-08 22:37:01.672', '2026-09-08 22:37:01.675', false, NULL, NULL, 1, 1, true);
 
 INSERT INTO public.aggregator_country (id, created_at, updated_at, is_deleted, deleted_at, "name", iso_code, created_by_id, deleted_by_id) VALUES(1, '2026-09-07 00:23:22.143', '2026-09-07 00:23:22.145', false, NULL, 'India', 'IN', 1, NULL);
 INSERT INTO public.aggregator_state (id, created_at, updated_at, is_deleted, deleted_at, "name", code, country_id, created_by_id, deleted_by_id) VALUES(1, '2026-09-07 00:23:44.551', '2026-09-07 00:23:44.553', false, NULL, 'Gujarat', 'GJ', 1, 1, NULL);
@@ -209,8 +225,8 @@ INSERT INTO public.aggregator_crop (id, created_at, updated_at, is_deleted, dele
 INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, buying_price, selling_price) VALUES(1, '2026-09-07 00:28:02.358', '2026-09-07 00:28:12.045', false, NULL, NULL, 1, 'P-I34V7RI1JPUH', 'SAI-33', 1, 100.00, 120.00);
 INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, buying_price, selling_price) VALUES(2, '2026-09-07 00:28:40.714', '2026-09-07 00:28:40.718', false, NULL, NULL, 1, 'P-NQ8N4LF7MJYQ', 'SAI-3353', 2, 210.00, 250.00);
 
-INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packing_bag_weight, packing_bags, selling_price) VALUES(1, '2026-09-07 00:29:08.487', '2026-09-07 00:29:15.227', false, NULL, NULL, 1, 'PP-U4UYPFOF08NZ', 1, 1.000, 40, 4800.00);
-INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packing_bag_weight, packing_bags, selling_price) VALUES(2, '2026-09-07 00:29:29.899', '2026-09-07 00:29:29.904', false, NULL, NULL, 1, 'PP-5SVE39LY2XEI', 2, 1.500, 20, 5000.00);
+INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(1, '2026-09-07 00:29:08.487', '2026-09-07 00:29:15.227', false, NULL, NULL, 1, 'PP-U4UYPFOF08NZ', 1, 1.000, 40, 4800.00);
+INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(2, '2026-09-07 00:29:29.899', '2026-09-07 00:29:29.904', false, NULL, NULL, 1, 'PP-5SVE39LY2XEI', 2, 1.500, 20, 5000.00);
 -- -------------------------------------------------------------------------
 -- Sequence sync
 -- -------------------------------------------------------------------------

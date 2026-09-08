@@ -122,7 +122,7 @@ class ProductApiTest(WebApiTestCase):
         self.assertEqual(product["crop"], {"id": self.crop.id, "name": "Wheat"})
         self.assertEqual(float(product["buying_price"]), 1000.0)
         self.assertEqual(float(product["selling_price"]), 1200.0)
-        self.assertEqual(float(product["margin_per_bag"]), 200.0)
+        self.assertEqual(float(product["margin_per_packet"]), 200.0)
         # The primary key must never be sent out.
         self.assertNotIn("id", product)
 

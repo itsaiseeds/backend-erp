@@ -11,7 +11,7 @@ from common.models import (
 class ProductPackaging(
     PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel
 ):
-    """A packaging variant of a ``Product`` (bag weight × number of bags).
+    """A packaging variant of a ``Product`` (packet weight × number of packets).
 
     Exposed to the frontend by its ``public_id`` (``PP-…``); the primary key is
     never sent out.
@@ -25,39 +25,39 @@ class ProductPackaging(
         on_delete=models.PROTECT,
         related_name="packagings",
     )
-    packing_bag_weight = models.DecimalField(
-        "packing bag weight",
+    packet_weight = models.DecimalField(
+        "packet weight",
         max_digits=8,
         decimal_places=3,
-        help_text="Weight of a single bag, in kilograms.",
+        help_text="Weight of a single packet, in kilograms.",
     )
-    packing_bags = models.PositiveIntegerField("packing bags")
+    packets = models.PositiveIntegerField("packets")
     selling_price = models.DecimalField(
         "selling price",
         max_digits=12,
         decimal_places=2,
         help_text=(
-            "Whole-packaging price (not per-bag). Downstream OrderItems default "
+            "Whole-packaging price (not per-packet). Downstream OrderItems default "
             "their negotiated price to this value. Set explicitly, or leave to "
             "ProductOperations.add_packaging which fills it with "
-            "packing_bags * product.selling_price. Frozen at the value stored "
-            "here -- it does not track later changes to the product's per-bag price."
+            "packets * product.selling_price. Frozen at the value stored "
+            "here -- it does not track later changes to the product's per-packet price."
         ),
     )
 
     class Meta:
         verbose_name = "product packaging"
         verbose_name_plural = "product packagings"
-        ordering = ["product__name", "packing_bag_weight"]
+        ordering = ["product__name", "packet_weight"]
         constraints = [
             models.UniqueConstraint(
-                fields=["product", "packing_bag_weight", "packing_bags"],
-                name="uniq_productpackaging_product_weight_bags",
+                fields=["product", "packet_weight", "packets"],
+                name="uniq_productpackaging_product_weight_packets",
             ),
             models.CheckConstraint(
                 condition=(
-                    models.Q(packing_bag_weight__gt=0)
-                    & models.Q(packing_bags__gt=0)
+                    models.Q(packet_weight__gt=0)
+                    & models.Q(packets__gt=0)
                     & models.Q(selling_price__gte=0)
                 ),
                 name="ck_productpackaging_positive",
@@ -66,9 +66,9 @@ class ProductPackaging(
 
     def __str__(self):
         if self.product_id:
-            return f"{self.product.name}: {self.packing_bags} × {self.packing_bag_weight}kg"
+            return f"{self.product.name}: {self.packets} × {self.packet_weight}kg"
         return "product packaging"
 
     @property
     def total_weight(self):
-        return self.packing_bag_weight * self.packing_bags
+        return self.packet_weight * self.packets

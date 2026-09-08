@@ -314,11 +314,11 @@ class AppStrings {
   static const String COLUMN_CROP = 'Crop';
   static const String COLUMN_BUYING_PRICE = 'Buying Price';
   static const String COLUMN_SELLING_PRICE = 'Selling Price';
-  static const String COLUMN_MARGIN_PER_BAG = 'Margin Per Bag';
+  static const String COLUMN_MARGIN_PER_PACKET = 'Margin Per Packet';
 
   static const String SORT_BY_BUYING_PRICE = 'buying_price';
   static const String SORT_BY_SELLING_PRICE = 'selling_price';
-  static const String SORT_BY_MARGIN_PER_BAG = 'margin_per_bag';
+  static const String SORT_BY_MARGIN_PER_PACKET = 'margin_per_packet';
   static const String FILTER_BY_CROP = 'crop';
 
   static const String FIELD_PRODUCT_NAME = 'Product Name';
@@ -354,13 +354,13 @@ class AppStrings {
   static const String PRODUCT_PACKAGINGS_EMPTY_STATE_TITLE =
       'No product packagings yet';
   static const String PRODUCT_PACKAGINGS_EMPTY_STATE_BODY =
-      'Add a packaging to define how a product is sold in bags.';
+      'Add a packaging to define how a product is sold in packets.';
   static const String ADD_PRODUCT_PACKAGING = 'Add Packaging';
   static const String EDIT_PRODUCT_PACKAGING = 'Edit Packaging';
   static const String ADD_PRODUCT_PACKAGING_SUBTITLE =
-      'Define the bag weight, bag count, and price for a product.';
+      'Define the packet weight, packet count, and price for a product.';
   static const String EDIT_PRODUCT_PACKAGING_SUBTITLE =
-      'Update the bag weight, bag count, or price of this packaging.';
+      'Update the packet weight, packet count, or price of this packaging.';
   static const String PRODUCT_PACKAGING_CREATED_TITLE = 'Packaging created';
   static const String PRODUCT_PACKAGING_UPDATED_TITLE = 'Packaging updated';
   static const String PRODUCT_PACKAGING_DELETED_TITLE = 'Packaging deleted';
@@ -370,26 +370,26 @@ class AppStrings {
       'This action cannot be undone.';
   static const String PRODUCT_PACKAGING_DETAIL_TITLE = 'Packaging details';
   static const String PRODUCT_PACKAGING_DETAIL_SUBTITLE =
-      'Bag configuration and pricing on record.';
+      'Packet configuration and pricing on record.';
 
   static const String COLUMN_PRODUCT = 'Product';
-  static const String COLUMN_PACKING_BAG_WEIGHT = 'Bag Weight (kg)';
-  static const String COLUMN_PACKING_BAGS = 'Bags';
+  static const String COLUMN_PACKET_WEIGHT = 'Packet Weight (kg)';
+  static const String COLUMN_PACKETS = 'Packets';
   static const String COLUMN_TOTAL_WEIGHT = 'Total Weight (kg)';
 
   static const String SORT_BY_PRODUCT = 'product';
-  static const String SORT_BY_PACKING_BAG_WEIGHT = 'packing_bag_weight';
-  static const String SORT_BY_PACKING_BAGS = 'packing_bags';
+  static const String SORT_BY_PACKET_WEIGHT = 'packet_weight';
+  static const String SORT_BY_PACKETS = 'packets';
   static const String SORT_BY_TOTAL_WEIGHT = 'total_weight';
   static const String FILTER_BY_PRODUCT = 'product';
 
   static const String FIELD_PRODUCT = 'Product';
   static const String FIELD_PRODUCT_HINT = 'Select a product';
-  static const String FIELD_PACKING_BAG_WEIGHT = 'Packing Bag Weight (kg)';
-  static const String FIELD_PACKING_BAG_WEIGHT_HINT =
-      'Enter the weight of one bag';
-  static const String FIELD_PACKING_BAGS = 'Packing Bags';
-  static const String FIELD_PACKING_BAGS_HINT = 'Enter the number of bags';
+  static const String FIELD_PACKET_WEIGHT = 'Packet Weight (kg)';
+  static const String FIELD_PACKET_WEIGHT_HINT =
+      'Enter the weight of one packet';
+  static const String FIELD_PACKETS = 'Packets';
+  static const String FIELD_PACKETS_HINT = 'Enter the number of packets';
 
   static const String VALIDATION_PRODUCT_REQUIRED = 'Product is required.';
   static const String VALIDATION_POSITIVE_AMOUNT_REQUIRED =

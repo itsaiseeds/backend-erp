@@ -30,16 +30,16 @@ class ProductPackagingsRepository {
 
   Future<void> createProductPackaging({
     required String productPublicId,
-    required String packingBagWeight,
-    required String packingBags,
+    required String packetWeight,
+    required String packets,
     required String sellingPrice,
   }) async {
     await _apiClient.post(
       ProductPackagingsEndpoints.create,
       body: _body(
         productPublicId: productPublicId,
-        packingBagWeight: packingBagWeight,
-        packingBags: packingBags,
+        packetWeight: packetWeight,
+        packets: packets,
         sellingPrice: sellingPrice,
       ),
     );
@@ -48,16 +48,16 @@ class ProductPackagingsRepository {
   Future<void> updateProductPackaging({
     required String publicId,
     required String productPublicId,
-    required String packingBagWeight,
-    required String packingBags,
+    required String packetWeight,
+    required String packets,
     required String sellingPrice,
   }) async {
     await _apiClient.patch(
       ProductPackagingsEndpoints.detail(publicId),
       body: _body(
         productPublicId: productPublicId,
-        packingBagWeight: packingBagWeight,
-        packingBags: packingBags,
+        packetWeight: packetWeight,
+        packets: packets,
         sellingPrice: sellingPrice,
       ),
     );
@@ -69,14 +69,14 @@ class ProductPackagingsRepository {
 
   static Map<String, dynamic> _body({
     required String productPublicId,
-    required String packingBagWeight,
-    required String packingBags,
+    required String packetWeight,
+    required String packets,
     required String sellingPrice,
   }) {
     return {
       'product': productPublicId,
-      'packing_bag_weight': packingBagWeight,
-      'packing_bags': int.tryParse(packingBags.trim()) ?? 0,
+      'packet_weight': packetWeight,
+      'packets': int.tryParse(packets.trim()) ?? 0,
       'selling_price': sellingPrice,
     };
   }

@@ -51,8 +51,8 @@ class _ProductPackagingFormDialogState
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final SellingPriceAutofill _autofill = SellingPriceAutofill();
-  late final TextEditingController _bagWeightController;
-  late final TextEditingController _bagsController;
+  late final TextEditingController _packetWeightController;
+  late final TextEditingController _packetsController;
   late final TextEditingController _sellingPriceController;
 
   List<ProductModel> _products = const [];
@@ -67,11 +67,11 @@ class _ProductPackagingFormDialogState
   void initState() {
     super.initState();
     final ProductPackagingModel? packaging = widget.packaging;
-    _bagWeightController = TextEditingController(
-      text: packaging?.packingBagWeight ?? '',
+    _packetWeightController = TextEditingController(
+      text: packaging?.packetWeight ?? '',
     );
-    _bagsController = TextEditingController(
-      text: packaging?.packingBagsLabel ?? '',
+    _packetsController = TextEditingController(
+      text: packaging?.packetsLabel ?? '',
     );
     _sellingPriceController = TextEditingController(
       text: packaging?.sellingPrice ?? '',
@@ -79,15 +79,15 @@ class _ProductPackagingFormDialogState
     _autofill.adoptExistingValue(_sellingPriceController.text);
     _products = ProductsService.instance.products;
     _selectedProduct = _resolveSelectedProduct();
-    _bagsController.addListener(_onBagsChanged);
+    _packetsController.addListener(_onPacketsChanged);
     _loadProducts();
   }
 
   @override
   void dispose() {
-    _bagsController.removeListener(_onBagsChanged);
-    _bagWeightController.dispose();
-    _bagsController.dispose();
+    _packetsController.removeListener(_onPacketsChanged);
+    _packetWeightController.dispose();
+    _packetsController.dispose();
     _sellingPriceController.dispose();
     super.dispose();
   }
@@ -108,7 +108,7 @@ class _ProductPackagingFormDialogState
     });
   }
 
-  void _onBagsChanged() => _applyAutofill();
+  void _onPacketsChanged() => _applyAutofill();
 
   void _onProductSelected(ProductModel product) {
     setState(() {
@@ -121,7 +121,7 @@ class _ProductPackagingFormDialogState
   void _applyAutofill() {
     final String? computed = _autofill.nextValue(
       productSellingPrice: _selectedProduct?.sellingPriceValue,
-      bags: _bagsController.text,
+      packets: _packetsController.text,
     );
     if (computed == null || computed == _sellingPriceController.text) return;
     _sellingPriceController.value = TextEditingValue(
@@ -151,14 +151,14 @@ class _ProductPackagingFormDialogState
         ? await cubit.updateProductPackaging(
             publicId: widget.packaging!.publicId,
             productPublicId: _selectedProduct!.publicId,
-            packingBagWeight: _bagWeightController.text.trim(),
-            packingBags: _bagsController.text.trim(),
+            packetWeight: _packetWeightController.text.trim(),
+            packets: _packetsController.text.trim(),
             sellingPrice: _sellingPriceController.text.trim(),
           )
         : await cubit.createProductPackaging(
             productPublicId: _selectedProduct!.publicId,
-            packingBagWeight: _bagWeightController.text.trim(),
-            packingBags: _bagsController.text.trim(),
+            packetWeight: _packetWeightController.text.trim(),
+            packets: _packetsController.text.trim(),
             sellingPrice: _sellingPriceController.text.trim(),
           );
 
@@ -263,9 +263,9 @@ class _ProductPackagingFormDialogState
             ],
             const SizedBox(height: AppSpacing.md),
             AppTextField(
-              controller: _bagWeightController,
-              label: AppStrings.FIELD_PACKING_BAG_WEIGHT,
-              hint: AppStrings.FIELD_PACKING_BAG_WEIGHT_HINT,
+              controller: _packetWeightController,
+              label: AppStrings.FIELD_PACKET_WEIGHT,
+              hint: AppStrings.FIELD_PACKET_WEIGHT_HINT,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -275,9 +275,9 @@ class _ProductPackagingFormDialogState
             ),
             const SizedBox(height: AppSpacing.md),
             AppTextField(
-              controller: _bagsController,
-              label: AppStrings.FIELD_PACKING_BAGS,
-              hint: AppStrings.FIELD_PACKING_BAGS_HINT,
+              controller: _packetsController,
+              label: AppStrings.FIELD_PACKETS,
+              hint: AppStrings.FIELD_PACKETS_HINT,
               keyboardType: TextInputType.number,
               enabled: !_isSubmitting,
               inputFormatters: _countFormatters,

@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 
 from common.models import indian_now
@@ -159,6 +160,90 @@ def update_order_status(order: Order, status: StatusIds) -> Order:
     return order
 
 
+@transaction.atomic
+def verify_order(order: Order, admin: Any) -> Order:
+    """Mark ``order`` verified, recording the acting sales admin and time.
+
+    Three gates apply:
+
+    * ``admin`` must hold an ``Admin`` profile (or be a superuser). Note that
+      ``can_update_stock_count`` is deliberately **not** checked here -- that
+      flag gates writing an ``InventorySnapshot``, nothing else.
+    * today's stock count must be complete, i.e. every active packaging has been
+      counted. No count, no verification.
+    * there must be enough available stock: for every packaging on the order,
+      the bags it needs must not exceed what is still available (on hand minus
+      already reserved/consumed). Not enough stock, no verification.
+    """
+    from . import InventoryOperations
+
+    if not (admin is not None and (admin.is_admin_user or admin.is_superuser)):
+        raise PermissionDenied("Orders can only be verified by a sales admin.")
+
+    if not InventoryOperations.is_stock_count_complete():
+        missing = list(
+            InventoryOperations.missing_packagings().values_list("public_id", flat=True)
+        )
+        raise ValidationError(
+            {
+                "status": (
+                    "Today's stock count is incomplete -- orders cannot be verified. "
+                    f"Missing packagings: {', '.join(missing)}."
+                )
+            }
+        )
+
+    shortages = []
+    for packaging, needed in InventoryOperations.order_bag_requirements(order).items():
+        available = InventoryOperations.available_bags(packaging)
+        if needed > available:
+            shortages.append(f"{packaging.public_id}: need {needed}, have {available}")
+    if shortages:
+        raise ValidationError(
+            {
+                "status": (
+                    "Not enough stock to verify this order -- "
+                    f"{'; '.join(shortages)}."
+                )
+            }
+        )
+
+    order.status = Status.by_id(StatusIds.CONFIRMED)
+    order.verified_by = admin
+    order.verified_at = indian_now()
+    order.full_clean()
+    order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+    return order
+
+
+@transaction.atomic
+def unverify_order(order: Order, *, status: StatusIds = StatusIds.UNDER_REVIEW) -> Order:
+    """Reverse a verification, clearing who verified it and when.
+
+    The bags this order was holding are released automatically: reservations
+    are derived from ``Order.status``, never stored.
+    """
+    order.status = Status.by_id(status)
+    order.verified_by = None
+    order.verified_at = None
+    order.full_clean()
+    order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+    return order
+
+
+def revert_dispatch(order: Order) -> Order:
+    """Reverse a dispatch, returning the order to ``CONFIRMED``.
+
+    Its bags move back from consumed to reserved on their own, for the same
+    reason: both figures are derived from the status.
+    """
+    order.status = Status.by_id(StatusIds.CONFIRMED)
+    order.actual_delivery_date = None
+    order.full_clean()
+    order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
+    return order
+
+
 def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
     order.status = Status.by_id(StatusIds.DELIVERED)
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
@@ -182,8 +267,9 @@ def order_payload(order: Order) -> dict:
             order.actual_delivery_date.isoformat() if order.actual_delivery_date else None
         ),
         "special_comments": order.special_comments,
+        "verified_at": order.verified_at.isoformat() if order.verified_at else None,
         "total_amount": str(order.total_amount),
-        "total_bags": order.total_bags,
+        "total_packets": order.total_packets,
         "items": [
             {
                 "packaging": packaging_payload(item.product_packaging),

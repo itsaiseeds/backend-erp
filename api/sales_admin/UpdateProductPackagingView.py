@@ -5,7 +5,7 @@ Handles ``PATCH``/``DELETE``
 
 Only an application Admin may update or delete a packaging (``admin_required``
 on ``AdminApiView``). Packagings are addressed by their ``public_id``
-(``PP-…``); the ``product`` + ``packing_bag_weight`` + ``packing_bags`` triple is
+(``PP-…``); the ``product`` + ``packet_weight`` + ``packets`` triple is
 validated for uniqueness, excluding the packaging being edited. Soft-deleted
 packagings are never found (404).
 """
@@ -30,16 +30,16 @@ class UpdateProductPackagingSerializer(serializers.Serializer):
     product = serializers.SlugRelatedField(
         slug_field="public_id", queryset=Product.objects.all(), required=False
     )
-    packing_bag_weight = serializers.DecimalField(
+    packet_weight = serializers.DecimalField(
         max_digits=8,
         decimal_places=3,
         required=False,
-        error_messages={"invalid": "Packing bag weight must be a valid number."},
+        error_messages={"invalid": "Packing packet weight must be a valid number."},
     )
-    packing_bags = serializers.IntegerField(
+    packets = serializers.IntegerField(
         min_value=1,
         required=False,
-        error_messages={"min_value": "Packing bag count must be at least 1."},
+        error_messages={"min_value": "Packing packet count must be at least 1."},
     )
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, min_value=0
@@ -49,19 +49,19 @@ class UpdateProductPackagingSerializer(serializers.Serializer):
         if self.instance is None:
             return attrs
         product = attrs.get("product", self.instance.product)
-        weight = attrs.get("packing_bag_weight", self.instance.packing_bag_weight)
-        bags = attrs.get("packing_bags", self.instance.packing_bags)
+        weight = attrs.get("packet_weight", self.instance.packet_weight)
+        packets = attrs.get("packets", self.instance.packets)
         if weight <= 0:
             raise serializers.ValidationError(
-                "Packing bag weight must be positive."
+                "Packing packet weight must be positive."
             )
         qs = ProductPackaging.all_objects.filter(
-            product=product, packing_bag_weight=weight, packing_bags=bags
+            product=product, packet_weight=weight, packets=packets
         )
         qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError(
-                "This product already has a packaging with this bag weight and bag count."
+                "This product already has a packaging with this packet weight and packet count."
             )
         return attrs
 
@@ -86,7 +86,7 @@ class UpdateProductPackagingView(AdminApiView):
             instance=packaging, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        for field in ("product", "packing_bag_weight", "packing_bags", "selling_price"):
+        for field in ("product", "packet_weight", "packets", "selling_price"):
             if field in serializer.validated_data:
                 setattr(packaging, field, serializer.validated_data[field])
         packaging.save()

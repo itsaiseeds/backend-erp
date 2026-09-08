@@ -853,17 +853,17 @@ components:
 
         ``product`` is addressed by its ``public_id`` (``P-…``). ``selling_price``
         is the whole-packaging price; when omitted it is frozen to
-        ``packing_bags * product.selling_price`` (see
+        ``packets * product.selling_price`` (see
         ``aggregator.ProductOperations.add_packaging``).
       properties:
         product:
           type: string
           minLength: 1
-        packing_bag_weight:
+        packet_weight:
           type: string
           format: decimal
           pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
-        packing_bags:
+        packets:
           type: integer
           minimum: 1
         selling_price:
@@ -871,8 +871,8 @@ components:
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
       required:
-      - packing_bag_weight
-      - packing_bags
+      - packet_weight
+      - packets
       - product
     CreateProductRequest:
       type: object
@@ -1027,11 +1027,11 @@ components:
         product:
           type: string
           minLength: 1
-        packing_bag_weight:
+        packet_weight:
           type: string
           format: decimal
           pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
-        packing_bags:
+        packets:
           type: integer
           minimum: 1
         selling_price:
@@ -1089,11 +1089,11 @@ components:
           type: string
         product:
           $ref: '#/components/schemas/ProductRef'
-        packing_bag_weight:
+        packet_weight:
           type: string
           format: decimal
           pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
-        packing_bags:
+        packets:
           type: integer
           minimum: 1
         total_weight:
@@ -1105,8 +1105,8 @@ components:
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
       required:
-      - packing_bag_weight
-      - packing_bags
+      - packet_weight
+      - packets
       - product
       - public_id
       - selling_price
@@ -1129,14 +1129,14 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
-        margin_per_bag:
+        margin_per_packet:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
       required:
       - buying_price
       - crop
-      - margin_per_bag
+      - margin_per_packet
       - name
       - public_id
       - selling_price

@@ -24,10 +24,10 @@ class _ProductsStubAdapter implements HttpClientAdapter {
     const String products =
         '[{"public_id":"p1","name":"Super Hybrid 101",'
         '"crop":{"id":1,"name":"Cotton"},"buying_price":"1200.00",'
-        '"selling_price":"1500.50","margin_per_bag":"300.50"},'
+        '"selling_price":"1500.50","margin_per_packet":"300.50"},'
         '{"public_id":"p2","name":"Golden Wheat Select",'
         '"crop":{"id":2,"name":"Wheat"},"buying_price":"900.00",'
-        '"selling_price":"1100.00","margin_per_bag":"200.00"}]';
+        '"selling_price":"1100.00","margin_per_packet":"200.00"}]';
     const String crops = '[{"id":1,"name":"Cotton"},{"id":2,"name":"Wheat"}]';
 
     return ResponseBody.fromString(

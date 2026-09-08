@@ -42,8 +42,8 @@ class ProductDetailDialog extends StatelessWidget {
                 value: product.sellingPrice,
               ),
               DetailField(
-                label: AppStrings.COLUMN_MARGIN_PER_BAG,
-                value: product.marginPerBag,
+                label: AppStrings.COLUMN_MARGIN_PER_PACKET,
+                value: product.marginPerPacket,
               ),
             ],
           ),

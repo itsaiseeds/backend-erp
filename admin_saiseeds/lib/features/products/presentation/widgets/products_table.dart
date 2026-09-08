@@ -14,7 +14,7 @@ class ProductsTable extends StatefulWidget {
   static const String COLUMN_CROP = 'crop';
   static const String COLUMN_BUYING_PRICE = 'buying_price';
   static const String COLUMN_SELLING_PRICE = 'selling_price';
-  static const String COLUMN_MARGIN_PER_BAG = 'margin_per_bag';
+  static const String COLUMN_MARGIN_PER_PACKET = 'margin_per_packet';
 
   final List<ProductModel> products;
   final bool isLoading;
@@ -78,8 +78,8 @@ class ProductsTableState extends State<ProductsTable> {
       width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
-      id: ProductsTable.COLUMN_MARGIN_PER_BAG,
-      label: AppStrings.COLUMN_MARGIN_PER_BAG,
+      id: ProductsTable.COLUMN_MARGIN_PER_PACKET,
+      label: AppStrings.COLUMN_MARGIN_PER_PACKET,
       width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
@@ -114,8 +114,8 @@ class ProductsTableState extends State<ProductsTable> {
         return AppStrings.COLUMN_BUYING_PRICE;
       case AppStrings.SORT_BY_SELLING_PRICE:
         return AppStrings.COLUMN_SELLING_PRICE;
-      case AppStrings.SORT_BY_MARGIN_PER_BAG:
-        return AppStrings.COLUMN_MARGIN_PER_BAG;
+      case AppStrings.SORT_BY_MARGIN_PER_PACKET:
+        return AppStrings.COLUMN_MARGIN_PER_PACKET;
       default:
         return sort;
     }
@@ -145,7 +145,7 @@ class ProductsTableState extends State<ProductsTable> {
         AppStrings.SORT_BY_NAME,
         AppStrings.SORT_BY_BUYING_PRICE,
         AppStrings.SORT_BY_SELLING_PRICE,
-        AppStrings.SORT_BY_MARGIN_PER_BAG,
+        AppStrings.SORT_BY_MARGIN_PER_PACKET,
       ],
       filterByOptions: const [
         AppStrings.FILTER_BY_NAME,
@@ -179,8 +179,8 @@ class ProductsTableState extends State<ProductsTable> {
         return _textCell(product.buyingPrice);
       case ProductsTable.COLUMN_SELLING_PRICE:
         return _textCell(product.sellingPrice);
-      case ProductsTable.COLUMN_MARGIN_PER_BAG:
-        return _textCell(product.marginPerBag);
+      case ProductsTable.COLUMN_MARGIN_PER_PACKET:
+        return _textCell(product.marginPerPacket);
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
