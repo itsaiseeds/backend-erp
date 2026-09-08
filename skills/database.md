@@ -108,7 +108,7 @@ that would fail against existing data), apply it in phases to cause **minimum do
 | File | Purpose |
 |---|---|
 | `sql/ddl.sql` | `CREATE TABLE` for **every** app — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), `authentication_user`, `authentication_user_groups/…_user_permissions`, `authentication_admin`, `authentication_salesperson`, `aggregator_*` (address/city/country/pincode/state), `authtoken_token` |
-| `sql/dml.sql` | Seeds content types (28) + permissions (112: add/change/delete/view × 28 models), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`), a no-TOTP user (`8888888888`), and the `aggregator_status` rows (ids 1–9) mirrored by `StatusIds` — used by the DML-seeded tests |
+| `sql/dml.sql` | Seeds content types (31) + permissions (124: add/change/delete/view × 31 models), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`), a no-TOTP user (`8888888888`), and the `aggregator_status` rows (ids 1–9) mirrored by `StatusIds` — used by the DML-seeded tests |
 | `sql/admin_perf.sql` | Prod DDL: `pg_trgm` extension + GIN indexes on `authentication_user(name, email)` for Django-admin `ILIKE` search (idempotent) |
 | `sql/session_auth_24h.sql` | Prod DDL: `authtoken_token.user_id` FK (DRF adds it only via migrate) + `created` index for the 24h TTL sweep (idempotent) |
 
@@ -128,10 +128,12 @@ drf-authtoken (`authtoken_token`). `auth_user`, `auth_user_groups`, and
 
 Seeds the reference data Django and the tests need:
 
-1. **28 content types** (auth user/group/permission, contenttypes, sessions,
+1. **31 content types** (auth user/group/permission, contenttypes, sessions,
    admin logentry, authentication user/admin/salesperson, aggregator
-   country/state/city/pincode/address)
-2. **112 permissions** (add/change/delete/view × 28 models)
+   country/state/city/pincode/address + the sales domain: product/
+   productpackaging/order/orderitem/inventorysnapshot/customorder/
+   customorderitem etc.)
+2. **124 permissions** (add/change/delete/view × 31 models)
 3. **Reconciliation users**: superuser `9999999999`/`admin` (TOTP enabled,
    `created_by`/`verified_by` self-referenced) and non-TOTP user `8888888888`
    (used by the DML-seeded tests).
@@ -232,7 +234,7 @@ The `reload_db.sh` script always reads from `.env.dev` (localhost).
 ## Adding Content Types and Permissions for New Models
 
 `sql/dml.sql` seeds the content types and permissions for every SQL-managed
-model (currently 28 content types → 112 permissions). When adding a new
+model (currently 31 content types → 124 permissions). When adding a new
 SQL-managed model, append its content type and 4 CRUD permissions **after the
 current max IDs** (check `SELECT max(id), setval(...)` in `dml.sql`):
 

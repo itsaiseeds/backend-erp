@@ -208,12 +208,15 @@ bag holds N packets. (This inverts an earlier model where a "packet" held
   packaging on the order (`available_bags` ≥ needed). Any shortfall blocks it.
 - `Admin.can_update_stock_count` gates **writing a stock count and nothing
   else** — it does *not* gate order verification.
-- `CustomOrder` is **standalone** (no FK to `Order`), booked **only by a sales
-  admin**, and has **no verification step**: `create_custom_order` auto-confirms
-  it (born `CONFIRMED`, `verified_by`/`verified_at` set to the creating admin).
-  Creation is **blocked unless enough loose packets are in stock**
-  (`available_loose_packets` ≥ requested). Its `CustomOrderItem` lines carry
-  (`product`, `packets`) — no packaging.
+- `CustomOrder` is the instrument for **giving out samples to clients**. It is
+  **standalone** (no FK to `Order`), booked **only by a sales admin**, and has
+  **no verification step**: `create_custom_order` auto-confirms it (born
+  `CONFIRMED`, `verified_by`/`verified_at` set to the creating admin). Creation
+  is **blocked unless enough loose packets are in stock**
+  (`available_loose_packets` ≥ requested), so you cannot hand out samples you do
+  not physically have. Its `CustomOrderItem` lines carry (`product`, `packets`)
+  — no packaging; from there it follows the normal dispatch lifecycle, and
+  reversing a dispatch returns those packets to reserved automatically.
 
 ### Auth / roles
 - Login is **TOTP** (authenticator app) for everyone except staff (Django admin

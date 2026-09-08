@@ -31,7 +31,8 @@
   `AndroidBaseView`); views only redeclare auth/permission classes when they
   deliberately differ (pre-auth endpoints, superuser/role gates).
 - **KISS:** views stay thin — validate with a serializer, then delegate writes
-  to the operations layer (`OrderOperations`, `ClientOperations`,
+  to the operations layer (`OrderOperations`, `CustomOrderOperations`,
+  `InventoryOperations`, `ClientOperations`, `ProductOperations`,
   `UserOperations`).
 - **YAGNI:** `android/v1/` is empty on purpose; add endpoints only when a
   client actually needs them.
