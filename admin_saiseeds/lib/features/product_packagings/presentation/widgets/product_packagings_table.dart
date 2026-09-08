@@ -11,8 +11,8 @@ import '../../data/models/product_packaging_model.dart';
 class ProductPackagingsTable extends StatefulWidget {
   static const String CONFIG_KEY = 'product_packagings';
   static const String COLUMN_PRODUCT = 'product';
-  static const String COLUMN_PACKING_BAG_WEIGHT = 'packing_bag_weight';
-  static const String COLUMN_PACKING_BAGS = 'packing_bags';
+  static const String COLUMN_PACKET_WEIGHT = 'packet_weight';
+  static const String COLUMN_PACKETS = 'packets';
   static const String COLUMN_TOTAL_WEIGHT = 'total_weight';
   static const String COLUMN_SELLING_PRICE = 'selling_price';
 
@@ -63,13 +63,13 @@ class ProductPackagingsTableState extends State<ProductPackagingsTable> {
       width: AppSizes.tableColumnWidthWide,
     ),
     AppDataColumn(
-      id: ProductPackagingsTable.COLUMN_PACKING_BAG_WEIGHT,
-      label: AppStrings.COLUMN_PACKING_BAG_WEIGHT,
+      id: ProductPackagingsTable.COLUMN_PACKET_WEIGHT,
+      label: AppStrings.COLUMN_PACKET_WEIGHT,
       width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
-      id: ProductPackagingsTable.COLUMN_PACKING_BAGS,
-      label: AppStrings.COLUMN_PACKING_BAGS,
+      id: ProductPackagingsTable.COLUMN_PACKETS,
+      label: AppStrings.COLUMN_PACKETS,
       width: AppSizes.tableColumnWidthNarrow,
     ),
     AppDataColumn(
@@ -108,10 +108,10 @@ class ProductPackagingsTableState extends State<ProductPackagingsTable> {
     switch (sort) {
       case AppStrings.SORT_BY_PRODUCT:
         return AppStrings.COLUMN_PRODUCT;
-      case AppStrings.SORT_BY_PACKING_BAG_WEIGHT:
-        return AppStrings.COLUMN_PACKING_BAG_WEIGHT;
-      case AppStrings.SORT_BY_PACKING_BAGS:
-        return AppStrings.COLUMN_PACKING_BAGS;
+      case AppStrings.SORT_BY_PACKET_WEIGHT:
+        return AppStrings.COLUMN_PACKET_WEIGHT;
+      case AppStrings.SORT_BY_PACKETS:
+        return AppStrings.COLUMN_PACKETS;
       case AppStrings.SORT_BY_TOTAL_WEIGHT:
         return AppStrings.COLUMN_TOTAL_WEIGHT;
       case AppStrings.SORT_BY_SELLING_PRICE:
@@ -143,8 +143,8 @@ class ProductPackagingsTableState extends State<ProductPackagingsTable> {
       ],
       sortByOptions: const [
         AppStrings.SORT_BY_PRODUCT,
-        AppStrings.SORT_BY_PACKING_BAG_WEIGHT,
-        AppStrings.SORT_BY_PACKING_BAGS,
+        AppStrings.SORT_BY_PACKET_WEIGHT,
+        AppStrings.SORT_BY_PACKETS,
         AppStrings.SORT_BY_TOTAL_WEIGHT,
         AppStrings.SORT_BY_SELLING_PRICE,
       ],
@@ -171,10 +171,10 @@ class ProductPackagingsTableState extends State<ProductPackagingsTable> {
     switch (col.id) {
       case ProductPackagingsTable.COLUMN_PRODUCT:
         return _textCell(packaging.productName, isStrong: true);
-      case ProductPackagingsTable.COLUMN_PACKING_BAG_WEIGHT:
-        return _textCell(packaging.packingBagWeight);
-      case ProductPackagingsTable.COLUMN_PACKING_BAGS:
-        return _textCell(packaging.packingBagsLabel);
+      case ProductPackagingsTable.COLUMN_PACKET_WEIGHT:
+        return _textCell(packaging.packetWeight);
+      case ProductPackagingsTable.COLUMN_PACKETS:
+        return _textCell(packaging.packetsLabel);
       case ProductPackagingsTable.COLUMN_TOTAL_WEIGHT:
         return _textCell(packaging.totalWeight);
       case ProductPackagingsTable.COLUMN_SELLING_PRICE:

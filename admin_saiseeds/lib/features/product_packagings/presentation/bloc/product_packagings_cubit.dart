@@ -154,15 +154,15 @@ class ProductPackagingsCubit extends SafeCubit<ProductPackagingsState> {
 
   Future<bool> createProductPackaging({
     required String productPublicId,
-    required String packingBagWeight,
-    required String packingBags,
+    required String packetWeight,
+    required String packets,
     required String sellingPrice,
   }) {
     return _mutate(
       () => _repository.createProductPackaging(
         productPublicId: productPublicId,
-        packingBagWeight: packingBagWeight,
-        packingBags: packingBags,
+        packetWeight: packetWeight,
+        packets: packets,
         sellingPrice: sellingPrice,
       ),
     );
@@ -171,16 +171,16 @@ class ProductPackagingsCubit extends SafeCubit<ProductPackagingsState> {
   Future<bool> updateProductPackaging({
     required String publicId,
     required String productPublicId,
-    required String packingBagWeight,
-    required String packingBags,
+    required String packetWeight,
+    required String packets,
     required String sellingPrice,
   }) {
     return _mutate(
       () => _repository.updateProductPackaging(
         publicId: publicId,
         productPublicId: productPublicId,
-        packingBagWeight: packingBagWeight,
-        packingBags: packingBags,
+        packetWeight: packetWeight,
+        packets: packets,
         sellingPrice: sellingPrice,
       ),
     );
@@ -213,8 +213,8 @@ class ProductPackagingsCubit extends SafeCubit<ProductPackagingsState> {
           query: source.search,
           searchableValues: (packaging) => [
             packaging.productName,
-            packaging.packingBagWeight,
-            packaging.packingBagsLabel,
+            packaging.packetWeight,
+            packaging.packetsLabel,
             packaging.totalWeight,
             packaging.sellingPrice,
           ],
@@ -262,10 +262,10 @@ class ProductPackagingsCubit extends SafeCubit<ProductPackagingsState> {
     switch (field) {
       case AppStrings.SORT_BY_PRODUCT:
         return packaging.productName.toLowerCase();
-      case AppStrings.SORT_BY_PACKING_BAG_WEIGHT:
-        return packaging.packingBagWeightValue;
-      case AppStrings.SORT_BY_PACKING_BAGS:
-        return packaging.packingBags;
+      case AppStrings.SORT_BY_PACKET_WEIGHT:
+        return packaging.packetWeightValue;
+      case AppStrings.SORT_BY_PACKETS:
+        return packaging.packets;
       case AppStrings.SORT_BY_TOTAL_WEIGHT:
         return packaging.totalWeightValue;
       case AppStrings.SORT_BY_SELLING_PRICE:

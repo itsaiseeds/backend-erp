@@ -6,7 +6,7 @@ class ProductModel {
   final CropModel? crop;
   final String buyingPrice;
   final String sellingPrice;
-  final String marginPerBag;
+  final String marginPerPacket;
 
   const ProductModel({
     required this.publicId,
@@ -14,7 +14,7 @@ class ProductModel {
     this.crop,
     this.buyingPrice = '',
     this.sellingPrice = '',
-    this.marginPerBag = '',
+    this.marginPerPacket = '',
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -28,7 +28,7 @@ class ProductModel {
           : null,
       buyingPrice: _priceOf(json['buying_price']),
       sellingPrice: _priceOf(json['selling_price']),
-      marginPerBag: _priceOf(json['margin_per_bag']),
+      marginPerPacket: _priceOf(json['margin_per_packet']),
     );
   }
 
@@ -40,7 +40,7 @@ class ProductModel {
 
   num? get sellingPriceValue => num.tryParse(sellingPrice);
 
-  num? get marginPerBagValue => num.tryParse(marginPerBag);
+  num? get marginPerPacketValue => num.tryParse(marginPerPacket);
 
   static String _priceOf(dynamic value) {
     if (value == null) return '';

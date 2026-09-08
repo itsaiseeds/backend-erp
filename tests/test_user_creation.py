@@ -32,6 +32,10 @@ class UserCreationTest(WebApiTestCase):
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
 
+        Admin.objects.create(
+            user=cls.superuser, can_update_stock_count=False, created_by=cls.superuser
+        )
+
         cls.country, _ = Country.objects.get_or_create(
             name="India", defaults={"iso_code": "IN", "created_by": cls.superuser}
         )
@@ -116,17 +120,25 @@ class UserCreationTest(WebApiTestCase):
                 "/api/sales-admin/sales-people", payload, format="json"
             ).status_code
             self.assertEqual(status_code, status.HTTP_403_FORBIDDEN)
-        # A superuser only creates admins -> also forbidden for sales-people.
+        # A superuser may also create a salesperson.
         self.login_as(self.superuser)
         self.assertEqual(
-            self.client.post("/api/sales-admin/sales-people", payload, format="json").status_code,
-            status.HTTP_403_FORBIDDEN,
+            self.client.post(
+                "/api/sales-admin/sales-people",
+                {**payload, "phone_number": "9000000087"},
+                format="json",
+            ).status_code,
+            status.HTTP_201_CREATED,
         )
 
         # An application admin may create a salesperson.
         self.login_as(self.seed_admin)
         self.assertEqual(
-            self.client.post("/api/sales-admin/sales-people", payload, format="json").status_code,
+            self.client.post(
+                "/api/sales-admin/sales-people",
+                {**payload, "phone_number": "9000000086"},
+                format="json",
+            ).status_code,
             status.HTTP_201_CREATED,
         )
 

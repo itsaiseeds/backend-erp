@@ -36,12 +36,12 @@ class ProductPackagingDetailDialog extends StatelessWidget {
                 value: packaging.productName,
               ),
               DetailField(
-                label: AppStrings.COLUMN_PACKING_BAG_WEIGHT,
-                value: packaging.packingBagWeight,
+                label: AppStrings.COLUMN_PACKET_WEIGHT,
+                value: packaging.packetWeight,
               ),
               DetailField(
-                label: AppStrings.COLUMN_PACKING_BAGS,
-                value: packaging.packingBagsLabel,
+                label: AppStrings.COLUMN_PACKETS,
+                value: packaging.packetsLabel,
               ),
               DetailField(
                 label: AppStrings.COLUMN_TOTAL_WEIGHT,

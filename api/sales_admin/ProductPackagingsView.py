@@ -28,8 +28,8 @@ class ProductPackagingPayloadSerializer(serializers.Serializer):
 
     public_id = serializers.CharField()
     product = ProductRefSerializer()
-    packing_bag_weight = serializers.DecimalField(max_digits=8, decimal_places=3)
-    packing_bags = serializers.IntegerField(min_value=1)
+    packet_weight = serializers.DecimalField(max_digits=8, decimal_places=3)
+    packets = serializers.IntegerField(min_value=1)
     total_weight = serializers.DecimalField(max_digits=11, decimal_places=3)
     selling_price = serializers.DecimalField(max_digits=12, decimal_places=2)
 
@@ -39,7 +39,7 @@ class CreateProductPackagingSerializer(serializers.Serializer):
 
     ``product`` is addressed by its ``public_id`` (``P-…``). ``selling_price``
     is the whole-packaging price; when omitted it is frozen to
-    ``packing_bags * product.selling_price`` (see
+    ``packets * product.selling_price`` (see
     ``aggregator.ProductOperations.add_packaging``).
     """
 
@@ -48,34 +48,34 @@ class CreateProductPackagingSerializer(serializers.Serializer):
         queryset=Product.objects.all(),
         error_messages={"required": "Product is required."},
     )
-    packing_bag_weight = serializers.DecimalField(
+    packet_weight = serializers.DecimalField(
         max_digits=8,
         decimal_places=3,
-        error_messages={"required": "Packing bag weight is required."},
+        error_messages={"required": "Packing packet weight is required."},
     )
-    packing_bags = serializers.IntegerField(
+    packets = serializers.IntegerField(
         min_value=1,
-        error_messages={"required": "Packing bag count is required."},
+        error_messages={"required": "Packing packet count is required."},
     )
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, min_value=0
     )
 
     def validate(self, attrs):
-        if attrs["packing_bag_weight"] <= 0:
+        if attrs["packet_weight"] <= 0:
             raise serializers.ValidationError(
-                "Packing bag weight must be positive."
+                "Packing packet weight must be positive."
             )
         qs = ProductPackaging.all_objects.filter(
             product=attrs["product"],
-            packing_bag_weight=attrs["packing_bag_weight"],
-            packing_bags=attrs["packing_bags"],
+            packet_weight=attrs["packet_weight"],
+            packets=attrs["packets"],
         )
         if self.instance is not None:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError(
-                "This product already has a packaging with this bag weight and bag count."
+                "This product already has a packaging with this packet weight and packet count."
             )
         return attrs
 
@@ -88,8 +88,8 @@ def packaging_payload(packaging):
             "public_id": packaging.product.public_id,
             "name": packaging.product.name,
         },
-        "packing_bag_weight": packaging.packing_bag_weight,
-        "packing_bags": packaging.packing_bags,
+        "packet_weight": packaging.packet_weight,
+        "packets": packaging.packets,
         "total_weight": packaging.total_weight,
         "selling_price": packaging.selling_price,
     }
@@ -107,7 +107,7 @@ class ProductPackagingsView(AdminApiView):
     )
     def get(self, request):
         packagings = ProductPackaging.objects.select_related("product").order_by(
-            "product__name", "packing_bag_weight"
+            "product__name", "packet_weight"
         )
         return Response([packaging_payload(p) for p in packagings])
 
@@ -122,12 +122,12 @@ class ProductPackagingsView(AdminApiView):
         data = serializer.validated_data
         selling_price = data.get(
             "selling_price",
-            data["packing_bags"] * data["product"].selling_price,
+            data["packets"] * data["product"].selling_price,
         )
         packaging = ProductPackaging.objects.create(
             product=data["product"],
-            packing_bag_weight=data["packing_bag_weight"],
-            packing_bags=data["packing_bags"],
+            packet_weight=data["packet_weight"],
+            packets=data["packets"],
             selling_price=selling_price,
             created_by=request.user,
         )

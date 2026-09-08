@@ -10,7 +10,7 @@ void main() {
         'crop': {'id': 4, 'name': 'Cotton'},
         'buying_price': '1200.00',
         'selling_price': '1500.50',
-        'margin_per_bag': '300.50',
+        'margin_per_packet': '300.50',
       });
 
       expect(product.publicId, 'b3f1c2d4-5a6b-7c8d-9e0f-112233445566');
@@ -22,7 +22,7 @@ void main() {
       expect(product.cropName, 'Cotton');
       expect(product.buyingPrice, '1200.00');
       expect(product.sellingPrice, '1500.50');
-      expect(product.marginPerBag, '300.50');
+      expect(product.marginPerPacket, '300.50');
     });
 
     test('exposes numeric values parsed from the price strings', () {
@@ -32,12 +32,12 @@ void main() {
         'crop': {'id': 1, 'name': 'Wheat'},
         'buying_price': '900.25',
         'selling_price': '1000.75',
-        'margin_per_bag': '100.50',
+        'margin_per_packet': '100.50',
       });
 
       expect(product.buyingPriceValue, 900.25);
       expect(product.sellingPriceValue, 1000.75);
-      expect(product.marginPerBagValue, 100.50);
+      expect(product.marginPerPacketValue, 100.50);
     });
 
     test('tolerates a missing crop and absent price keys', () {
@@ -53,7 +53,7 @@ void main() {
       expect(product.cropName, '');
       expect(product.buyingPrice, '');
       expect(product.buyingPriceValue, isNull);
-      expect(product.marginPerBag, '');
+      expect(product.marginPerPacket, '');
     });
 
     test('coerces a numeric price into its string form', () {
@@ -79,7 +79,7 @@ void main() {
           'crop': {'id': 1, 'name': 'Cotton'},
           'buying_price': '100.00',
           'selling_price': '150.00',
-          'margin_per_bag': '50.00',
+          'margin_per_packet': '50.00',
         },
         {
           'public_id': 'p2',
@@ -87,7 +87,7 @@ void main() {
           'crop': {'id': 2, 'name': 'Wheat'},
           'buying_price': '200.00',
           'selling_price': '260.00',
-          'margin_per_bag': '60.00',
+          'margin_per_packet': '60.00',
         },
       ];
 
@@ -97,7 +97,7 @@ void main() {
 
       expect(products, hasLength(2));
       expect(products.first.cropName, 'Cotton');
-      expect(products.last.marginPerBagValue, 60);
+      expect(products.last.marginPerPacketValue, 60);
     });
   });
 }

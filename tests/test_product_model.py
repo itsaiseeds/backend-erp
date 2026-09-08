@@ -32,7 +32,7 @@ class ProductModelTest(DMLTestCase):
         assert len(product.public_id) == 14
         assert isinstance(product.crop, Crop)
         assert product.crop.name == "Maize"
-        assert product.margin_per_bag == Decimal("50.00")
+        assert product.margin_per_packet == Decimal("50.00")
 
     def test_crop_is_reused(self):
         """tests/test_product_model.py::ProductModelTest::test_crop_is_reused"""
@@ -52,7 +52,7 @@ class ProductModelTest(DMLTestCase):
             actor=self.su,
         )
         packaging = add_packaging(
-            product, packing_bag_weight=Decimal("25.000"), packing_bags=4, actor=self.su
+            product, packet_weight=Decimal("25.000"), packets=4, actor=self.su
         )
         assert packaging.public_id.startswith("PP-")
         assert len(packaging.public_id) == 15

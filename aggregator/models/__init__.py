@@ -7,7 +7,10 @@ from .ClientTransportAgency import ClientTransportAgency
 from .Contact import Contact
 from .Country import Country
 from .Crop import Crop
+from .CustomOrder import CustomOrder
+from .CustomOrderItem import CustomOrderItem
 from .DispatchDetails import DispatchDetails
+from .InventorySnapshot import InventorySnapshot
 from .Order import Order
 from .OrderItem import OrderItem
 from .Pincode import Pincode
@@ -35,8 +38,11 @@ __all__ = [
     "ClientTransportAgency",
     "Product",
     "ProductPackaging",
+    "InventorySnapshot",
     "DispatchDetails",
     "PrivateDispatchDetails",
     "Order",
     "OrderItem",
+    "CustomOrder",
+    "CustomOrderItem",
 ]

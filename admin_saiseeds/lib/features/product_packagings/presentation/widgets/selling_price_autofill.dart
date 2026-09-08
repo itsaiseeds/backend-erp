@@ -18,15 +18,15 @@ class SellingPriceAutofill {
     _isManuallyEdited = true;
   }
 
-  String? nextValue({required num? productSellingPrice, required String bags}) {
+  String? nextValue({required num? productSellingPrice, required String packets}) {
     if (_isManuallyEdited) return null;
 
-    final int? bagCount = int.tryParse(bags.trim());
-    if (productSellingPrice == null || bagCount == null || bagCount <= 0) {
+    final int? packetCount = int.tryParse(packets.trim());
+    if (productSellingPrice == null || packetCount == null || packetCount <= 0) {
       return null;
     }
 
-    final String computed = (productSellingPrice * bagCount).toStringAsFixed(
+    final String computed = (productSellingPrice * packetCount).toStringAsFixed(
       PRICE_DECIMALS,
     );
     _lastAutofilledValue = computed;

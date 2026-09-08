@@ -209,7 +209,7 @@ class ProductsCubit extends SafeCubit<ProductsState> {
         product.cropName,
         product.buyingPrice,
         product.sellingPrice,
-        product.marginPerBag,
+        product.marginPerPacket,
       ],
     );
 
@@ -256,8 +256,8 @@ class ProductsCubit extends SafeCubit<ProductsState> {
         return product.buyingPriceValue;
       case AppStrings.SORT_BY_SELLING_PRICE:
         return product.sellingPriceValue;
-      case AppStrings.SORT_BY_MARGIN_PER_BAG:
-        return product.marginPerBagValue;
+      case AppStrings.SORT_BY_MARGIN_PER_PACKET:
+        return product.marginPerPacketValue;
       default:
         return null;
     }

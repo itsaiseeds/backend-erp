@@ -9,7 +9,7 @@ from common.models import (
 
 
 class Product(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel):
-    """A product we buy and sell, priced per bag.
+    """A product we buy and sell, priced per packet.
 
     Exposed to the frontend by its ``public_id`` (``P-…``); the primary key is
     never sent out.
@@ -25,12 +25,12 @@ class Product(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Created
         related_name="products",
     )
     buying_price = models.DecimalField(
-        "buying price per bag",
+        "buying price per packet",
         max_digits=12,
         decimal_places=2,
     )
     selling_price = models.DecimalField(
-        "selling price per bag",
+        "selling price per packet",
         max_digits=12,
         decimal_places=2,
     )
@@ -54,5 +54,5 @@ class Product(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Created
         return f"{self.name} ({self.crop})" if self.crop_id else self.name
 
     @property
-    def margin_per_bag(self):
+    def margin_per_packet(self):
         return self.selling_price - self.buying_price

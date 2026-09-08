@@ -8,11 +8,12 @@ from __future__ import annotations
 import datetime
 from decimal import Decimal
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.utils import IntegrityError
 
 from aggregator.ClientOperations import add_client_address, create_client
+from aggregator.InventoryOperations import record_stock_counts
 from aggregator.models import (
     Address,
     City,
@@ -21,6 +22,7 @@ from aggregator.models import (
     Order,
     Pincode,
     PrivateDispatchDetails,
+    ProductPackaging,
     State,
     StatusIds,
 )
@@ -28,7 +30,9 @@ from aggregator.OrderOperations import (
     attach_dispatch_details,
     create_order,
     order_payload,
+    unverify_order,
     update_order_status,
+    verify_order,
 )
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, SalesPerson, User
@@ -57,7 +61,9 @@ class OrderModelTest(DMLTestCase):
         cls.city2 = City.objects.create(name="Mumbai", state=cls.state, created_by=cls.su)
         cls.pincode = Pincode.objects.create(code="411001", city=cls.city, created_by=cls.su)
         SalesPerson.objects.create(user=cls.sp_user, city=cls.city, created_by=cls.su)
-        Admin.objects.create(user=cls.adm_user, created_by=cls.su)
+        Admin.objects.create(
+            user=cls.adm_user, created_by=cls.su, can_update_stock_count=True
+        )
 
         cls.addr = Address.objects.create(
             address_line_1="1 Main St", pincode=cls.pincode, city=cls.city,
@@ -76,7 +82,8 @@ class OrderModelTest(DMLTestCase):
             buying_price=Decimal("100.00"), selling_price=Decimal("150.00"), actor=cls.sp_user,
         )
         cls.pack = add_packaging(
-            cls.product, packing_bag_weight=Decimal("25.000"), packing_bags=4, actor=cls.sp_user
+            cls.product, packet_weight=Decimal("25.000"), packets=4,
+            actor=cls.sp_user,
         )
 
     def _items(self, price="140.00", quantity=3):
@@ -103,10 +110,10 @@ class OrderModelTest(DMLTestCase):
         assert len(order.public_id) == 16
         assert order.status.code == "BOOKED"
         assert order.expected_delivery_date == datetime.date.today() + datetime.timedelta(days=1)
-        # negotiated_selling_price (140) is now per-packaging (was per-bag);
-        # line_total = 140 * 3 quantity = 420. total_bags still counts bags.
+        # negotiated_selling_price (140) is now per-packaging (was per-packet);
+        # line_total = 140 * 3 quantity = 420. total_packets still counts packets.
         assert order.total_amount == Decimal("420.00")
-        assert order.total_bags == 12
+        assert order.total_packets == 12
 
     def test_delivery_address_must_belong_to_client(self):
         """tests/test_order_model.py::OrderModelTest::test_delivery_address_must_belong_to_client"""
@@ -181,3 +188,51 @@ class OrderModelTest(DMLTestCase):
         assert "id" not in payload
         assert payload["public_id"] == order.public_id
         assert payload["items"][0]["packaging"]["public_id"] == self.pack.public_id
+
+    # -- verification ---------------------------------------------------------
+
+    def _count_stock(self):
+        """Upload a complete stock count so verification is allowed."""
+        record_stock_counts(
+            counts=dict.fromkeys(ProductPackaging.objects.all(), 500),
+            actor=self.adm_user,
+        )
+
+    def test_confirmed_requires_verification_details(self):
+        """tests/test_order_model.py::OrderModelTest::test_confirmed_requires_verification_details"""
+        order = self._order()
+        with self.assertRaises(ValidationError):
+            update_order_status(order, StatusIds.CONFIRMED)
+
+    def test_verifier_must_be_admin(self):
+        """tests/test_order_model.py::OrderModelTest::test_verifier_must_be_admin"""
+        self._count_stock()
+        order = self._order()
+        with self.assertRaises(PermissionDenied):
+            verify_order(order, self.plain_user)
+
+    def test_verify_order_records_who_and_when(self):
+        """tests/test_order_model.py::OrderModelTest::test_verify_order_records_who_and_when"""
+        self._count_stock()
+        order = self._order()
+        verify_order(order, self.adm_user)
+        assert order.status.code == "CONFIRMED"
+        assert order.is_verified
+        assert order.verified_by_id == self.adm_user.id
+        assert order.verified_at is not None
+
+    def test_verify_order_blocked_without_a_stock_count(self):
+        """tests/test_order_model.py::OrderModelTest::test_verify_order_blocked_without_a_stock_count"""
+        order = self._order()
+        with self.assertRaises(ValidationError):
+            verify_order(order, self.adm_user)
+
+    def test_unverify_clears_the_verification_details(self):
+        """tests/test_order_model.py::OrderModelTest::test_unverify_clears_the_verification_details"""
+        self._count_stock()
+        order = self._order()
+        verify_order(order, self.adm_user)
+        unverify_order(order)
+        assert order.status.code == "UNDER_REVIEW"
+        assert order.verified_by_id is None
+        assert order.verified_at is None

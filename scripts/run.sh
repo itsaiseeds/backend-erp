@@ -103,12 +103,22 @@ find_flutter() {
 # ---------------------------------------------------------------------------
 cmd_flutter() {
     find_flutter
-    echo "[flutter] Building Flutter web app ..."
+    # `flutter build web` is always a release build, and in release the app
+    # loads .env.prod (see AppConfigKeys.envFile), whose API_BASE_URL points at
+    # the deployed backend. Served from localhost that is a cross-origin call ->
+    # CORS failure. Pass the local API explicitly: a compiled --dart-define wins
+    # over the .env fallback (see ApiConfig.baseUrl), so this build talks to the
+    # local backend (same origin as the Django-served SPA -> no CORS at all).
+    local dev_url
+    dev_url="${API_BASE_URL:-http://localhost:8000}"
+    echo "[flutter] Building Flutter web app for local API: $dev_url"
     cd "$REPO_ROOT/admin_saiseeds"
     "$FLUTTER_CMD" pub get
-    MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release --base-href /sales-admin/
+    MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release \
+        --base-href /sales-admin/ \
+        --dart-define=API_BASE_URL="$dev_url"
     cd "$REPO_ROOT"
-    echo "[flutter] Build complete: admin_saiseeds/build/web/"
+    echo "[flutter] Build complete: admin_saiseeds/build/web/ (API: $dev_url)"
 }
 
 # ---------------------------------------------------------------------------

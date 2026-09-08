@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -9,50 +7,52 @@ from common.models import (
     PrefixedPublicIdModel,
     SoftDeletedModel,
     TimeStampedModel,
-    indian_now,
 )
 
+from .Order import (
+    DISPATCH_REQUIRED_STATUS_CODES,
+    ORDER_STATUS_CODES,
+    default_expected_delivery_date,
+)
 from .Status import StatusIds
 
-ORDER_STATUS_CODES = {s.name for s in StatusIds.order_statuses()}
-DISPATCH_REQUIRED_STATUS_CODES = {StatusIds.DISPATCHED.name, StatusIds.DELIVERED.name}
 
+class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel):
+    """A loose-packet order, made up of one or more ``CustomOrderItem`` rows.
 
-def default_expected_delivery_date():
-    """Default expected delivery: the day after the order is booked."""
-    return indian_now().date() + timedelta(days=1)
+    Unlike a normal :class:`Order`, a custom order draws on the **loose packet**
+    pool of a packaging rather than sealed bags, so its lines are counted in
+    packets. It is a standalone record -- there is deliberately **no** foreign key
+    to ``Order``; it mirrors the same required fields except for its line items.
 
+    Created only by a sales admin (``created_by``) -- a salesperson cannot book
+    one. It shares the order lifecycle statuses and the same dispatch rules: at
+    most one of ``dispatch_details`` / ``private_dispatch_details`` may be set,
+    and exactly one is required once the order is dispatched.
 
-class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel):
-    """A booked order for a client, made up of one or more ``OrderItem`` rows.
-
-    Booked by a sales person (``created_by``). Dispatch details are attached
-    later: at most one of ``dispatch_details`` / ``private_dispatch_details``
-    may ever be set, and exactly one is required once the order is dispatched.
-
-    Exposed to the frontend by its ``public_id`` (``ORD-…``); the primary key is
-    never sent out.
+    Exposed to the frontend by its ``public_id`` (``CORD-…``); the primary key
+    is never sent out.
     """
 
-    public_id_prefix = "ORD-"
+    public_id_prefix = "CORD-"
 
     client = models.ForeignKey(
         "aggregator.Client",
         verbose_name="client",
         on_delete=models.PROTECT,
-        related_name="orders",
+        related_name="custom_orders",
     )
     delivery_address = models.ForeignKey(
         "aggregator.Address",
         verbose_name="delivery address",
         on_delete=models.PROTECT,
-        related_name="orders",
+        related_name="custom_orders",
     )
     status = models.ForeignKey(
         "aggregator.Status",
         verbose_name="status",
         on_delete=models.PROTECT,
-        related_name="orders",
+        related_name="custom_orders",
     )
     expected_delivery_date = models.DateField(
         "expected delivery date",
@@ -69,7 +69,7 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
         on_delete=models.PROTECT,
         null=True,
         blank=True,
-        related_name="orders",
+        related_name="custom_orders",
     )
     private_dispatch_details = models.ForeignKey(
         "aggregator.PrivateDispatchDetails",
@@ -77,7 +77,7 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
         on_delete=models.PROTECT,
         null=True,
         blank=True,
-        related_name="orders",
+        related_name="custom_orders",
     )
     special_comments = models.TextField("special comments", blank=True)
     verified_by = models.ForeignKey(
@@ -87,13 +87,13 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
         null=True,
         blank=True,
         related_name="+",
-        help_text="Sales admin who verified this order.",
+        help_text="Sales admin who verified this custom order.",
     )
     verified_at = models.DateTimeField("verified at", null=True, blank=True)
 
     class Meta:
-        verbose_name = "order"
-        verbose_name_plural = "orders"
+        verbose_name = "custom order"
+        verbose_name_plural = "custom orders"
         ordering = ["-created_at"]
         constraints = [
             models.CheckConstraint(
@@ -101,12 +101,12 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
                     dispatch_details__isnull=False,
                     private_dispatch_details__isnull=False,
                 ),
-                name="ck_order_not_both_dispatch_details",
+                name="ck_customorder_not_both_dispatch_details",
             ),
         ]
 
     def __str__(self):
-        return self.public_id or "Order"
+        return self.public_id or "Custom order"
 
     @property
     def total_amount(self):
@@ -114,13 +114,8 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
 
     @property
     def total_packets(self):
-        return sum(
-            (
-                item.quantity * item.product_packaging.packets
-                for item in self.items.all()
-            ),
-            0,
-        )
+        """Total loose packets across all lines (lines are already counted in packets)."""
+        return sum((item.packets for item in self.items.all()), 0)
 
     @property
     def is_verified(self):
@@ -143,19 +138,19 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
         errors = {}
 
         if self.status_id and self.status.code not in ORDER_STATUS_CODES:
-            errors["status"] = "Invalid status for an order."
+            errors["status"] = "Invalid status for a custom order."
 
         if (
             self.status_id
             and self.status.code == StatusIds.CONFIRMED.name
             and (self.verified_by_id is None or self.verified_at is None)
         ):
-            errors["status"] = "A verified order must record who verified it and when."
+            errors["status"] = "A verified custom order must record who verified it and when."
 
         if self.verified_by_id and not (
             self.verified_by.is_admin_user or self.verified_by.is_superuser
         ):
-            errors["verified_by"] = "Orders can only be verified by a sales admin."
+            errors["verified_by"] = "Custom orders can only be verified by a sales admin."
 
         if self.client_id and self.delivery_address_id:
             from .ClientAddress import ClientAddress
@@ -171,7 +166,8 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
 
         if self.dispatch_details_id and self.private_dispatch_details_id:
             errors["dispatch_details"] = (
-                "An order cannot have both dispatch details and private dispatch details."
+                "A custom order cannot have both dispatch details and private "
+                "dispatch details."
             )
 
         if (
@@ -180,10 +176,16 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
             and not self.dispatch_details_id
             and not self.private_dispatch_details_id
         ):
-            errors["status"] = "Dispatch details are required once the order is dispatched."
+            errors["status"] = (
+                "Dispatch details are required once the custom order is dispatched."
+            )
 
-        if self.created_by_id and not self.created_by.is_salesperson:
-            errors["created_by"] = "Orders can only be created by a sales person."
+        # A custom order is an admin instrument: only a sales admin (or a
+        # superuser) may book one -- never a salesperson.
+        if self.created_by_id and not (
+            self.created_by.is_admin_user or self.created_by.is_superuser
+        ):
+            errors["created_by"] = "Custom orders can only be created by a sales admin."
 
         if self.client_id:
             if self.dispatch_details_id and self.dispatch_details.client_id != self.client_id:

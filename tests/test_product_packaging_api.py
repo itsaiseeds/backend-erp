@@ -63,20 +63,20 @@ class ProductPackagingApiTest(WebApiTestCase):
         )
         cls.packaging = ProductPackaging.objects.create(
             product=cls.product,
-            packing_bag_weight=25,
-            packing_bags=5,
+            packet_weight=25,
+            packets=5,
             selling_price=6000,
             created_by=cls.seed_admin,
         )
 
     # -- helpers --------------------------------------------------------------
 
-    def _payload(self, product=None, weight=25, bags=5, selling_price="6000.00"):
+    def _payload(self, product=None, weight=25, packets=5, selling_price="6000.00"):
         """Return a valid create-packaging body."""
         return {
             "product": (product or self.product).public_id,
-            "packing_bag_weight": weight,
-            "packing_bags": bags,
+            "packet_weight": weight,
+            "packets": packets,
             "selling_price": selling_price,
         }
 
@@ -126,7 +126,9 @@ class ProductPackagingApiTest(WebApiTestCase):
         """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_create_packaging_payload_shape"""
         self.login_as(self.seed_admin)
         response = self.client.post(
-            PACKAGINGS_URL, self._payload(weight=50, bags=2, selling_price="3000.00"), format="json"
+            PACKAGINGS_URL,
+            self._payload(weight=50, packets=2, selling_price="3000.00"),
+            format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
         packaging = response.data
@@ -136,8 +138,8 @@ class ProductPackagingApiTest(WebApiTestCase):
             packaging["product"],
             {"public_id": self.product.public_id, "name": "Premium"},
         )
-        self.assertEqual(float(packaging["packing_bag_weight"]), 50.0)
-        self.assertEqual(packaging["packing_bags"], 2)
+        self.assertEqual(float(packaging["packet_weight"]), 50.0)
+        self.assertEqual(packaging["packets"], 2)
         self.assertEqual(float(packaging["total_weight"]), 100.0)
         self.assertEqual(float(packaging["selling_price"]), 3000.0)
         # The primary key must never be sent out.
@@ -148,10 +150,10 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.assertEqual(created.product_id, self.product.id)
         self.assertEqual(created.created_by_id, self.seed_admin.id)
 
-    def test_admin_create_packaging_defaults_selling_price_to_bags_times_product_price(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_create_packaging_defaults_selling_price_to_bags_times_product_price"""
+    def test_admin_create_packaging_defaults_selling_price_to_packets_times_product_price(self):
+        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_create_packaging_defaults_selling_price_to_packets_times_product_price"""
         self.login_as(self.seed_admin)
-        payload = self._payload(weight=50, bags=3)
+        payload = self._payload(weight=50, packets=3)
         payload.pop("selling_price")
         response = self.client.post(PACKAGINGS_URL, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
@@ -172,7 +174,7 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         self.assertEqual(
             self.client.post(
-                PACKAGINGS_URL, self._payload(weight=25, bags=5), format="json"
+                PACKAGINGS_URL, self._payload(weight=25, packets=5), format="json"
             ).status_code,
             status.HTTP_400_BAD_REQUEST,
         )
@@ -183,7 +185,7 @@ class ProductPackagingApiTest(WebApiTestCase):
         for payload in (
             self._payload(weight=0),
             self._payload(weight=-1),
-            self._payload(bags=0),
+            self._payload(packets=0),
             self._payload(selling_price="-1.00"),
         ):
             self.assertEqual(
@@ -199,7 +201,7 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         created = self.client.post(
             PACKAGINGS_URL,
-            self._payload(weight=50, bags=2, selling_price="3000.00"),
+            self._payload(weight=50, packets=2, selling_price="3000.00"),
             format="json",
         )
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
@@ -239,7 +241,7 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         response = self.client.patch(
             self._url(self.packaging),
-            {"packing_bag_weight": 25, "packing_bags": 5},
+            {"packet_weight": 25, "packets": 5},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -248,15 +250,15 @@ class ProductPackagingApiTest(WebApiTestCase):
         """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_update_packaging_duplicate_rejected"""
         ProductPackaging.objects.create(
             product=self.product,
-            packing_bag_weight=50,
-            packing_bags=2,
+            packet_weight=50,
+            packets=2,
             selling_price=3000,
             created_by=self.seed_admin,
         )
         self.login_as(self.seed_admin)
         response = self.client.patch(
             self._url(self.packaging),
-            {"packing_bag_weight": 50, "packing_bags": 2},
+            {"packet_weight": 50, "packets": 2},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
