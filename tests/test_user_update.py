@@ -31,7 +31,9 @@ class UserUpdateTest(WebApiTestCase):
         """Build the geography tree, an app admin and a salesperson."""
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
-
+        Admin.objects.create(
+                    user=cls.superuser, can_update_stock_count=False, created_by=cls.superuser
+                )
         cls.country, _ = Country.objects.get_or_create(
             name="India", defaults={"iso_code": "IN", "created_by": cls.superuser}
         )
@@ -304,11 +306,11 @@ class UserUpdateTest(WebApiTestCase):
                 self.client.patch(url, {"name": "x"}, format="json").status_code,
                 status.HTTP_403_FORBIDDEN,
             )
-        # A superuser only manages admins -> also forbidden here.
+        # A superuser may also update a salesperson.
         self.login_as(self.superuser)
         self.assertEqual(
             self.client.patch(url, {"name": "x"}, format="json").status_code,
-            status.HTTP_403_FORBIDDEN,
+            status.HTTP_200_OK,
         )
 
         # An application admin may update a salesperson.

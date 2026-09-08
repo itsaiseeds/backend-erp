@@ -205,7 +205,6 @@ INSERT INTO public.authentication_user (id, "password", last_login, is_superuser
 
 INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count) VALUES(1, '2026-09-07 00:34:36.434', '2026-09-07 00:36:17.156', false, NULL, NULL, 1, 4, false);
 INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count) VALUES(2, '2026-09-07 00:36:25.485', '2026-09-07 00:36:25.487', false, NULL, NULL, 1, 5, true);
-INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count) VALUES(3, '2026-09-08 22:37:01.672', '2026-09-08 22:37:01.675', false, NULL, NULL, 1, 1, true);
 
 INSERT INTO public.aggregator_country (id, created_at, updated_at, is_deleted, deleted_at, "name", iso_code, created_by_id, deleted_by_id) VALUES(1, '2026-09-07 00:23:22.143', '2026-09-07 00:23:22.145', false, NULL, 'India', 'IN', 1, NULL);
 INSERT INTO public.aggregator_state (id, created_at, updated_at, is_deleted, deleted_at, "name", code, country_id, created_by_id, deleted_by_id) VALUES(1, '2026-09-07 00:23:44.551', '2026-09-07 00:23:44.553', false, NULL, 'Gujarat', 'GJ', 1, 1, NULL);
