@@ -172,6 +172,44 @@ class AndroidClientApiTest(AndroidApiTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_a_city_that_is_not_in_the_selected_state_is_rejected(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_a_city_that_is_not_in_the_selected_state_is_rejected"""
+        rajasthan_city = City.objects.get(name="Jaipur")  # in Rajasthan, not Gujarat
+        body = self._body(
+            addresses=[self._address(city=rajasthan_city, pincode="302001")]
+        )
+        # _address() defaults state to Gujarat -> inconsistent with Jaipur
+        self.login_as(self.sales_person)
+
+        response = self.client.post(CREATE_CLIENT_URL, body, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Jaipur", response.data["detail"])
+        self.assertIn("Gujarat", response.data["detail"])
+
+    def test_a_mismatched_state_on_update_is_rejected(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_a_mismatched_state_on_update_is_rejected"""
+        from aggregator.models import State
+
+        created = self._create()  # address: 1 Ring Road, Surat, Gujarat
+        rajasthan = State.objects.get(name="Rajasthan")
+
+        response = self.client.post(
+            UPDATE_CLIENT_URL,
+            {
+                "public_id": created.data["public_id"],
+                # same line / pincode / city as the stored address, wrong state
+                "addresses": [self._address(state=rajasthan.id)],
+                "contacts": [{"name": "Ramesh", "phone_number": "9876500001"}],
+                "transport_agencies": [{"name": "ABC Transport"}],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        client = Client.objects.get(public_id=created.data["public_id"])
+        self.assertEqual(client.client_addresses.get().address.state.name, "Gujarat")
+
     # -- transport agency naming ---------------------------------------------
 
     def test_two_clients_may_share_an_agency_name_as_separate_rows(self):
