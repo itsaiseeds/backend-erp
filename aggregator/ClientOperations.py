@@ -12,7 +12,11 @@ from django.db import transaction
 
 from common.models import indian_now
 
-from .AddressOperations import address_payload, create_address
+from .AddressOperations import (
+    address_payload,
+    assert_geo_chain_consistent,
+    create_address,
+)
 from .models import (
     Address,
     City,
@@ -291,6 +295,8 @@ def _address_link_key(link: ClientAddress) -> tuple:
 @transaction.atomic
 def sync_client_addresses(client: Client, items: list[dict], actor: User) -> list[ClientAddress]:
     """Replace the client's addresses with ``items`` (at least one required)."""
+    for item in items:
+        assert_geo_chain_consistent(item["city"], item["state"], item["country"])
 
     def create(item):
         address = create_address(

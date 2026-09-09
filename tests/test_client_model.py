@@ -8,12 +8,14 @@ from __future__ import annotations
 
 from django.core.exceptions import ValidationError
 
+from aggregator.AddressOperations import assert_geo_chain_consistent, create_address
 from aggregator.ClientOperations import (
     add_client_address,
     add_client_contact,
     add_client_transport_agency,
     create_client,
     set_or_update_primary_address,
+    sync_client_addresses,
     verify_client,
 )
 from aggregator.models import (
@@ -143,3 +145,75 @@ class ClientModelTest(DMLTestCase):
             client.client_addresses.filter(is_primary=True).values_list("address_id", flat=True)
         )
         assert primaries == [a2.id]
+
+    # -- address geo-chain consistency --------------------------------------
+
+    def _sync_item(self, **overrides):
+        item = {
+            "line_1": "1 Main St",
+            "pincode": "411001",
+            "city": self.city,
+            "state": self.state,
+            "country": self.country,
+        }
+        item.update(overrides)
+        return item
+
+    def test_geo_chain_rejects_a_city_outside_the_state(self):
+        """tests/test_client_model.py::ClientModelTest::test_geo_chain_rejects_a_city_outside_the_state"""
+        foreign_state = State.objects.create(
+            name="Farland", country=self.country, created_by=self.su
+        )
+        with self.assertRaises(ValidationError):
+            assert_geo_chain_consistent(self.city, foreign_state, self.country)
+
+    def test_geo_chain_rejects_a_state_outside_the_country(self):
+        """tests/test_client_model.py::ClientModelTest::test_geo_chain_rejects_a_state_outside_the_country"""
+        nepal = Country.objects.create(name="Nepal", iso_code="NP", created_by=self.su)
+        with self.assertRaises(ValidationError):
+            assert_geo_chain_consistent(self.city, self.state, nepal)
+
+    def test_geo_chain_passes_a_nested_trio(self):
+        """tests/test_client_model.py::ClientModelTest::test_geo_chain_passes_a_nested_trio"""
+        assert_geo_chain_consistent(self.city, self.state, self.country)
+
+    def test_create_address_rejects_a_city_state_mismatch(self):
+        """tests/test_client_model.py::ClientModelTest::test_create_address_rejects_a_city_state_mismatch"""
+        foreign_state = State.objects.create(
+            name="Farland", country=self.country, created_by=self.su
+        )
+        with self.assertRaises(ValidationError):
+            create_address(
+                {
+                    "line_1": "1 Main St",
+                    "pincode": self.pincode,
+                    "city": self.city,
+                    "state": foreign_state,
+                    "country": self.country,
+                },
+                self.sp_user,
+            )
+
+    def test_sync_client_addresses_rejects_a_mismatch_even_on_an_unchanged_row(self):
+        """The declarative sync matches an unchanged address by (line, pincode,
+        city); the submitted state/country is still validated so a mismatch is a
+        400 rather than being silently dropped.
+
+        tests/test_client_model.py::ClientModelTest::test_sync_client_addresses_rejects_a_mismatch_even_on_an_unchanged_row
+        """
+        client = create_client(
+            company_name="Acme", gst_number="27AAPFU0939F1ZV", actor=self.sp_user
+        )
+        sync_client_addresses(client, [self._sync_item()], self.sp_user)
+
+        foreign_state = State.objects.create(
+            name="Farland", country=self.country, created_by=self.su
+        )
+        with self.assertRaises(ValidationError):
+            sync_client_addresses(
+                client, [self._sync_item(state=foreign_state)], self.sp_user
+            )
+
+        # the stored address is untouched
+        stored = client.client_addresses.get().address
+        assert stored.state_id == self.state.id

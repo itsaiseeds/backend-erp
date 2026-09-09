@@ -199,7 +199,8 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `AndroidPaginatedDateRangeListView` | `android/api/paginated_views.py` | Android `GET` list base (inherits `salesperson_required`): paginated + optional/required `start_date_time`..`end_date_time` window + a declarative filter/sort catalogue. Subclass sets `get_queryset` / `serialize_page` and optionally `date_field`, `enforce_date_range_filters`, `queryset_filters`, `sort_options`, `default_sort` | → `AndroidBaseView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
 | Routing mechanism | `android/api/routing.py` | `merged_routes(versions)` merges each version's `routes.ROUTES` in order (later wins); `build_urlpatterns` turns the merge into urlpatterns | used by → `android/api/urls.py` |
 | Version router | `android/api/urls.py` | `VERSIONS = ["v1", ...]`; mounts `<version>/` with routes inherited from every earlier version | → `routing.build_urlpatterns` |
-| Android v1 | `android/api/v1/routes.py` | `ROUTES`: `auth/login` (`LoginView`), `auth/logout` (`LogoutView`), `auth/reauthenticate` (`ReauthenticateView`), `utilities/cities` (`CitiesView`), `get-clients` (`GetClientsView`), `client/<public_id>` (`GetClientView`), `create-client` (`CreateClientView`), `update-client` (`UpdateClientView`) | → `AndroidBaseView` (except `LoginView`, pre-auth) |
+| Android v1 | `android/api/v1/routes.py` | `ROUTES`: `auth/login` (`LoginView`), `auth/logout` (`LogoutView`), `auth/reauthenticate` (`ReauthenticateView`), `utilities/countries` (`CountriesView`), `utilities/states` (`StatesView`), `utilities/cities` (`CitiesView`), `get-clients` (`GetClientsView`), `client/<public_id>` (`GetClientView`), `create-client` (`CreateClientView`), `update-client` (`UpdateClientView`) | → `AndroidBaseView` (except `LoginView`, pre-auth) |
+| `CountriesView` / `StatesView` | `android/api/v1/CountriesView.py`, `android/api/v1/StatesView.py` | Flat address-form look-ups the client-creation form needs but nothing else exposed: `GET utilities/countries` → `[{id,name,iso_code}]`; `GET utilities/states` → `[{id,name,code,country_id}]` with optional `?country_id=`. `utilities/cities` stays the India-only state→city grouped tree | → `AndroidBaseView`; feed `country` / `state` / `city` ids to `create-client` / `update-client` |
 | `GetClientView` (android + web) | `android/api/v1/GetClientView.py`, `api/sales_admin/GetClientView.py` | `GET .../client/<public_id>` — one client in full via `ClientOperations.client_payload` (core details + **every** address / contact / transport agency, each `is_primary`-flagged). Android scopes to `created_by=request.user` (a sales person only sees their own); web (`admin_required`) reads any client. Unknown / soft-deleted id → 404 | → `AndroidBaseView` / `AdminApiView`, `client_payload`, `ClientPayloadSerializer` |
 | `LoginView` | `android/api/v1/LoginView.py` | `POST /android/api/v1/auth/login` — pre-auth, `AllowAny`; TOTP login for sales persons, mints/rotates a bearer `Token` (mirrors `VerifyOTPView` but token-only, no session) | reads → `User`; writes → `rest_framework.authtoken.Token` |
 
@@ -224,7 +225,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `State` | `aggregator/models/State.py` | `name` + optional `code`; unique `(country, name)` | 1:N → `City` |
 | `City` | `aggregator/models/City.py` | `name`; unique `(state, name)`; `country` property; `ordering = name` | 1:N → `Pincode`, `Address`; ← `SalesPerson.city` |
 | `Pincode` | `aggregator/models/Pincode.py` | `code`; unique `(city, code)`; `state`/`country` convenience properties | 1:N → `Address` |
-| `Address` | `aggregator/models/Address.py` | Denormalised pincode/city/state/country chain so any level can be listed/filtered; `clean()` validates the chain matches | FK → all four geo nodes |
+| `Address` | `aggregator/models/Address.py` | Denormalised pincode/city/state/country chain so any level can be listed/filtered; `clean()` validates the chain matches. `AddressOperations.assert_geo_chain_consistent(city, state, country)` is the same city→state→country check, called up front by `create_address` **and** `sync_client_addresses` (the declarative sync matches an unchanged address by (line, pincode, city), so a bad `state`/`country` in the payload would otherwise be silently dropped instead of 400'd) | FK → all four geo nodes |
 | aggregator admin | `aggregator/admin.py` | `SoftDeleteModelAdmin` + `autocomplete_fields`/`list_select_related` so related picks don't N+1 | configures → Django `admin` |
 
 ### Domain — aggregator (sales)
@@ -380,7 +381,9 @@ erDiagram
         ├── auth/login         POST  LoginView            (AllowAny → TOTP login, mints a token)
         ├── auth/logout        POST  LogoutView           (IsSalesPerson → deletes the token)
         ├── auth/reauthenticate GET  ReauthenticateView    (IsSalesPerson)
-        ├── utilities/cities   GET   CitiesView            (IsSalesPerson)
+        ├── utilities/countries GET  CountriesView         (IsSalesPerson → [{id,name,iso_code}])
+        ├── utilities/states   GET   StatesView            (IsSalesPerson → [{id,name,code,country_id}], ?country_id=)
+        ├── utilities/cities   GET   CitiesView            (IsSalesPerson → India state→city tree)
         ├── get-clients        GET   GetClientsView        (IsSalesPerson → own clients; paginated; ?city_id / ?status / ?company_name / ?address / ?created_gte / ?created_lte filters + ?sort; catalogues in available_filters/available_sorts)
         ├── client/<public_id> GET   GetClientView         (IsSalesPerson → own client, full detail: core + all addresses/contacts/agencies)
         ├── create-client      POST  CreateClientView      (IsSalesPerson → born VERIFICATION_PENDING)
