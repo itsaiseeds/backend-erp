@@ -352,7 +352,7 @@ class MixinRequestHandlingTest(SimpleTestCase):
         response, _ = self._view(enforce=False)(self.factory.get("/"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["count"], 25)
+        self.assertEqual(response.data["total_count"], 25)
         self.assertEqual(len(response.data["results"]), 10)
         self.assertNotIn("available_filters", response.data)
         self.assertNotIn("available_sorts", response.data)
@@ -366,7 +366,7 @@ class MixinRequestHandlingTest(SimpleTestCase):
         response, _ = view(self.factory.get("/"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["count"], 25)
+        self.assertEqual(response.data["total_count"], 25)
         self.assertEqual(len(response.data["results"]), 10)
         self.assertEqual(
             response.data["available_filters"],
@@ -390,7 +390,7 @@ class MixinRequestHandlingTest(SimpleTestCase):
         response, _ = view(self.factory.get("/", {"bogus": "1"}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["count"], 25)
+        self.assertEqual(response.data["total_count"], 25)
 
     def test_a_range_filter_applies_gte_lte_and_echoes_a_range_kind(self):
         view = self._view(
@@ -423,7 +423,7 @@ class MixinRequestHandlingTest(SimpleTestCase):
         response, _ = view(self.factory.get("/"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["count"], 25)
+        self.assertEqual(response.data["total_count"], 25)
 
     def test_an_empty_filter_value_is_a_400(self):
         view = self._view(queryset_filters=(QuerysetFilter("n__in"),), enforce=False)

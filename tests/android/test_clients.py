@@ -294,7 +294,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
         response = self.client.get(GET_CLIENTS_URL)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["total_count"], 2)
         self.assertEqual(
             sorted(c["company_name"] for c in response.data["results"]),
             ["Acme Seeds", "Beta Seeds"],
@@ -333,7 +333,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
         response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["total_count"], 1)
         self.assertEqual(
             [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
         )
@@ -346,7 +346,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
             GET_CLIENTS_URL, {"city_id": f"{self.city.id},{self.other_city.id}"}
         )
 
-        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["total_count"], 2)
         self.assertEqual(
             sorted(c["company_name"] for c in response.data["results"]),
             ["Acme Seeds", "Beta Seeds"],
@@ -371,8 +371,8 @@ class AndroidClientApiTest(AndroidApiTestCase):
         matched = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
         missed = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
 
-        self.assertEqual(matched.data["count"], 1)
-        self.assertEqual(missed.data["count"], 0)
+        self.assertEqual(matched.data["total_count"], 1)
+        self.assertEqual(missed.data["total_count"], 0)
 
     def test_filtering_by_status(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_status"""
@@ -452,7 +452,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
         response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
 
         self.assertEqual(response.data["results"], [])
-        self.assertEqual(response.data["count"], 0)
+        self.assertEqual(response.data["total_count"], 0)
         self.assertEqual(Client.objects.count(), 1)
 
     def test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical(self):
@@ -519,14 +519,18 @@ class AndroidClientApiTest(AndroidApiTestCase):
             self.assertEqual(created.status_code, status.HTTP_201_CREATED)
 
         page_1 = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
-        self.assertEqual(page_1.data["count"], 12)
+        self.assertEqual(page_1.data["total_count"], 12)
+        self.assertEqual(page_1.data["total_pages"], 2)
         self.assertEqual(len(page_1.data["results"]), 10)
-        self.assertIsNotNone(page_1.data["next"])
+        self.assertEqual(page_1.data["next_page_number"], 2)
+        self.assertIsNone(page_1.data["previous_page_number"])
 
         page_2 = self.client.get(
             GET_CLIENTS_URL, {"city_id": str(self.city.id), "page": 2}
         )
         self.assertEqual(len(page_2.data["results"]), 2)
+        self.assertIsNone(page_2.data["next_page_number"])
+        self.assertEqual(page_2.data["previous_page_number"], 1)
 
     def test_an_unrecognised_query_param_is_ignored(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_an_unrecognised_query_param_is_ignored"""
@@ -535,7 +539,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
         response = self.client.get(GET_CLIENTS_URL, {"company_name": "Acme"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.data["total_count"], 2)
 
     def test_an_empty_filter_value_is_rejected(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_an_empty_filter_value_is_rejected"""

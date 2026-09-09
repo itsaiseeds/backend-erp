@@ -172,10 +172,22 @@ Example: `?city_id=12,15&status=VERIFIED&created_gte=2026-01-01T00:00:00Z&sort=-
 
 ### Response shape
 
-DRF envelope `{count, next, previous, results}` **plus**, when the view declares
-them, `available_filters` (`[{filter, kind, description, params?, options?}]`)
-and `available_sorts` (`[{sort, description}]`) — on **every** response, so the
-frontend discovers the contract without a second endpoint.
+Page-number envelope from `StandardPageNumberPagination`:
+
+```jsonc
+{
+  "total_count": 37,            // rows matching the query, across every page
+  "total_pages": 4,             // at this page_size; always >= 1
+  "next_page_number": 3,        // or null on the last page
+  "previous_page_number": 1,    // or null on the first page
+  "results": [ ... ]
+}
+```
+
+**plus**, when the view declares them, `available_filters`
+(`[{filter, kind, description, params?, options?}]`) and `available_sorts`
+(`[{sort, description}]`) — on **every** response, so the frontend discovers the
+contract without a second endpoint.
 
 ### OpenAPI
 
