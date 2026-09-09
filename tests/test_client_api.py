@@ -22,6 +22,7 @@ SUPERUSER_PHONE = "9999999999"
 VERIFY_CLIENT_URL = "/api/sales-admin/verify-client/"
 UPDATE_CLIENT_URL = "/api/sales-admin/update-client/"
 GET_CLIENTS_URL = "/api/sales-admin/get-clients/"
+CLIENT_URL = "/api/sales-admin/client/{public_id}"
 
 GST = "27AAPFU0939F1ZV"
 
@@ -223,3 +224,59 @@ class SalesAdminClientApiTest(WebApiTestCase):
         response = self.client.get(GET_CLIENTS_URL)
 
         self.assertEqual(response.status_code, status.HTTP_501_NOT_IMPLEMENTED)
+
+    # -- single client detail -----------------------------------------------
+
+    def test_an_admin_gets_any_client_in_full(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_admin_gets_any_client_in_full"""
+        self.login_as(self.admin_user)
+
+        response = self.client.get(CLIENT_URL.format(public_id=self.pending.public_id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.data
+        self.assertEqual(body["public_id"], self.pending.public_id)
+        self.assertEqual(body["company_name"], "Acme Seeds")
+        self.assertEqual(body["gst_number"], GST)
+        self.assertEqual([a["line_1"] for a in body["addresses"]], ["1 Ring Road"])
+        self.assertEqual([c["name"] for c in body["contacts"]], ["Ramesh"])
+        self.assertEqual(
+            [t["name"] for t in body["transport_agencies"]], ["ABC Transport"]
+        )
+
+    def test_client_detail_reflects_verification(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_client_detail_reflects_verification"""
+        self.login_as(self.admin_user)
+        self.client.post(
+            VERIFY_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+        )
+
+        body = self.client.get(
+            CLIENT_URL.format(public_id=self.pending.public_id)
+        ).data
+
+        self.assertEqual(body["status"], "VERIFIED")
+        self.assertTrue(body["is_verified"])
+        self.assertEqual(body["verified_by"], self.admin_user.name)
+
+    def test_client_detail_unknown_public_id_is_404(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_client_detail_unknown_public_id_is_404"""
+        self.login_as(self.admin_user)
+
+        response = self.client.get(CLIENT_URL.format(public_id="C-NOPE"))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_client_detail_needs_an_admin(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_client_detail_needs_an_admin"""
+        self.login_as(self.sales_person)
+
+        response = self.client.get(CLIENT_URL.format(public_id=self.pending.public_id))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_client_detail_rejects_anonymous(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_client_detail_rejects_anonymous"""
+        response = self.client.get(CLIENT_URL.format(public_id=self.pending.public_id))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

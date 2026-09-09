@@ -17,7 +17,8 @@ single ``sort``::
     ?city_id=12,15&created_after=2026-01-01&sort=-created_at&page=2
 
 * a :class:`QuerysetFilter` is one param, ``?<name>=<v1,v2,...>`` -- the comma
-  list is OR-ed, then AND-ed with the other filters.
+  list is OR-ed, then AND-ed with the other filters. ``multi=False`` makes it a
+  single free-text term instead (no comma split) -- for substring search.
 * a :class:`RangeFilter` is a ``?<name>_after=`` / ``?<name>_before=`` pair
   (inclusive ``>=`` / ``<=``); send either or both. This is how open-ended
   filters -- dates, numbers -- are expressed, since a comma list can't say
@@ -238,13 +239,25 @@ class QuerysetFilter(ListFilter):
     """A single-param filter: ``?<name>=<v1,v2,...>`` (comma list OR-ed).
 
     ``name``
-        The query param; also the default Django lookup, so ``"status_id__in"``
-        or ``"city_id__in"`` work out of the box.
+        The query param, and -- unless ``lookup`` is given -- the Django lookup
+        too, so ``"status_id__in"`` / ``"city_id__in"`` work out of the box.
+    ``lookup``
+        The ORM lookup the default ``apply`` uses, when it should differ from the
+        public param name (``QuerysetFilter("company_name",
+        lookup="company_name__icontains", ...)``).
     ``parse``
         Per-value coercion (default :func:`parse_int`; also :func:`parse_str`).
+    ``multi``
+        ``True`` (default): ``?<name>=a,b`` is split into a value list, OR-ed by
+        the default ``apply`` (which uses an ``__in``-style lookup). ``False``:
+        the whole param value is one term (no comma split, no length cap) -- for
+        free-text search where a comma is data, and the default ``apply`` passes
+        the single value straight to ``lookup``.
     ``apply``
         ``(queryset, values) -> queryset`` for anything a bare
-        ``.filter(name=values)`` can't express (relation spans, ``.distinct()``).
+        ``.filter(lookup=values)`` can't express (relation spans, ``.distinct()``,
+        ``Q`` objects). ``values`` is always a list (length 1 when ``multi`` is
+        ``False``).
     ``options``
         Static ``[{"value", "label"}]`` list, or a ``(request) -> list``
         callable -- the eligible choices, echoed on the catalogue entry so a
@@ -258,14 +271,18 @@ class QuerysetFilter(ListFilter):
         self,
         name: str,
         *,
+        lookup: str | None = None,
         parse: ValueParser = parse_int,
+        multi: bool = True,
         apply: Callable[[QuerySet, list], QuerySet] | None = None,
         description: str = "",
         options: FilterOptions | None = None,
         kind: str | None = None,
     ) -> None:
         self.name = name
+        self.lookup = lookup or name
         self.parse = parse
+        self.multi = multi
         self._apply = apply
         self.description = description
         self._options = options
@@ -280,14 +297,17 @@ class QuerysetFilter(ListFilter):
         """Sanitize this filter's query-param string into a value list.
 
         ``raw`` is the exact ``?<name>=`` string (``None`` when the param is
-        absent). It is split on commas; blank segments are dropped; each
-        surviving segment is run through :attr:`parse`; duplicates are
-        collapsed with first-seen order preserved.
+        absent). With ``multi`` (default) it is split on commas, blank segments
+        dropped, each segment run through :attr:`parse`, duplicates collapsed
+        (first-seen order kept). With ``multi`` off the whole string is one term
+        through :attr:`parse`.
         """
         if raw is None or not raw.strip():
             raise serializers.ValidationError(
                 {self.name: "This filter needs at least one value."}
             )
+        if not self.multi:
+            return [self.parse(raw.strip())]
         segments = [seg for seg in (part.strip() for part in raw.split(",")) if seg]
         if not segments:
             raise serializers.ValidationError({self.name: "No values supplied."})
@@ -306,7 +326,7 @@ class QuerysetFilter(ListFilter):
         """Narrow ``queryset`` by the sanitized ``values``."""
         if self._apply is not None:
             return self._apply(queryset, values)
-        return queryset.filter(**{self.name: values})
+        return queryset.filter(**{self.lookup: values if self.multi else values[0]})
 
     def apply_from_request(self, queryset: QuerySet, request: Request) -> QuerySet:
         return self.apply(queryset, self.clean_values(request.query_params[self.name]))
@@ -329,13 +349,12 @@ class QuerysetFilter(ListFilter):
 
     def openapi_parameters(self) -> list[OpenApiParameter]:
         hint = self.description or f"Filter by {self.name}."
-        return [
-            OpenApiParameter(
-                self.name,
-                OpenApiTypes.STR,
-                description=f"{hint} Comma-separated; AND-ed with the other filters.",
-            )
-        ]
+        shape = (
+            "Comma-separated (any match); AND-ed with the other filters."
+            if self.multi
+            else "Single value; AND-ed with the other filters."
+        )
+        return [OpenApiParameter(self.name, OpenApiTypes.STR, description=f"{hint} {shape}")]
 
 
 class RangeFilter(ListFilter):
