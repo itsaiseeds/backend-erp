@@ -1159,13 +1159,15 @@ components:
       type: object
       description: Output shape for the paginated envelope (schema only).
       properties:
-        count:
+        total_count:
           type: integer
-        next:
-          type: string
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
           nullable: true
-        previous:
-          type: string
+        previous_page_number:
+          type: integer
           nullable: true
         results:
           type: array
@@ -1182,10 +1184,11 @@ components:
       required:
       - available_filters
       - available_sorts
-      - count
-      - next
-      - previous
+      - next_page_number
+      - previous_page_number
       - results
+      - total_count
+      - total_pages
     ClientPayload:
       type: object
       description: Output shape for a full client (schema only; responses are built
