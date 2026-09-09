@@ -84,12 +84,10 @@ it in the response body — e.g. `"csrf_token": get_token(request)` in the
 `VerifyOTPView` payload — so the SPA can grab it straight from the JSON instead
 of parsing cookies. Do not mix the two approaches across endpoints.
 
-## Paginated date-range list views
+## Paginated list views (date window + filters + sorting)
 
-For any `GET` list endpoint whose results must be filtered by a required
-`start_date_time`..`end_date_time` window (on the object's own `created_at`,
-or on a related object's timestamp), subclass one of the two concrete bases
-instead of hand-rolling pagination and query-param parsing:
+For any `GET` list endpoint, subclass one of the two concrete bases instead of
+hand-rolling pagination, query-param parsing, filtering or sorting:
 
 - Web: `api.paginated_views.AdminPaginatedDateRangeListView`
   (defaults to `admin_required = True`; tighten with `superuser_required =
@@ -97,44 +95,130 @@ instead of hand-rolling pagination and query-param parsing:
 - Android: `android.api.paginated_views.AndroidPaginatedDateRangeListView`
   (inherits `salesperson_required = True` from `AndroidBaseView`).
 
-Both compose the private mixin in
-`common/views/paginated_date_range.py` and only override `get()`.
+Both compose the private mixin in `common/views/paginated_date_range.py`.
 
 ### What a subclass must provide
 
-- `get_queryset(self, request) -> QuerySet` — the base queryset (pre
-  date-filter).
-- `serialize_page(self, page_items, request) -> list | dict` — turn one
-  page of ORM objects into the JSON payload (project's hand-built-dict style).
-- Optional `date_field` (default `"created_at"`) — the ORM path used for the
-  range filter, supports Django `__` lookups for related fields, e.g.
-  `date_field = "order__created_at"`.
+- `get_queryset(self, request) -> QuerySet` — the base queryset (before the
+  window / filters / sort are layered on).
+- `serialize_page(self, page_items, request) -> list | dict` — turn one page of
+  ORM objects into the JSON payload (project's hand-built-dict style).
+
+### What a subclass may set
+
+| Attr | Default | Meaning |
+|---|---|---|
+| `date_field` | `"created_at"` | ORM path for the `start_date_time`..`end_date_time` window (`__` lookups ok, e.g. `"order__created_at"`). |
+| `enforce_date_range_filters` | `True` | `True` → a request with **neither** bound is a **400**. `False` → served unfiltered. A **partial** pair is always a 400. |
+| `queryset_filters` | `()` | Tuple of `ListFilter` (`QuerysetFilter` and/or `RangeFilter`). The ones whose param(s) are present are sanitized and **AND-ed** onto the queryset. |
+| `sort_options` | `()` | Tuple of `SortOption`. Client sends `?sort=<-?name,...>` (comma list, `-` = descending). A `pk` tie-breaker is always appended. |
+| `default_sort` | `()` | ORM ordering (str or sequence) used when `?sort` is absent. |
+
+`page`, `page_size`, `sort`, `start_date_time`, `end_date_time` are **reserved** —
+no filter param may reuse those names (raises at request time if it does).
+
+### Filters
+
+Every `available_filters` entry carries a **`kind`** (`select`, `int`, `text`,
+`date`, `datetime`, `date_range`, `datetime_range`, ...) so the frontend picks a
+widget with no guessing. Two filter types:
+
+**`QuerysetFilter`** — one param, `?<name>=<v1,v2,...>` (comma list OR-ed):
+
+```python
+QuerysetFilter("status_id__in", parse=parse_int, description="...")   # name == ORM lookup
+QuerysetFilter(
+    "city_id",
+    apply=lambda qs, ids: qs.filter(       # custom apply: relation spans / .distinct()
+        client_addresses__is_primary=True,
+        client_addresses__address__city_id__in=ids,
+    ).distinct(),
+    options=lambda request: [{"value": c.id, "label": c.name} for c in ...],  # or a static list
+    description="...",
+)
+```
+
+- up to `MAX_FILTER_VALUES` (100) values, each through `parse` (`parse_int`
+  default, or `parse_str` / `parse_date` / `parse_datetime`); empty /
+  unparseable / too many → **400**; duplicates collapsed; **undeclared** param
+  ignored.
+- `options` (static list or `(request) -> list`) → the eligible `{value, label}`
+  choices, echoed on the entry (**no second lookup**) and flips `kind` to
+  `select`.
+
+**`RangeFilter`** — the answer for open-ended filters (dates, numbers): a comma
+list names a set but can't say *between*, so a range gets a **two-param pair**,
+`?<name>_after=` / `?<name>_before=` (inclusive `>=` / `<=`; send either or
+both; suffixes configurable, e.g. `("gte", "lte")`):
+
+```python
+RangeFilter("created", field="created_at", parse=parse_datetime,
+            suffixes=("gte", "lte"), description="...")   # -> ?created_gte= / ?created_lte=
+```
+
+The entry carries `params: [<lower>, <upper>]` and `kind: "<type>_range"`.
+Inverted bounds → **400**.
 
 ### Query contract
 
-- `start_date_time` and `end_date_time` (ISO 8601) are **required**; missing,
-  invalid, or `start > end` returns **400**.
-- `page` (default `1`) and `page_size` (default `10`, capped at `30`) are
-  optional.
+- `?page` (default 1), `?page_size` (default 10, max 30).
+- `?<filter>=<csv>` / `?<name>_after=&<name>_before=` per declared filter, AND-ed.
+- `?sort=<-?name,...>` per `sort_options`; unknown key → **400**.
+- `?start_date_time=` / `?end_date_time=` (ISO 8601) — the built-in window; see
+  `enforce_date_range_filters`. Prefer a `RangeFilter` for new views so the
+  bound shows up in the catalogue.
+
+Example: `?city_id=12,15&status=VERIFIED&created_gte=2026-01-01T00:00:00Z&sort=-created_at&page=2`
 
 ### Response shape
 
-DRF standard envelope: `{count, next, previous, results}` (from
-`StandardPageNumberPagination`).
+DRF envelope `{count, next, previous, results}` **plus**, when the view declares
+them, `available_filters` (`[{filter, kind, description, params?, options?}]`)
+and `available_sorts` (`[{sort, description}]`) — on **every** response, so the
+frontend discovers the contract without a second endpoint.
 
-### Minimal subclass (illustrative)
+### OpenAPI
+
+Feed the view's own catalogues to `list_query_parameters(...)` in
+`@extend_schema` so `docs/api/openapi.yml` documents exactly what the view
+accepts; regenerate with `bash scripts/run.sh schema`. Type the response with a
+serializer whose `available_filters` / `available_sorts` fields reuse
+`FilterCatalogueEntrySerializer` / `SortCatalogueEntrySerializer`.
+
+### Illustrative subclass
 
 ```python
-from api.paginated_views import AdminPaginatedDateRangeListView
+_FILTERS = (
+    QuerysetFilter("city_id", apply=..., options=..., description="..."),
+    QuerysetFilter("status", parse=..., apply=..., options=[...], description="..."),
+    RangeFilter("created", field="created_at", parse=parse_datetime,
+                suffixes=("gte", "lte"), description="..."),
+)
+_SORTS = (SortOption("created_at", description="..."), SortOption("company_name", description="..."))
 
-class OrdersView(AdminPaginatedDateRangeListView):
-    # date_field defaults to "created_at" — override for related lookups.
+class GetClientsView(AndroidPaginatedDateRangeListView):
+    enforce_date_range_filters = False
+    default_sort = "-created_at"
+    queryset_filters = _FILTERS
+    sort_options = _SORTS
+
+    @extend_schema(
+        parameters=list_query_parameters(
+            queryset_filters=_FILTERS, sort_options=_SORTS, date_window="none"
+        ),
+        responses={200: ClientListPageSerializer},
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self, request):
-        return Order.objects.select_related("customer").order_by("-id")
+        return Client.objects.filter(created_by=request.user)
 
     def serialize_page(self, page_items, request):
-        return [order_payload(o) for o in page_items]
+        return [client_list_payload(c) for c in page_items]
 ```
+
+See `android/api/v1/GetClientsView.py` for the real thing.
 
 ## Client lists are declarative
 

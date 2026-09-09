@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, TypeVar
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from common.models import SoftDeletedModel, indian_now
+from common.models import indian_now
 
 from .AddressOperations import address_payload, create_address
 from .models import (
@@ -157,7 +157,7 @@ def set_or_update_primary_address(
 # client may also point at.
 
 
-def _unlink(link: SoftDeletedModel, actor: User) -> None:
+def _unlink(link: LinkT, actor: User) -> None:
     """Soft delete a link row.
 
     ``SoftDeletedModel.delete()`` is deliberately bypassed: it requires the

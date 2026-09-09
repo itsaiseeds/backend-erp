@@ -9,6 +9,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
+from aggregator.ClientOperations import verify_client
 from aggregator.models import City, Client, ClientAddress, Country, State, TransportAgency
 from authentication.models import Admin, SalesPerson
 from tests.android.common import AndroidApiTestCase
@@ -99,6 +100,14 @@ class AndroidClientApiTest(AndroidApiTestCase):
         return self.client.post(
             CREATE_CLIENT_URL, self._body(**overrides), format="json"
         )
+
+    # 15-char GSTINs that differ only in the final char (see validate_gst_number).
+    _GST_SUFFIXES = "013456789ACDEFGHIJKLMNOPQRSTUWXY"
+
+    @classmethod
+    def _gst(cls, index: int) -> str:
+        """A distinct valid GSTIN for the ``index``-th throwaway client."""
+        return f"27AAPFU0939F1Z{cls._GST_SUFFIXES[index]}"
 
     # -- creation -------------------------------------------------------------
 
@@ -269,8 +278,8 @@ class AndroidClientApiTest(AndroidApiTestCase):
 
     # -- listing --------------------------------------------------------------
 
-    def test_clients_are_grouped_by_their_primary_addresss_city(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_clients_are_grouped_by_their_primary_addresss_city"""
+    def _seed_clients_in_two_cities(self):
+        """Acme with a Surat primary address, Beta with an Ahmedabad one."""
         self._create()
         self._create(
             gst=OTHER_GST,
@@ -278,20 +287,159 @@ class AndroidClientApiTest(AndroidApiTestCase):
             addresses=[self._address(city=self.other_city, pincode="380001")],
         )
 
+    def test_no_filter_returns_the_first_page_and_the_catalogues(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_no_filter_returns_the_first_page_and_the_catalogues"""
+        self._seed_clients_in_two_cities()
+
         response = self.client.get(GET_CLIENTS_URL)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
         self.assertEqual(
-            [group["city"]["name"] for group in response.data],
-            ["Ahmedabad", "Surat"],
+            sorted(c["company_name"] for c in response.data["results"]),
+            ["Acme Seeds", "Beta Seeds"],
+        )
+        self.assertEqual(
+            [(f["filter"], f["kind"]) for f in response.data["available_filters"]],
+            [("city_id", "select"), ("status", "select"), ("created", "datetime_range")],
+        )
+        created = response.data["available_filters"][2]
+        self.assertEqual(created["params"], ["created_gte", "created_lte"])
+        self.assertEqual(
+            [s["sort"] for s in response.data["available_sorts"]],
+            ["created_at", "company_name"],
         )
 
-    def test_the_list_carries_the_primary_contact_and_address(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_the_list_carries_the_primary_contact_and_address"""
+    def test_the_city_id_filter_advertises_only_this_sales_persons_cities(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_the_city_id_filter_advertises_only_this_sales_persons_cities"""
+        self._create()  # sales_person: one client in Surat
+        self._create(  # other_sales_person: one client in Ahmedabad -- must not leak
+            actor=self.other_sales_person,
+            gst=OTHER_GST,
+            company_name="Beta Seeds",
+            addresses=[self._address(city=self.other_city, pincode="380001")],
+        )
+        self.login_as(self.sales_person)
+
+        options = self.client.get(GET_CLIENTS_URL).data["available_filters"][0]["options"]
+
+        self.assertEqual([o["label"] for o in options], ["Surat"])
+        self.assertEqual([o["value"] for o in options], [self.city.id])
+
+    def test_filtering_by_primary_address_city_returns_only_matching_clients(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_primary_address_city_returns_only_matching_clients"""
+        self._seed_clients_in_two_cities()
+
+        response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
+        )
+
+    def test_filtering_accepts_several_comma_separated_city_ids(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_accepts_several_comma_separated_city_ids"""
+        self._seed_clients_in_two_cities()
+
+        response = self.client.get(
+            GET_CLIENTS_URL, {"city_id": f"{self.city.id},{self.other_city.id}"}
+        )
+
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(
+            sorted(c["company_name"] for c in response.data["results"]),
+            ["Acme Seeds", "Beta Seeds"],
+        )
+
+    def test_only_the_primary_address_city_is_matched(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_only_the_primary_address_city_is_matched"""
+        self.login_as(self.sales_person)
+        self.client.post(
+            CREATE_CLIENT_URL,
+            self._body(
+                addresses=[
+                    self._address(is_primary=True),
+                    self._address(
+                        line_1="2 Side Road", city=self.other_city, pincode="380001"
+                    ),
+                ]
+            ),
+            format="json",
+        )
+
+        matched = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
+        missed = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
+
+        self.assertEqual(matched.data["count"], 1)
+        self.assertEqual(missed.data["count"], 0)
+
+    def test_filtering_by_status(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_status"""
+        self._create()  # Acme -- stays VERIFICATION_PENDING
+        self._create(gst=OTHER_GST, company_name="Beta Seeds")
+        verify_client(Client.objects.get(company_name="Beta Seeds"), self.admin_user)
+        self.login_as(self.sales_person)
+
+        verified = self.client.get(GET_CLIENTS_URL, {"status": "VERIFIED"})
+        pending = self.client.get(GET_CLIENTS_URL, {"status": "VERIFICATION_PENDING"})
+
+        self.assertEqual(
+            [c["company_name"] for c in verified.data["results"]], ["Beta Seeds"]
+        )
+        self.assertEqual(
+            [c["company_name"] for c in pending.data["results"]], ["Acme Seeds"]
+        )
+        self.assertEqual(
+            [o["value"] for o in verified.data["available_filters"][1]["options"]],
+            ["VERIFICATION_PENDING", "VERIFIED"],
+        )
+
+    def test_an_unknown_status_code_is_rejected(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_an_unknown_status_code_is_rejected"""
         self._create()
 
-        card = self.client.get(GET_CLIENTS_URL).data[0]["clients"][0]
+        response = self.client.get(GET_CLIENTS_URL, {"status": "NOPE"})
 
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Unknown status", response.data["detail"])
+
+    def test_filtering_by_the_created_window(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_created_window"""
+        self._create()
+        acme = Client.objects.get(company_name="Acme Seeds")
+        Client.objects.filter(pk=acme.pk).update(created_at="2020-01-01T00:00:00Z")
+        self._create(gst=OTHER_GST, company_name="Beta Seeds")  # created now
+        self.login_as(self.sales_person)
+
+        recent = self.client.get(GET_CLIENTS_URL, {"created_gte": "2024-01-01T00:00:00Z"})
+        old = self.client.get(GET_CLIENTS_URL, {"created_lte": "2021-01-01T00:00:00Z"})
+
+        self.assertEqual(
+            [c["company_name"] for c in recent.data["results"]], ["Beta Seeds"]
+        )
+        self.assertEqual(
+            [c["company_name"] for c in old.data["results"]], ["Acme Seeds"]
+        )
+
+    def test_an_inverted_created_window_is_rejected(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_an_inverted_created_window_is_rejected"""
+        self._create()
+
+        response = self.client.get(
+            GET_CLIENTS_URL,
+            {"created_gte": "2026-02-01T00:00:00Z", "created_lte": "2026-01-01T00:00:00Z"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_the_page_carries_the_primary_contact_and_address(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_the_page_carries_the_primary_contact_and_address"""
+        self._create()
+
+        response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
+
+        card = response.data["results"][0]
         self.assertEqual(card["company_name"], "Acme Seeds")
         self.assertEqual(card["primary_contact"]["phone_number"], "9876500001")
         self.assertEqual(card["primary_address"]["pincode"], "395007")
@@ -301,10 +449,110 @@ class AndroidClientApiTest(AndroidApiTestCase):
         self._create()
         self.login_as(self.other_sales_person)
 
-        response = self.client.get(GET_CLIENTS_URL)
+        response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
 
-        self.assertEqual(response.data, [])
+        self.assertEqual(response.data["results"], [])
+        self.assertEqual(response.data["count"], 0)
         self.assertEqual(Client.objects.count(), 1)
+
+    def test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical"""
+        self.login_as(self.sales_person)
+        for index, name in enumerate(("Charlie", "Alpha", "Bravo")):
+            self.client.post(
+                CREATE_CLIENT_URL,
+                self._body(gst=self._gst(index), company_name=f"{name} Seeds"),
+                format="json",
+            )
+
+        default = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
+        by_name = self.client.get(
+            GET_CLIENTS_URL, {"city_id": str(self.city.id), "sort": "company_name"}
+        )
+
+        self.assertEqual(
+            [c["company_name"] for c in default.data["results"]],
+            ["Bravo Seeds", "Alpha Seeds", "Charlie Seeds"],
+        )
+        self.assertEqual(
+            [c["company_name"] for c in by_name.data["results"]],
+            ["Alpha Seeds", "Bravo Seeds", "Charlie Seeds"],
+        )
+
+    def test_a_descending_sort_is_accepted(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_a_descending_sort_is_accepted"""
+        self.login_as(self.sales_person)
+        for index, name in enumerate(("Alpha", "Bravo")):
+            self.client.post(
+                CREATE_CLIENT_URL,
+                self._body(gst=self._gst(index), company_name=f"{name} Seeds"),
+                format="json",
+            )
+
+        response = self.client.get(
+            GET_CLIENTS_URL, {"city_id": str(self.city.id), "sort": "-company_name"}
+        )
+
+        self.assertEqual(
+            [c["company_name"] for c in response.data["results"]],
+            ["Bravo Seeds", "Alpha Seeds"],
+        )
+
+    def test_an_unknown_sort_is_rejected(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_an_unknown_sort_is_rejected"""
+        self._create()
+
+        response = self.client.get(GET_CLIENTS_URL, {"sort": "gst_number"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Unknown sort", response.data["detail"])
+
+    def test_results_are_paginated(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_results_are_paginated"""
+        self.login_as(self.sales_person)
+        for index in range(12):
+            created = self.client.post(
+                CREATE_CLIENT_URL,
+                self._body(gst=self._gst(index), company_name=f"Client {index:02d}"),
+                format="json",
+            )
+            self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+
+        page_1 = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
+        self.assertEqual(page_1.data["count"], 12)
+        self.assertEqual(len(page_1.data["results"]), 10)
+        self.assertIsNotNone(page_1.data["next"])
+
+        page_2 = self.client.get(
+            GET_CLIENTS_URL, {"city_id": str(self.city.id), "page": 2}
+        )
+        self.assertEqual(len(page_2.data["results"]), 2)
+
+    def test_an_unrecognised_query_param_is_ignored(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_an_unrecognised_query_param_is_ignored"""
+        self._seed_clients_in_two_cities()
+
+        response = self.client.get(GET_CLIENTS_URL, {"company_name": "Acme"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+
+    def test_an_empty_filter_value_is_rejected(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_an_empty_filter_value_is_rejected"""
+        self._create()
+
+        response = self.client.get(GET_CLIENTS_URL, {"city_id": ""})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("at least one value", response.data["detail"])
+
+    def test_non_integer_filter_values_are_rejected(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_non_integer_filter_values_are_rejected"""
+        self._create()
+
+        response = self.client.get(GET_CLIENTS_URL, {"city_id": "1,not-a-number"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_an_admin_without_a_sales_profile_is_rejected(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_an_admin_without_a_sales_profile_is_rejected"""

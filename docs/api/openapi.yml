@@ -128,8 +128,50 @@ paths:
   /android/api/v1/get-clients:
     get:
       operationId: android_api_v1_get_clients_list
-      description: List the calling sales person's clients, grouped by city.
-      summary: List my clients grouped by city
+      description: 'List the caller''s clients: filter by city / status / created
+        window, sort.'
+      summary: List my clients (filter by city / status / created, sortable)
+      parameters:
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) of the client's primary address (see options). Comma-separated;
+          AND-ed with the other filters.
+      - in: query
+        name: created_gte
+        schema:
+          type: string
+          format: date-time
+        description: When the client was added (ISO 8601). Inclusive lower bound.
+      - in: query
+        name: created_lte
+        schema:
+          type: string
+          format: date-time
+        description: When the client was added (ISO 8601). Inclusive upper bound.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, company_name); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Client verification status. Comma-separated; AND-ed with the
+          other filters.
       tags:
       - android
       security:
@@ -139,9 +181,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ClientCityGroup'
+                $ref: '#/components/schemas/ClientListPage'
           description: ''
   /android/api/v1/update-client:
     post:
@@ -1048,32 +1088,6 @@ components:
       - line_1
       - pincode
       - state
-    ClientCityGroup:
-      type: object
-      description: Output shape for one city block (schema only).
-      properties:
-        city:
-          allOf:
-          - $ref: '#/components/schemas/ClientCityRef'
-          nullable: true
-        clients:
-          type: array
-          items:
-            $ref: '#/components/schemas/ClientListItem'
-      required:
-      - city
-      - clients
-    ClientCityRef:
-      type: object
-      description: Output shape for the city a group is keyed by (schema only).
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-      required:
-      - id
-      - name
     ClientContactPayload:
       type: object
       description: Output shape for one client contact (schema only).
@@ -1125,6 +1139,7 @@ components:
           type: string
         status:
           type: string
+          nullable: true
         primary_contact:
           allOf:
           - $ref: '#/components/schemas/ClientContactPayload'
@@ -1140,6 +1155,37 @@ components:
       - primary_contact
       - public_id
       - status
+    ClientListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientListItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - count
+      - next
+      - previous
+      - results
     ClientPayload:
       type: object
       description: Output shape for a full client (schema only; responses are built
@@ -1392,6 +1438,33 @@ components:
       required:
       - id
       - name
+    FilterCatalogueEntry:
+      type: object
+      description: Schema for one ``available_filters`` entry.
+      properties:
+        filter:
+          type: string
+        kind:
+          type: string
+          description: 'Widget hint: select, int, text, date, datetime, date_range,
+            datetime_range, ...'
+        description:
+          type: string
+        params:
+          type: array
+          items:
+            type: string
+          description: The query params this filter reads (range filters have two).
+        options:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Eligible {value, label} choices, when the filter is closed-ended.
+      required:
+      - description
+      - filter
+      - kind
     LoginRequest:
       type: object
       properties:
@@ -1668,6 +1741,17 @@ components:
       - name
       - phone_number
       - role
+    SortCatalogueEntry:
+      type: object
+      description: Schema for one ``available_sorts`` entry.
+      properties:
+        sort:
+          type: string
+        description:
+          type: string
+      required:
+      - description
+      - sort
     State:
       type: object
       description: Output shape for a state and its cities (schema only).

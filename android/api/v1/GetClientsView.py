@@ -1,34 +1,52 @@
 """Client list endpoint: ``GET /android/api/v1/get-clients``.
 
-Lists the clients the calling sales person created, grouped by the city of each
-client's primary address, with that address and the primary contact person
-attached so the app can render a card without a second call.
+Lists the clients the calling sales person created, newest first, each with its
+primary address and primary contact attached so the app can render a card
+without a second call.
 
-Deliberately unpaginated: ``AndroidPaginatedDateRangeListView`` returns a flat
-page over a date window, which cannot express this grouping.
+Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``:
+
+* ``?city_id=<id1,id2,...>`` -- clients whose *primary* address is in one of
+  those cities. The ``available_filters`` entry lists the eligible
+  ``{value, label}`` cities (exactly the ones this sales person has clients in),
+  so the picker needs no second call.
+* ``?status=<code,...>`` -- ``VERIFICATION_PENDING`` / ``VERIFIED``; the entry
+  carries both as options.
+* ``?created_gte=`` / ``?created_lte=`` -- ISO 8601 datetime bounds on when the
+  client was added (inclusive; send either or both).
+* ``?sort=<-?name,...>`` over ``created_at`` / ``company_name``; default newest
+  first.
+
+A bare request returns the first page of all the caller's clients.
 """
 
 from __future__ import annotations
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, QuerySet
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
-from rest_framework.response import Response
+from rest_framework.request import Request
 
 from aggregator.ClientOperations import client_list_payload
 from aggregator.models import Client, ClientAddress, ClientContact
-from android.api.base import AndroidBaseView
+from aggregator.models.Status import StatusIds
+from android.api.paginated_views import AndroidPaginatedDateRangeListView
 from api.client_serializers import (
     ClientAddressPayloadSerializer,
     ClientContactPayloadSerializer,
 )
+from common.views.paginated_date_range import (
+    FilterCatalogueEntrySerializer,
+    QuerysetFilter,
+    RangeFilter,
+    SortCatalogueEntrySerializer,
+    SortOption,
+    list_query_parameters,
+    parse_datetime,
+    parse_str,
+)
 
-
-class ClientCityRefSerializer(serializers.Serializer):
-    """Output shape for the city a group is keyed by (schema only)."""
-
-    id = serializers.IntegerField()
-    name = serializers.CharField()
+_CLIENT_STATUS_CODES = [status.name for status in StatusIds.client_statuses()]
 
 
 class ClientListItemSerializer(serializers.Serializer):
@@ -37,36 +55,122 @@ class ClientListItemSerializer(serializers.Serializer):
     public_id = serializers.CharField()
     company_name = serializers.CharField()
     company_phone = serializers.CharField()
-    status = serializers.CharField()
+    status = serializers.CharField(allow_null=True)
     primary_contact = ClientContactPayloadSerializer(allow_null=True)
     primary_address = ClientAddressPayloadSerializer(allow_null=True)
 
 
-class ClientCityGroupSerializer(serializers.Serializer):
-    """Output shape for one city block (schema only)."""
+class ClientListPageSerializer(serializers.Serializer):
+    """Output shape for the paginated envelope (schema only)."""
 
-    city = ClientCityRefSerializer(allow_null=True)
-    clients = ClientListItemSerializer(many=True)
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = ClientListItemSerializer(many=True)
+    available_filters = FilterCatalogueEntrySerializer(many=True)
+    available_sorts = SortCatalogueEntrySerializer(many=True)
 
 
-class GetClientsView(AndroidBaseView):
-    """List the calling sales person's clients, grouped by city."""
+def _by_primary_address_city(queryset: QuerySet, city_ids: list[int]) -> QuerySet:
+    """Keep clients whose *primary* address sits in one of ``city_ids``.
+
+    The join is spelled out (rather than reusing ``Client.primary_address``) so
+    it stays a single query; ``is_deleted=False`` is explicit because a lookup
+    that spans the relation does not pick up ``ClientAddress``'s default
+    soft-delete manager.
+    """
+    return queryset.filter(
+        client_addresses__is_primary=True,
+        client_addresses__is_deleted=False,
+        client_addresses__address__city_id__in=city_ids,
+    ).distinct()
+
+
+def _cities_of_my_clients(request: Request) -> list[dict]:
+    """The distinct primary-address cities among the caller's clients.
+
+    This is the eligible value set for the ``city_id`` filter: the picker only
+    ever needs to show a city the sales person actually has a client in.
+    """
+    rows = (
+        ClientAddress.objects.filter(is_primary=True, client__created_by=request.user)
+        .values_list("address__city_id", "address__city__name")
+        .distinct()
+        .order_by("address__city__name")
+    )
+    return [{"value": city_id, "label": name} for city_id, name in rows]
+
+
+def _parse_status(raw: str) -> str:
+    code = parse_str(raw).upper()
+    if code not in _CLIENT_STATUS_CODES:
+        raise serializers.ValidationError(
+            f"Unknown status '{raw}'. Allowed: {', '.join(_CLIENT_STATUS_CODES)}."
+        )
+    return code
+
+
+_QUERYSET_FILTERS = (
+    QuerysetFilter(
+        "city_id",
+        apply=_by_primary_address_city,
+        description="City id(s) of the client's primary address (see options).",
+        options=_cities_of_my_clients,
+    ),
+    QuerysetFilter(
+        "status",
+        parse=_parse_status,
+        apply=lambda queryset, codes: queryset.filter(status__code__in=codes),
+        description="Client verification status.",
+        options=[
+            {"value": code, "label": code.replace("_", " ").title()}
+            for code in _CLIENT_STATUS_CODES
+        ],
+    ),
+    RangeFilter(
+        "created",
+        field="created_at",
+        parse=parse_datetime,
+        suffixes=("gte", "lte"),
+        description="When the client was added (ISO 8601).",
+    ),
+)
+_SORT_OPTIONS = (
+    SortOption("created_at", description="When the client was added (default: newest first)."),
+    SortOption("company_name", description="Company name, A->Z."),
+)
+
+
+class GetClientsView(AndroidPaginatedDateRangeListView):
+    """List the caller's clients: filter by city / status / created window, sort."""
+
+    enforce_date_range_filters = False
+    default_sort = "-created_at"
+    queryset_filters = _QUERYSET_FILTERS
+    sort_options = _SORT_OPTIONS
 
     @extend_schema(
-        summary="List my clients grouped by city",
-        responses={200: ClientCityGroupSerializer(many=True)},
+        operation_id="android_api_v1_get_clients_list",
+        summary="List my clients (filter by city / status / created, sortable)",
+        parameters=list_query_parameters(
+            queryset_filters=_QUERYSET_FILTERS,
+            sort_options=_SORT_OPTIONS,
+            date_window="none",
+        ),
+        responses={200: ClientListPageSerializer},
     )
-    def get(self, request):
-        primary_addresses = ClientAddress.objects.filter(
-            is_primary=True
-        ).select_related(
+    def get(self, request: Request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self, request: Request) -> QuerySet:
+        primary_addresses = ClientAddress.objects.filter(is_primary=True).select_related(
             "address",
             "address__pincode",
             "address__city",
             "address__state",
             "address__country",
         )
-        clients = (
+        return (
             Client.objects.filter(created_by=request.user)
             .select_related("status")
             .prefetch_related(
@@ -80,22 +184,5 @@ class GetClientsView(AndroidBaseView):
             )
         )
 
-        groups: dict[int | None, dict] = {}
-        for client in clients:
-            address_link = next(iter(client.client_addresses.all()), None)
-            city = address_link.address.city if address_link else None
-            group = groups.setdefault(
-                city.id if city else None,
-                {
-                    "city": {"id": city.id, "name": city.name} if city else None,
-                    "clients": [],
-                },
-            )
-            group["clients"].append(client_list_payload(client))
-
-        def sort_key(group):
-            """Cities alphabetically; the "no primary address" block last."""
-            city = group["city"]
-            return (city is None, city["name"] if city else "")
-
-        return Response(sorted(groups.values(), key=sort_key))
+    def serialize_page(self, page_items: list[Client], request: Request) -> list[dict]:
+        return [client_list_payload(client) for client in page_items]

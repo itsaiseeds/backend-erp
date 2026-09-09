@@ -2,8 +2,8 @@
 
 Placeholder. The sales-admin client list has not been specified yet -- what an
 admin should see (every client, filters, pagination) is a different question
-from the Android list, which is scoped to one sales person and grouped by city.
-Until then the route exists and says so.
+from the Android list, which is scoped to one sales person and filterable by
+the primary-address city. Until then the route exists and says so.
 """
 
 from __future__ import annotations
