@@ -180,7 +180,7 @@ role-flag parent both client bases build on.
 | `BaseApiView` | `api/views.py` | Flag-driven base (`auth_required`, `admin_required`, `superuser_required`) → DRF `get_permissions()`; does not itself pick an auth scheme; also defines `fire_and_forget` (post-commit background thread) | base ← `AdminApiView`, `AndroidBaseView` |
 | Auth classes | `api/authentication.py` | `SessionAuthentication` (DRF session but with a real `WWW-Authenticate` challenge so anonymous = **401**, not 403; used only by the web) + `ExpiringTokenAuthentication` (24h TTL via `TOKEN_TTL_HOURS`; an expired token is deleted on first use; used only by Android) | used by → `AdminApiView`, `AndroidBaseView` |
 | `AdminApiView` | `api/admin.py` | Sales-admin website base: **session cookie only** | → `BaseApiView` |
-| `AdminPaginatedDateRangeListView` | `api/paginated_views.py` | Sales-admin `GET` list base: paginated + required `start_date_time`..`end_date_time` filter (default `admin_required = True`); subclass sets `get_queryset` / `serialize_page` / optional `date_field` | → `AdminApiView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
+| `AdminPaginatedDateRangeListView` | `api/paginated_views.py` | Sales-admin `GET` list base (default `admin_required = True`): paginated + optional/required `start_date_time`..`end_date_time` window + a declarative filter/sort catalogue. Subclass sets `get_queryset` / `serialize_page` and optionally `date_field`, `enforce_date_range_filters`, `queryset_filters`, `sort_options`, `default_sort` | → `AdminApiView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
 | Permissions | `api/permissions.py` | `IsRolePermission` meta-class + `IsAdminUser`, `IsSuperUser`, `IsSalesPerson` | keyed off → `User.is_admin_user/is_superuser/is_salesperson` |
 | Top API router | `api/urls.py` | `/api/sales-admin/`, `/api/utilities/` (web, session-only) | → namespace URLconfs |
 | `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales-admin/auth/otp/verify` — pre-auth, `AllowAny`; verifies the user's **TOTP** code, opens a session, returns the user payload + `can_create_admin`/`can_create_sales_person` flags (no token) | reads → `User`; calls → `login()` + `get_token()` (issues `sessionid` + `csrftoken` cookies) |
@@ -196,10 +196,10 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
 | `AndroidBaseView` | `android/api/base.py` | Salesperson Android base: **bearer `ExpiringTokenAuthentication` only** + requires `SalesPerson` profile | → `BaseApiView`, `api.permissions.IsSalesPerson` |
-| `AndroidPaginatedDateRangeListView` | `android/api/paginated_views.py` | Android `GET` list base: paginated + required `start_date_time`..`end_date_time` filter (inherits `salesperson_required`); subclass sets `get_queryset` / `serialize_page` / optional `date_field` | → `AndroidBaseView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
+| `AndroidPaginatedDateRangeListView` | `android/api/paginated_views.py` | Android `GET` list base (inherits `salesperson_required`): paginated + optional/required `start_date_time`..`end_date_time` window + a declarative filter/sort catalogue. Subclass sets `get_queryset` / `serialize_page` and optionally `date_field`, `enforce_date_range_filters`, `queryset_filters`, `sort_options`, `default_sort` | → `AndroidBaseView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
 | Routing mechanism | `android/api/routing.py` | `merged_routes(versions)` merges each version's `routes.ROUTES` in order (later wins); `build_urlpatterns` turns the merge into urlpatterns | used by → `android/api/urls.py` |
 | Version router | `android/api/urls.py` | `VERSIONS = ["v1", ...]`; mounts `<version>/` with routes inherited from every earlier version | → `routing.build_urlpatterns` |
-| Android v1 | `android/api/v1/routes.py` | `ROUTES`: `auth/login` (`LoginView`), `auth/logout` (`LogoutView`), `auth/reauthenticate` (`ReauthenticateView`), `utilities/cities` (`CitiesView`) | → `AndroidBaseView` (except `LoginView`, pre-auth) |
+| Android v1 | `android/api/v1/routes.py` | `ROUTES`: `auth/login` (`LoginView`), `auth/logout` (`LogoutView`), `auth/reauthenticate` (`ReauthenticateView`), `utilities/cities` (`CitiesView`), `get-clients` (`GetClientsView`), `create-client` (`CreateClientView`), `update-client` (`UpdateClientView`) | → `AndroidBaseView` (except `LoginView`, pre-auth) |
 | `LoginView` | `android/api/v1/LoginView.py` | `POST /android/api/v1/auth/login` — pre-auth, `AllowAny`; TOTP login for sales persons, mints/rotates a bearer `Token` (mirrors `VerifyOTPView` but token-only, no session) | reads → `User`; writes → `rest_framework.authtoken.Token` |
 
 > Naming gotcha: `api/admin.py` defines the **`AdminApiView` base controller**, not
@@ -239,7 +239,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `InventorySnapshot` | `aggregator/models/InventorySnapshot.py` | The day's physical stock count, one row per (`snapshot_date`, `product_packaging`) (`INV-…`). Two pools that never mix: whole `bags` (per packaging, the unit `OrderItem.quantity` uses, consumed by `Order`) and loose `loose_packets` (default 0, aggregated **per product** for availability, consumed by `CustomOrder`). Written only by an admin with `can_update_stock_count`. Only the latest `snapshot_date` survives — a newer count hard-deletes every earlier row. Reserved/consumed are **derived** from order status, never stored, which is what makes verification and dispatch reversible | FK → `ProductPackaging`, `User` (`created_by`) |
 | `CustomOrder` | `aggregator/models/CustomOrder.py` | Loose-packet order (`CORD-…`), the **admin-only** counterpart of `Order`. Mirrors `Order`'s fields but is **standalone — no FK to `Order`**. **No verification step**: `create_custom_order` auto-confirms it (born `CONFIRMED`, `verified_by`/`verified_at` set), and creation is **blocked unless enough loose packets are in stock**. `created_by` must be an admin. `total_packets` sums line packets directly | FK → `Client`, `Address`, `Status`, `DispatchDetails`; 1:N → `CustomOrderItem` |
 | `CustomOrderItem` | `aggregator/models/CustomOrderItem.py` | One custom-order line: a raw `Product` and a `packets` count at a **per-packet** `negotiated_selling_price` (defaults to `product.selling_price`). Deliberately has **no `ProductPackaging`** — a custom order bypasses packaging and draws on the product's loose-packet pool; `line_total = negotiated_selling_price * packets` | FK → `CustomOrder`, `Product` |
-| `Client` | `aggregator/models/Client.py` | Customer company; verification statuses limited to `StatusIds.client_statuses()` | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
+| `Client` | `aggregator/models/Client.py` | Customer company (`C-…`); verification statuses limited to `StatusIds.client_statuses()`. Created by a sales person as `VERIFICATION_PENDING`, approved by an admin through `/api/sales-admin/verify-client/`. Always carries at least one address, contact and transport agency, each list with exactly one primary | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
 
 ### Reusable bases — common
 
@@ -251,9 +251,12 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | Admin helpers | `common/admin.py`, `common/models/` | `AuditFieldsAdminMixin` (read-only audit fieldsets, auto `created_by`) + `SoftDeleteModelAdmin` (soft delete through the admin) | aggregator + auth admins |
 | `PublicIdModel` | `common/models/public_id.py` | 12-char `public_id` for user-facing refs (intended for orders/invoices) | (no concrete use yet) |
 | `RandomIdModel` | `common/models/random_id.py` | random `UUIDField` column | (no concrete use yet) |
-| `_PaginatedDateRangeListMixin` | `common/views/paginated_date_range.py` | Provides `GET` for a paginated list view filtered by required `start_date_time`..`end_date_time` on `date_field` (default `"created_at"`, supports `__` lookups); subclass implements `get_queryset` + `serialize_page` | used by → `AdminPaginatedDateRangeListView`, `AndroidPaginatedDateRangeListView` |
+| `_PaginatedDateRangeListMixin` | `common/views/paginated_date_range.py` | Provides `GET` for a paginated list view: `start_date_time`..`end_date_time` window on `date_field` (default `"created_at"`, `__` lookups ok; `enforce_date_range_filters=False` makes it optional) → declared `queryset_filters` (any `ListFilter`; those whose param(s) are present are AND-ed) → declared `sort_options` (`?sort=<-?name,...>`, `pk` tie-breaker always appended, else `default_sort`) → paginate. Reserved param names: `page`, `page_size`, `sort`, `start_date_time`, `end_date_time`. Every response echoes `available_filters` / `available_sorts`; a bare request returns page 1. Subclass implements `get_queryset` + `serialize_page` | used by → `AdminPaginatedDateRangeListView`, `AndroidPaginatedDateRangeListView` |
 | `StandardPageNumberPagination` | `common/views/paginated_date_range.py` | Project default `PageNumberPagination` (`?page=`, `?page_size=`, default 10, max 30); DRF `{count,next,previous,results}` envelope | used by → `_PaginatedDateRangeListMixin` |
-| `DateRangeQuerySerializer` | `common/views/paginated_date_range.py` | Validates required `start_date_time` / `end_date_time` query params (ISO datetimes, `start <= end`) | used by → `_PaginatedDateRangeListMixin` |
+| `DateRangeQuerySerializer` | `common/views/paginated_date_range.py` | Validates `start_date_time` / `end_date_time` query params (ISO datetimes, `start <= end`) | used by → `_PaginatedDateRangeListMixin` |
+| `ListFilter` (ABC) + `QuerysetFilter` / `RangeFilter` | `common/views/paginated_date_range.py` | Declarative list filters, each owning its param(s), self-applying from the request and self-describing for `available_filters` with a `kind` (widget hint). **`QuerysetFilter`**: one param `?<name>=<csv>` (OR within, AND across); `name` doubles as the ORM lookup; `parse` (default `parse_int`, cap 100); `apply` for relation spans / `.distinct()`; `options` (static list or `(request)->list` of `{value,label}`, flips `kind` to `select`). **`RangeFilter`**: a `?<name>_after=` / `?<name>_before=` pair (suffixes configurable, e.g. `gte`/`lte`) → `field__gte`/`__lte`; `parse` default `parse_datetime` (also `parse_date`, `parse_int`); `kind` = `<type>_range`. Parsers: `parse_int`, `parse_str`, `parse_date`, `parse_datetime` | used by → `_PaginatedDateRangeListMixin`, `GetClientsView` (`city_id`, `status`, `created`) |
+| `SortOption` | `common/views/paginated_date_range.py` | One declarative sort key: `name` (the `?sort=` token, `-` prefix = desc), `fields` (ORM `order_by` fragments, default `(name,)`, flipped for desc) | used by → `_PaginatedDateRangeListMixin`, `GetClientsView` (`created_at`, `company_name`) |
+| `list_query_parameters()` + catalogue serializers | `common/views/paginated_date_range.py` | Builds the drf-spectacular `parameters` list from a view's filters (each `ListFilter` emits its own `openapi_parameters()`) / `sort_options` (+ `page`/`page_size`/`date_window`) so the OpenAPI query string stays in lockstep; `FilterCatalogueEntrySerializer` (`filter`/`kind`/`description`/`params?`/`options?`) / `SortCatalogueEntrySerializer` type the response catalogue keys | used by → `GetClientsView.@extend_schema` |
 
 ### Schema & data
 
@@ -359,7 +362,10 @@ erDiagram
 │   ├── admins               GET/POST  AdminsView         (IsSuperUser)
 │   ├── admins/<int:id>      PATCH/DELETE  UpdateAdminView (IsSuperUser)
 │   ├── sales-people         GET/POST  SalesPeopleView    (IsAdminUser)
-│   └── sales-people/<int:id> PATCH/DELETE  UpdateSalesPersonView (IsAdminUser)
+│   ├── sales-people/<int:id> PATCH/DELETE  UpdateSalesPersonView (IsAdminUser)
+│   ├── verify-client/       POST  VerifyClientView       (IsAdminUser → marks VERIFIED + verified_by/at)
+│   ├── update-client/       POST  UpdateClientView       (IsAdminUser → core fields + any list)
+│   └── get-clients/         GET   GetClientsView         (IsAdminUser → 501, work in progress)
 ├── utilities/
 │   ├── reauthenticate       GET   ReauthenticateView      (IsAuthenticated)
 │   └── cities               GET   CitiesView              (IsSuperUser)
@@ -372,7 +378,10 @@ erDiagram
         ├── auth/login         POST  LoginView            (AllowAny → TOTP login, mints a token)
         ├── auth/logout        POST  LogoutView           (IsSalesPerson → deletes the token)
         ├── auth/reauthenticate GET  ReauthenticateView    (IsSalesPerson)
-        └── utilities/cities   GET   CitiesView            (IsSalesPerson)
+        ├── utilities/cities   GET   CitiesView            (IsSalesPerson)
+        ├── get-clients        GET   GetClientsView        (IsSalesPerson → own clients; paginated; ?city_id / ?status / ?created_gte / ?created_lte filters + ?sort; catalogues in available_filters/available_sorts)
+        ├── create-client      POST  CreateClientView      (IsSalesPerson → born VERIFICATION_PENDING)
+        └── update-client      POST  UpdateClientView      (IsSalesPerson → own client's three lists only)
 /sales-admin[/...]   -> Flutter build  (config/views.py catch-all)
 ```
 

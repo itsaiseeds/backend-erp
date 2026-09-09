@@ -8,13 +8,19 @@ declares the same key in its own ``ROUTES``.
 from __future__ import annotations
 
 from .CitiesView import CitiesView
+from .CreateClientView import CreateClientView
+from .GetClientsView import GetClientsView
 from .LoginView import LoginView
 from .LogoutView import LogoutView
 from .ReauthenticateView import ReauthenticateView
+from .UpdateClientView import UpdateClientView
 
 ROUTES: dict[str, type] = {
     "auth/login": LoginView,
     "auth/logout": LogoutView,
     "auth/reauthenticate": ReauthenticateView,
     "utilities/cities": CitiesView,
+    "get-clients": GetClientsView,
+    "create-client": CreateClientView,
+    "update-client": UpdateClientView,
 }

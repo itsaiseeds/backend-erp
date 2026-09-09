@@ -6,12 +6,15 @@ Products and packagings are exposed to the frontend by their ``public_id``
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from .models import Crop, Product, ProductPackaging
 
+if TYPE_CHECKING:
+    from authentication.models import User
 
-def _resolve_crop(crop: Any, actor: Any) -> Crop:
+
+def _resolve_crop(crop: Crop | str, actor: User) -> Crop:
     """Accept a ``Crop`` instance or a crop name, creating the crop if needed."""
     if isinstance(crop, Crop):
         return crop
@@ -25,10 +28,10 @@ def _resolve_crop(crop: Any, actor: Any) -> Crop:
 def create_product(
     *,
     name: str,
-    crop: Any,
+    crop: Crop | str,
     buying_price,
     selling_price,
-    actor: Any,
+    actor: User,
 ) -> Product:
     product = Product(
         name=name,
@@ -47,7 +50,7 @@ def add_packaging(
     *,
     packet_weight,
     packets: int,
-    actor: Any,
+    actor: User,
     selling_price=None,
 ) -> ProductPackaging:
     """Create a packaging for ``product``.

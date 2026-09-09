@@ -97,6 +97,120 @@ paths:
               schema:
                 description: Missing, expired, or revoked token.
           description: ''
+  /android/api/v1/create-client:
+    post:
+      operationId: android_api_v1_create_client_create
+      description: Create a client owned by the calling sales person.
+      summary: Create a client
+      tags:
+      - android
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPayload'
+          description: ''
+  /android/api/v1/get-clients:
+    get:
+      operationId: android_api_v1_get_clients_list
+      description: 'List the caller''s clients: filter by city / status / created
+        window, sort.'
+      summary: List my clients (filter by city / status / created, sortable)
+      parameters:
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) of the client's primary address (see options). Comma-separated;
+          AND-ed with the other filters.
+      - in: query
+        name: created_gte
+        schema:
+          type: string
+          format: date-time
+        description: When the client was added (ISO 8601). Inclusive lower bound.
+      - in: query
+        name: created_lte
+        schema:
+          type: string
+          format: date-time
+        description: When the client was added (ISO 8601). Inclusive upper bound.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, company_name); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Client verification status. Comma-separated; AND-ed with the
+          other filters.
+      tags:
+      - android
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientListPage'
+          description: ''
+  /android/api/v1/update-client:
+    post:
+      operationId: android_api_v1_update_client_create
+      description: Replace the three lists of a client the calling sales person created.
+      summary: Update a client's addresses, contacts and transport agencies
+      tags:
+      - android
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPayload'
+          description: ''
   /android/api/v1/utilities/cities:
     get:
       operationId: android_api_v1_utilities_cities_list
@@ -365,6 +479,18 @@ paths:
       - sessionAuth: []
       responses:
         '204':
+          description: No response body
+  /api/sales-admin/get-clients/:
+    get:
+      operationId: api_sales_admin_get_clients_retrieve
+      description: Not implemented yet (app admin only).
+      summary: List clients (work in progress)
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '501':
           description: No response body
   /api/sales-admin/product-packagings:
     get:
@@ -653,6 +779,62 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/update-client/:
+    post:
+      operationId: api_sales_admin_update_client_create
+      description: Update any client's core details and lists (app admin only).
+      summary: Update a client
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateClientRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateClientRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateClientRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPayload'
+          description: ''
+  /api/sales-admin/verify-client/:
+    post:
+      operationId: api_sales_admin_verify_client_create
+      description: Approve a pending client (app admin only).
+      summary: Verify a client
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyClientRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerifyClientRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerifyClientRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPayload'
+          description: ''
   /api/utilities/cities:
     get:
       operationId: api_utilities_cities_list
@@ -728,6 +910,40 @@ components:
       - name
       - phone_number
       - role
+    AdminUpdateClientRequest:
+      type: object
+      description: Request validation for an admin's client update -- every field
+        optional.
+      properties:
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientAddressRequest'
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientContactRequest'
+        transport_agencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientTransportAgencyRequest'
+        public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        company_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        company_phone:
+          type: string
+          maxLength: 10
+        gst_number:
+          type: string
+          minLength: 1
+          maxLength: 15
+      required:
+      - public_id
     AndroidCity:
       type: object
       description: Output shape for one city row (schema only; responses are built
@@ -802,6 +1018,250 @@ components:
       required:
       - id
       - name
+    ClientAddressPayload:
+      type: object
+      description: Output shape for one client address (schema only).
+      properties:
+        label:
+          type: string
+        is_primary:
+          type: boolean
+        line_1:
+          type: string
+        line_2:
+          type: string
+        pincode:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+      required:
+      - city
+      - country
+      - is_primary
+      - label
+      - line_1
+      - line_2
+      - pincode
+      - state
+    ClientAddressRequest:
+      type: object
+      description: |-
+        One address of a client.
+
+        City, state and country are master data and must already exist; the pincode
+        is typed in by the sales person and is created on demand.
+        ``Address.clean()`` then checks the whole pincode -> city -> state ->
+        country chain hangs together.
+      properties:
+        line_1:
+          type: string
+          minLength: 1
+          maxLength: 255
+        line_2:
+          type: string
+          default: ''
+          maxLength: 255
+        pincode:
+          type: string
+          minLength: 1
+          maxLength: 10
+        city:
+          type: integer
+        state:
+          type: integer
+        country:
+          type: integer
+        label:
+          type: string
+          default: ''
+          maxLength: 64
+        is_primary:
+          type: boolean
+          default: false
+      required:
+      - city
+      - country
+      - line_1
+      - pincode
+      - state
+    ClientContactPayload:
+      type: object
+      description: Output shape for one client contact (schema only).
+      properties:
+        name:
+          type: string
+        phone_number:
+          type: string
+        role:
+          type: string
+        is_primary:
+          type: boolean
+      required:
+      - is_primary
+      - name
+      - phone_number
+      - role
+    ClientContactRequest:
+      type: object
+      description: One contact person of a client.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        role:
+          type: string
+          default: ''
+          maxLength: 64
+        is_primary:
+          type: boolean
+          default: false
+      required:
+      - name
+      - phone_number
+    ClientListItem:
+      type: object
+      description: Output shape for one client card (schema only).
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+        company_phone:
+          type: string
+        status:
+          type: string
+          nullable: true
+        primary_contact:
+          allOf:
+          - $ref: '#/components/schemas/ClientContactPayload'
+          nullable: true
+        primary_address:
+          allOf:
+          - $ref: '#/components/schemas/ClientAddressPayload'
+          nullable: true
+      required:
+      - company_name
+      - company_phone
+      - primary_address
+      - primary_contact
+      - public_id
+      - status
+    ClientListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientListItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - count
+      - next
+      - previous
+      - results
+    ClientPayload:
+      type: object
+      description: Output shape for a full client (schema only; responses are built
+        by hand).
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+        company_phone:
+          type: string
+        gst_number:
+          type: string
+        status:
+          type: string
+        is_verified:
+          type: boolean
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        verified_by:
+          type: string
+          nullable: true
+        created_by:
+          type: string
+          nullable: true
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientAddressPayload'
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientContactPayload'
+        transport_agencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientTransportAgencyPayload'
+      required:
+      - addresses
+      - company_name
+      - company_phone
+      - contacts
+      - created_by
+      - gst_number
+      - is_verified
+      - public_id
+      - status
+      - transport_agencies
+      - verified_at
+      - verified_by
+    ClientTransportAgencyPayload:
+      type: object
+      description: Output shape for one client transport agency (schema only).
+      properties:
+        name:
+          type: string
+        is_primary:
+          type: boolean
+      required:
+      - is_primary
+      - name
+    ClientTransportAgencyRequest:
+      type: object
+      description: One transport agency of a client -- a name and nothing else.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        is_primary:
+          type: boolean
+          default: false
+      required:
+      - name
     CreateAdminRequest:
       type: object
       description: |-
@@ -836,6 +1296,40 @@ components:
       - city
       - name
       - phone_number
+    CreateClientRequest:
+      type: object
+      description: Request validation for creating a client with its three lists.
+      properties:
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientAddressRequest'
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientContactRequest'
+        transport_agencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientTransportAgencyRequest'
+        company_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        company_phone:
+          type: string
+          default: ''
+          maxLength: 10
+        gst_number:
+          type: string
+          minLength: 1
+          maxLength: 15
+      required:
+      - addresses
+      - company_name
+      - contacts
+      - gst_number
+      - transport_agencies
     CreateCropRequest:
       type: object
       description: Request validation for creating a new ``Crop``.
@@ -944,6 +1438,33 @@ components:
       required:
       - id
       - name
+    FilterCatalogueEntry:
+      type: object
+      description: Schema for one ``available_filters`` entry.
+      properties:
+        filter:
+          type: string
+        kind:
+          type: string
+          description: 'Widget hint: select, int, text, date, datetime, date_range,
+            datetime_range, ...'
+        description:
+          type: string
+        params:
+          type: array
+          items:
+            type: string
+          description: The query params this filter reads (range filters have two).
+        options:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Eligible {value, label} choices, when the filter is closed-ended.
+      required:
+      - description
+      - filter
+      - kind
     LoginRequest:
       type: object
       properties:
@@ -1220,6 +1741,17 @@ components:
       - name
       - phone_number
       - role
+    SortCatalogueEntry:
+      type: object
+      description: Schema for one ``available_sorts`` entry.
+      properties:
+        sort:
+          type: string
+        description:
+          type: string
+      required:
+      - description
+      - sort
     State:
       type: object
       description: Output shape for a state and its cities (schema only).
@@ -1245,6 +1777,31 @@ components:
           type: string
       required:
       - provisioning_uri
+    UpdateClientRequest:
+      type: object
+      description: Request validation for a sales person's client update.
+      properties:
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientAddressRequest'
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientContactRequest'
+        transport_agencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientTransportAgencyRequest'
+        public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+      required:
+      - addresses
+      - contacts
+      - public_id
+      - transport_agencies
     UserRef:
       type: object
       description: Swagger schema for a compact ``{id, name}`` user reference.
@@ -1256,6 +1813,16 @@ components:
       required:
       - id
       - name
+    VerifyClientRequest:
+      type: object
+      description: Request validation for verifying a client.
+      properties:
+        public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+      required:
+      - public_id
     VerifyOTPRequest:
       type: object
       properties:
