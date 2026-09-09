@@ -136,12 +136,21 @@ QuerysetFilter(
     options=lambda request: [{"value": c.id, "label": c.name} for c in ...],  # or a static list
     description="...",
 )
+QuerysetFilter(                            # free-text substring search
+    "company_name",
+    lookup="company_name__icontains",     # public param name != ORM lookup
+    parse=parse_str, multi=False,         # whole value is one term, no comma split
+    description="...",
+)
 ```
 
-- up to `MAX_FILTER_VALUES` (100) values, each through `parse` (`parse_int`
-  default, or `parse_str` / `parse_date` / `parse_datetime`); empty /
-  unparseable / too many → **400**; duplicates collapsed; **undeclared** param
-  ignored.
+- multi (default): up to `MAX_FILTER_VALUES` (100) comma-separated values, each
+  through `parse` (`parse_int` default, or `parse_str` / `parse_date` /
+  `parse_datetime`); duplicates collapsed. `multi=False`: the whole param value
+  is one term (a comma is data) — for substring / `__icontains` search.
+- empty / unparseable / too many → **400**; **undeclared** param ignored.
+- `lookup=` overrides the ORM lookup the default `apply` uses, so the public
+  param name stays clean (`company_name`, not `company_name__icontains`).
 - `options` (static list or `(request) -> list`) → the eligible `{value, label}`
   choices, echoed on the entry (**no second lookup**) and flips `kind` to
   `select`.
@@ -231,6 +240,18 @@ class GetClientsView(AndroidPaginatedDateRangeListView):
 ```
 
 See `android/api/v1/GetClientsView.py` for the real thing.
+
+## Reading clients
+
+| Endpoint | Scope | Payload |
+|---|---|---|
+| `GET /android/api/v1/get-clients` | the caller's own clients | compact card per client (`client_list_payload` — primary address + primary contact only), paginated / filtered / sorted |
+| `GET /android/api/v1/client/<public_id>` | the caller's own clients | one client in full (`client_payload` — core + **every** address / contact / transport agency) |
+| `GET /api/sales-admin/client/<public_id>` | **any** client (admin) | same full `client_payload` |
+
+`client_payload` / `client_list_payload` live in `aggregator/ClientOperations.py`;
+the detail views are three lines each (`get_object_or_404` + `Response(client_payload(client))`).
+`GET /api/sales-admin/get-clients/` is still a 501 stub.
 
 ## Client lists are declarative
 

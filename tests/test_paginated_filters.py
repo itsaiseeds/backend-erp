@@ -84,6 +84,17 @@ class QuerysetFilterCleanValuesTest(SimpleTestCase):
         spec = QuerysetFilter("status_code__in", parse=parse_str)
         self.assertEqual(spec.clean_values(" booked , shipped "), ["booked", "shipped"])
 
+    def test_multi_false_keeps_the_whole_value_as_one_term(self):
+        spec = QuerysetFilter("company_name", parse=parse_str, multi=False)
+
+        self.assertEqual(spec.clean_values(" Acme, Inc "), ["Acme, Inc"])
+
+    def test_multi_false_still_rejects_a_blank_value(self):
+        spec = QuerysetFilter("company_name", parse=parse_str, multi=False)
+
+        with self.assertRaises(serializers.ValidationError):
+            spec.clean_values("   ")
+
 
 class QuerysetFilterApplyTest(SimpleTestCase):
     """tests/test_paginated_filters.py::QuerysetFilterApplyTest"""
@@ -94,6 +105,15 @@ class QuerysetFilterApplyTest(SimpleTestCase):
         QuerysetFilter("status_id__in").apply(queryset, [1, 2])
 
         self.assertEqual(queryset.filtered_with, {"status_id__in": [1, 2]})
+
+    def test_lookup_overrides_the_param_name_for_the_default_apply(self):
+        queryset = _FakeQuerySet()
+
+        QuerysetFilter(
+            "company_name", lookup="company_name__icontains", parse=parse_str, multi=False
+        ).apply(queryset, ["acme"])
+
+        self.assertEqual(queryset.filtered_with, {"company_name__icontains": "acme"})
 
     def test_a_custom_apply_callable_takes_over(self):
         spec = QuerysetFilter("city_id", apply=lambda qs, values: (qs, values))

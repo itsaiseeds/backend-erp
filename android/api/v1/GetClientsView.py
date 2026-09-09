@@ -12,6 +12,9 @@ Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
   so the picker needs no second call.
 * ``?status=<code,...>`` -- ``VERIFICATION_PENDING`` / ``VERIFIED``; the entry
   carries both as options.
+* ``?company_name=<term>`` -- case-insensitive substring of the company name.
+* ``?address=<term>`` -- case-insensitive substring of the *primary* address
+  (line 1/2, pincode or city name).
 * ``?created_gte=`` / ``?created_lte=`` -- ISO 8601 datetime bounds on when the
   client was added (inclusive; send either or both).
 * ``?sort=<-?name,...>`` over ``created_at`` / ``company_name``; default newest
@@ -22,7 +25,7 @@ A bare request returns the first page of all the caller's clients.
 
 from __future__ import annotations
 
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.request import Request
@@ -111,6 +114,24 @@ def _parse_status(raw: str) -> str:
     return code
 
 
+def _by_primary_address_text(queryset: QuerySet, terms: list[str]) -> QuerySet:
+    """Substring match against the client's *primary* address.
+
+    Matches line 1 / line 2 / pincode / city name of the one primary address
+    (all conditions on a single join, so a non-primary address never satisfies
+    it). ``terms`` always has one entry -- the filter is ``multi=False``.
+    """
+    term = terms[0]
+    primary = Q(client_addresses__is_primary=True, client_addresses__is_deleted=False)
+    text = (
+        Q(client_addresses__address__address_line_1__icontains=term)
+        | Q(client_addresses__address__address_line_2__icontains=term)
+        | Q(client_addresses__address__pincode__code__icontains=term)
+        | Q(client_addresses__address__city__name__icontains=term)
+    )
+    return queryset.filter(primary & text).distinct()
+
+
 _QUERYSET_FILTERS = (
     QuerysetFilter(
         "city_id",
@@ -127,6 +148,21 @@ _QUERYSET_FILTERS = (
             {"value": code, "label": code.replace("_", " ").title()}
             for code in _CLIENT_STATUS_CODES
         ],
+    ),
+    QuerysetFilter(
+        "company_name",
+        lookup="company_name__icontains",
+        parse=parse_str,
+        multi=False,
+        description="Case-insensitive substring of the company name.",
+    ),
+    QuerysetFilter(
+        "address",
+        parse=parse_str,
+        multi=False,
+        apply=_by_primary_address_text,
+        description="Case-insensitive substring of the primary address "
+        "(line 1/2, pincode or city).",
     ),
     RangeFilter(
         "created",
@@ -152,7 +188,7 @@ class GetClientsView(AndroidPaginatedDateRangeListView):
 
     @extend_schema(
         operation_id="android_api_v1_get_clients_list",
-        summary="List my clients (filter by city / status / created, sortable)",
+        summary="List my clients (filter by city / status / name / address / created, sortable)",
         parameters=list_query_parameters(
             queryset_filters=_QUERYSET_FILTERS,
             sort_options=_SORT_OPTIONS,
