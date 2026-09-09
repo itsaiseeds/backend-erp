@@ -68,13 +68,60 @@ FilterOptions = Sequence[dict] | Callable[[Request], Sequence[dict]]
 class StandardPageNumberPagination(PageNumberPagination):
     """Project default page number pagination.
 
-    Uses ``?page=`` and ``?page_size=`` (capped at ``max_page_size``) and
-    returns DRF's standard ``{count, next, previous, results}`` envelope.
+    Uses ``?page=`` and ``?page_size=`` (capped at ``max_page_size``). The
+    envelope is page-number oriented rather than DRF's URL default::
+
+        {
+          "total_count": <rows matching the query, across every page>,
+          "total_pages": <number of pages at this page_size, always >= 1>,
+          "next_page_number": <int or null on the last page>,
+          "previous_page_number": <int or null on the first page>,
+          "results": [...],
+        }
     """
 
     page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 30
+
+    def get_paginated_response(self, data) -> Response:
+        page = self.page
+        return Response(
+            {
+                "total_count": page.paginator.count,
+                "total_pages": page.paginator.num_pages,
+                "next_page_number": (
+                    page.next_page_number() if page.has_next() else None
+                ),
+                "previous_page_number": (
+                    page.previous_page_number() if page.has_previous() else None
+                ),
+                "results": data,
+            }
+        )
+
+    def get_paginated_response_schema(self, schema: dict) -> dict:
+        return {
+            "type": "object",
+            "required": [
+                "total_count",
+                "total_pages",
+                "next_page_number",
+                "previous_page_number",
+                "results",
+            ],
+            "properties": {
+                "total_count": {"type": "integer", "example": 37},
+                "total_pages": {"type": "integer", "example": 4},
+                "next_page_number": {"type": "integer", "nullable": True, "example": 3},
+                "previous_page_number": {
+                    "type": "integer",
+                    "nullable": True,
+                    "example": 1,
+                },
+                "results": schema,
+            },
+        }
 
 
 DATE_RANGE_PARAMS = ("start_date_time", "end_date_time")

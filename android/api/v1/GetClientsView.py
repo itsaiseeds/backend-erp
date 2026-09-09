@@ -63,9 +63,10 @@ class ClientListItemSerializer(serializers.Serializer):
 class ClientListPageSerializer(serializers.Serializer):
     """Output shape for the paginated envelope (schema only)."""
 
-    count = serializers.IntegerField()
-    next = serializers.CharField(allow_null=True)
-    previous = serializers.CharField(allow_null=True)
+    total_count = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+    next_page_number = serializers.IntegerField(allow_null=True)
+    previous_page_number = serializers.IntegerField(allow_null=True)
     results = ClientListItemSerializer(many=True)
     available_filters = FilterCatalogueEntrySerializer(many=True)
     available_sorts = SortCatalogueEntrySerializer(many=True)
