@@ -8,15 +8,18 @@ from django.urls import path
 
 from .AdminsView import AdminsView
 from .CropsView import CropsView
+from .GetClientsView import GetClientsView
 from .LogoutView import LogoutView
 from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
 from .SalesPeopleView import SalesPeopleView
 from .UpdateAdminView import UpdateAdminView
+from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateSalesPersonView import UpdateSalesPersonView
+from .VerifyClientView import VerifyClientView
 from .VerifyOTPView import VerifyOTPView
 
 urlpatterns = [
@@ -40,4 +43,8 @@ urlpatterns = [
         UpdateSalesPersonView.as_view(),
         name="update-sales-person",
     ),
+    # The client routes are verbs, not collections, and keep a trailing slash.
+    path("verify-client/", VerifyClientView.as_view(), name="verify-client"),
+    path("update-client/", UpdateClientView.as_view(), name="update-client"),
+    path("get-clients/", GetClientsView.as_view(), name="get-clients"),
 ]

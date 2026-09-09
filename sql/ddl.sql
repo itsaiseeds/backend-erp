@@ -526,9 +526,11 @@ CREATE TABLE IF NOT EXISTS public.aggregator_transportagency (
 	deleted_by_id int8 NULL,
 	created_by_id int8 NULL,
 	"name" varchar(255) NOT NULL,
-	CONSTRAINT aggregator_transportagency_pkey PRIMARY KEY (id),
-	CONSTRAINT uniq_transportagency_name UNIQUE (name)
+	CONSTRAINT aggregator_transportagency_pkey PRIMARY KEY (id)
 );
+-- A name is unique per client, not globally: two clients may each own their own
+-- agency row named "ABC Transport". Enforced in aggregator/ClientOperations.py.
+CREATE INDEX IF NOT EXISTS aggregator_transportagency_name_idx ON public.aggregator_transportagency USING btree (name);
 CREATE INDEX IF NOT EXISTS aggregator_transportagency_is_deleted_idx ON public.aggregator_transportagency USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_transportagency_created_by_id_idx ON public.aggregator_transportagency USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_transportagency_deleted_by_id_idx ON public.aggregator_transportagency USING btree (deleted_by_id);
@@ -560,6 +562,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_client (
 	deleted_at timestamptz NULL,
 	deleted_by_id int8 NULL,
 	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
 	company_name varchar(255) NOT NULL,
 	company_phone varchar(10) NOT NULL,
 	gst_number varchar(15) NOT NULL,
@@ -567,8 +570,10 @@ CREATE TABLE IF NOT EXISTS public.aggregator_client (
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
 	CONSTRAINT aggregator_client_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_client_public_id_key UNIQUE (public_id),
 	CONSTRAINT aggregator_client_gst_number_key UNIQUE (gst_number)
 );
+CREATE INDEX IF NOT EXISTS aggregator_client_public_id_like ON public.aggregator_client USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_client_gst_number_like ON public.aggregator_client USING btree (gst_number varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_client_status_id_idx ON public.aggregator_client USING btree (status_id);
 CREATE INDEX IF NOT EXISTS aggregator_client_verified_by_id_idx ON public.aggregator_client USING btree (verified_by_id);

@@ -199,7 +199,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `AndroidPaginatedDateRangeListView` | `android/api/paginated_views.py` | Android `GET` list base: paginated + required `start_date_time`..`end_date_time` filter (inherits `salesperson_required`); subclass sets `get_queryset` / `serialize_page` / optional `date_field` | → `AndroidBaseView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
 | Routing mechanism | `android/api/routing.py` | `merged_routes(versions)` merges each version's `routes.ROUTES` in order (later wins); `build_urlpatterns` turns the merge into urlpatterns | used by → `android/api/urls.py` |
 | Version router | `android/api/urls.py` | `VERSIONS = ["v1", ...]`; mounts `<version>/` with routes inherited from every earlier version | → `routing.build_urlpatterns` |
-| Android v1 | `android/api/v1/routes.py` | `ROUTES`: `auth/login` (`LoginView`), `auth/logout` (`LogoutView`), `auth/reauthenticate` (`ReauthenticateView`), `utilities/cities` (`CitiesView`) | → `AndroidBaseView` (except `LoginView`, pre-auth) |
+| Android v1 | `android/api/v1/routes.py` | `ROUTES`: `auth/login` (`LoginView`), `auth/logout` (`LogoutView`), `auth/reauthenticate` (`ReauthenticateView`), `utilities/cities` (`CitiesView`), `get-clients` (`GetClientsView`), `create-client` (`CreateClientView`), `update-client` (`UpdateClientView`) | → `AndroidBaseView` (except `LoginView`, pre-auth) |
 | `LoginView` | `android/api/v1/LoginView.py` | `POST /android/api/v1/auth/login` — pre-auth, `AllowAny`; TOTP login for sales persons, mints/rotates a bearer `Token` (mirrors `VerifyOTPView` but token-only, no session) | reads → `User`; writes → `rest_framework.authtoken.Token` |
 
 > Naming gotcha: `api/admin.py` defines the **`AdminApiView` base controller**, not
@@ -239,7 +239,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `InventorySnapshot` | `aggregator/models/InventorySnapshot.py` | The day's physical stock count, one row per (`snapshot_date`, `product_packaging`) (`INV-…`). Two pools that never mix: whole `bags` (per packaging, the unit `OrderItem.quantity` uses, consumed by `Order`) and loose `loose_packets` (default 0, aggregated **per product** for availability, consumed by `CustomOrder`). Written only by an admin with `can_update_stock_count`. Only the latest `snapshot_date` survives — a newer count hard-deletes every earlier row. Reserved/consumed are **derived** from order status, never stored, which is what makes verification and dispatch reversible | FK → `ProductPackaging`, `User` (`created_by`) |
 | `CustomOrder` | `aggregator/models/CustomOrder.py` | Loose-packet order (`CORD-…`), the **admin-only** counterpart of `Order`. Mirrors `Order`'s fields but is **standalone — no FK to `Order`**. **No verification step**: `create_custom_order` auto-confirms it (born `CONFIRMED`, `verified_by`/`verified_at` set), and creation is **blocked unless enough loose packets are in stock**. `created_by` must be an admin. `total_packets` sums line packets directly | FK → `Client`, `Address`, `Status`, `DispatchDetails`; 1:N → `CustomOrderItem` |
 | `CustomOrderItem` | `aggregator/models/CustomOrderItem.py` | One custom-order line: a raw `Product` and a `packets` count at a **per-packet** `negotiated_selling_price` (defaults to `product.selling_price`). Deliberately has **no `ProductPackaging`** — a custom order bypasses packaging and draws on the product's loose-packet pool; `line_total = negotiated_selling_price * packets` | FK → `CustomOrder`, `Product` |
-| `Client` | `aggregator/models/Client.py` | Customer company; verification statuses limited to `StatusIds.client_statuses()` | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
+| `Client` | `aggregator/models/Client.py` | Customer company (`C-…`); verification statuses limited to `StatusIds.client_statuses()`. Created by a sales person as `VERIFICATION_PENDING`, approved by an admin through `/api/sales-admin/verify-client/`. Always carries at least one address, contact and transport agency, each list with exactly one primary | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
 
 ### Reusable bases — common
 
@@ -359,7 +359,10 @@ erDiagram
 │   ├── admins               GET/POST  AdminsView         (IsSuperUser)
 │   ├── admins/<int:id>      PATCH/DELETE  UpdateAdminView (IsSuperUser)
 │   ├── sales-people         GET/POST  SalesPeopleView    (IsAdminUser)
-│   └── sales-people/<int:id> PATCH/DELETE  UpdateSalesPersonView (IsAdminUser)
+│   ├── sales-people/<int:id> PATCH/DELETE  UpdateSalesPersonView (IsAdminUser)
+│   ├── verify-client/       POST  VerifyClientView       (IsAdminUser → marks VERIFIED + verified_by/at)
+│   ├── update-client/       POST  UpdateClientView       (IsAdminUser → core fields + any list)
+│   └── get-clients/         GET   GetClientsView         (IsAdminUser → 501, work in progress)
 ├── utilities/
 │   ├── reauthenticate       GET   ReauthenticateView      (IsAuthenticated)
 │   └── cities               GET   CitiesView              (IsSuperUser)
@@ -372,7 +375,10 @@ erDiagram
         ├── auth/login         POST  LoginView            (AllowAny → TOTP login, mints a token)
         ├── auth/logout        POST  LogoutView           (IsSalesPerson → deletes the token)
         ├── auth/reauthenticate GET  ReauthenticateView    (IsSalesPerson)
-        └── utilities/cities   GET   CitiesView            (IsSalesPerson)
+        ├── utilities/cities   GET   CitiesView            (IsSalesPerson)
+        ├── get-clients        GET   GetClientsView        (IsSalesPerson → own clients, grouped by city)
+        ├── create-client      POST  CreateClientView      (IsSalesPerson → born VERIFICATION_PENDING)
+        └── update-client      POST  UpdateClientView      (IsSalesPerson → own client's three lists only)
 /sales-admin[/...]   -> Flutter build  (config/views.py catch-all)
 ```
 

@@ -160,6 +160,7 @@ class ClientTransportAgencyInline(CreatedByStampInlineMixin, admin.TabularInline
 @admin.register(Client)
 class ClientAdmin(SoftDeleteParentAdmin):
     list_display = (
+        "public_id",
         "company_name",
         "gst_number",
         "company_phone",
@@ -168,7 +169,7 @@ class ClientAdmin(SoftDeleteParentAdmin):
         "created_by",
         "created_at",
     )
-    search_fields = ("company_name", "gst_number", "company_phone")
+    search_fields = ("public_id", "company_name", "gst_number", "company_phone")
     list_filter = ("status",)
     autocomplete_fields = ("status", "verified_by")
     list_select_related = ("status", "verified_by")

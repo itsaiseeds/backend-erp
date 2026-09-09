@@ -5,10 +5,16 @@ DRF's default handler returns field-level errors as ``{"field": ["msg"]}``
 which leaks internal structure to clients.  This handler intercepts those and
 flattens them into a single ``detail`` key so the front-end only needs to
 read one place.
+
+It also translates Django's own ``ValidationError`` -- what the operations
+layer and ``Model.full_clean()`` raise -- into DRF's, so a broken business rule
+reaches the caller as a 400 with its message instead of a 500.
 """
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.views import exception_handler as _drf_default
 
 
@@ -29,6 +35,9 @@ def _flatten(errors) -> str:
 
 def custom_exception_handler(exc, context):
     """Wrap DRF's default handler and normalise the response shape."""
+    if isinstance(exc, DjangoValidationError):
+        exc = DRFValidationError(exc.messages)
+
     response = _drf_default(exc, context)
 
     if response is not None:

@@ -264,3 +264,7 @@ SELECT setval('auth_permission_id_seq', 116);
 - **Idempotency** — all inserts use `ON CONFLICT DO NOTHING`, all creates use `IF NOT EXISTS`
 - **DB container must be running** — `reload_db.sh` will fail if `docker compose ps db` shows the container is down
 - **Never use `reload_db.sh` against production** — it only targets Docker PostgreSQL
+- **`aggregator_transportagency.name` is intentionally not unique** — a transport
+  agency belongs to one client, and two clients may each own a row with the same
+  name. Uniqueness *within* a client is a cross-table rule, enforced in
+  `aggregator/ClientOperations.py`, not by a constraint

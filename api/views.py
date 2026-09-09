@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import Any
 
 from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
@@ -23,7 +22,7 @@ from rest_framework.views import APIView
 from .permissions import IsAdminUser, IsSalesPerson, IsSuperUser
 
 
-def fire_and_forget(func: Callable[[], Any]) -> None:
+def fire_and_forget(func: Callable[[], object]) -> None:
     """Run ``func`` in a background thread after the current transaction commits.
 
     Use this for low-priority, "nice to have" work that must never fail the API

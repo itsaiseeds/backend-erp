@@ -7,12 +7,15 @@ operations so the views stay thin.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from aggregator.models import Address
 
+if TYPE_CHECKING:
+    from authentication.models import User
 
-def create_address(address_data: dict | None, actor: Any) -> Address | None:
+
+def create_address(address_data: dict | None, actor: User) -> Address | None:
     """Persist a validated ``aggregator.Address``, recording ``actor`` as its
     creator. Returns ``None`` when no address data is supplied.
 
@@ -32,3 +35,19 @@ def create_address(address_data: dict | None, actor: Any) -> Address | None:
     address.full_clean()
     address.save()
     return address
+
+
+def address_payload(address: Address) -> dict:
+    """Frontend-facing dict for an address, field by field.
+
+    The geographic chain is spelled out (rather than collapsed into ``str()``)
+    so a client can lay the address out itself.
+    """
+    return {
+        "line_1": address.address_line_1,
+        "line_2": address.address_line_2,
+        "pincode": address.pincode.code,
+        "city": address.city.name,
+        "state": address.state.name,
+        "country": address.country.name,
+    }

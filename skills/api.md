@@ -136,6 +136,27 @@ class OrdersView(AdminPaginatedDateRangeListView):
         return [order_payload(o) for o in page_items]
 ```
 
+## Client lists are declarative
+
+A client's addresses, contact people and transport agencies are never patched
+entry by entry. Whoever writes them (`POST /android/api/v1/create-client`,
+`POST /android/api/v1/update-client`, `POST /api/sales-admin/update-client/`)
+sends the **complete desired list**, and the `sync_client_*` helpers in
+`aggregator/ClientOperations.py` reconcile the link rows against it: entries are
+matched by their content, missing ones are unlinked, new ones are created.
+
+Two rules hold on every one of those endpoints:
+
+- each list keeps **at least one** entry;
+- exactly one entry is `is_primary` -- forced when the list has a single entry,
+  otherwise taken from the caller's flag, defaulting to the first entry.
+
+Who may write what differs by client, not by the contract: a sales person may
+only replace the three lists of a client they created, while a sales admin may
+also change `company_name` / `company_phone` / `gst_number` on any client.
+Status, `verified_by` and `verified_at` belong to
+`POST /api/sales-admin/verify-client/` alone.
+
 ## The pre-auth TOTP login POST needs no X-CSRFToken
 
 The verify-OTP POST itself works without a CSRF header: DRF never runs the
