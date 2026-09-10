@@ -583,16 +583,81 @@ paths:
           description: No response body
   /api/sales-admin/get-clients/:
     get:
-      operationId: api_sales_admin_get_clients_retrieve
-      description: Not implemented yet (app admin only).
-      summary: List clients (work in progress)
+      operationId: sales_admin_get_clients_list
+      description: 'List every client: filter by sales person / city / status / created
+        window, sort.'
+      summary: List clients (filter by sales person / city / status / name / address
+        / created, sortable)
+      parameters:
+      - in: query
+        name: address
+        schema:
+          type: string
+        description: Case-insensitive substring of the primary address (line 1/2,
+          pincode or city). Single value; AND-ed with the other filters.
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) of the client's primary address (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: company_name
+        schema:
+          type: string
+        description: Case-insensitive substring of the company name. Single value;
+          AND-ed with the other filters.
+      - in: query
+        name: created_by
+        schema:
+          type: string
+        description: User id(s) of the sales person who created the client (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: created_gte
+        schema:
+          type: string
+          format: date-time
+        description: When the client was added (ISO 8601). Inclusive lower bound.
+      - in: query
+        name: created_lte
+        schema:
+          type: string
+          format: date-time
+        description: When the client was added (ISO 8601). Inclusive upper bound.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, company_name); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Client verification status. Comma-separated (any match); AND-ed
+          with the other filters.
       tags:
       - api
       security:
       - sessionAuth: []
       responses:
-        '501':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientListPage'
+          description: ''
   /api/sales-admin/product-packagings:
     get:
       operationId: api_sales_admin_product_packagings_list
