@@ -10,7 +10,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
-from aggregator.ClientOperations import create_client_with_details
+from aggregator.ClientOperations import create_client_with_details, verify_client
 from aggregator.models import City, Country, State
 from authentication.models import Admin, SalesPerson
 from tests.common import WebApiTestCase
@@ -43,17 +43,10 @@ class SalesAdminClientApiTest(WebApiTestCase):
         cls.country = Country.objects.get(name="India")
         cls.state = State.objects.get(name="Gujarat", country=cls.country)
         cls.city = City.objects.get(name="Surat", state=cls.state)
+        cls.other_city = City.objects.get(name="Ahmedabad", state=cls.state)
 
-        cls.sales_person = User.objects.create_user(
-            phone_number="9000000001",
-            name="Sales One",
-            is_verified=True,
-            created_by=cls.superuser,
-            verified_by=cls.superuser,
-        )
-        SalesPerson.objects.create(
-            user=cls.sales_person, city=cls.city, created_by=cls.superuser
-        )
+        cls.sales_person = cls._make_sales_person("9000000001", "Sales One")
+        cls.other_sales_person = cls._make_sales_person("9000000004", "Sales Two")
 
         cls.admin_user = User.objects.create_user(
             phone_number="9000000002",
@@ -70,6 +63,50 @@ class SalesAdminClientApiTest(WebApiTestCase):
             is_verified=True,
             created_by=cls.superuser,
             verified_by=cls.superuser,
+        )
+
+    @classmethod
+    def _make_sales_person(cls, phone, name):
+        user = User.objects.create_user(
+            phone_number=phone,
+            name=name,
+            is_verified=True,
+            created_by=cls.superuser,
+            verified_by=cls.superuser,
+        )
+        SalesPerson.objects.create(user=user, city=cls.city, created_by=cls.superuser)
+        return user
+
+    # 15-char GSTINs differing only in the final char (see validate_gst_number).
+    _GST_SUFFIXES = "013456789ACDEFGHIJKLMNOPQRSTUWXY"
+
+    def _make_client(
+        self,
+        *,
+        company_name,
+        gst_index,
+        actor=None,
+        city=None,
+        line_1="1 Ring Road",
+        pincode="395007",
+    ):
+        city = city or self.city
+        return create_client_with_details(
+            company_name=company_name,
+            company_phone="9876543210",
+            gst_number=f"27AAPFU0939F1Z{self._GST_SUFFIXES[gst_index]}",
+            addresses=[
+                {
+                    "line_1": line_1,
+                    "pincode": pincode,
+                    "city": city,
+                    "state": self.state,
+                    "country": self.country,
+                }
+            ],
+            contacts=[{"name": "Ramesh", "phone_number": "9876500001"}],
+            transport_agencies=[{"name": "ABC Transport"}],
+            actor=actor or self.sales_person,
         )
 
     def setUp(self):
@@ -215,15 +252,146 @@ class SalesAdminClientApiTest(WebApiTestCase):
 
         self.assertEqual(response.data["status"], "VERIFICATION_PENDING")
 
-    # -- the list stub --------------------------------------------------------
+    # -- the client list ----------------------------------------------------
 
-    def test_get_clients_is_still_work_in_progress(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_get_clients_is_still_work_in_progress"""
+    def test_get_clients_needs_an_admin(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_get_clients_needs_an_admin"""
+        self.login_as(self.sales_person)
+
+        self.assertEqual(self.client.get(GET_CLIENTS_URL).status_code, 403)
+
+    def test_no_filter_returns_every_client_and_the_catalogues(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_no_filter_returns_every_client_and_the_catalogues"""
+        self._make_client(company_name="Beta Seeds", gst_index=1, actor=self.other_sales_person)
         self.login_as(self.admin_user)
 
         response = self.client.get(GET_CLIENTS_URL)
 
-        self.assertEqual(response.status_code, status.HTTP_501_NOT_IMPLEMENTED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["total_count"], 2)
+        self.assertEqual(
+            sorted(c["company_name"] for c in response.data["results"]),
+            ["Acme Seeds", "Beta Seeds"],
+        )
+        self.assertEqual(
+            [(f["filter"], f["kind"]) for f in response.data["available_filters"]],
+            [
+                ("created_by", "select"),
+                ("city_id", "select"),
+                ("status", "select"),
+                ("company_name", "text"),
+                ("address", "text"),
+                ("created", "datetime_range"),
+            ],
+        )
+        self.assertEqual(
+            [s["sort"] for s in response.data["available_sorts"]],
+            ["created_at", "company_name"],
+        )
+
+    def test_the_card_names_the_sales_person_who_created_the_client(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_the_card_names_the_sales_person_who_created_the_client"""
+        self.login_as(self.admin_user)
+
+        card = self.client.get(GET_CLIENTS_URL).data["results"][0]
+
+        self.assertEqual(card["company_name"], "Acme Seeds")
+        self.assertEqual(card["created_by"], "Sales One")
+        self.assertEqual(card["primary_contact"]["phone_number"], "9876500001")
+        self.assertEqual(card["primary_address"]["pincode"], "395007")
+
+    def test_filtering_by_created_by(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_created_by"""
+        self._make_client(company_name="Beta Seeds", gst_index=1, actor=self.other_sales_person)
+        self.login_as(self.admin_user)
+
+        response = self.client.get(
+            GET_CLIENTS_URL, {"created_by": str(self.other_sales_person.id)}
+        )
+
+        self.assertEqual(
+            [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
+        )
+        options = response.data["available_filters"][0]["options"]
+        self.assertEqual(
+            sorted(o["label"] for o in options), ["Sales One", "Sales Two"]
+        )
+
+    def test_filtering_by_primary_address_city(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_primary_address_city"""
+        self._make_client(
+            company_name="Beta Seeds", gst_index=1, city=self.other_city, pincode="380001"
+        )
+        self.login_as(self.admin_user)
+
+        response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
+
+        self.assertEqual(
+            [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
+        )
+
+    def test_filtering_by_status(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_status"""
+        beta = self._make_client(company_name="Beta Seeds", gst_index=1)
+        verify_client(beta, self.admin_user)
+        self.login_as(self.admin_user)
+
+        response = self.client.get(GET_CLIENTS_URL, {"status": "VERIFIED"})
+
+        self.assertEqual(
+            [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
+        )
+
+    def test_filtering_by_company_name_substring(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_company_name_substring"""
+        self._make_client(company_name="Beta Traders", gst_index=1)
+        self.login_as(self.admin_user)
+
+        response = self.client.get(GET_CLIENTS_URL, {"company_name": "cme se"})
+
+        self.assertEqual(
+            [c["company_name"] for c in response.data["results"]], ["Acme Seeds"]
+        )
+
+    def test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical"""
+        self._make_client(company_name="Zeta Seeds", gst_index=1)
+        self.login_as(self.admin_user)
+
+        default = self.client.get(GET_CLIENTS_URL)
+        by_name = self.client.get(GET_CLIENTS_URL, {"sort": "company_name"})
+
+        self.assertEqual(
+            [c["company_name"] for c in default.data["results"]],
+            ["Zeta Seeds", "Acme Seeds"],
+        )
+        self.assertEqual(
+            [c["company_name"] for c in by_name.data["results"]],
+            ["Acme Seeds", "Zeta Seeds"],
+        )
+
+    def test_an_unknown_sort_is_rejected(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_unknown_sort_is_rejected"""
+        self.login_as(self.admin_user)
+
+        response = self.client.get(GET_CLIENTS_URL, {"sort": "gst_number"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_results_are_paginated(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_results_are_paginated"""
+        for index in range(1, 12):
+            self._make_client(company_name=f"Client {index:02d}", gst_index=index)
+        self.login_as(self.admin_user)
+
+        page_1 = self.client.get(GET_CLIENTS_URL)
+        self.assertEqual(page_1.data["total_count"], 12)
+        self.assertEqual(len(page_1.data["results"]), 10)
+        self.assertEqual(page_1.data["next_page_number"], 2)
+
+        page_2 = self.client.get(GET_CLIENTS_URL, {"page": 2})
+        self.assertEqual(len(page_2.data["results"]), 2)
+        self.assertIsNone(page_2.data["next_page_number"])
 
     # -- single client detail -----------------------------------------------
 
