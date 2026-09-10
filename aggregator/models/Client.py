@@ -3,7 +3,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from authentication.validators import validate_phone_number
-from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
+from common.models import (
+    CreatedByModel,
+    PrefixedPublicIdModel,
+    SoftDeletedModel,
+    TimeStampedModel,
+)
 
 from ..validators import validate_gst_number
 from .Status import StatusIds
@@ -11,14 +16,19 @@ from .Status import StatusIds
 CLIENT_STATUS_CODES = {s.name for s in StatusIds.client_statuses()}
 
 
-class Client(TimeStampedModel, SoftDeletedModel, CreatedByModel):
+class Client(
+    PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel
+):
     """A customer company we sell to.
 
     Created by a sales person (``created_by``) and later verified by a sales
     admin. Its addresses, contacts and transport agencies are attached through
     the ``ClientAddress`` / ``ClientContact`` / ``ClientTransportAgency`` link
-    tables.
+    tables. Exposed to the frontend by its ``public_id`` (``C-…``); the primary
+    key is never sent out.
     """
+
+    public_id_prefix = "C-"
 
     company_name = models.CharField("company name", max_length=255)
     company_phone = models.CharField(

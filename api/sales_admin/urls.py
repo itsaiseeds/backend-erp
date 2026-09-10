@@ -9,17 +9,21 @@ from django.urls import path
 from .AdminsView import AdminsView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .CropsView import CropsView
+from .GetClientsView import GetClientsView
+from .GetClientView import GetClientView
 from .LogoutView import LogoutView
 from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
 from .SalesPeopleView import SalesPeopleView
 from .StockView import StockView
 from .UpdateAdminView import UpdateAdminView
+from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateSalesPersonView import UpdateSalesPersonView
 from .UpdateTodaysInventoryView import UpdateTodaysInventoryView
+from .VerifyClientView import VerifyClientView
 from .VerifyOTPView import VerifyOTPView
 
 urlpatterns = [
@@ -54,4 +58,10 @@ urlpatterns = [
         UpdateSalesPersonView.as_view(),
         name="update-sales-person",
     ),
+    # The client *verb* routes keep a trailing slash; ``client/<public_id>`` is
+    # a collection item, named like ``products/<public_id>`` above.
+    path("verify-client/", VerifyClientView.as_view(), name="verify-client"),
+    path("update-client/", UpdateClientView.as_view(), name="update-client"),
+    path("get-clients/", GetClientsView.as_view(), name="get-clients"),
+    path("client/<str:public_id>", GetClientView.as_view(), name="client-detail"),
 ]

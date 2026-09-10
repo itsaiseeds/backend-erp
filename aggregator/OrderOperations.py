@@ -7,7 +7,7 @@ never include the internal primary key.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -15,22 +15,29 @@ from django.db import transaction
 from common.models import indian_now
 
 from .models import (
+    Address,
+    City,
+    Client,
     DispatchDetails,
     Order,
     OrderItem,
     PrivateDispatchDetails,
+    ProductPackaging,
     Status,
     StatusIds,
 )
 from .ProductOperations import packaging_payload
 
+if TYPE_CHECKING:
+    from authentication.models import User
+
 
 @transaction.atomic
 def create_order(
     *,
-    client: Any,
-    delivery_address: Any,
-    actor: Any,
+    client: Client,
+    delivery_address: Address,
+    actor: User,
     items: Iterable[dict],
     status: StatusIds = StatusIds.BOOKED,
     special_comments: str = "",
@@ -69,9 +76,9 @@ def create_order(
 def add_order_item(
     order: Order,
     *,
-    product_packaging: Any,
+    product_packaging: ProductPackaging,
     quantity: int,
-    actor: Any,
+    actor: User,
     negotiated_selling_price=None,
 ) -> OrderItem:
     """Add a line to ``order``.
@@ -97,10 +104,10 @@ def add_order_item(
 def attach_dispatch_details(
     order: Order,
     *,
-    dispatched_by: Any,
+    dispatched_by: User,
     dispatch_date,
-    from_city: Any,
-    to_city: Any,
+    from_city: City,
+    to_city: City,
     lr_number: str,
 ) -> DispatchDetails:
     """Record a third-party dispatch and link it to the order (clears private)."""
@@ -126,10 +133,10 @@ def attach_dispatch_details(
 def attach_private_dispatch_details(
     order: Order,
     *,
-    dispatched_by: Any,
+    dispatched_by: User,
     dispatch_date,
-    from_city: Any,
-    to_city: Any,
+    from_city: City,
+    to_city: City,
     vehicle_number: str,
     driver_number: str,
 ) -> PrivateDispatchDetails:
@@ -161,7 +168,7 @@ def update_order_status(order: Order, status: StatusIds) -> Order:
 
 
 @transaction.atomic
-def verify_order(order: Order, admin: Any) -> Order:
+def verify_order(order: Order, admin: User) -> Order:
     """Mark ``order`` verified, recording the acting sales admin and time.
 
     Three gates apply:

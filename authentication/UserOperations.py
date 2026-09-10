@@ -10,18 +10,12 @@ or ``address`` and a sales person carries only its ``city``.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pyotp
-from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from aggregator.models import City
-from authentication.models import Admin, SalesPerson
+from authentication.models import Admin, SalesPerson, User
 from authentication.validators import validate_phone_number
-
-User = get_user_model()
-
 
 # -- Output payloads -----------------------------------------------------------
 
@@ -137,7 +131,7 @@ def salesperson_payload(salesperson: SalesPerson, *, include_totp: bool = False)
 # -- Creation helpers ---------------------------------------------------------
 
 
-def create_verified_user(data: dict, actor: Any) -> Any:
+def create_verified_user(data: dict, actor: User) -> User:
     """Create a user account that is ready to log in via TOTP.
 
     Accounts created here are verified, carry an active TOTP secret (so the
