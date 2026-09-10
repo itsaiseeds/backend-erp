@@ -9,7 +9,7 @@ Soft-deleted states and countries are excluded.
 
 from __future__ import annotations
 
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
 
