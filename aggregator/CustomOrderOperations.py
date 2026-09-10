@@ -12,7 +12,7 @@ payloads never include the internal primary key.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -20,21 +20,28 @@ from django.db import transaction
 from common.models import indian_now
 
 from .models import (
+    Address,
+    City,
+    Client,
     CustomOrder,
     CustomOrderItem,
     DispatchDetails,
     PrivateDispatchDetails,
+    Product,
     Status,
     StatusIds,
 )
+
+if TYPE_CHECKING:
+    from authentication.models import User
 
 
 @transaction.atomic
 def create_custom_order(
     *,
-    client: Any,
-    delivery_address: Any,
-    actor: Any,
+    client: Client,
+    delivery_address: Address,
+    actor: User,
     items: Iterable[dict],
     special_comments: str = "",
     expected_delivery_date=None,
@@ -104,9 +111,9 @@ def create_custom_order(
 def add_custom_order_item(
     order: CustomOrder,
     *,
-    product: Any,
+    product: Product,
     packets: int,
-    actor: Any,
+    actor: User,
     negotiated_selling_price=None,
 ) -> CustomOrderItem:
     """Add a loose-packet line to ``order``.
@@ -139,10 +146,10 @@ def update_custom_order_status(order: CustomOrder, status: StatusIds) -> CustomO
 def attach_dispatch_details(
     order: CustomOrder,
     *,
-    dispatched_by: Any,
+    dispatched_by: User,
     dispatch_date,
-    from_city: Any,
-    to_city: Any,
+    from_city: City,
+    to_city: City,
     lr_number: str,
 ) -> DispatchDetails:
     """Record a third-party dispatch and link it to the custom order."""
@@ -168,10 +175,10 @@ def attach_dispatch_details(
 def attach_private_dispatch_details(
     order: CustomOrder,
     *,
-    dispatched_by: Any,
+    dispatched_by: User,
     dispatch_date,
-    from_city: Any,
-    to_city: Any,
+    from_city: City,
+    to_city: City,
     vehicle_number: str,
     driver_number: str,
 ) -> PrivateDispatchDetails:

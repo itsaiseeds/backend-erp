@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -37,11 +37,19 @@ from common.models import indian_now
 from .models import (
     CustomOrderItem,
     InventorySnapshot,
+    Order,
     OrderItem,
     Product,
     ProductPackaging,
     StatusIds,
 )
+
+if TYPE_CHECKING:
+    from authentication.models import User
+
+# A stock-count line is either a bare bag count or a ``{"bags", "loose_packets"}``
+# mapping.
+StockCountValue = int | Mapping[str, int]
 
 # Orders holding sealed bags: verified, not yet gone.
 RESERVING_STATUS_IDS = (StatusIds.CONFIRMED,)
@@ -54,7 +62,7 @@ def today() -> date:
     return indian_now().date()
 
 
-def _assert_can_update_stock_count(actor: Any) -> None:
+def _assert_can_update_stock_count(actor: User | None) -> None:
     """Raise unless ``actor`` may write a stock count.
 
     ``Admin.can_update_stock_count`` gates exactly this and nothing else -- in
@@ -95,7 +103,7 @@ def record_stock_count(
     *,
     product_packaging: ProductPackaging,
     bags: int,
-    actor: Any,
+    actor: User,
     loose_packets: int = 0,
     snapshot_date: date | None = None,
 ) -> InventorySnapshot:
@@ -131,8 +139,8 @@ def record_stock_count(
 @transaction.atomic
 def record_stock_counts(
     *,
-    counts: Mapping[Any, Any],
-    actor: Any,
+    counts: Mapping[ProductPackaging, StockCountValue],
+    actor: User,
     snapshot_date: date | None = None,
 ) -> list[InventorySnapshot]:
     """Upload a whole day's count in one transaction.
@@ -340,7 +348,7 @@ def available_loose_packets(product: Product, snapshot_date: date | None = None)
 # -- Shared -------------------------------------------------------------------
 
 
-def order_bag_requirements(order: Any) -> dict[ProductPackaging, int]:
+def order_bag_requirements(order: Order) -> dict[ProductPackaging, int]:
     """Bags each packaging must supply for ``order``.
 
     The single place order demand is computed, so the future custom-order flow
