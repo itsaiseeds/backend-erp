@@ -12,8 +12,9 @@
 #   bash scripts/run.sh status       # Show container status
 #   bash scripts/run.sh shell        # Open Django shell in web container
 #   bash scripts/run.sh psql         # Open psql in db container
-#   bash scripts/run.sh flutter      # Build Flutter web app for production
-#   bash scripts/run.sh flutter-prod # Build Flutter web app pointing at the prod API
+#   bash scripts/run.sh flutter        # Build Flutter web app for production
+#   bash scripts/run.sh flutter-prod   # Build Flutter web app pointing at the prod API
+#   bash scripts/run.sh flutter-preprod # Build Flutter web app pointing at the preprod API
 #   bash scripts/run.sh schema       # Regenerate docs/api/openapi.yml
 #   bash scripts/run.sh test         # All tests (in web container)
 #   bash scripts/run.sh test-unit    # Run the pytest suite (in web container)
@@ -43,8 +44,9 @@ if [[ -z "$COMMAND" ]]; then
     echo "  status      Show container status"
     echo "  shell       Open Django shell in web container"
     echo "  psql        Open psql in db container"
-    echo "  flutter     Build Flutter web app for production"
-    echo "  flutter-prod Build Flutter web app for the production API"
+    echo "  flutter       Build Flutter web app for production"
+    echo "  flutter-prod  Build Flutter web app for the production API"
+    echo "  flutter-preprod Build Flutter web app for the preprod API"
     echo "  schema      Regenerate docs/api/openapi.yml"
     echo "  test        Run all tests in web container"
     echo "  test-unit   Run unit tests in web container"
@@ -131,7 +133,7 @@ cmd_flutter() {
 cmd_flutter_prod() {
     find_flutter
     local prod_url
-    prod_url="${API_BASE_URL:-https://backend-erp-jlt9.onrender.com/}"
+    prod_url="${API_BASE_URL:-https://sai-seeds.onrender.com/}"
     echo "[flutter-prod] Building Flutter web app for prod API: $prod_url"
     cd "$REPO_ROOT/admin_saiseeds"
     "$FLUTTER_CMD" pub get
@@ -140,6 +142,26 @@ cmd_flutter_prod() {
         --dart-define=API_BASE_URL="$prod_url"
     cd "$REPO_ROOT"
     echo "[flutter-prod] Build complete: admin_saiseeds/build/web/"
+}
+
+# ---------------------------------------------------------------------------
+# Flutter build (preprod) with the preprod API baked in.
+# ---------------------------------------------------------------------------
+# Same --dart-define mechanism as cmd_flutter_prod, pointed at the preprod
+# deploy instead. Override at call time if needed:
+#   API_BASE_URL=https://api.example.com bash scripts/run.sh flutter-preprod
+cmd_flutter_preprod() {
+    find_flutter
+    local preprod_url
+    preprod_url="${API_BASE_URL:-https://sai-seeds-preprod.onrender.com/}"
+    echo "[flutter-preprod] Building Flutter web app for preprod API: $preprod_url"
+    cd "$REPO_ROOT/admin_saiseeds"
+    "$FLUTTER_CMD" pub get
+    MSYS_NO_PATHCONV=1 "$FLUTTER_CMD" build web --release \
+        --base-href /sales-admin/ \
+        --dart-define=API_BASE_URL="$preprod_url"
+    cd "$REPO_ROOT"
+    echo "[flutter-preprod] Build complete: admin_saiseeds/build/web/"
 }
 
 # ---------------------------------------------------------------------------
@@ -294,6 +316,7 @@ case "$COMMAND" in
     psql)       cmd_psql ;;
     flutter)    cmd_flutter ;;
     flutter-prod) cmd_flutter_prod ;;
+    flutter-preprod) cmd_flutter_preprod ;;
     schema)     cmd_schema ;;
     test)       cmd_test ;;
     test-unit)  cmd_test_unit ;;
