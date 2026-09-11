@@ -1,0 +1,27 @@
+name: Sync preprod
+
+on:
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  sync-preprod:
+    name: push master to preprod
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Push master to preprod
+        run: |
+          git push origin HEAD:refs/heads/preprod --force
