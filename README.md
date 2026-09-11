@@ -168,9 +168,26 @@ Read by `config/settings.py` (fallbacks exist for `SECRET_KEY`/`DEBUG`/`ALLOWED_
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | `backend-erp-jlt9.onrender.com` |
 | `CORS_ALLOWED_ORIGINS` | (empty) | admin web origin |
 | `DJANGO_SUPERUSER_*` | (dev fallback) | from Render dashboard |
+| `SUPABASE_URL` | (empty → local disk) | Supabase project URL |
+| `SUPABASE_SECRET_KEY` | (empty → local disk) | Supabase secret key |
+| `SUPABASE_STORAGE_BUCKET` | `product-images` | `product-images` (public bucket) |
 
 `.env.dev` (committed, placeholders) feeds Docker Compose; `.env` (gitignored)
 holds production/Neon secrets.
+
+Product images have two storage backends, chosen by whether Supabase is
+configured (`common/storage/images.py`):
+
+- **`SUPABASE_*` set** — the file goes to a **public** Supabase Storage bucket and
+  only its URL is stored on the row (`Product.image_url`). Deployed environments
+  must use this: Render's filesystem is ephemeral, so local files die with the
+  container. `manage.py check` warns (`common.W001`) when `DEBUG` is off and the
+  credentials are missing.
+- **`SUPABASE_*` empty** — the file is written under `MEDIA_ROOT` (`media/`,
+  gitignored) and `image_url` holds a `MEDIA_URL`-relative path. The dev server
+  serves it; the test suite uses a temp `MEDIA_ROOT` per test
+  (`tests/conftest.py`). This is the development and CI default, so uploads work
+  out of the box with no Supabase account.
 
 ## Safety rules
 

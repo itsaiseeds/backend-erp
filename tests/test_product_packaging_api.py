@@ -11,7 +11,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
-from aggregator.models import Crop, Product, ProductPackaging
+from aggregator.models import Crop, Product, ProductPackaging, Stage, StageIds
 from authentication.models import Admin
 from tests.common import WebApiTestCase
 
@@ -57,7 +57,7 @@ class ProductPackagingApiTest(WebApiTestCase):
         cls.product = Product.objects.create(
             name="Premium",
             crop=cls.crop,
-            buying_price=1000,
+            stage=Stage.by_id(StageIds.BREEDER),
             selling_price=1200,
             created_by=cls.seed_admin,
         )

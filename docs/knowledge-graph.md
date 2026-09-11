@@ -69,6 +69,7 @@ graph TD
     subgraph SALES["Sales domain (aggregator/)"]
         STATUS["Status + StatusIds<br/>(generic enum: order + client)"]
         CROP["Crop"]
+        STAGE["Stage + StageIds<br/>(seed classification: 4 fixed rows)"]
         CL["Client<br/>(created_by=salesperson,<br/>verified_by=sales admin)"]
         TA["TransportAgency"]
         CON["Contact"]
@@ -90,6 +91,7 @@ graph TD
         CL --> CTA --> TA
         CL --> STATUS
         CROP --> PROD --> PP
+        STAGE --> PROD
         ORD --> CL
         ORD --> ADDR
         ORD --> STATUS
@@ -234,9 +236,11 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 |---|---|---|---|
 | `Status` | `aggregator/models/Status.py` | Generic enum-like status rows (ids 1–9, seeded in `sql/dml.sql`); hosts `StatusIds` and the `Status.by_id()` resolver. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Order.status`, `Client.status`, `OrderOperations`, `ClientOperations` |
 | `StatusIds` | `aggregator/models/Status.py` | `enum.IntEnum` — the single source of truth for the status CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`StatusIds.BOOKED.name == "BOOKED"`, `int(StatusIds.BOOKED) == 1`). `order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9. | derives → `Order.ORDER_STATUS_CODES`, `Client.CLIENT_STATUS_CODES`; used by → `OrderOperations`, `ClientOperations`, tests |
+| `Stage` | `aggregator/models/Stage.py` | Seeded, enum-like seed classification of a product (ids 1–4 in `sql/dml.sql`: `BREEDER`, `FOUNDATION`, `RESEARCH`, `CERTIFICATE`); hosts `StageIds` and the `Stage.by_id()` resolver. Same shape as `Status`. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Product.stage` |
+| `StageIds` | `aggregator/models/Stage.py` | `enum.IntEnum` — the single source of truth for the stage CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`int(StageIds.BREEDER) == 1`). | used by → `ProductsView`, `UpdateProductView`, tests |
 | `Order` | `aggregator/models/Order.py` | Booked order exposed by `public_id` (`ORD-…`); `verified_by`/`verified_at` record the verifying sales admin (required once the status is `CONFIRMED`); lifecycle statuses limited to `StatusIds.order_statuses()`. No stored total — `total_amount` and `total_bags` are `@property`s summed from `items` | FK → `Client`, `Address`, `Status`; 1:N → `OrderItem` |
 | `OrderItem` | `aggregator/models/OrderItem.py` | One order line: a `ProductPackaging` (a bag) at a `negotiated_selling_price` (**per-bag**) × `quantity`; `line_total = negotiated_selling_price * quantity`. Defaulted to `packaging.selling_price` when omitted at creation via `OrderOperations.add_order_item` | FK → `Order`, `ProductPackaging` |
-| `Product` | `aggregator/models/Product.py` | Sellable product exposed by `public_id` (`P-…`); `selling_price`/`buying_price` are **per-packet** rates (never used directly in order totals — see `ProductPackaging`); `margin_per_packet = selling_price - buying_price` | FK → `Crop`; 1:N → `ProductPackaging` |
+| `Product` | `aggregator/models/Product.py` | Sellable product exposed by `public_id` (`P-…`); `selling_price` is a **per-packet** rate (never used directly in order totals — see `ProductPackaging`). Carries a required `stage` (seed classification) and an optional `image_url` — written by `common.storage`: an absolute Supabase Storage URL when deployed, a `MEDIA_URL`-relative path on local disk in dev/tests | FK → `Crop`, `Stage`; 1:N → `ProductPackaging` |
 | `ProductPackaging` | `aggregator/models/ProductPackaging.py` | A **bag**: a container of `packets` small units, each `packet_weight` kg, for a `Product` (`PP-…`). Stores a **whole-bag** `selling_price` (Decimal 12,2, NOT NULL); `ProductOperations.add_packaging(...)` defaults it to `packets * product.selling_price` when omitted; **frozen** once stored. Downstream `OrderItem.negotiated_selling_price` defaults to this value | FK → `Product`; 1:N → `OrderItem` |
 | `InventorySnapshot` | `aggregator/models/InventorySnapshot.py` | The day's physical stock count, one row per (`snapshot_date`, `product_packaging`) (`INV-…`). Two pools that never mix: whole `bags` (per packaging, the unit `OrderItem.quantity` uses, consumed by `Order`) and loose `loose_packets` (default 0, aggregated **per product** for availability, consumed by `CustomOrder`). Written only by an admin with `can_update_stock_count`. Only the latest `snapshot_date` survives — a newer count hard-deletes every earlier row. Reserved/consumed are **derived** from order status, never stored, which is what makes verification and dispatch reversible | FK → `ProductPackaging`, `User` (`created_by`) |
 | `CustomOrder` | `aggregator/models/CustomOrder.py` | Loose-packet order (`CORD-…`), the **admin-only** counterpart of `Order`. Mirrors `Order`'s fields but is **standalone — no FK to `Order`**. **No verification step**: `create_custom_order` auto-confirms it (born `CONFIRMED`, `verified_by`/`verified_at` set), and creation is **blocked unless enough loose packets are in stock**. `created_by` must be an admin. `total_packets` sums line packets directly | FK → `Client`, `Address`, `Status`, `DispatchDetails`; 1:N → `CustomOrderItem` |

@@ -516,6 +516,27 @@ CREATE INDEX IF NOT EXISTS aggregator_status_is_deleted_idx ON public.aggregator
 CREATE INDEX IF NOT EXISTS aggregator_status_created_by_id_idx ON public.aggregator_status USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_status_deleted_by_id_idx ON public.aggregator_status USING btree (deleted_by_id);
 
+-- aggregator_stage -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_stage (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	code varchar(32) NOT NULL,
+	"name" varchar(64) NOT NULL,
+	sequence int2 NOT NULL DEFAULT 0,
+	CONSTRAINT aggregator_stage_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_stage_code_key UNIQUE (code),
+	CONSTRAINT aggregator_stage_sequence_check CHECK (sequence >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_stage_code_like ON public.aggregator_stage USING btree (code varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_stage_is_deleted_idx ON public.aggregator_stage USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_stage_created_by_id_idx ON public.aggregator_stage USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_stage_deleted_by_id_idx ON public.aggregator_stage USING btree (deleted_by_id);
+
 -- aggregator_transportagency --------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.aggregator_transportagency (
 	id bigserial NOT NULL,
@@ -678,15 +699,17 @@ CREATE TABLE IF NOT EXISTS public.aggregator_product (
 	public_id varchar(20) NOT NULL,
 	"name" varchar(255) NOT NULL,
 	crop_id int8 NOT NULL,
-	buying_price numeric(12, 2) NOT NULL,
+	stage_id int8 NOT NULL,
 	selling_price numeric(12, 2) NOT NULL,
+	image_url varchar(500) NOT NULL DEFAULT '',
 	CONSTRAINT aggregator_product_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_product_public_id_key UNIQUE (public_id),
 	CONSTRAINT uniq_product_name_crop UNIQUE (name, crop_id),
-	CONSTRAINT ck_product_prices_non_negative CHECK (buying_price >= 0 AND selling_price >= 0)
+	CONSTRAINT ck_product_prices_non_negative CHECK (selling_price >= 0)
 );
 CREATE INDEX IF NOT EXISTS aggregator_product_public_id_like ON public.aggregator_product USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_product_crop_id_idx ON public.aggregator_product USING btree (crop_id);
+CREATE INDEX IF NOT EXISTS aggregator_product_stage_id_idx ON public.aggregator_product USING btree (stage_id);
 CREATE INDEX IF NOT EXISTS aggregator_product_is_deleted_idx ON public.aggregator_product USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_product_created_by_id_idx ON public.aggregator_product USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_product_deleted_by_id_idx ON public.aggregator_product USING btree (deleted_by_id);
@@ -922,6 +945,8 @@ CREATE INDEX IF NOT EXISTS aggregator_customorderitem_deleted_by_id_idx ON publi
 -- Foreign keys for the sales-domain tables ------------------------------------
 ALTER TABLE public.aggregator_status ADD CONSTRAINT aggregator_status_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_status ADD CONSTRAINT aggregator_status_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_stage ADD CONSTRAINT aggregator_stage_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_stage ADD CONSTRAINT aggregator_stage_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_transportagency ADD CONSTRAINT aggregator_transportagency_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_transportagency ADD CONSTRAINT aggregator_transportagency_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
@@ -953,6 +978,7 @@ ALTER TABLE public.aggregator_crop ADD CONSTRAINT aggregator_crop_created_by_id_
 ALTER TABLE public.aggregator_crop ADD CONSTRAINT aggregator_crop_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_product ADD CONSTRAINT aggregator_product_crop_id_fk FOREIGN KEY (crop_id) REFERENCES public.aggregator_crop(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_product ADD CONSTRAINT aggregator_product_stage_id_fk FOREIGN KEY (stage_id) REFERENCES public.aggregator_stage(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_product ADD CONSTRAINT aggregator_product_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_product ADD CONSTRAINT aggregator_product_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 

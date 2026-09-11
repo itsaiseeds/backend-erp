@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .models import Crop, Product, ProductPackaging
+from .models import Crop, Product, ProductPackaging, Stage
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -29,15 +29,17 @@ def create_product(
     *,
     name: str,
     crop: Crop | str,
-    buying_price,
+    stage: Stage,
     selling_price,
     actor: User,
+    image_url: str = "",
 ) -> Product:
     product = Product(
         name=name,
         crop=_resolve_crop(crop, actor),
-        buying_price=buying_price,
+        stage=stage,
         selling_price=selling_price,
+        image_url=image_url,
         created_by=actor,
     )
     product.full_clean()
@@ -92,9 +94,9 @@ def product_payload(product: Product) -> dict:
         "public_id": product.public_id,
         "name": product.name,
         "crop": product.crop.name if product.crop_id else None,
-        "buying_price": str(product.buying_price),
+        "stage": {"code": product.stage.code, "name": product.stage.name},
         "selling_price": str(product.selling_price),
-        "margin_per_packet": str(product.margin_per_packet),
+        "image_url": product.image_url,
         "packagings": [
             packaging_payload(p) for p in product.packagings.all()
         ],

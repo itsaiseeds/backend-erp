@@ -141,9 +141,10 @@ backend-erp/
   kwarg as `id` and looks the row up with `id=…`.
 
 ### Enums & seeded statuses
-- Seed rows that act as enum values (e.g. `aggregator_status`, ids 1–9 in
-  `sql/dml.sql`) are mirrored by an `enum.IntEnum`
-  (`aggregator/models/Status.py::StatusIds`): member **name** == seeded
+- Seed rows that act as enum values (`aggregator_status`, ids 1–9, and
+  `aggregator_stage`, ids 1–4, both in `sql/dml.sql`) are mirrored by an
+  `enum.IntEnum` (`aggregator/models/Status.py::StatusIds`,
+  `aggregator/models/Stage.py::StageIds`): member **name** == seeded
   **code**, member **value** == row **id**. Members are usable directly in ORM
   queries (`Status.objects.get(id=StatusIds.BOOKED)`).
 - The enum is the single source of truth for the CODE→id mapping — never
@@ -154,7 +155,11 @@ backend-erp/
   `Status.objects.get(code=...)`.
 - **Keep `StatusIds` in sync with `dml.sql`:** if a status row is added,
   renamed, or renumbered there, update the enum (and the
-  `order_statuses()` / `client_statuses()` id ranges) in the same change.
+  `order_statuses()` / `client_statuses()` id ranges) in the same change. The
+  same rule applies to `StageIds` and `aggregator_stage`.
+- `Product.stage` is the same pattern applied to a product's seed
+  classification: `BREEDER`, `FOUNDATION`, `RESEARCH`, `CERTIFICATE`. It is a
+  required FK — resolve it with `Stage.by_id(StageIds.BREEDER)`.
 
 ### Unit model: a **packet** is the small unit; a **bag** is the container
 A `ProductPackaging` **is a bag** — a container of `packets` small units, each of
@@ -163,9 +168,20 @@ bag holds N packets. (This inverts an earlier model where a "packet" held
 "bags"; the two nouns were swapped wholesale.)
 
 ### Pricing units: `Product` is per-packet, `ProductPackaging` and `OrderItem` are per-bag
-- `Product.selling_price` (and `buying_price`) is the **per-packet** rate. It
-  never appears in totals math directly — the bag (packaging) is the pricing
-  unit downstream. `Product.margin_per_packet = selling_price - buying_price`.
+- `Product.selling_price` is the **per-packet** rate. It never appears in
+  totals math directly — the bag (packaging) is the pricing unit downstream.
+  Buying price is deliberately **not** tracked on a product.
+
+### Uploaded files
+- Never write uploads straight to disk from a view — go through
+  `common.storage.upload_image` / `delete_image`. It validates once (type +
+  size) and then picks a backend: the Supabase bucket when `SUPABASE_*` is
+  configured, `MEDIA_ROOT` otherwise (dev and tests).
+- Store only the returned URL on the row (`Product.image_url`, a `CharField` —
+  **not** a `URLField`, because the local backend returns a relative
+  `/media/…` path).
+- Upload **before** creating the row: files are named by a fresh UUID, so a
+  failed upload never leaves a half-created record behind.
 - `ProductPackaging.selling_price` is the **whole-bag** list price (Decimal
   12,2, `NOT NULL`, stored). `ProductOperations.add_packaging(...)` defaults it
   to `packets * product.selling_price` at creation; **frozen** once stored.

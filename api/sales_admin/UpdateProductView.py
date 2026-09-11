@@ -13,9 +13,10 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
-from aggregator.models import Crop, Product
+from aggregator.models import Crop, Product, Stage
 from api.admin import AdminApiView
 from common.models.timestamped import indian_now
+from common.storage import delete_image, upload_image
 
 from .ProductsView import ProductPayloadSerializer, product_payload
 
@@ -31,12 +32,13 @@ class UpdateProductSerializer(serializers.Serializer):
     crop = serializers.PrimaryKeyRelatedField(
         queryset=Crop.objects.all(), required=False
     )
-    buying_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, required=False, min_value=0
+    stage = serializers.PrimaryKeyRelatedField(
+        queryset=Stage.objects.all(), required=False
     )
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, min_value=0
     )
+    image = serializers.ImageField(required=False)
 
     def validate(self, attrs):
         name = attrs.get("name", self.instance.name if self.instance is not None else None)
@@ -67,17 +69,29 @@ class UpdateProductView(AdminApiView):
     )
     def patch(self, request, public_id: str):
         product = get_object_or_404(
-            Product.objects.select_related("crop"), public_id=public_id
+            Product.objects.select_related("crop", "stage"), public_id=public_id
         )
 
         serializer = UpdateProductSerializer(
             instance=product, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        for field in ("name", "crop", "buying_price", "selling_price"):
+        for field in ("name", "crop", "stage", "selling_price"):
             if field in serializer.validated_data:
                 setattr(product, field, serializer.validated_data[field])
+
+        # Upload before saving so a failed upload leaves the row untouched; the
+        # object it replaces is only removed once the new URL is committed.
+        image = serializer.validated_data.get("image")
+        replaced_image_url = ""
+        if image:
+            replaced_image_url = product.image_url
+            product.image_url = upload_image(image, folder="products")
+
         product.save()
+
+        if replaced_image_url:
+            delete_image(replaced_image_url)
 
         return Response(product_payload(product))
 

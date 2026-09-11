@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path
 from drf_spectacular.views import (
@@ -25,3 +27,8 @@ urlpatterns = [
     ),
     re_path(r"^sales-admin(?:/(?P<path>.*))?$", flutter_catch_all),
 ]
+
+# Locally uploaded product images (common.storage.local). Deployed
+# environments serve images straight from the Supabase bucket instead, and
+# ``static()`` is a no-op when DEBUG is off.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
