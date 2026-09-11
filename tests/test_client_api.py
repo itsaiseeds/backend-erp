@@ -274,19 +274,23 @@ class SalesAdminClientApiTest(WebApiTestCase):
             ["Acme Seeds", "Beta Seeds"],
         )
         self.assertEqual(
-            [(f["filter"], f["kind"]) for f in response.data["available_filters"]],
             [
-                ("created_by", "select"),
-                ("city_id", "select"),
-                ("status", "select"),
-                ("company_name", "text"),
-                ("address", "text"),
-                ("created", "datetime_range"),
+                (f["filter"], f["label"], f["kind"])
+                for f in response.data["available_filters"]
+            ],
+            [
+                ("created_by", "Created By", "select"),
+                ("verified_by", "Verified By", "select"),
+                ("city_id", "City", "select"),
+                ("status", "Status", "select"),
+                ("company_name", "Company Name", "text"),
+                ("address", "Address", "text"),
+                ("created", "Created", "datetime_range"),
             ],
         )
         self.assertEqual(
-            [s["sort"] for s in response.data["available_sorts"]],
-            ["created_at", "company_name"],
+            [(s["sort"], s["label"]) for s in response.data["available_sorts"]],
+            [("created_at", "Created"), ("company_name", "Company Name")],
         )
 
     def test_the_card_names_the_sales_person_who_created_the_client(self):
@@ -300,6 +304,59 @@ class SalesAdminClientApiTest(WebApiTestCase):
         self.assertEqual(card["primary_contact"]["phone_number"], "9876500001")
         self.assertEqual(card["primary_address"]["pincode"], "395007")
 
+    def test_the_card_names_the_admin_who_verified_the_client(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_the_card_names_the_admin_who_verified_the_client"""
+        self.login_as(self.admin_user)
+
+        # Unverified: the field is present but null.
+        card = self.client.get(GET_CLIENTS_URL).data["results"][0]
+        self.assertIsNone(card["verified_by"])
+
+        self.client.post(
+            VERIFY_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+        )
+
+        card = self.client.get(GET_CLIENTS_URL).data["results"][0]
+        self.assertEqual(card["verified_by"], "Sales Admin")
+
+    def test_verified_by_options_skip_clients_nobody_has_verified(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_verified_by_options_skip_clients_nobody_has_verified"""
+        self.login_as(self.admin_user)
+
+        def verified_by_options():
+            entries = self.client.get(GET_CLIENTS_URL).data["available_filters"]
+            entry = next(f for f in entries if f["filter"] == "verified_by")
+            return entry["options"]
+
+        # Nothing verified yet -- an all-null column must offer no choices at
+        # all, rather than a "None" entry that cannot be sent as a filter value.
+        self.assertEqual(verified_by_options(), [])
+
+        self.client.post(
+            VERIFY_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+        )
+
+        self.assertEqual(
+            verified_by_options(),
+            [{"value": self.admin_user.id, "label": "Sales Admin"}],
+        )
+
+    def test_filtering_by_verified_by(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_verified_by"""
+        self._make_client(company_name="Beta Seeds", gst_index=1)
+        self.login_as(self.admin_user)
+        self.client.post(
+            VERIFY_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+        )
+
+        response = self.client.get(
+            GET_CLIENTS_URL, {"verified_by": str(self.admin_user.id)}
+        )
+
+        self.assertEqual(
+            [c["company_name"] for c in response.data["results"]], ["Acme Seeds"]
+        )
+
     def test_filtering_by_created_by(self):
         """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_created_by"""
         self._make_client(company_name="Beta Seeds", gst_index=1, actor=self.other_sales_person)
@@ -312,7 +369,8 @@ class SalesAdminClientApiTest(WebApiTestCase):
         self.assertEqual(
             [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
         )
-        options = response.data["available_filters"][0]["options"]
+        entries = response.data["available_filters"]
+        options = next(f for f in entries if f["filter"] == "created_by")["options"]
         self.assertEqual(
             sorted(o["label"] for o in options), ["Sales One", "Sales Two"]
         )

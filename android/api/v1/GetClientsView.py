@@ -135,12 +135,14 @@ def _by_primary_address_text(queryset: QuerySet, terms: list[str]) -> QuerySet:
 _QUERYSET_FILTERS = (
     QuerysetFilter(
         "city_id",
+        label="City",
         apply=_by_primary_address_city,
         description="City id(s) of the client's primary address (see options).",
         options=_cities_of_my_clients,
     ),
     QuerysetFilter(
         "status",
+        label="Status",
         parse=_parse_status,
         apply=lambda queryset, codes: queryset.filter(status__code__in=codes),
         description="Client verification status.",
@@ -151,6 +153,7 @@ _QUERYSET_FILTERS = (
     ),
     QuerysetFilter(
         "company_name",
+        label="Company Name",
         lookup="company_name__icontains",
         parse=parse_str,
         multi=False,
@@ -158,6 +161,7 @@ _QUERYSET_FILTERS = (
     ),
     QuerysetFilter(
         "address",
+        label="Address",
         parse=parse_str,
         multi=False,
         apply=_by_primary_address_text,
@@ -166,6 +170,7 @@ _QUERYSET_FILTERS = (
     ),
     RangeFilter(
         "created",
+        label="Created",
         field="created_at",
         parse=parse_datetime,
         suffixes=("gte", "lte"),
@@ -173,8 +178,12 @@ _QUERYSET_FILTERS = (
     ),
 )
 _SORT_OPTIONS = (
-    SortOption("created_at", description="When the client was added (default: newest first)."),
-    SortOption("company_name", description="Company name, A->Z."),
+    SortOption(
+        "created_at",
+        label="Created",
+        description="When the client was added (default: newest first).",
+    ),
+    SortOption("company_name", label="Company Name", description="Company name, A->Z."),
 )
 
 

@@ -1,7 +1,9 @@
 from django import forms
 from django.contrib import admin
+from rest_framework.serializers import ValidationError as DRFValidationError
 
 from common.admin import AUDIT_FIELDS, SoftDeleteModelAdmin
+from common.storage import delete_image, upload_image
 
 from .models import (
     Address,
@@ -211,13 +213,69 @@ class ClientTransportAgencyAdmin(SoftDeleteModelAdmin):
     list_select_related = ("client", "transport_agency")
 
 
+class ProductAdminForm(forms.ModelForm):
+    """Admin form for ``Product``, with a file field for the picture.
+
+    ``image_url`` itself is read-only on the admin (see ``ProductAdmin``): it is
+    a location, not something to hand-edit. Uploading here goes through the same
+    ``common.storage`` path the API uses -- the Supabase bucket when configured,
+    ``MEDIA_ROOT`` otherwise.
+    """
+
+    image = forms.ImageField(
+        required=False,
+        label="image",
+        help_text=(
+            "Upload to set or replace the picture. JPEG, PNG or WebP, 5 MB max. "
+            "Leave blank to keep the current one."
+        ),
+    )
+
+    class Meta:
+        model = Product
+        fields = "__all__"
+
+    def clean_image(self):
+        """Validate and upload, so a rejected file is a form error, not a 500.
+
+        The upload happens during validation rather than in ``save`` because
+        that is the only place an admin can be shown a readable message. The
+        cost is that a file uploaded alongside *another* invalid field is
+        orphaned in the bucket -- cheap, and the alternative is an error page.
+        """
+        image = self.cleaned_data.get("image")
+        if not image:
+            return image
+        try:
+            # upload_image validates type and size before touching the network.
+            self._uploaded_image_url = upload_image(image, folder="products")
+        except DRFValidationError as exc:
+            raise forms.ValidationError(exc.detail) from exc
+        return image
+
+    def save(self, commit=True):
+        product = super().save(commit=False)
+        uploaded = getattr(self, "_uploaded_image_url", "")
+        replaced = ""
+        if uploaded:
+            replaced = product.image_url
+            product.image_url = uploaded
+        if commit:
+            product.save()
+            if replaced:
+                delete_image(replaced)
+        return product
+
+
 @admin.register(Product)
 class ProductAdmin(SoftDeleteModelAdmin):
+    form = ProductAdminForm
     list_display = ("public_id", "name", "crop", "stage", "selling_price", "created_at")
     search_fields = ("public_id", "name", "crop__name")
     list_filter = ("crop", "stage")
     autocomplete_fields = ("crop", "stage")
     list_select_related = ("crop", "stage")
+    readonly_fields = ("image_url",)
     ordering = ("name",)
 
 

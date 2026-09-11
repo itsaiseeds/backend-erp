@@ -3,7 +3,7 @@
 ``GET /api/utilities/countries`` returns ``[{id, name, iso_code}, ...]``
 so the frontend can render country pickers.
 
-Restricted to a Django superuser authenticated with the web session.
+Restricted to an application Admin authenticated with the web session.
 Soft-deleted countries are excluded.
 """
 
@@ -28,7 +28,7 @@ class CountrySerializer(serializers.Serializer):
 class CountriesView(AdminApiView):
     """List all countries, ordered by name."""
 
-    superuser_required = True
+    admin_required = True
 
     @extend_schema(
         summary="List all countries",

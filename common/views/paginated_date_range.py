@@ -31,12 +31,15 @@ single ``sort``::
 ``page``, ``page_size``, ``start_date_time``, ``end_date_time`` and ``sort`` are
 reserved -- no filter param may reuse those names.
 
-Every ``available_filters`` entry carries a ``kind`` (``select``, ``int``,
-``text``, ``date``, ``datetime``, ``date_range``, ``datetime_range``, ...) so
-the frontend picks the right widget without guessing; a closed-ended filter
-also carries ``options`` (``{value, label}`` choices) so a picker needs no
-second call. :func:`list_query_parameters` turns a view's ``queryset_filters`` /
-``sort_options`` into the drf-spectacular ``parameters`` list for its schema.
+Every ``available_filters`` entry carries a ``label`` (a human-readable field
+name, so the client titles the widget without mapping param names itself) and a
+``kind`` (``select``, ``int``, ``text``, ``date``, ``datetime``, ``date_range``,
+``datetime_range``, ...) so the frontend picks the right widget without
+guessing; a closed-ended filter also carries ``options`` (``{value, label}``
+choices) so a picker needs no second call. ``available_sorts`` entries carry a
+``label`` for the same reason. :func:`list_query_parameters` turns a view's
+``queryset_filters`` / ``sort_options`` into the drf-spectacular ``parameters``
+list for its schema.
 
 Two concrete client bases wrap the mixin defined here:
 ``api.paginated_views.AdminPaginatedDateRangeListView`` (sales-admin website)
@@ -52,7 +55,7 @@ from typing import Generic, TypeVar
 
 from django.db.models import Model, QuerySet
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema_field
 from rest_framework import serializers
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
@@ -181,6 +184,17 @@ def parse_datetime(raw: str):
     return serializers.DateTimeField().to_internal_value(raw.strip())
 
 
+def humanize(name: str) -> str:
+    """``"created_by"`` -> ``"Created By"``, ``"city_id"`` -> ``"City"``.
+
+    The fallback when a filter or sort option declares no explicit ``label``. A
+    trailing ``_id`` is dropped: the client shows the label to a human, who
+    cares about "City", not that the param carries an id.
+    """
+    words = name.removesuffix("_id").split("_")
+    return " ".join(word.capitalize() for word in words if word) or name
+
+
 # Which catalogue ``kind`` a bare parser implies, when the filter declares none.
 _PARSER_KIND: dict[ValueParser, str] = {
     parse_int: "int",
@@ -207,6 +221,7 @@ class ListFilter(abc.ABC):
     """
 
     name: str
+    label: str
     kind: str
     description: str
 
@@ -258,6 +273,10 @@ class QuerysetFilter(ListFilter):
         ``.filter(lookup=values)`` can't express (relation spans, ``.distinct()``,
         ``Q`` objects). ``values`` is always a list (length 1 when ``multi`` is
         ``False``).
+    ``label``
+        Human-readable field name for the catalogue entry, so the client can
+        title the widget without mapping param names itself. Defaults to
+        :func:`humanize` of ``name``.
     ``options``
         Static ``[{"value", "label"}]`` list, or a ``(request) -> list``
         callable -- the eligible choices, echoed on the catalogue entry so a
@@ -276,10 +295,12 @@ class QuerysetFilter(ListFilter):
         multi: bool = True,
         apply: Callable[[QuerySet, list], QuerySet] | None = None,
         description: str = "",
+        label: str | None = None,
         options: FilterOptions | None = None,
         kind: str | None = None,
     ) -> None:
         self.name = name
+        self.label = label or humanize(name)
         self.lookup = lookup or name
         self.parse = parse
         self.multi = multi
@@ -340,6 +361,7 @@ class QuerysetFilter(ListFilter):
     def catalogue_entry(self, request: Request) -> dict:
         entry: dict[str, object] = {
             "filter": self.name,
+            "label": self.label,
             "kind": self.kind,
             "description": self.description,
         }
@@ -373,6 +395,9 @@ class RangeFilter(ListFilter):
     ``parse``
         Bound coercion (default :func:`parse_datetime`; also :func:`parse_date`,
         :func:`parse_int`).
+    ``label``
+        Human-readable field name for the catalogue entry. Defaults to
+        :func:`humanize` of ``name``.
     ``kind``
         Catalogue widget hint; defaults to ``"<parser-kind>_range"``.
     """
@@ -384,10 +409,12 @@ class RangeFilter(ListFilter):
         field: str | None = None,
         parse: ValueParser = parse_datetime,
         description: str = "",
+        label: str | None = None,
         kind: str | None = None,
         suffixes: tuple[str, str] = ("after", "before"),
     ) -> None:
         self.name = name
+        self.label = label or humanize(name)
         self.field = field or name
         self.parse = parse
         self.description = description
@@ -421,6 +448,7 @@ class RangeFilter(ListFilter):
     def catalogue_entry(self, request: Request) -> dict:
         return {
             "filter": self.name,
+            "label": self.label,
             "kind": self.kind,
             "params": list(self.param_names()),
             "description": self.description,
@@ -456,6 +484,10 @@ class SortOption:
         within a name).
     ``description``
         Human hint surfaced to the client in the catalogue.
+    ``label``
+        Human-readable name for the sort, so the client can title the menu
+        entry without mapping tokens itself. Defaults to :func:`humanize` of
+        ``name``.
     """
 
     def __init__(
@@ -464,8 +496,10 @@ class SortOption:
         *,
         fields: Sequence[str] | None = None,
         description: str = "",
+        label: str | None = None,
     ) -> None:
         self.name = name
+        self.label = label or humanize(name)
         self.fields = tuple(fields) if fields else (name,)
         self.description = description
 
@@ -477,16 +511,40 @@ class SortOption:
 
     def catalogue_entry(self) -> dict:
         """The ``available_sorts`` entry handed to the client."""
-        return {"sort": self.name, "description": self.description}
+        return {
+            "sort": self.name,
+            "label": self.label,
+            "description": self.description,
+        }
 
 
 # -- OpenAPI --------------------------------------------------------------
 
 
+@extend_schema_field(OpenApiTypes.ANY)
+class _OptionValueField(serializers.Field):
+    """Schema-only: an option's value is whatever its filter's param accepts.
+
+    Usually an integer id, sometimes a string code (``status``), so the schema
+    declares it untyped rather than picking one and lying about the other.
+    """
+
+    def to_representation(self, value):
+        return value
+
+
+class FilterOptionSerializer(serializers.Serializer):
+    """Schema for one ``{value, label}`` choice on a closed-ended filter."""
+
+    value = _OptionValueField(help_text="Send this in the filter's query param.")
+    label = serializers.CharField(help_text="Human-readable text for the picker.")
+
+
 class FilterCatalogueEntrySerializer(serializers.Serializer):
     """Schema for one ``available_filters`` entry."""
 
-    filter = serializers.CharField()
+    filter = serializers.CharField(help_text="Query param name (range filters: see params).")
+    label = serializers.CharField(help_text="Human-readable field name for the widget title.")
     kind = serializers.CharField(
         help_text="Widget hint: select, int, text, date, datetime, date_range, datetime_range, ..."
     )
@@ -496,17 +554,18 @@ class FilterCatalogueEntrySerializer(serializers.Serializer):
         required=False,
         help_text="The query params this filter reads (range filters have two).",
     )
-    options = serializers.ListField(
-        child=serializers.DictField(),
+    options = FilterOptionSerializer(
+        many=True,
         required=False,
-        help_text="Eligible {value, label} choices, when the filter is closed-ended.",
+        help_text="Eligible choices, when the filter is closed-ended.",
     )
 
 
 class SortCatalogueEntrySerializer(serializers.Serializer):
     """Schema for one ``available_sorts`` entry."""
 
-    sort = serializers.CharField()
+    sort = serializers.CharField(help_text="Send this in ?sort= ('-' prefix for descending).")
+    label = serializers.CharField(help_text="Human-readable name for the menu entry.")
     description = serializers.CharField()
 
 

@@ -5,7 +5,7 @@
 can render hierarchical state -> city pickers and submit the matching ``city``
 ids to the admin / sales-person creation endpoints.
 
-Restricted to a Django superuser authenticated with the web session.
+Restricted to an application Admin authenticated with the web session.
 Session-only: never touches bearer tokens (see ``android.api.v1.CitiesView``
 for the Android counterpart). Soft-deleted states and cities are excluded.
 """
@@ -38,7 +38,7 @@ class StateSerializer(serializers.Serializer):
 class CitiesView(AdminApiView):
     """List Indian states, each with its cities, grouped by state."""
 
-    superuser_required = True
+    admin_required = True
 
     @extend_schema(
         summary="List Indian states grouped with their cities",

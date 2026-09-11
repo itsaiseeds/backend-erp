@@ -120,13 +120,24 @@ class QuerysetFilterApplyTest(SimpleTestCase):
 
         self.assertEqual(spec.apply("QS", [7]), ("QS", [7]))
 
-    def test_catalogue_entry_carries_name_kind_and_description(self):
+    def test_catalogue_entry_carries_name_label_kind_and_description(self):
         spec = QuerysetFilter("city_id", description="primary address city")
 
         self.assertEqual(
             spec.catalogue_entry(request=None),
-            {"filter": "city_id", "kind": "int", "description": "primary address city"},
+            {
+                "filter": "city_id",
+                # Defaulted from the name: trailing "_id" dropped, title-cased.
+                "label": "City",
+                "kind": "int",
+                "description": "primary address city",
+            },
         )
+
+    def test_an_explicit_label_overrides_the_derived_one(self):
+        spec = QuerysetFilter("city_id", label="Delivery City")
+
+        self.assertEqual(spec.catalogue_entry(request=None)["label"], "Delivery City")
 
     def test_kind_defaults_from_the_parser_and_is_overridable(self):
         self.assertEqual(QuerysetFilter("q", parse=parse_str).kind, "text")
@@ -143,6 +154,7 @@ class QuerysetFilterApplyTest(SimpleTestCase):
             spec.catalogue_entry(request="req"),
             {
                 "filter": "city_id",
+                "label": "City",
                 "kind": "select",
                 "description": "city",
                 "options": [{"value": 1, "label": "Surat"}],
@@ -243,6 +255,7 @@ class RangeFilterTest(SimpleTestCase):
             self.spec.catalogue_entry(request=None),
             {
                 "filter": "created",
+                "label": "Created",
                 "kind": "date_range",
                 "params": ["created_after", "created_before"],
                 "description": "",
@@ -265,11 +278,16 @@ class SortOptionTest(SimpleTestCase):
 
         self.assertEqual(option.order_by(descending=True), ["-created_at", "id"])
 
-    def test_catalogue_entry_exposes_name_and_description(self):
+    def test_catalogue_entry_exposes_name_label_and_description(self):
         self.assertEqual(
             SortOption("created_at", description="added").catalogue_entry(),
-            {"sort": "created_at", "description": "added"},
+            {"sort": "created_at", "label": "Created At", "description": "added"},
         )
+
+    def test_an_explicit_label_overrides_the_derived_one(self):
+        option = SortOption("created_at", label="Date added", description="added")
+
+        self.assertEqual(option.catalogue_entry()["label"], "Date added")
 
 
 class ListQueryParametersTest(SimpleTestCase):
@@ -390,7 +408,14 @@ class MixinRequestHandlingTest(SimpleTestCase):
         self.assertEqual(len(response.data["results"]), 10)
         self.assertEqual(
             response.data["available_filters"],
-            [{"filter": "n__in", "kind": "int", "description": "a number"}],
+            [
+                {
+                    "filter": "n__in",
+                    "label": "N In",
+                    "kind": "int",
+                    "description": "a number",
+                }
+            ],
         )
 
     def test_each_declared_filter_is_its_own_param_and_they_and_together(self):
@@ -495,7 +520,7 @@ class MixinRequestHandlingTest(SimpleTestCase):
 
         self.assertEqual(
             response.data["available_sorts"],
-            [{"sort": "created_at", "description": "added"}],
+            [{"sort": "created_at", "label": "Created At", "description": "added"}],
         )
 
     def test_a_filter_or_sort_named_like_a_reserved_param_is_a_config_error(self):
