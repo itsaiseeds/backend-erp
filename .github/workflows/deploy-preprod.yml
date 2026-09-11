@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   sync-preprod:
-    name: push master to preprod
+    name: build flutter for preprod and push
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion == 'success'
 
@@ -22,6 +22,26 @@ jobs:
           ref: master
           fetch-depth: 0
 
-      - name: Push master to preprod
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build Flutter web app for preprod API
+        working-directory: admin_saiseeds
+        run: |
+          flutter pub get
+          flutter build web --release \
+            --base-href /sales-admin/ \
+            --dart-define=API_BASE_URL=https://sai-seeds-preprod.onrender.com
+
+      - name: Commit preprod build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add admin_saiseeds/build
+          git diff --cached --quiet || git commit -m "Build Flutter web app for preprod API"
+
+      - name: Push to preprod
         run: |
           git push origin HEAD:refs/heads/preprod --force
