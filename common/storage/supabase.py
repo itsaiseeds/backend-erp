@@ -9,6 +9,9 @@ directly with ``requests`` (already a dependency). Configuration lives in
 ``config.settings``: ``SUPABASE_URL``, ``SUPABASE_SECRET_KEY`` and
 ``SUPABASE_STORAGE_BUCKET``. When they are unset this backend is simply not
 selected — see ``common.storage.images`` for the dispatch.
+
+``SUPABASE_SECRET_KEY`` may be either generation of Supabase key -- a current
+``sb_secret_…`` or a legacy ``service_role`` JWT; see :func:`_auth_headers`.
 """
 
 from __future__ import annotations
@@ -52,6 +55,29 @@ def _object_url(name: str) -> str:
     )
 
 
+def _auth_headers() -> dict[str, str]:
+    """Authenticate as the service role, for either Supabase key format.
+
+    Supabase has two generations of keys and Storage authenticates them
+    differently:
+
+    * **Legacy** ``service_role`` keys are JWTs. Storage decodes them out of
+      ``Authorization: Bearer``.
+    * **Current** keys (``sb_secret_…``) are opaque strings, not JWTs. They are
+      presented in the ``apikey`` header. Sending one as a bearer token makes
+      Storage try to decode it as a JWT and reject the request with
+      ``403 "Invalid Compact JWS"``.
+
+    Both formats go in ``apikey``; only a JWT-shaped key additionally gets the
+    bearer header, so either generation works without a settings flag.
+    """
+    key = settings.SUPABASE_SECRET_KEY
+    headers = {"apikey": key}
+    if key.count(".") == 2:  # header.payload.signature -- a legacy JWT key
+        headers["Authorization"] = f"Bearer {key}"
+    return headers
+
+
 def put(image: UploadedFile, *, name: str, content_type: str) -> str:
     """Upload ``image`` to the bucket and return its public URL."""
     image.seek(0)
@@ -59,7 +85,7 @@ def put(image: UploadedFile, *, name: str, content_type: str) -> str:
         _object_url(name),
         data=image.read(),
         headers={
-            "Authorization": f"Bearer {settings.SUPABASE_SECRET_KEY}",
+            **_auth_headers(),
             "Content-Type": content_type,
             "x-upsert": "true",
         },
@@ -87,7 +113,7 @@ def remove(url: str) -> None:
     try:
         response = requests.delete(
             _object_url(name),
-            headers={"Authorization": f"Bearer {settings.SUPABASE_SECRET_KEY}"},
+            headers=_auth_headers(),
             timeout=_TIMEOUT_SECONDS,
         )
         if not response.ok:

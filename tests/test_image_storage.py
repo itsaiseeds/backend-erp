@@ -26,6 +26,12 @@ SUPABASE_CONFIGURED = {
     "SUPABASE_STORAGE_BUCKET": "product-images",
 }
 
+# A legacy ``service_role`` key: three dot-separated base64 segments.
+SUPABASE_LEGACY_JWT = {
+    **SUPABASE_CONFIGURED,
+    "SUPABASE_SECRET_KEY": "header.payload.signature",
+}
+
 SUPABASE_UNCONFIGURED = {
     "SUPABASE_URL": "",
     "SUPABASE_SECRET_KEY": "",
@@ -111,10 +117,24 @@ class SupabaseBackendTest(SimpleTestCase):
                 "https://sb.example/storage/v1/object/product-images/products/"
             )
         )
-        self.assertEqual(
-            post.call_args.kwargs["headers"]["Authorization"], "Bearer sb_secret_test"
-        )
+        # An ``sb_secret_…`` key is opaque, not a JWT: it goes in ``apikey``.
+        # Sending it as a bearer token makes Storage try to JWT-decode it and
+        # answer 403 "Invalid Compact JWS".
+        headers = post.call_args.kwargs["headers"]
+        self.assertEqual(headers["apikey"], "sb_secret_test")
+        self.assertNotIn("Authorization", headers)
         self.assertFalse(Path(settings.MEDIA_ROOT).exists())
+
+    @override_settings(**SUPABASE_LEGACY_JWT)
+    def test_a_legacy_jwt_key_is_also_sent_as_a_bearer_token(self):
+        """tests/test_image_storage.py::SupabaseBackendTest::test_a_legacy_jwt_key_is_also_sent_as_a_bearer_token"""
+        with patch("common.storage.supabase.requests.post") as post:
+            post.return_value = Mock(ok=True)
+            upload_image(_image(), folder="products")
+
+        headers = post.call_args.kwargs["headers"]
+        self.assertEqual(headers["apikey"], "header.payload.signature")
+        self.assertEqual(headers["Authorization"], "Bearer header.payload.signature")
 
     def test_supabase_error_becomes_a_validation_error(self):
         """tests/test_image_storage.py::SupabaseBackendTest::test_supabase_error_becomes_a_validation_error"""
@@ -131,6 +151,9 @@ class SupabaseBackendTest(SimpleTestCase):
         self.assertEqual(
             request_delete.call_args.args[0],
             "https://sb.example/storage/v1/object/product-images/products/a.png",
+        )
+        self.assertEqual(
+            request_delete.call_args.kwargs["headers"]["apikey"], "sb_secret_test"
         )
 
     def test_a_failing_delete_is_swallowed(self):
