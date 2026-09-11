@@ -49,6 +49,7 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(28, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(34, 'aggregator', 'inventorysnapshot');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(35, 'aggregator', 'customorder');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(36, 'aggregator', 'customorderitem');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(37, 'aggregator', 'stage');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -182,6 +183,10 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(122, 'Can change custom order item', 36, 'change_customorderitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(123, 'Can delete custom order item', 36, 'delete_customorderitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(124, 'Can view custom order item', 36, 'view_customorderitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(125, 'Can add stage', 37, 'add_stage');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(126, 'Can change stage', 37, 'change_stage');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(127, 'Can delete stage', 37, 'delete_stage');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(128, 'Can view stage', 37, 'view_stage');
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)
@@ -196,6 +201,15 @@ INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, de
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(7, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'REJECTED', 'Rejected', 7);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(8, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'VERIFICATION_PENDING', 'Verification pending', 1);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(9, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'VERIFIED', 'Verified', 2);
+
+-- -------------------------------------------------------------------------
+-- aggregator_stage (seed classification of a product; enum-like, 4 fixed rows)
+--   Mirrored by aggregator/models/Stage.py::StageIds. created_by left NULL.
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_stage (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(1, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'BREEDER', 'Breeder', 1);
+INSERT INTO public.aggregator_stage (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(2, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'FOUNDATION', 'Foundation', 2);
+INSERT INTO public.aggregator_stage (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(3, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'RESEARCH', 'Research', 3);
+INSERT INTO public.aggregator_stage (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(4, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'CERTIFICATE', 'Certificate', 4);
 
 INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(2, '!unusable', NULL, false, '2026-08-28 05:22:53.878', '2026-08-28 05:22:54.057', '8888888888', 'no totp user', NULL, NULL, false, NULL, 0, NULL, false, false, true, '2026-08-28 05:22:54.057', 1, NULL);
 INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(1, 'argon2$argon2id$v=19$m=102400,t=2,p=8$R2xUZXNHM2JtQkFhaVhtTjdHTjNZdw$sSm84Zeic9+weLp+hLiBDHtXZDOrKSYeVSmsaR9l/CA', '2026-09-07 00:18:33.996', true, '2026-08-28 05:22:53.878', '2026-08-28 05:22:54.057', '9999999999', 'admin', 'admin@example.com', 'JBSWY3DPEHPK3PXP', true, NULL, 0, NULL, true, true, true, '2026-08-28 05:22:54.057', 1, 1);
@@ -221,8 +235,8 @@ INSERT INTO public.authentication_salesperson (id, created_at, updated_at, is_de
 INSERT INTO public.aggregator_crop (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name") VALUES(1, '2026-09-07 00:26:28.109', '2026-09-07 00:26:28.111', false, NULL, NULL, 1, 'Castor');
 INSERT INTO public.aggregator_crop (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name") VALUES(2, '2026-09-07 00:26:42.132', '2026-09-07 00:26:42.133', false, NULL, NULL, 1, 'Bajari');
 
-INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, buying_price, selling_price) VALUES(1, '2026-09-07 00:28:02.358', '2026-09-07 00:28:12.045', false, NULL, NULL, 1, 'P-I34V7RI1JPUH', 'SAI-33', 1, 100.00, 120.00);
-INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, buying_price, selling_price) VALUES(2, '2026-09-07 00:28:40.714', '2026-09-07 00:28:40.718', false, NULL, NULL, 1, 'P-NQ8N4LF7MJYQ', 'SAI-3353', 2, 210.00, 250.00);
+INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, stage_id, selling_price, image_url) VALUES(1, '2026-09-07 00:28:02.358', '2026-09-07 00:28:12.045', false, NULL, NULL, 1, 'P-I34V7RI1JPUH', 'SAI-33', 1, 1, 120.00, '');
+INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, stage_id, selling_price, image_url) VALUES(2, '2026-09-07 00:28:40.714', '2026-09-07 00:28:40.718', false, NULL, NULL, 1, 'P-NQ8N4LF7MJYQ', 'SAI-3353', 2, 1, 250.00, '');
 
 INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(1, '2026-09-07 00:29:08.487', '2026-09-07 00:29:15.227', false, NULL, NULL, 1, 'PP-U4UYPFOF08NZ', 1, 1.000, 40, 4800.00);
 INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(2, '2026-09-07 00:29:29.899', '2026-09-07 00:29:29.904', false, NULL, NULL, 1, 'PP-5SVE39LY2XEI', 2, 1.500, 20, 5000.00);
@@ -236,6 +250,7 @@ INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_d
 SELECT setval(pg_get_serial_sequence('public.django_content_type', 'id'),         (SELECT MAX(id) FROM public.django_content_type));
 SELECT setval(pg_get_serial_sequence('public.auth_permission', 'id'),             (SELECT MAX(id) FROM public.auth_permission));
 SELECT setval(pg_get_serial_sequence('public.aggregator_status', 'id'),           (SELECT MAX(id) FROM public.aggregator_status));
+SELECT setval(pg_get_serial_sequence('public.aggregator_stage', 'id'),            (SELECT MAX(id) FROM public.aggregator_stage));
 SELECT setval(pg_get_serial_sequence('public.authentication_user', 'id'),         (SELECT MAX(id) FROM public.authentication_user));
 SELECT setval(pg_get_serial_sequence('public.authentication_admin', 'id'),        (SELECT MAX(id) FROM public.authentication_admin));
 SELECT setval(pg_get_serial_sequence('public.authentication_salesperson', 'id'),  (SELECT MAX(id) FROM public.authentication_salesperson));

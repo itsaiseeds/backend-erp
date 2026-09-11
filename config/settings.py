@@ -231,6 +231,20 @@ STORAGES = {
 # Flutter build directory (served by catch-all view, not collectstatic)
 FLUTTER_BUILD_DIR = BASE_DIR / "admin_saiseeds" / "build" / "web"
 
+# Uploaded product images. Two backends, picked by whether Supabase is
+# configured (see common/storage/images.py):
+#   * set   -> a PUBLIC Supabase Storage bucket; only the URL is stored on the
+#              row. Deployed environments must use this: Render's filesystem is
+#              ephemeral, so anything on local disk dies with the container.
+#   * unset -> MEDIA_ROOT on local disk (development and tests).
+# A deploy that leaves them unset is flagged by common/checks.py.
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
+SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "product-images")
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

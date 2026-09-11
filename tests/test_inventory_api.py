@@ -16,7 +16,7 @@ from decimal import Decimal
 
 from rest_framework import status
 
-from aggregator.models import ProductPackaging
+from aggregator.models import ProductPackaging, Stage, StageIds
 from authentication.models import Admin, SalesPerson, User
 from tests.common import WebApiTestCase
 
@@ -95,7 +95,7 @@ class InventoryApiTest(WebApiTestCase):
         cls.crop = Crop.objects.create(name="Wheat", created_by=cls.stock_admin_user)
         cls.product = cls.crop.products.create(
             name="PBW 725",
-            buying_price=Decimal("45.00"),
+            stage=Stage.by_id(StageIds.BREEDER),
             selling_price=Decimal("55.50"),
             created_by=cls.stock_admin_user,
         )

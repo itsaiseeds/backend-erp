@@ -23,6 +23,8 @@ from aggregator.models import (
     Pincode,
     PrivateDispatchDetails,
     ProductPackaging,
+    Stage,
+    StageIds,
     State,
     StatusIds,
 )
@@ -79,7 +81,8 @@ class OrderModelTest(DMLTestCase):
         add_client_address(cls.client_obj, cls.addr, cls.sp_user, is_primary=True)
         cls.product = create_product(
             name="Hybrid Maize", crop="Maize",
-            buying_price=Decimal("100.00"), selling_price=Decimal("150.00"), actor=cls.sp_user,
+            stage=Stage.by_id(StageIds.BREEDER),
+            selling_price=Decimal("150.00"), actor=cls.sp_user,
         )
         cls.pack = add_packaging(
             cls.product, packet_weight=Decimal("25.000"), packets=4,

@@ -31,6 +31,8 @@ from aggregator.models import (
     CustomOrder,
     Pincode,
     ProductPackaging,
+    Stage,
+    StageIds,
     State,
     StatusIds,
 )
@@ -81,7 +83,8 @@ class CustomOrderOperationsTest(DMLTestCase):
 
         cls.product = create_product(
             name="Hybrid Cotton", crop="Cotton",
-            buying_price=Decimal("100.00"), selling_price=Decimal("150.00"), actor=cls.su,
+            stage=Stage.by_id(StageIds.BREEDER),
+            selling_price=Decimal("150.00"), actor=cls.su,
         )
         # Two packagings of the SAME product, so on-hand loose sums across both.
         cls.pack_a = add_packaging(
@@ -94,7 +97,8 @@ class CustomOrderOperationsTest(DMLTestCase):
         )
         cls.other_product = create_product(
             name="Hybrid Wheat", crop="Wheat",
-            buying_price=Decimal("80.00"), selling_price=Decimal("120.00"), actor=cls.su,
+            stage=Stage.by_id(StageIds.BREEDER),
+            selling_price=Decimal("120.00"), actor=cls.su,
         )
         cls.other_pack = add_packaging(
             cls.other_product, packet_weight=Decimal("1.000"), packets=50,

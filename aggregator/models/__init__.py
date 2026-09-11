@@ -17,6 +17,7 @@ from .Pincode import Pincode
 from .PrivateDispatchDetails import PrivateDispatchDetails
 from .Product import Product
 from .ProductPackaging import ProductPackaging
+from .Stage import Stage, StageIds
 from .State import State
 from .Status import Status, StatusIds
 from .TransportAgency import TransportAgency
@@ -36,6 +37,8 @@ __all__ = [
     "ClientAddress",
     "ClientContact",
     "ClientTransportAgency",
+    "Stage",
+    "StageIds",
     "Product",
     "ProductPackaging",
     "InventorySnapshot",

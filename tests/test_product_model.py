@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from aggregator.models import Crop
+from aggregator.models import Crop, Stage, StageIds
 from aggregator.ProductOperations import add_packaging, create_product, product_payload
 from authentication.models import User
 from tests.common import DMLTestCase
@@ -24,7 +24,7 @@ class ProductModelTest(DMLTestCase):
         product = create_product(
             name="Hybrid Maize",
             crop="Maize",
-            buying_price=Decimal("100.00"),
+            stage=Stage.by_id(StageIds.BREEDER),
             selling_price=Decimal("150.00"),
             actor=self.su,
         )
@@ -32,14 +32,15 @@ class ProductModelTest(DMLTestCase):
         assert len(product.public_id) == 14
         assert isinstance(product.crop, Crop)
         assert product.crop.name == "Maize"
-        assert product.margin_per_packet == Decimal("50.00")
+        assert product.stage.code == StageIds.BREEDER.name
+        assert product.image_url == ""
 
     def test_crop_is_reused(self):
         """tests/test_product_model.py::ProductModelTest::test_crop_is_reused"""
-        one = Decimal("1")
         two = Decimal("2")
-        create_product(name="A", crop="Wheat", buying_price=one, selling_price=two, actor=self.su)
-        create_product(name="B", crop="Wheat", buying_price=one, selling_price=two, actor=self.su)
+        breeder = Stage.by_id(StageIds.BREEDER)
+        create_product(name="A", crop="Wheat", stage=breeder, selling_price=two, actor=self.su)
+        create_product(name="B", crop="Wheat", stage=breeder, selling_price=two, actor=self.su)
         assert Crop.objects.filter(name="Wheat").count() == 1
 
     def test_packaging_public_id_and_total_weight(self):
@@ -47,7 +48,7 @@ class ProductModelTest(DMLTestCase):
         product = create_product(
             name="Hybrid Maize",
             crop="Maize",
-            buying_price=Decimal("100.00"),
+            stage=Stage.by_id(StageIds.BREEDER),
             selling_price=Decimal("150.00"),
             actor=self.su,
         )
@@ -63,7 +64,7 @@ class ProductModelTest(DMLTestCase):
         product = create_product(
             name="Hybrid Maize",
             crop="Maize",
-            buying_price=Decimal("100.00"),
+            stage=Stage.by_id(StageIds.BREEDER),
             selling_price=Decimal("150.00"),
             actor=self.su,
         )
@@ -71,3 +72,7 @@ class ProductModelTest(DMLTestCase):
         assert "id" not in payload
         assert payload["public_id"] == product.public_id
         assert payload["crop"] == "Maize"
+        assert payload["stage"] == {"code": "BREEDER", "name": "Breeder"}
+        assert payload["image_url"] == ""
+        assert "buying_price" not in payload
+        assert "margin_per_packet" not in payload

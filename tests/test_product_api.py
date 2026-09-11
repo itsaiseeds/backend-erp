@@ -8,10 +8,16 @@ session, since these are session-only web endpoints.
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
-from rest_framework import status
+import io
+from pathlib import Path
+from unittest.mock import patch
 
-from aggregator.models import Crop, Product
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework import serializers, status
+
+from aggregator.models import Crop, Product, Stage, StageIds
 from authentication.models import Admin
 from tests.common import WebApiTestCase
 
@@ -54,10 +60,12 @@ class ProductApiTest(WebApiTestCase):
         )
 
         cls.crop = Crop.objects.create(name="Wheat", created_by=cls.seed_admin)
+        cls.breeder = Stage.by_id(StageIds.BREEDER)
+        cls.certificate = Stage.by_id(StageIds.CERTIFICATE)
         cls.product = Product.objects.create(
             name="Premium",
             crop=cls.crop,
-            buying_price=1000,
+            stage=cls.breeder,
             selling_price=1200,
             created_by=cls.seed_admin,
         )
@@ -69,13 +77,27 @@ class ProductApiTest(WebApiTestCase):
         return {
             "name": name,
             "crop": self.crop.id,
-            "buying_price": "1000.00",
+            "stage": self.breeder.id,
             "selling_price": "1200.00",
         }
 
     def _url(self, product):
         """Return the update/delete URL for a product (by public id)."""
         return f"{PRODUCTS_URL}/{product.public_id}"
+
+    @staticmethod
+    def _png(name="pic.png"):
+        """A real 1x1 PNG — ``serializers.ImageField`` verifies content with Pillow."""
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (1, 1)).save(buffer, format="PNG")
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+    @staticmethod
+    def _stored(image_url):
+        """The file on disk behind a local-backend ``image_url``."""
+        return Path(settings.MEDIA_ROOT) / image_url[len(settings.MEDIA_URL):]
 
     # -- permission gating ----------------------------------------------------
 
@@ -120,9 +142,15 @@ class ProductApiTest(WebApiTestCase):
         self.assertTrue(product["public_id"].startswith("P-"))
         self.assertEqual(product["name"], "Basmati")
         self.assertEqual(product["crop"], {"id": self.crop.id, "name": "Wheat"})
-        self.assertEqual(float(product["buying_price"]), 1000.0)
+        self.assertEqual(
+            product["stage"],
+            {"id": self.breeder.id, "code": "BREEDER", "name": "Breeder"},
+        )
         self.assertEqual(float(product["selling_price"]), 1200.0)
-        self.assertEqual(float(product["margin_per_packet"]), 200.0)
+        self.assertEqual(product["image_url"], "")
+        # Buying price is no longer tracked.
+        self.assertNotIn("buying_price", product)
+        self.assertNotIn("margin_per_packet", product)
         # The primary key must never be sent out.
         self.assertNotIn("id", product)
 
@@ -151,14 +179,108 @@ class ProductApiTest(WebApiTestCase):
     def test_create_product_negative_prices_rejected(self):
         """tests/test_product_api.py::ProductApiTest::test_create_product_negative_prices_rejected"""
         self.login_as(self.seed_admin)
-        for key in ("buying_price", "selling_price"):
-            payload = self._payload(f"Product-{key}")
-            payload[key] = "-1.00"
-            self.assertEqual(
-                self.client.post(PRODUCTS_URL, payload, format="json").status_code,
-                status.HTTP_400_BAD_REQUEST,
-                key,
-            )
+        payload = self._payload("Product-negative")
+        payload["selling_price"] = "-1.00"
+        self.assertEqual(
+            self.client.post(PRODUCTS_URL, payload, format="json").status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_create_product_requires_stage(self):
+        """tests/test_product_api.py::ProductApiTest::test_create_product_requires_stage"""
+        self.login_as(self.seed_admin)
+        payload = self._payload("Stageless")
+        del payload["stage"]
+        response = self.client.post(PRODUCTS_URL, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Stage is required.", response.data["detail"])
+
+    def test_create_product_invalid_stage_rejected(self):
+        """tests/test_product_api.py::ProductApiTest::test_create_product_invalid_stage_rejected"""
+        self.login_as(self.seed_admin)
+        payload = self._payload("Bad stage")
+        payload["stage"] = 999999
+        self.assertEqual(
+            self.client.post(PRODUCTS_URL, payload, format="json").status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # -- images ---------------------------------------------------------------
+    #
+    # Supabase is unconfigured in CI, so ``common.storage`` selects the on-disk
+    # backend and these exercise it for real; ``tests/conftest.py`` points
+    # MEDIA_ROOT at a temp directory per test.
+
+    def test_create_product_with_image_stores_it_and_returns_its_url(self):
+        """tests/test_product_api.py::ProductApiTest::test_create_product_with_image_stores_it_and_returns_its_url"""
+        self.login_as(self.seed_admin)
+        payload = self._payload("Pictured")
+        payload["image"] = self._png()
+        response = self.client.post(PRODUCTS_URL, payload, format="multipart")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        image_url = response.data["image_url"]
+        self.assertTrue(image_url.startswith(f"{settings.MEDIA_URL}products/"))
+        self.assertTrue(self._stored(image_url).is_file())
+
+        created = Product.objects.get(public_id=response.data["public_id"])
+        self.assertEqual(created.image_url, image_url)
+
+    def test_create_product_without_image_leaves_url_blank(self):
+        """tests/test_product_api.py::ProductApiTest::test_create_product_without_image_leaves_url_blank"""
+        self.login_as(self.seed_admin)
+        response = self.client.post(PRODUCTS_URL, self._payload("Plain"), format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        self.assertEqual(response.data["image_url"], "")
+        self.assertFalse(Path(settings.MEDIA_ROOT).exists())
+
+    def test_update_product_replaces_the_image_and_removes_the_old_file(self):
+        """tests/test_product_api.py::ProductApiTest::test_update_product_replaces_the_image_and_removes_the_old_file"""
+        self.login_as(self.seed_admin)
+        created = self.client.post(
+            PRODUCTS_URL, {**self._payload("Pictured"), "image": self._png()},
+            format="multipart",
+        )
+        old_url = created.data["image_url"]
+        self.assertTrue(self._stored(old_url).is_file())
+
+        response = self.client.patch(
+            f"{PRODUCTS_URL}/{created.data['public_id']}",
+            {"image": self._png()},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+
+        new_url = response.data["image_url"]
+        self.assertNotEqual(new_url, old_url)
+        self.assertTrue(self._stored(new_url).is_file())
+        self.assertFalse(self._stored(old_url).exists())
+
+    def test_create_product_with_a_non_image_file_rejected(self):
+        """tests/test_product_api.py::ProductApiTest::test_create_product_with_a_non_image_file_rejected"""
+        self.login_as(self.seed_admin)
+        payload = self._payload("Not a picture")
+        payload["image"] = SimpleUploadedFile(
+            "notes.txt", b"definitely not a png", content_type="text/plain"
+        )
+        response = self.client.post(PRODUCTS_URL, payload, format="multipart")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Product.all_objects.filter(name="Not a picture").exists())
+
+    def test_failed_upload_does_not_create_a_product(self):
+        """tests/test_product_api.py::ProductApiTest::test_failed_upload_does_not_create_a_product"""
+        self.login_as(self.seed_admin)
+        payload = self._payload("Doomed")
+        payload["image"] = self._png()
+        with patch(
+            "api.sales_admin.ProductsView.upload_image",
+            side_effect=serializers.ValidationError("Could not upload the image."),
+        ):
+            response = self.client.post(PRODUCTS_URL, payload, format="multipart")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Product.all_objects.filter(name="Doomed").exists())
 
     # -- listing --------------------------------------------------------------
 
@@ -194,12 +316,24 @@ class ProductApiTest(WebApiTestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.selling_price, 1500)
 
+    def test_admin_update_product_stage(self):
+        """tests/test_product_api.py::ProductApiTest::test_admin_update_product_stage"""
+        self.login_as(self.seed_admin)
+        response = self.client.patch(
+            self._url(self.product), {"stage": self.certificate.id}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["stage"]["code"], "CERTIFICATE")
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stage_id, self.certificate.id)
+
     def test_update_product_duplicate_name_crop_rejected(self):
         """tests/test_product_api.py::ProductApiTest::test_update_product_duplicate_name_crop_rejected"""
         Product.objects.create(
             name="Basmati",
             crop=self.crop,
-            buying_price=1000,
+            stage=self.breeder,
             selling_price=1200,
             created_by=self.seed_admin,
         )

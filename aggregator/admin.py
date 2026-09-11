@@ -20,6 +20,7 @@ from .models import (
     PrivateDispatchDetails,
     Product,
     ProductPackaging,
+    Stage,
     State,
     Status,
     TransportAgency,
@@ -118,6 +119,13 @@ class StatusAdmin(SoftDeleteModelAdmin):
     ordering = ("sequence", "code")
 
 
+@admin.register(Stage)
+class StageAdmin(SoftDeleteModelAdmin):
+    list_display = ("code", "name", "sequence", "created_at")
+    search_fields = ("code", "name")
+    ordering = ("sequence", "code")
+
+
 @admin.register(TransportAgency)
 class TransportAgencyAdmin(SoftDeleteModelAdmin):
     list_display = ("name", "created_by", "created_at")
@@ -205,11 +213,11 @@ class ClientTransportAgencyAdmin(SoftDeleteModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(SoftDeleteModelAdmin):
-    list_display = ("public_id", "name", "crop", "buying_price", "selling_price", "created_at")
+    list_display = ("public_id", "name", "crop", "stage", "selling_price", "created_at")
     search_fields = ("public_id", "name", "crop__name")
-    list_filter = ("crop",)
-    autocomplete_fields = ("crop",)
-    list_select_related = ("crop",)
+    list_filter = ("crop", "stage")
+    autocomplete_fields = ("crop", "stage")
+    list_select_related = ("crop", "stage")
     ordering = ("name",)
 
 

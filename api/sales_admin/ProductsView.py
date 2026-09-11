@@ -12,8 +12,9 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
-from aggregator.models import Crop, Product
+from aggregator.models import Crop, Product, Stage
 from api.admin import AdminApiView
+from common.storage import upload_image
 
 
 class CropRefSerializer(serializers.Serializer):
@@ -23,15 +24,23 @@ class CropRefSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
+class StageRefSerializer(serializers.Serializer):
+    """Output shape for the ``stage`` reference on a product."""
+
+    id = serializers.IntegerField()
+    code = serializers.CharField()
+    name = serializers.CharField()
+
+
 class ProductPayloadSerializer(serializers.Serializer):
     """Output shape for one product row."""
 
     public_id = serializers.CharField()
     name = serializers.CharField()
     crop = CropRefSerializer()
-    buying_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    stage = StageRefSerializer()
     selling_price = serializers.DecimalField(max_digits=12, decimal_places=2)
-    margin_per_packet = serializers.DecimalField(max_digits=12, decimal_places=2)
+    image_url = serializers.CharField(allow_blank=True)
 
 
 class CreateProductSerializer(serializers.Serializer):
@@ -48,14 +57,15 @@ class CreateProductSerializer(serializers.Serializer):
         queryset=Crop.objects.all(),
         error_messages={"required": "Crop is required."},
     )
-    buying_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=0,
-        error_messages={"required": "Buying price is required."},
+    stage = serializers.PrimaryKeyRelatedField(
+        queryset=Stage.objects.all(),
+        error_messages={"required": "Stage is required."},
     )
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, min_value=0,
         error_messages={"required": "Selling price is required."},
     )
+    image = serializers.ImageField(required=False)
 
     def validate(self, attrs):
         name = attrs["name"].strip()
@@ -76,9 +86,13 @@ def product_payload(product):
         "public_id": product.public_id,
         "name": product.name,
         "crop": {"id": product.crop_id, "name": product.crop.name},
-        "buying_price": product.buying_price,
+        "stage": {
+            "id": product.stage_id,
+            "code": product.stage.code,
+            "name": product.stage.name,
+        },
         "selling_price": product.selling_price,
-        "margin_per_packet": product.margin_per_packet,
+        "image_url": product.image_url,
     }
 
 
@@ -93,7 +107,7 @@ class ProductsView(AdminApiView):
         responses={200: ProductPayloadSerializer(many=True)},
     )
     def get(self, request):
-        products = Product.objects.select_related("crop").order_by("name")
+        products = Product.objects.select_related("crop", "stage").order_by("name")
         return Response([product_payload(product) for product in products])
 
     @extend_schema(
@@ -105,11 +119,16 @@ class ProductsView(AdminApiView):
         serializer = CreateProductSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        # Upload first: the object is named by a fresh UUID, so a failed upload
+        # aborts with a 400 before any product row exists.
+        image = data.get("image")
+        image_url = upload_image(image, folder="products") if image else ""
         product = Product.objects.create(
             name=data["name"],
             crop=data["crop"],
-            buying_price=data["buying_price"],
+            stage=data["stage"],
             selling_price=data["selling_price"],
+            image_url=image_url,
             created_by=request.user,
         )
         return Response(product_payload(product), status=status.HTTP_201_CREATED)

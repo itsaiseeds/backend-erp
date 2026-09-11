@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.utils import IntegrityError
 
-from aggregator.models import InventorySnapshot
+from aggregator.models import InventorySnapshot, Stage, StageIds
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, User
 from tests.common import DMLTestCase
@@ -41,7 +41,8 @@ class InventorySnapshotModelTest(DMLTestCase):
 
         cls.product = create_product(
             name="Hybrid Bajra", crop="Bajra",
-            buying_price=Decimal("100.00"), selling_price=Decimal("150.00"), actor=cls.su,
+            stage=Stage.by_id(StageIds.BREEDER),
+            selling_price=Decimal("150.00"), actor=cls.su,
         )
         cls.pack = add_packaging(
             cls.product, packet_weight=Decimal("1.000"), packets=40, actor=cls.su
