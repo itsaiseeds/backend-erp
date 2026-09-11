@@ -1,4 +1,4 @@
-"""ORM-backed tests for the superuser-only grouped city list utility endpoint.
+"""ORM-backed tests for the admin-only grouped city list utility endpoint.
 
 These use the ``WebApiTestCase`` baseline (DML-seeded, superuser phone ``9999999999``) and add
 their own geography + an application admin in ``setUpTestData``. Request/response
@@ -22,7 +22,7 @@ SUPERUSER_PHONE = "9999999999"
 
 
 class CityUtilitiesTest(WebApiTestCase):
-    """Cover the superuser-only grouped city list endpoint.
+    """Cover the admin-only grouped city list endpoint.
 
     tests/test_city_utilities.py::CityUtilitiesTest
     """
@@ -49,20 +49,23 @@ class CityUtilitiesTest(WebApiTestCase):
         )
         cls.pune = City.objects.create(name="Pune", state=cls.state, created_by=cls.superuser)
 
-    def test_cities_requires_superuser(self):
-        """tests/test_city_utilities.py::CityUtilitiesTest::test_cities_requires_superuser"""
+    def test_cities_requires_admin(self):
+        """tests/test_city_utilities.py::CityUtilitiesTest::test_cities_requires_admin"""
         # Anonymous
         self.assertIn(self.client.get("/api/utilities/cities").status_code, (401, 403))
-        # App admin is still forbidden (superuser only).
-        self.login_as(self.seed_admin)
-        self.assertIn(self.client.get("/api/utilities/cities").status_code, (401, 403))
-        # Superuser is allowed.
+        # A bare superuser has no Admin profile, and `is_admin_user` deliberately
+        # does not count one -- same rule as every other sales-admin endpoint.
         self.login_as(self.superuser)
+        self.assertEqual(
+            self.client.get("/api/utilities/cities").status_code, status.HTTP_403_FORBIDDEN
+        )
+        # App admin is allowed.
+        self.login_as(self.seed_admin)
         self.assertEqual(self.client.get("/api/utilities/cities").status_code, status.HTTP_200_OK)
 
     def test_cities_grouped_by_state(self):
         """tests/test_city_utilities.py::CityUtilitiesTest::test_cities_grouped_by_state"""
-        self.login_as(self.superuser)
+        self.login_as(self.seed_admin)
         response = self.client.get("/api/utilities/cities")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         payload = response.data

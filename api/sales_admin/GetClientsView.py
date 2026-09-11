@@ -3,8 +3,9 @@
 The sales-admin counterpart of ``GET /android/api/v1/get-clients``. Same compact
 card per client (company details plus the primary address and primary contact),
 same pagination / filter / sort contract -- but scoped to *every* client rather
-than the caller's own, and with one extra filter: ``created_by``, the id of the
-sales person who onboarded the client.
+than the caller's own, and with two extra filters: ``created_by`` (the sales
+person who onboarded the client) and ``verified_by`` (the sales admin who
+approved it). Each client card also carries both names.
 
 Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
 (shared mixin):
@@ -12,6 +13,9 @@ Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
 * ``?created_by=<id1,id2,...>`` -- clients a given sales person created. The
   ``available_filters`` entry lists the eligible ``{value, label}`` sales people
   (exactly the ones who have clients), so the picker needs no second call.
+* ``?verified_by=<id1,id2,...>`` -- clients a given sales admin verified. The
+  entry lists only admins who have actually verified something: ``verified_by``
+  is null until approval, and a null is not a selectable filter value.
 * ``?city_id=<id1,id2,...>`` -- clients whose *primary* address is in one of
   those cities; the entry lists every city some client's primary address sits
   in.
@@ -64,6 +68,9 @@ class ClientListItemSerializer(serializers.Serializer):
     company_phone = serializers.CharField()
     status = serializers.CharField(allow_null=True)
     created_by = serializers.CharField(allow_null=True)
+    verified_by = serializers.CharField(
+        allow_null=True, help_text="Sales admin who verified the client; null until verified."
+    )
     primary_contact = ClientContactPayloadSerializer(allow_null=True)
     primary_address = ClientAddressPayloadSerializer(allow_null=True)
 
@@ -102,9 +109,26 @@ def _salespeople_with_clients(request: Request) -> list[dict]:
     needs to show a sales person who actually owns at least one client.
     """
     rows = (
-        Client.objects.values_list("created_by_id", "created_by__name")
+        Client.objects.filter(created_by__isnull=False)
+        .values_list("created_by_id", "created_by__name")
         .distinct()
         .order_by("created_by__name")
+    )
+    return [{"value": user_id, "label": name} for user_id, name in rows]
+
+
+def _verifiers_of_clients(request: Request) -> list[dict]:
+    """The distinct sales admins who have verified a client.
+
+    ``verified_by`` is null until a client is approved, so unverified clients
+    contribute no option -- a "None" entry in the picker would be meaningless
+    and un-sendable as a filter value.
+    """
+    rows = (
+        Client.objects.filter(verified_by__isnull=False)
+        .values_list("verified_by_id", "verified_by__name")
+        .distinct()
+        .order_by("verified_by__name")
     )
     return [{"value": user_id, "label": name} for user_id, name in rows]
 
@@ -150,18 +174,28 @@ def _by_primary_address_text(queryset: QuerySet, terms: list[str]) -> QuerySet:
 _QUERYSET_FILTERS = (
     QuerysetFilter(
         "created_by",
+        label="Created By",
         lookup="created_by_id__in",
         description="User id(s) of the sales person who created the client (see options).",
         options=_salespeople_with_clients,
     ),
     QuerysetFilter(
+        "verified_by",
+        label="Verified By",
+        lookup="verified_by_id__in",
+        description="User id(s) of the sales admin who verified the client (see options).",
+        options=_verifiers_of_clients,
+    ),
+    QuerysetFilter(
         "city_id",
+        label="City",
         apply=_by_primary_address_city,
         description="City id(s) of the client's primary address (see options).",
         options=_primary_address_cities,
     ),
     QuerysetFilter(
         "status",
+        label="Status",
         parse=_parse_status,
         apply=lambda queryset, codes: queryset.filter(status__code__in=codes),
         description="Client verification status.",
@@ -172,6 +206,7 @@ _QUERYSET_FILTERS = (
     ),
     QuerysetFilter(
         "company_name",
+        label="Company Name",
         lookup="company_name__icontains",
         parse=parse_str,
         multi=False,
@@ -179,6 +214,7 @@ _QUERYSET_FILTERS = (
     ),
     QuerysetFilter(
         "address",
+        label="Address",
         parse=parse_str,
         multi=False,
         apply=_by_primary_address_text,
@@ -187,6 +223,7 @@ _QUERYSET_FILTERS = (
     ),
     RangeFilter(
         "created",
+        label="Created",
         field="created_at",
         parse=parse_datetime,
         suffixes=("gte", "lte"),
@@ -194,8 +231,12 @@ _QUERYSET_FILTERS = (
     ),
 )
 _SORT_OPTIONS = (
-    SortOption("created_at", description="When the client was added (default: newest first)."),
-    SortOption("company_name", description="Company name, A->Z."),
+    SortOption(
+        "created_at",
+        label="Created",
+        description="When the client was added (default: newest first).",
+    ),
+    SortOption("company_name", label="Company Name", description="Company name, A->Z."),
 )
 
 
@@ -232,7 +273,7 @@ class GetClientsView(AdminPaginatedDateRangeListView):
             "address__country",
         )
         return (
-            Client.objects.select_related("status", "created_by")
+            Client.objects.select_related("status", "created_by", "verified_by")
             .prefetch_related(
                 Prefetch("client_addresses", queryset=primary_addresses),
                 Prefetch(
@@ -249,6 +290,7 @@ class GetClientsView(AdminPaginatedDateRangeListView):
             {
                 **client_list_payload(client),
                 "created_by": client.created_by.name if client.created_by else None,
+                "verified_by": client.verified_by.name if client.verified_by else None,
             }
             for client in page_items
         ]

@@ -119,9 +119,12 @@ no filter param may reuse those names (raises at request time if it does).
 
 ### Filters
 
-Every `available_filters` entry carries a **`kind`** (`select`, `int`, `text`,
-`date`, `datetime`, `date_range`, `datetime_range`, ...) so the frontend picks a
-widget with no guessing. Two filter types:
+Every `available_filters` entry carries a **`label`** (human-readable field
+name for the widget title, defaulted from the filter name by `humanize()` —
+`city_id` -> `City`, `created_by` -> `Created By` — and overridable with
+`label=`) and a **`kind`** (`select`, `int`, `text`, `date`, `datetime`,
+`date_range`, `datetime_range`, ...) so the frontend picks a widget with no
+guessing. Two filter types:
 
 **`QuerysetFilter`** — one param, `?<name>=<v1,v2,...>` (comma list OR-ed):
 
@@ -194,9 +197,10 @@ Page-number envelope from `StandardPageNumberPagination`:
 ```
 
 **plus**, when the view declares them, `available_filters`
-(`[{filter, kind, description, params?, options?}]`) and `available_sorts`
-(`[{sort, description}]`) — on **every** response, so the frontend discovers the
-contract without a second endpoint.
+(`[{filter, label, kind, description, params?, options?}]`) and
+`available_sorts` (`[{sort, label, description}]`) — on **every** response, so
+the frontend discovers the contract without a second endpoint. `label` on both
+is what the client shows a human; `filter` / `sort` are what it sends back.
 
 ### OpenAPI
 
@@ -204,7 +208,10 @@ Feed the view's own catalogues to `list_query_parameters(...)` in
 `@extend_schema` so `docs/api/openapi.yml` documents exactly what the view
 accepts; regenerate with `bash scripts/run.sh schema`. Type the response with a
 serializer whose `available_filters` / `available_sorts` fields reuse
-`FilterCatalogueEntrySerializer` / `SortCatalogueEntrySerializer`.
+`FilterCatalogueEntrySerializer` / `SortCatalogueEntrySerializer`. Those spell
+out `options` as `FilterOptionSerializer` (`{value, label}`) rather than a bare
+`DictField` — a free-form dict is what makes Swagger render placeholder
+`additionalProp1` keys instead of the real shape.
 
 ### Illustrative subclass
 

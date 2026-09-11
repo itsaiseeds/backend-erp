@@ -3,7 +3,7 @@
 ``GET /api/utilities/states`` returns ``[{id, name, code, country: {id, name}},
 ...]``.  Pass ``?country=<id>`` to narrow to one country.
 
-Restricted to a Django superuser authenticated with the web session.
+Restricted to an application Admin authenticated with the web session.
 Soft-deleted states and countries are excluded.
 """
 
@@ -36,7 +36,7 @@ class StateSerializer(serializers.Serializer):
 class StatesView(AdminApiView):
     """List states, optionally filtered by country id."""
 
-    superuser_required = True
+    admin_required = True
 
     @extend_schema(
         summary="List states (optionally filtered by country)",
