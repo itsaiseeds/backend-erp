@@ -8,6 +8,6 @@ class CommonConfig(AppConfig):
     verbose_name = "Common (reusable abstract base models)"
 
     def ready(self):
-        from .checks import supabase_configured_when_deployed
+        from .checks import images_have_durable_storage
 
-        register(supabase_configured_when_deployed)
+        register(images_have_durable_storage)

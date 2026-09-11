@@ -7,17 +7,19 @@ Registered from ``CommonConfig.ready()`` and therefore run by
 
 from __future__ import annotations
 
-from django.conf import settings
 from django.core.checks import Warning as CheckWarning
 
 
-def supabase_configured_when_deployed(app_configs, **kwargs) -> list[CheckWarning]:
-    """Warn when a non-DEBUG environment would store images on local disk.
+def images_have_durable_storage(app_configs, **kwargs) -> list[CheckWarning]:
+    """Warn whenever uploads would land on local disk instead of a bucket.
 
     The fallback to ``MEDIA_ROOT`` is what makes uploads work in development and
-    in tests, but on Render the filesystem is ephemeral: images written there
-    disappear on the next deploy. Missing credentials should be noisy, not a
-    silent data-loss bug.
+    in tests, so this fires there too -- deliberately. ``DEBUG`` is not a usable
+    proxy for "deployed": preprod runs with ``DEBUG=True`` and a real bucket. The
+    only question worth asking is whether the files will outlive the container,
+    and on Render they will not: anything written to local disk disappears on
+    the next deploy. Missing credentials should be noisy, not a silent
+    data-loss bug.
     """
     from common.storage import supabase
 
