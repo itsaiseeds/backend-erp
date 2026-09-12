@@ -39,7 +39,14 @@ class ProductPayloadSerializer(serializers.Serializer):
     name = serializers.CharField()
     crop = CropRefSerializer()
     stage = StageRefSerializer()
-    selling_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    selling_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text=(
+            "Rate per kilogram; packet and bag prices derive from it and the "
+            "weight sold."
+        ),
+    )
     image_url = serializers.CharField(allow_blank=True)
 
 
@@ -64,6 +71,7 @@ class CreateProductSerializer(serializers.Serializer):
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, min_value=0,
         error_messages={"required": "Selling price is required."},
+        help_text="Rate per kilogram; packet and bag prices derive from it and the weight sold.",
     )
     image = serializers.ImageField(required=False)
 

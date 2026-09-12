@@ -40,8 +40,8 @@ class ProductPackaging(
             "Whole-packaging price (not per-packet). Downstream OrderItems default "
             "their negotiated price to this value. Set explicitly, or leave to "
             "ProductOperations.add_packaging which fills it with "
-            "packets * product.selling_price. Frozen at the value stored "
-            "here -- it does not track later changes to the product's per-packet price."
+            "packets * product.price_for_weight(packet_weight). Frozen at the value stored "
+            "here -- it does not track later changes to the product's per-kilogram rate."
         ),
     )
 

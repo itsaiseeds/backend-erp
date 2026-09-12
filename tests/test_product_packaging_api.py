@@ -150,14 +150,35 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.assertEqual(created.product_id, self.product.id)
         self.assertEqual(created.created_by_id, self.seed_admin.id)
 
-    def test_admin_create_packaging_defaults_selling_price_to_packets_times_product_price(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_create_packaging_defaults_selling_price_to_packets_times_product_price"""
+    def test_admin_create_packaging_defaults_selling_price_from_weight(self):
+        """The default bag price is packets x packet_weight x the per-kg rate.
+
+        tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_create_packaging_defaults_selling_price_from_weight
+        """
         self.login_as(self.seed_admin)
         payload = self._payload(weight=50, packets=3)
         payload.pop("selling_price")
         response = self.client.post(PACKAGINGS_URL, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
-        self.assertEqual(float(response.data["selling_price"]), 3600.0)
+        # 1200/kg x 50kg = 60000 a packet, x 3 packets = 180000 a bag.
+        self.assertEqual(float(response.data["selling_price"]), 180000.0)
+
+    def test_default_packaging_price_scales_with_packet_weight(self):
+        """Halving the packet weight halves the bag price -- the point of a per-kg rate.
+
+        tests/test_product_packaging_api.py::ProductPackagingApiTest::test_default_packaging_price_scales_with_packet_weight
+        """
+        self.login_as(self.seed_admin)
+        prices = {}
+        for weight in (10, 20):
+            payload = self._payload(weight=weight, packets=2)
+            payload.pop("selling_price")
+            response = self.client.post(PACKAGINGS_URL, payload, format="json")
+            self.assertEqual(
+                response.status_code, status.HTTP_201_CREATED, response.content
+            )
+            prices[weight] = float(response.data["selling_price"])
+        self.assertEqual(prices[20], prices[10] * 2)
 
     def test_create_packaging_invalid_product_public_id_rejected(self):
         """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_create_packaging_invalid_product_public_id_rejected"""

@@ -284,7 +284,7 @@ class ProductPackagingAdminForm(forms.ModelForm):
 
     ``selling_price`` is ``NOT NULL`` at the DB and model level, but this form
     lets an admin leave it blank -- when it does, ``clean_selling_price``
-    fills in ``packets * product.selling_price`` so the underlying
+    fills in ``packets * product.price_for_weight(packet_weight)`` so the underlying
     ``ModelForm._post_clean`` sees a valid value and the model's ``full_clean``
     passes. This fallback is intentionally scoped to the admin: programmatic
     callers (``ProductOperations.add_packaging``) already handle the default.
@@ -299,7 +299,8 @@ class ProductPackagingAdminForm(forms.ModelForm):
         selling_price = self.fields["selling_price"]
         selling_price.required = False
         selling_price.help_text = (
-            "Leave blank to default to packets × product.selling_price."
+            "Leave blank to default to packets × packet_weight × the "
+            "product's per-kilogram selling_price."
         )
 
     def clean_selling_price(self):
@@ -308,10 +309,11 @@ class ProductPackagingAdminForm(forms.ModelForm):
             return value
         product = self.cleaned_data.get("product")
         packets = self.cleaned_data.get("packets")
-        if product is None or packets is None:
+        packet_weight = self.cleaned_data.get("packet_weight")
+        if product is None or packets is None or packet_weight is None:
             # Let the other fields' own validation surface first.
             return value
-        return packets * product.selling_price
+        return packets * product.price_for_weight(packet_weight)
 
 
 @admin.register(ProductPackaging)

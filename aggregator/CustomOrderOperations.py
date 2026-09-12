@@ -1,9 +1,13 @@
 """Custom-order lifecycle helpers for the ``aggregator`` sales domain.
 
 A custom order is the loose-packet counterpart of a normal :class:`Order`: its
-lines are counted in loose packets and drawn from a packaging's loose pool, and it
-may be booked only by a sales admin. It is a standalone record with no foreign
-key to ``Order``.
+lines are counted in loose packets and drawn from the ``(product, packet_weight)``
+loose pool, and it may be booked only by a sales admin. It is a standalone
+record with no foreign key to ``Order``.
+
+Every line names a ``packet_weight`` because a loose packet has a definite
+weight: 5 x 1kg and 5 x 500g draw on different pools and are worth different
+money.
 
 Custom orders are exposed to the frontend by their ``public_id`` (``CORD-…``);
 payloads never include the internal primary key.
@@ -53,14 +57,16 @@ def create_custom_order(
     ``CONFIRMED`` with ``verified_by``/``verified_at`` set to the creating admin.
 
     ``actor`` must be a sales admin (enforced in ``CustomOrder.clean``). Each
-    entry in ``items`` is ``{"product", "packets"}`` plus an optional
-    ``"negotiated_selling_price"`` (per packet); when omitted the line uses the
-    product's ``selling_price`` (the per-packet rate).
+    entry in ``items`` is ``{"product", "packet_weight", "packets"}`` plus an
+    optional ``"negotiated_selling_price"`` (per packet); when omitted the line
+    is priced at ``product.price_for_weight(packet_weight)``.
 
-    **Stock gate:** there must be enough loose-packet stock. For every product
-    line, the packets requested must not exceed what is currently available
-    (`available_loose_packets`); otherwise the order is not created. Because the
-    order confirms immediately, availability is checked *before* it reserves.
+    **Stock gate:** there must be enough loose-packet stock in the exact
+    ``(product, packet_weight)`` pool the line names -- a 1kg line is never
+    filled from 500g stock. The packets requested must not exceed what is
+    currently available (`available_loose_packets`); otherwise the order is not
+    created. Because the order confirms immediately, availability is checked
+    *before* it reserves.
     """
     from . import InventoryOperations
 
@@ -69,10 +75,13 @@ def create_custom_order(
     shortages = []
     for item in items:
         product = item["product"]
+        packet_weight = item["packet_weight"]
         needed = item["packets"]
-        available = InventoryOperations.available_loose_packets(product)
+        available = InventoryOperations.available_loose_packets(product, packet_weight)
         if needed > available:
-            shortages.append(f"{product.name}: need {needed}, have {available}")
+            shortages.append(
+                f"{product.name} @ {packet_weight}kg: need {needed}, have {available}"
+            )
     if shortages:
         raise ValidationError(
             {
@@ -101,6 +110,7 @@ def create_custom_order(
         add_custom_order_item(
             order,
             product=item["product"],
+            packet_weight=item["packet_weight"],
             negotiated_selling_price=item.get("negotiated_selling_price"),
             packets=item["packets"],
             actor=actor,
@@ -112,20 +122,25 @@ def add_custom_order_item(
     order: CustomOrder,
     *,
     product: Product,
+    packet_weight,
     packets: int,
     actor: User,
     negotiated_selling_price=None,
 ) -> CustomOrderItem:
-    """Add a loose-packet line to ``order``.
+    """Add a loose-packet line to ``order`` for one ``(product, packet_weight)`` pool.
 
-    ``negotiated_selling_price`` overrides the per-packet price for this line only;
-    omit it to charge ``product.selling_price``.
+    ``negotiated_selling_price`` overrides the per-packet price for this line
+    only; omit it to charge ``product.price_for_weight(packet_weight)``.
+
+    Because ``Product.selling_price`` is a per-kilogram rate, that default is
+    weight-correct on its own: a 500g line prefills at half a 1kg line.
     """
     if negotiated_selling_price is None:
-        negotiated_selling_price = product.selling_price
+        negotiated_selling_price = product.price_for_weight(packet_weight)
     item = CustomOrderItem(
         custom_order=order,
         product=product,
+        packet_weight=packet_weight,
         negotiated_selling_price=negotiated_selling_price,
         packets=packets,
         created_by=actor,
@@ -247,6 +262,7 @@ def custom_order_payload(order: CustomOrder) -> dict:
                     "public_id": item.product.public_id,
                     "name": item.product.name,
                 },
+                "packet_weight": str(item.packet_weight),
                 "negotiated_selling_price": str(item.negotiated_selling_price),
                 "packets": item.packets,
                 "line_total": str(item.line_total),

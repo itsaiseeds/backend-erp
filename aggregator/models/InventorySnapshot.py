@@ -18,23 +18,28 @@ def default_snapshot_date():
 class InventorySnapshot(
     PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel
 ):
-    """The physical stock counted for one ``ProductPackaging`` on one date.
+    """The sealed bags counted for one ``ProductPackaging`` on one date.
 
-    Stock is held in two pools that never mix:
+    This table holds **one pool only**: ``bags``, sealed whole packagings, the
+    unit ``OrderItem.quantity`` is expressed in. Normal packaged orders draw
+    from here and from nowhere else.
 
-    * ``bags``    - sealed whole packagings, the unit ``OrderItem.quantity``
-      is expressed in. Normal packaged orders draw from here.
-    * ``loose_packets`` - unpacked single packets. Optional (defaults to 0); reserved
-      for the future custom-order flow, which may never break open a bag.
+    The other pool -- stock that is in a packet but not in a bag -- lives in
+    ``LooseStockSnapshot``, keyed by ``(product, packet_weight)``. It is a
+    separate table because a loose packet has no packaging: ``packets``
+    describes how many packets go *in a bag*, which says nothing about a packet
+    sitting outside one. The two pools never mix, and they run on independent
+    date lifecycles.
 
-    Moving stock between the pools is a physical act: the admin opens bags on
-    the floor and re-uploads the count (``bags - 1``, ``loose_packets + N``).
-    This table therefore stays a pure record of what was counted -- it carries no
-    synthetic movements.
+    Moving stock between the pools is a physical act: the admin opens a bag on
+    the floor, then re-uploads this count (``bags - 1``) and the loose count
+    (``packets + N``). Both tables stay pure records of what was counted -- they
+    carry no synthetic movements.
 
     Only the latest ``snapshot_date`` is retained; recording a count for a newer
     date hard-deletes every earlier row (see
-    ``aggregator.InventoryOperations.record_stock_counts``).
+    ``aggregator.InventoryOperations.record_stock_counts``). That purge is
+    scoped to this table and never touches loose stock.
 
     Exposed to the frontend by its ``public_id`` (``INV-…``); the primary key is
     never sent out.
@@ -60,15 +65,6 @@ class InventorySnapshot(
             "OrderItem.quantity. May be 0 when only loose stock is held."
         ),
     )
-    loose_packets = models.PositiveIntegerField(
-        "loose packets",
-        default=0,
-        help_text=(
-            "Unpacked single packets on hand, in the packaging's packet size. "
-            "Optional -- defaults to 0. Never consumed by a packaged order."
-        ),
-    )
-
     class Meta:
         verbose_name = "inventory snapshot"
         verbose_name_plural = "inventory snapshots"
@@ -86,18 +82,13 @@ class InventorySnapshot(
         return f"inventory snapshot {self.snapshot_date}"
 
     @property
-    def bag_packets(self):
+    def total_packets(self):
         """Packets held inside the sealed bags."""
         return self.bags * self.product_packaging.packets
 
     @property
-    def total_packets(self):
-        """Every packet on hand, sealed and loose."""
-        return self.bag_packets + self.loose_packets
-
-    @property
     def total_weight(self):
-        """Total physical weight on hand, in kilograms."""
+        """Total physical weight of the sealed bags, in kilograms."""
         return self.total_packets * self.product_packaging.packet_weight
 
     def clean(self):
