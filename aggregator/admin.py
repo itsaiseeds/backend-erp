@@ -15,7 +15,11 @@ from .models import (
     Contact,
     Country,
     Crop,
+    CustomOrder,
+    CustomOrderItem,
     DispatchDetails,
+    InventorySnapshot,
+    LooseStockSnapshot,
     Order,
     OrderItem,
     Pincode,
@@ -406,3 +410,107 @@ class OrderItemAdmin(SoftDeleteModelAdmin):
     search_fields = ("order__client__company_name", "product_packaging__product__name")
     autocomplete_fields = ("order", "product_packaging")
     list_select_related = ("order", "product_packaging__product")
+
+
+# -- Stock ---------------------------------------------------------------------
+#
+# Two pools in two tables: sealed bags per packaging (InventorySnapshot) and
+# loose packets per (product, packet_weight) (LooseStockSnapshot). Writing
+# either requires ``Admin.can_update_stock_count``, enforced by each model's
+# ``clean()`` against the stamped ``created_by`` -- so an admin user without
+# that flag will be rejected on save here just as through the API.
+
+
+@admin.register(InventorySnapshot)
+class InventorySnapshotAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "public_id",
+        "snapshot_date",
+        "product_packaging",
+        "bags",
+        "total_packets",
+        "created_by",
+        "created_at",
+    )
+    search_fields = (
+        "public_id",
+        "product_packaging__product__name",
+        "product_packaging__public_id",
+    )
+    list_filter = ("snapshot_date", "product_packaging__product__crop")
+    autocomplete_fields = ("product_packaging",)
+    # total_packets reads product_packaging.packets; select_related keeps the
+    # changelist off an N+1.
+    list_select_related = ("product_packaging__product",)
+    date_hierarchy = "snapshot_date"
+    ordering = ("-snapshot_date", "product_packaging__product__name")
+
+
+@admin.register(LooseStockSnapshot)
+class LooseStockSnapshotAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "public_id",
+        "snapshot_date",
+        "product",
+        "packet_weight",
+        "packets",
+        "total_weight",
+        "created_by",
+        "created_at",
+    )
+    search_fields = ("public_id", "product__name", "product__crop__name")
+    list_filter = ("snapshot_date", "product__crop")
+    autocomplete_fields = ("product",)
+    list_select_related = ("product",)
+    date_hierarchy = "snapshot_date"
+    ordering = ("-snapshot_date", "product__name", "packet_weight")
+
+
+# -- Custom orders -------------------------------------------------------------
+
+
+class CustomOrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):
+    model = CustomOrderItem
+    extra = 0
+    autocomplete_fields = ("product",)
+
+
+@admin.register(CustomOrder)
+class CustomOrderAdmin(SoftDeleteParentAdmin):
+    list_display = (
+        "public_id",
+        "client",
+        "status",
+        "expected_delivery_date",
+        "actual_delivery_date",
+        "verified_by",
+        "created_by",
+        "created_at",
+    )
+    search_fields = ("public_id", "client__company_name", "special_comments")
+    list_filter = ("status",)
+    autocomplete_fields = (
+        "client",
+        "delivery_address",
+        "status",
+        "dispatch_details",
+        "private_dispatch_details",
+        "verified_by",
+    )
+    list_select_related = ("client", "status", "verified_by")
+    inlines = (CustomOrderItemInline,)
+
+
+@admin.register(CustomOrderItem)
+class CustomOrderItemAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "custom_order",
+        "product",
+        "packet_weight",
+        "negotiated_selling_price",
+        "packets",
+        "created_at",
+    )
+    search_fields = ("custom_order__public_id", "product__name")
+    autocomplete_fields = ("custom_order", "product")
+    list_select_related = ("custom_order", "product")
