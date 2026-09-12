@@ -86,9 +86,15 @@ class CustomOrderOperationsTest(DMLTestCase):
             stage=Stage.by_id(StageIds.BREEDER),
             selling_price=Decimal("150.00"), actor=cls.su,
         )
-        # Two packagings of the SAME product, so on-hand loose sums across both.
+        # pack_a and pack_c are the P1/P2 case: the SAME product at the SAME
+        # packet weight, bagged in different quantities. They share ONE pool of
+        # loose 1kg packets. pack_b is a second weight, a separate pool.
         cls.pack_a = add_packaging(
             cls.product, packet_weight=Decimal("1.000"), packets=40,
+            actor=cls.su,
+        )
+        cls.pack_c = add_packaging(
+            cls.product, packet_weight=Decimal("1.000"), packets=60,
             actor=cls.su,
         )
         cls.pack_b = add_packaging(
@@ -105,26 +111,49 @@ class CustomOrderOperationsTest(DMLTestCase):
             actor=cls.su,
         )
         cls.today = datetime.date.today()
+        cls.w1 = Decimal("1.000")
+        cls.w15 = Decimal("1.500")
 
     # -- helpers ---------------------------------------------------------------
 
     def _count(self, *, loose_packets=100, bags=400, snapshot_date=None):
-        """Upload a complete day's count: every packaging gets bags + loose packets."""
-        return inv.record_stock_counts(
-            counts={
-                pack: {"bags": bags, "loose_packets": loose_packets}
-                for pack in ProductPackaging.objects.all()
-            },
+        """Upload a complete day's bag count plus a loose count for every pool.
+
+        The two counts are separate writes -- bags per packaging, loose per
+        (product, packet_weight) -- so ``loose_packets`` is the count for each
+        pool, not a per-packaging figure that later gets summed.
+        """
+        inv.record_stock_counts(
+            counts=dict.fromkeys(ProductPackaging.objects.all(), bags),
+            actor=self.stock_admin,
+            snapshot_date=snapshot_date,
+        )
+        return self._count_loose(loose_packets, snapshot_date=snapshot_date)
+
+    def _count_loose(self, packets=100, *, snapshot_date=None):
+        """Upload a loose count of ``packets`` for every (product, weight) pool."""
+        pools = {
+            (pack.product, pack.packet_weight)
+            for pack in ProductPackaging.objects.select_related("product")
+        }
+        return inv.record_loose_stocks(
+            counts=dict.fromkeys(pools, packets),
             actor=self.stock_admin,
             snapshot_date=snapshot_date,
         )
 
-    def _custom_order(self, *, packets=30, product=None, actor=None):
+    def _custom_order(self, *, packets=30, product=None, packet_weight=None, actor=None):
         return create_custom_order(
             client=self.client_obj,
             delivery_address=self.addr,
             actor=actor or self.stock_admin,
-            items=[{"product": product or self.product, "packets": packets}],
+            items=[
+                {
+                    "product": product or self.product,
+                    "packet_weight": packet_weight or self.w1,
+                    "packets": packets,
+                }
+            ],
         )
 
     def _dispatch(self, order, *, date=None):
@@ -156,7 +185,7 @@ class CustomOrderOperationsTest(DMLTestCase):
         assert order.verified_by_id == self.stock_admin.id
         assert order.verified_at is not None
         # And it reserves immediately.
-        assert inv.reserved_loose_packets(self.product) == 30
+        assert inv.reserved_loose_packets(self.product, self.w1) == 30
 
     def test_no_packaging_and_totals_in_packets(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_no_packaging_and_totals_in_packets"""
@@ -165,7 +194,9 @@ class CustomOrderOperationsTest(DMLTestCase):
         item = order.items.get()
         assert item.product_id == self.product.id
         assert not hasattr(item, "product_packaging_id")
-        assert item.negotiated_selling_price == Decimal("150.00")  # product per-packet price
+        # 150/kg x a 1kg packet.
+        assert item.packet_weight == self.w1
+        assert item.negotiated_selling_price == Decimal("150.00")
         assert item.line_total == Decimal("4500.00")  # 150 * 30
         assert order.total_packets == 30
 
@@ -175,17 +206,53 @@ class CustomOrderOperationsTest(DMLTestCase):
         with self.assertRaises(ValidationError):
             create_custom_order(
                 client=self.client_obj, delivery_address=self.addr_other, actor=self.stock_admin,
-                items=[{"product": self.product, "packets": 5}],
+                items=[{"product": self.product, "packet_weight": self.w1, "packets": 5}],
             )
 
-    def test_one_line_per_product(self):
-        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_one_line_per_product"""
+    def test_one_line_per_product_and_weight(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_one_line_per_product_and_weight"""
         self._count()
         order = self._custom_order(packets=10)
+        # Same product AND same weight -> duplicate line.
         with self.assertRaises(ValidationError):
             add_custom_order_item(
-                order, product=self.product, packets=5, actor=self.stock_admin
+                order, product=self.product, packet_weight=self.w1, packets=5,
+                actor=self.stock_admin,
             )
+        # Same product at a DIFFERENT weight is a distinct pool, so it is allowed.
+        item = add_custom_order_item(
+            order, product=self.product, packet_weight=self.w15, packets=5,
+            actor=self.stock_admin,
+        )
+        assert item.packet_weight == self.w15
+        assert order.items.count() == 2
+
+    def test_line_price_prefills_from_the_per_kilogram_rate(self):
+        """A 1.5kg line prefills at 1.5x a 1kg line -- the reason pricing is per-kg.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_line_price_prefills_from_the_per_kilogram_rate
+        """
+        self._count()
+        order = self._custom_order(packets=10, packet_weight=self.w1)
+        heavy = add_custom_order_item(
+            order, product=self.product, packet_weight=self.w15, packets=10,
+            actor=self.stock_admin,
+        )
+        light = order.items.get(packet_weight=self.w1)
+        # product.selling_price is 150.00 per kilogram.
+        assert light.negotiated_selling_price == Decimal("150.00")
+        assert heavy.negotiated_selling_price == Decimal("225.00")
+        assert heavy.line_total == Decimal("2250.00")
+
+    def test_explicit_line_price_still_overrides_the_prefill(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_explicit_line_price_still_overrides_the_prefill"""
+        self._count()
+        order = self._custom_order(packets=10)
+        item = add_custom_order_item(
+            order, product=self.product, packet_weight=self.w15, packets=4,
+            negotiated_selling_price=Decimal("200.00"), actor=self.stock_admin,
+        )
+        assert item.negotiated_selling_price == Decimal("200.00")
 
     # -- the stock gate --------------------------------------------------------
 
@@ -198,19 +265,19 @@ class CustomOrderOperationsTest(DMLTestCase):
 
     def test_cannot_create_when_stock_insufficient(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_cannot_create_when_stock_insufficient"""
-        self._count(loose_packets=10)  # 2 packagings -> 20 available for the product
+        self._count(loose_packets=20)
         with self.assertRaises(ValidationError):
             self._custom_order(packets=25)
         # Nothing created, nothing reserved.
         assert CustomOrder.objects.count() == 0
-        assert inv.reserved_loose_packets(self.product) == 0
-        assert inv.available_loose_packets(self.product) == 20
+        assert inv.reserved_loose_packets(self.product, self.w1) == 0
+        assert inv.available_loose_packets(self.product, self.w1) == 20
 
     def test_stock_gate_accounts_for_earlier_orders(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_stock_gate_accounts_for_earlier_orders"""
-        self._count(loose_packets=10)  # 20 available
+        self._count(loose_packets=20)
         self._custom_order(packets=15)  # ok, reserves 15 -> 5 left
-        assert inv.available_loose_packets(self.product) == 5
+        assert inv.available_loose_packets(self.product, self.w1) == 5
         # A second order needing 10 can't be created against the remaining 5.
         with self.assertRaises(ValidationError):
             self._custom_order(packets=10)
@@ -218,19 +285,42 @@ class CustomOrderOperationsTest(DMLTestCase):
 
     # -- pool math -------------------------------------------------------------
 
-    def test_loose_on_hand_sums_across_a_products_packagings(self):
-        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_loose_on_hand_sums_across_a_products_packagings"""
-        self._count(loose_packets=100)  # two packagings of self.product
-        assert inv.on_hand_loose_packets(self.product) == 200
-        assert inv.available_loose_packets(self.product) == 200
+    def test_loose_on_hand_is_not_doubled_across_packagings(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_loose_on_hand_is_not_doubled_across_packagings"""
+        # pack_a (1kg x 40) and pack_c (1kg x 60) are two packagings of the same
+        # product at the same weight. A loose 1kg packet belongs to neither in
+        # particular -- there is ONE pool of 100, not one per packaging.
+        self._count(loose_packets=100)
+        assert inv.on_hand_loose_packets(self.product, self.w1) == 100
+        assert inv.available_loose_packets(self.product, self.w1) == 100
+
+    def test_loose_pools_are_isolated_per_packet_weight(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_loose_pools_are_isolated_per_packet_weight"""
+        self._count(loose_packets=100)
+        self._custom_order(packets=30, packet_weight=self.w1)
+        # The 1kg order never draws on the 1.5kg pool.
+        assert inv.available_loose_packets(self.product, self.w1) == 70
+        assert inv.reserved_loose_packets(self.product, self.w15) == 0
+        assert inv.available_loose_packets(self.product, self.w15) == 100
+
+    def test_cannot_fill_a_weight_with_another_weights_stock(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_cannot_fill_a_weight_with_another_weights_stock"""
+        # Only 1kg stock exists; a 1.5kg order must not borrow from it.
+        inv.record_loose_stock(
+            product=self.product, packet_weight=self.w1, packets=100,
+            actor=self.stock_admin,
+        )
+        with self.assertRaises(ValidationError):
+            self._custom_order(packets=5, packet_weight=self.w15)
+        assert CustomOrder.objects.count() == 0
 
     def test_loose_reservation_is_isolated_per_product(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_loose_reservation_is_isolated_per_product"""
         self._count(loose_packets=100)
         self._custom_order(packets=30, product=self.product)
-        # The other product's loose pool is untouched (it has one packaging: 100).
-        assert inv.reserved_loose_packets(self.other_product) == 0
-        assert inv.available_loose_packets(self.other_product) == 100
+        # The other product's loose pool is untouched.
+        assert inv.reserved_loose_packets(self.other_product, self.w1) == 0
+        assert inv.available_loose_packets(self.other_product, self.w1) == 100
 
     def test_loose_pool_never_touched_by_bag_math(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_loose_pool_never_touched_by_bag_math"""
@@ -244,23 +334,23 @@ class CustomOrderOperationsTest(DMLTestCase):
 
     def test_dispatch_reversal_moves_loose_packets_back_to_reserved(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_dispatch_reversal_moves_loose_packets_back_to_reserved"""
-        self._count(loose_packets=100)  # 200 on hand
+        self._count(loose_packets=100)  # one 1kg pool of 100
         order = self._custom_order(packets=30)  # auto-CONFIRMED, reserves 30
-        assert inv.reserved_loose_packets(self.product) == 30
-        assert inv.available_loose_packets(self.product) == 170
+        assert inv.reserved_loose_packets(self.product, self.w1) == 30
+        assert inv.available_loose_packets(self.product, self.w1) == 70
 
         self._dispatch(order)
-        assert inv.reserved_loose_packets(self.product) == 0
-        assert inv.consumed_loose_packets(self.product) == 30
-        assert inv.available_loose_packets(self.product) == 170
+        assert inv.reserved_loose_packets(self.product, self.w1) == 0
+        assert inv.consumed_loose_packets(self.product, self.w1) == 30
+        assert inv.available_loose_packets(self.product, self.w1) == 70
 
-        # Reverse the dispatch: packets return to reserved, still 170 available.
+        # Reverse the dispatch: packets return to reserved, still 70 available.
         revert_dispatch(order)
         assert order.status.code == "CONFIRMED"
         assert order.actual_delivery_date is None
-        assert inv.reserved_loose_packets(self.product) == 30
-        assert inv.consumed_loose_packets(self.product) == 0
-        assert inv.available_loose_packets(self.product) == 170
+        assert inv.reserved_loose_packets(self.product, self.w1) == 30
+        assert inv.consumed_loose_packets(self.product, self.w1) == 0
+        assert inv.available_loose_packets(self.product, self.w1) == 70
 
     def test_dispatch_before_count_not_subtracted_twice(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_dispatch_before_count_not_subtracted_twice"""
@@ -268,8 +358,8 @@ class CustomOrderOperationsTest(DMLTestCase):
         order = self._custom_order(packets=30)
         self._dispatch(order, date=self.today - datetime.timedelta(days=2))
         # Dispatched before the count -> already gone, not subtracted again.
-        assert inv.consumed_loose_packets(self.product) == 0
-        assert inv.available_loose_packets(self.product) == 200
+        assert inv.consumed_loose_packets(self.product, self.w1) == 0
+        assert inv.available_loose_packets(self.product, self.w1) == 100
 
     # -- both pools together ---------------------------------------------------
 
@@ -291,9 +381,9 @@ class CustomOrderOperationsTest(DMLTestCase):
 
         assert inv.reserved_bags(self.pack_a) == 6
         assert inv.consumed_bags(self.pack_a) == 0
-        assert inv.reserved_loose_packets(self.product) == 25
-        assert inv.consumed_loose_packets(self.product) == 0
+        assert inv.reserved_loose_packets(self.product, self.w1) == 25
+        assert inv.consumed_loose_packets(self.product, self.w1) == 0
 
         assert inv.available_bags(self.pack_a) == 394
         assert inv.available_bags(self.pack_b) == 400  # untouched
-        assert inv.available_loose_packets(self.product) == 175
+        assert inv.available_loose_packets(self.product, self.w1) == 75

@@ -688,6 +688,9 @@ CREATE INDEX IF NOT EXISTS aggregator_crop_created_by_id_idx ON public.aggregato
 CREATE INDEX IF NOT EXISTS aggregator_crop_deleted_by_id_idx ON public.aggregator_crop USING btree (deleted_by_id);
 
 -- aggregator_product ----------------------------------------------------------
+-- selling_price is a RATE PER KILOGRAM, not a per-packet or per-bag figure.
+-- Concrete prices derive from it and the weight sold: a packet costs
+-- rate x packet_weight, a bag costs that x packets. See Product.price_for_weight.
 CREATE TABLE IF NOT EXISTS public.aggregator_product (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -847,11 +850,14 @@ CREATE INDEX IF NOT EXISTS aggregator_orderitem_created_by_id_idx ON public.aggr
 CREATE INDEX IF NOT EXISTS aggregator_orderitem_deleted_by_id_idx ON public.aggregator_orderitem USING btree (deleted_by_id);
 
 -- aggregator_inventorysnapshot ------------------------------------------------
--- The day's physical stock count, one row per (snapshot_date, product_packaging).
--- Two pools that never mix: sealed `bags` (consumed by normal order items)
--- and unpacked `loose_packets` (reserved for the future custom-order flow).
+-- The day's sealed-bag count, one row per (snapshot_date, product_packaging).
+-- Bags only: they are consumed by normal order items and are the unit
+-- aggregator_orderitem.quantity is expressed in. The other pool -- stock in a
+-- packet but not in a bag -- lives in aggregator_loosestocksnapshot, keyed by
+-- (product, packet_weight), because a loose packet has no packaging.
 -- Only the latest snapshot_date is retained; recording a newer date hard-deletes
--- every earlier row (see aggregator/InventoryOperations.py).
+-- every earlier row (see aggregator/InventoryOperations.py). That purge is
+-- scoped to this table and never touches loose stock.
 CREATE TABLE IF NOT EXISTS public.aggregator_inventorysnapshot (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -864,12 +870,10 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inventorysnapshot (
 	snapshot_date date NOT NULL,
 	product_packaging_id int8 NOT NULL,
 	bags int8 NOT NULL,
-	loose_packets int8 NOT NULL DEFAULT 0,
 	CONSTRAINT aggregator_inventorysnapshot_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_inventorysnapshot_public_id_key UNIQUE (public_id),
 	CONSTRAINT uniq_inventorysnapshot_date_packaging UNIQUE (snapshot_date, product_packaging_id),
-	CONSTRAINT aggregator_inventorysnapshot_bags_check CHECK (bags >= 0),
-	CONSTRAINT aggregator_inventorysnapshot_loose_packets_check CHECK (loose_packets >= 0)
+	CONSTRAINT aggregator_inventorysnapshot_bags_check CHECK (bags >= 0)
 );
 CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_public_id_like ON public.aggregator_inventorysnapshot USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_snapshot_date_idx ON public.aggregator_inventorysnapshot USING btree (snapshot_date);
@@ -877,6 +881,43 @@ CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_product_packaging_id_idx
 CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_is_deleted_idx ON public.aggregator_inventorysnapshot USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_created_by_id_idx ON public.aggregator_inventorysnapshot USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_inventorysnapshot_deleted_by_id_idx ON public.aggregator_inventorysnapshot USING btree (deleted_by_id);
+
+-- aggregator_loosestocksnapshot -----------------------------------------------
+-- Loose stock: stock in a packet but not in a bag. One row per
+-- (snapshot_date, product, packet_weight) -- deliberately NOT per packaging,
+-- because that pair is all the identity a loose packet has. A product packed as
+-- both 1kg x 20 and 1kg x 30 has ONE pool of loose 1kg packets, not two;
+-- aggregator_productpackaging.packets describes how many packets go in a bag and
+-- says nothing about a packet sitting outside one.
+-- Consumed only by aggregator_customorderitem, which names the same pair.
+-- Optional: excluded from the daily completeness gate, so it never blocks order
+-- verification, and purged to its own latest date independently of
+-- aggregator_inventorysnapshot (see aggregator/InventoryOperations.py).
+CREATE TABLE IF NOT EXISTS public.aggregator_loosestocksnapshot (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	snapshot_date date NOT NULL,
+	product_id int8 NOT NULL,
+	packet_weight numeric(8,3) NOT NULL,
+	packets int8 NOT NULL,
+	CONSTRAINT aggregator_loosestocksnapshot_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_loosestocksnapshot_public_id_key UNIQUE (public_id),
+	CONSTRAINT uniq_loosestocksnapshot_date_product_weight UNIQUE (snapshot_date, product_id, packet_weight),
+	CONSTRAINT ck_loosestocksnapshot_positive CHECK (packet_weight > 0),
+	CONSTRAINT aggregator_loosestocksnapshot_packets_check CHECK (packets >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_loosestocksnapshot_public_id_like ON public.aggregator_loosestocksnapshot USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_loosestocksnapshot_snapshot_date_idx ON public.aggregator_loosestocksnapshot USING btree (snapshot_date);
+CREATE INDEX IF NOT EXISTS aggregator_loosestocksnapshot_product_id_idx ON public.aggregator_loosestocksnapshot USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_loosestocksnapshot_is_deleted_idx ON public.aggregator_loosestocksnapshot USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_loosestocksnapshot_created_by_id_idx ON public.aggregator_loosestocksnapshot USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_loosestocksnapshot_deleted_by_id_idx ON public.aggregator_loosestocksnapshot USING btree (deleted_by_id);
 
 -- aggregator_customorder ------------------------------------------------------
 -- A loose-packet order, the admin-only counterpart of aggregator_order. Standalone
@@ -917,8 +958,11 @@ CREATE INDEX IF NOT EXISTS aggregator_customorder_created_by_id_idx ON public.ag
 CREATE INDEX IF NOT EXISTS aggregator_customorder_deleted_by_id_idx ON public.aggregator_customorder USING btree (deleted_by_id);
 
 -- aggregator_customorderitem --------------------------------------------------
--- One custom-order line: a raw product and a packet count at a per-packet price. No
--- product_packaging: a custom order bypasses packaging entirely.
+-- A custom order line: loose packets of one product at one packet weight, at a
+-- per-packet price. Names (product_id, packet_weight) -- the same pair
+-- aggregator_loosestocksnapshot is keyed by -- and deliberately no packaging.
+-- packet_weight is required because a loose packet has a definite weight:
+-- 5 x 1kg and 5 x 500g draw on different pools and are worth different money.
 CREATE TABLE IF NOT EXISTS public.aggregator_customorderitem (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -930,10 +974,11 @@ CREATE TABLE IF NOT EXISTS public.aggregator_customorderitem (
 	custom_order_id int8 NOT NULL,
 	product_id int8 NOT NULL,
 	negotiated_selling_price numeric(12, 2) NOT NULL,
+	packet_weight numeric(8,3) NOT NULL,
 	packets int8 NOT NULL,
 	CONSTRAINT aggregator_customorderitem_pkey PRIMARY KEY (id),
-	CONSTRAINT uniq_customorderitem_order_product UNIQUE (custom_order_id, product_id),
-	CONSTRAINT ck_customorderitem_positive CHECK (negotiated_selling_price >= 0 AND packets > 0),
+	CONSTRAINT uniq_customorderitem_order_product_weight UNIQUE (custom_order_id, product_id, packet_weight),
+	CONSTRAINT ck_customorderitem_positive CHECK (negotiated_selling_price >= 0 AND packets > 0 AND packet_weight > 0),
 	CONSTRAINT aggregator_customorderitem_packets_check CHECK (packets >= 0)
 );
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_custom_order_id_idx ON public.aggregator_customorderitem USING btree (custom_order_id);
@@ -1015,6 +1060,9 @@ ALTER TABLE public.aggregator_orderitem ADD CONSTRAINT aggregator_orderitem_dele
 ALTER TABLE public.aggregator_inventorysnapshot ADD CONSTRAINT aggregator_inventorysnapshot_product_packaging_id_fk FOREIGN KEY (product_packaging_id) REFERENCES public.aggregator_productpackaging(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inventorysnapshot ADD CONSTRAINT aggregator_inventorysnapshot_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inventorysnapshot ADD CONSTRAINT aggregator_inventorysnapshot_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_loosestocksnapshot ADD CONSTRAINT aggregator_loosestocksnapshot_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_loosestocksnapshot ADD CONSTRAINT aggregator_loosestocksnapshot_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_loosestocksnapshot ADD CONSTRAINT aggregator_loosestocksnapshot_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_delivery_address_id_fk FOREIGN KEY (delivery_address_id) REFERENCES public.aggregator_address(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;

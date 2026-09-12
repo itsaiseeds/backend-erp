@@ -24,7 +24,7 @@ class OrderItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         decimal_places=2,
         help_text=(
             "Whole-packaging price for this line (matches ProductPackaging.selling_price's "
-            "unit, not the product's per-packet price). ``OrderOperations.add_order_item`` "
+            "unit, not the product's per-kilogram rate). ``OrderOperations.add_order_item`` "
             "defaults it to the linked ``ProductPackaging.selling_price`` when omitted."
         ),
     )

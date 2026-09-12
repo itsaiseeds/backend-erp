@@ -85,19 +85,31 @@ class InventoryOperationsTest(DMLTestCase):
             cls.product, packet_weight=Decimal("1.000"), packets=40, actor=cls.su
         )
         cls.today = datetime.date.today()
+        cls.weight = Decimal("1.000")
 
     # -- helpers ---------------------------------------------------------------
 
     def _count_everything(self, *, bags=400, loose_packets=100, snapshot_date=None):
-        """Record a complete day's count covering every active packaging."""
-        return inv.record_stock_counts(
-            counts={
-                pack: {"bags": bags, "loose_packets": loose_packets}
-                for pack in ProductPackaging.objects.all()
-            },
+        """Record a complete day's bag count, plus a loose count per pool.
+
+        Bags and loose stock are separate writes on separate tables: bags per
+        packaging, loose per (product, packet_weight).
+        """
+        snapshots = inv.record_stock_counts(
+            counts=dict.fromkeys(ProductPackaging.objects.all(), bags),
             actor=self.stock_admin,
             snapshot_date=snapshot_date,
         )
+        pools = {
+            (pack.product, pack.packet_weight)
+            for pack in ProductPackaging.objects.select_related("product")
+        }
+        inv.record_loose_stocks(
+            counts=dict.fromkeys(pools, loose_packets),
+            actor=self.stock_admin,
+            snapshot_date=snapshot_date,
+        )
+        return snapshots
 
     def _order(self, quantity=2):
         return create_order(
@@ -129,15 +141,14 @@ class InventoryOperationsTest(DMLTestCase):
             product_packaging=self.pack, bags=400, actor=self.stock_admin
         )
         inv.record_stock_count(
-            product_packaging=self.pack, bags=360, loose_packets=40, actor=self.stock_admin
+            product_packaging=self.pack, bags=360, actor=self.stock_admin
         )
         rows = InventorySnapshot.objects.filter(
             snapshot_date=self.today, product_packaging=self.pack
         )
         assert rows.count() == 1
-        # Opening bags to make loose stock is recorded by re-uploading.
+        # Opening bags is recorded by re-uploading the count.
         assert rows.first().bags == 360
-        assert rows.first().loose_packets == 40
 
     def test_newer_count_hard_deletes_older_days_only(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_newer_count_hard_deletes_older_days_only"""
@@ -190,14 +201,14 @@ class InventoryOperationsTest(DMLTestCase):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_packaged_order_never_touches_loose_stock"""
         self._count_everything(bags=400, loose_packets=100)
         assert inv.available_bags(self.pack) == 400
-        assert inv.available_loose_packets(self.product) == 100
+        assert inv.available_loose_packets(self.product, self.weight) == 100
 
         verify_order(self._order(quantity=2), self.stock_admin)
 
         assert inv.reserved_bags(self.pack) == 2
         assert inv.available_bags(self.pack) == 398
         # The loose pool is untouched by a packaged order.
-        assert inv.available_loose_packets(self.product) == 100
+        assert inv.available_loose_packets(self.product, self.weight) == 100
 
     def test_verify_order_blocked_when_insufficient_stock(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_verify_order_blocked_when_insufficient_stock"""
@@ -280,7 +291,7 @@ class InventoryOperationsTest(DMLTestCase):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_uncounted_packaging_has_no_stock"""
         assert inv.on_hand_bags(self.pack) == 0
         assert inv.available_bags(self.pack) == 0
-        assert inv.available_loose_packets(self.product) == 0
+        assert inv.available_loose_packets(self.product, self.weight) == 0
 
     def test_stock_position_and_payload_shapes(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_stock_position_and_payload_shapes"""
@@ -290,11 +301,12 @@ class InventoryOperationsTest(DMLTestCase):
         assert len(position) == ProductPackaging.objects.count()
         mine = next(p for p in position if p["packaging"] == self.pack)
         assert mine["packets_on_hand"] == 400
-        assert mine["product_loose_packets_available"] == 100
+        # Bags only -- the loose pool is a separate grain and a separate payload.
+        assert "product_loose_packets_available" not in mine
 
         payload = inv.snapshot_payload(inv.snapshot_line(self.pack))
         assert "id" not in payload
         assert payload["public_id"].startswith("INV-")
         assert payload["packaging"]["public_id"] == self.pack.public_id
-        assert payload["product_loose_packets_available"] == 100
-        assert payload["total_packets"] == 16100
+        assert "loose_packets" not in payload
+        assert payload["total_packets"] == 16000

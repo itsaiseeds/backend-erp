@@ -3,13 +3,18 @@
 Only an application Admin holding ``Admin.can_update_stock_count`` may write a
 count (also enforced by ``InventoryOperations._assert_can_update_stock_count``).
 
+This is the **sealed-bag** count only. Loose stock -- stock in a packet but not
+in a bag -- is counted separately and optionally at
+``/api/sales-admin/update-loose-stock``, on its own independent lifecycle:
+writing a bag count here never touches a loose row.
+
 ``POST`` replaces **today's entire** count: every active packaging receives a
 row for today, and packagings absent from the payload are recorded as zero.
 ``PATCH`` updates only the packagings named in the payload and leaves the rest
 of today's rows untouched.
 
 Either way, only the latest ``snapshot_date`` is retained -- recording today's
-count purges every older row (see ``InventoryOperations``).
+count purges every older bag row (see ``InventoryOperations``).
 """
 
 from __future__ import annotations
@@ -23,45 +28,13 @@ from aggregator.models import ProductPackaging
 from api.admin import AdminApiView
 
 
-class CountValueField(serializers.Field):
-    """A count value: a bare non-negative integer (bags, loose defaults to 0) or
-    a ``{"bags": n, "loose_packets": m}`` mapping."""
-
-    default_error_messages = {
-        "invalid": ("A count must be a non-negative integer or a "
-                    "\"bags\"/\"loose_packets\" object."),
-    }
-
-    def to_internal_value(self, data):
-        if isinstance(data, bool) or not isinstance(data, (int, dict)):
-            self.fail("invalid")
-        if isinstance(data, int):
-            if data < 0:
-                self.fail("invalid")
-            return {"bags": data, "loose_packets": 0}
-        unknown = set(data).difference({"bags", "loose_packets"})
-        if unknown:
-            raise serializers.ValidationError(
-                f"Unknown count keys: {', '.join(sorted(unknown))}."
-            )
-        bags = data.get("bags", 0)
-        loose_packets = data.get("loose_packets", 0)
-        for _name, value in (("bags", bags), ("loose_packets", loose_packets)):
-            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-                self.fail("invalid")
-        return {"bags": bags, "loose_packets": loose_packets}
-
-    def to_representation(self, value):
-        return value
-
-
 class UpdateTodaysInventorySerializer(serializers.Serializer):
-    """Request validation: a map of packaging ``public_id`` → today's count."""
+    """Request validation: a map of packaging ``public_id`` → today's bag count."""
 
     counts = serializers.DictField(
-        child=CountValueField(),
+        child=serializers.IntegerField(min_value=0),
         error_messages={"required": "Stock counts are required."},
-        help_text="Map of product-packaging public_id to its count.",
+        help_text="Map of product-packaging public_id to its bag count.",
     )
 
 
@@ -88,11 +61,9 @@ class SnapshotPayloadSerializer(serializers.Serializer):
     snapshot_date = serializers.DateField()
     packaging = PackagingRefSerializer()
     bags = serializers.IntegerField(min_value=0)
-    loose_packets = serializers.IntegerField(min_value=0)
     total_packets = serializers.IntegerField(min_value=0)
     total_weight = serializers.DecimalField(max_digits=11, decimal_places=3)
-    packets_available = serializers.IntegerField(min_value=0)
-    product_loose_packets_available = serializers.IntegerField(min_value=0)
+    packets_available = serializers.IntegerField()
 
 
 class UpdateTodaysInventoryView(AdminApiView):
@@ -104,9 +75,9 @@ class UpdateTodaysInventoryView(AdminApiView):
     def _resolve_counts(self, serializer) -> dict:
         """Map validated packaging public_ids to packaging instances.
 
-        ``serializer.validated_data`` holds ``{public_id: {"bags", "loose_packets"}}``;
-        this returns ``{packaging: {"bags", "loose_packets"}}`` after confirming every
-        named packaging exists and is not soft-deleted.
+        ``serializer.validated_data`` holds ``{public_id: bags}``; this returns
+        ``{packaging: bags}`` after confirming every named packaging exists and
+        is not soft-deleted.
         """
         counts = serializer.validated_data["counts"]
         ids = set(counts)
@@ -125,7 +96,8 @@ class UpdateTodaysInventoryView(AdminApiView):
         summary="Replace today's entire stock count",
         description=(
             "Every active packaging receives a snapshot row for today. Packagings "
-            "absent from ``counts`` are recorded as zero bags."
+            "absent from ``counts`` are recorded as zero bags. Loose stock is "
+            "counted separately and is not affected."
         ),
         request=UpdateTodaysInventorySerializer,
         responses={200: SnapshotPayloadSerializer(many=True)},
@@ -136,9 +108,9 @@ class UpdateTodaysInventoryView(AdminApiView):
         provided = self._resolve_counts(serializer)
 
         full_counts = {
-            packaging: provided.get(packaging, {"bags": 0, "loose_packets": 0})
+            packaging: provided.get(packaging, 0)
             for packaging in ProductPackaging.objects.all()
-        }
+        }  # noqa: C420 -- provided.get() varies per key, not a constant fill
         snapshots = InventoryOperations.record_stock_counts(
             counts=full_counts, actor=request.user
         )

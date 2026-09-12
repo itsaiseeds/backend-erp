@@ -39,7 +39,8 @@ class CreateProductPackagingSerializer(serializers.Serializer):
 
     ``product`` is addressed by its ``public_id`` (``P-…``). ``selling_price``
     is the whole-packaging price; when omitted it is frozen to
-    ``packets * product.selling_price`` (see
+    ``packets * product.price_for_weight(packet_weight)`` -- the product's
+    per-kilogram rate applied to one packet, times the packets in the bag (see
     ``aggregator.ProductOperations.add_packaging``).
     """
 
@@ -122,7 +123,7 @@ class ProductPackagingsView(AdminApiView):
         data = serializer.validated_data
         selling_price = data.get(
             "selling_price",
-            data["packets"] * data["product"].selling_price,
+            data["packets"] * data["product"].price_for_weight(data["packet_weight"]),
         )
         packaging = ProductPackaging.objects.create(
             product=data["product"],

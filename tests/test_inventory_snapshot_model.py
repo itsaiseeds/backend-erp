@@ -58,16 +58,16 @@ class InventorySnapshotModelTest(DMLTestCase):
             **kwargs,
         )
 
-    def test_public_id_prefix_and_loose_packets_default(self):
-        """tests/test_inventory_snapshot_model.py::InventorySnapshotModelTest::test_public_id_prefix_and_loose_packets_default"""
+    def test_public_id_prefix_and_default_date(self):
+        """tests/test_inventory_snapshot_model.py::InventorySnapshotModelTest::test_public_id_prefix_and_default_date"""
         snapshot = self._snapshot()
         snapshot.full_clean()
         snapshot.save()
         assert snapshot.public_id.startswith("INV-")
         assert len(snapshot.public_id) == 16
-        # loose_packets is optional to fill and defaults to zero.
-        assert snapshot.loose_packets == 0
         assert snapshot.snapshot_date == self.today
+        # Bags only: loose stock lives in LooseStockSnapshot.
+        assert not hasattr(snapshot, "loose_packets")
 
     def test_one_row_per_date_and_packaging(self):
         """tests/test_inventory_snapshot_model.py::InventorySnapshotModelTest::test_one_row_per_date_and_packaging"""
@@ -95,19 +95,17 @@ class InventorySnapshotModelTest(DMLTestCase):
 
     def test_derived_bag_and_weight_totals(self):
         """tests/test_inventory_snapshot_model.py::InventorySnapshotModelTest::test_derived_bag_and_weight_totals"""
-        snapshot = self._snapshot(bags=400, loose_packets=100)
+        snapshot = self._snapshot(bags=400)
         snapshot.full_clean()
         snapshot.save()
-        # 400 bags x 40 packets = 16000 sealed packets, plus 100 loose.
-        assert snapshot.bag_packets == 16000
-        assert snapshot.total_packets == 16100
-        assert snapshot.total_weight == Decimal("16100.000")
+        # 400 bags x 40 packets of 1kg = 16000 sealed packets.
+        assert snapshot.total_packets == 16000
+        assert snapshot.total_weight == Decimal("16000.000")
 
-    def test_loose_only_line(self):
-        """tests/test_inventory_snapshot_model.py::InventorySnapshotModelTest::test_loose_only_line"""
-        # A packaging may legitimately hold nothing but loose stock.
-        snapshot = self._snapshot(bags=0, loose_packets=25)
+    def test_zero_bags_is_allowed(self):
+        """tests/test_inventory_snapshot_model.py::InventorySnapshotModelTest::test_zero_bags_is_allowed"""
+        # A packaging may legitimately be out of sealed bags entirely.
+        snapshot = self._snapshot(bags=0)
         snapshot.full_clean()
         snapshot.save()
-        assert snapshot.bag_packets == 0
-        assert snapshot.total_packets == 25
+        assert snapshot.total_packets == 0
