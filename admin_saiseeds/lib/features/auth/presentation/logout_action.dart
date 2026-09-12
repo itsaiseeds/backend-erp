@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/routing/route_constants.dart';
+import '../../../core/services/metadata_service.dart';
 import '../../../core/services/session_guard.dart';
 import '../data/auth_repository.dart';
 import 'bloc/auth_bloc.dart';
@@ -19,6 +20,7 @@ class LogoutAction {
 
     await authRepository.revokeServerSession();
     await SessionGuard.endSession();
+    MetadataService.instance.reset();
 
     authBloc.add(const AuthSignedOut());
     sessionCubit.clear();

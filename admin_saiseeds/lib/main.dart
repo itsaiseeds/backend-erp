@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'core/widgets/layout/small_screen_notice.dart';
 import 'package:toastification/toastification.dart';
 import 'core/config/app_config_keys.dart';
 import 'core/config/observability_config.dart';
@@ -74,8 +75,7 @@ class AdminSaiseedsApp extends StatelessWidget {
         providers: [
           BlocProvider(create: (_) => AuthBloc(authRepository: authRepository)),
           BlocProvider(
-            create: (_) =>
-                SessionCubit(authRepository: authRepository)..load(),
+            create: (_) => SessionCubit(authRepository: authRepository)..load(),
           ),
         ],
         child: ToastificationWrapper(
@@ -85,6 +85,8 @@ class AdminSaiseedsApp extends StatelessWidget {
             theme: AppTheme.light,
             scrollBehavior: const AppScrollBehavior(),
             debugShowCheckedModeBanner: false,
+            builder: (context, child) =>
+                SmallScreenGate(child: child ?? const SizedBox.shrink()),
           ),
         ),
       ),

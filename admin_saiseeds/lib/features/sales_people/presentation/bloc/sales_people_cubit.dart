@@ -201,10 +201,7 @@ class SalesPeopleCubit extends SafeCubit<SalesPeopleState> {
     }
   }
 
-  SalesPeopleState _projected(
-    SalesPeopleState source, {
-    required int page,
-  }) {
+  SalesPeopleState _projected(SalesPeopleState source, {required int page}) {
     final List<SalesPersonModel> searched = ListQuery.search<SalesPersonModel>(
       source: source.allSalesPeople,
       query: source.search,
@@ -231,9 +228,7 @@ class SalesPeopleCubit extends SafeCubit<SalesPeopleState> {
     );
 
     final ListQueryResult<SalesPersonModel> paged =
-        ListQuery.withoutPagination<SalesPersonModel>(
-          source: sorted,
-        );
+        ListQuery.withoutPagination<SalesPersonModel>(source: sorted);
 
     return source.copyWith(
       visibleSalesPeople: paged.items,
@@ -258,10 +253,7 @@ class SalesPeopleCubit extends SafeCubit<SalesPeopleState> {
     }
   }
 
-  static Comparable<Object>? _sortValue(
-    SalesPersonModel person,
-    String field,
-  ) {
+  static Comparable<Object>? _sortValue(SalesPersonModel person, String field) {
     switch (field) {
       case AppStrings.SORT_BY_NAME:
         return person.name.toLowerCase();
@@ -274,7 +266,6 @@ class SalesPeopleCubit extends SafeCubit<SalesPeopleState> {
     }
   }
 
-  static String _messageOf(Object error) => error is ApiException
-      ? error.message
-      : AppStrings.SOMETHING_WENT_WRONG;
+  static String _messageOf(Object error) =>
+      error is ApiException ? error.message : AppStrings.SOMETHING_WENT_WRONG;
 }

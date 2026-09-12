@@ -151,6 +151,99 @@ class AppStrings {
   static const String TABLE_RESIZE_COLUMN = 'Resize column';
   static const String TABLE_SELECT_COLUMN_LABEL = 'Select';
   static const String TABLE_ACTIONS_COLUMN_LABEL = 'Actions';
+
+  static const String CLIENTS = 'Clients';
+  static const String CLIENT_STATUS_VERIFIED = 'Verified';
+  static const String CLIENT_STATUS_PENDING = 'Pending';
+  static const String CLIENTS_VIEW_PENDING = 'Pending requests';
+  static const String CLIENTS_VIEW_VERIFIED = 'Verified clients';
+  static const String CLIENTS_TABLE_SEARCH_HINT = 'Search clients...';
+  static const String CLIENTS_EMPTY_STATE_TITLE = 'No clients yet';
+  static const String CLIENTS_EMPTY_STATE_BODY =
+      'Clients created by sales people will appear here.';
+  static const String CLIENTS_PENDING_EMPTY_TITLE = 'Nothing to review';
+  static const String CLIENTS_PENDING_EMPTY_BODY =
+      'New client requests will appear here for approval.';
+  static const String CLIENTS_LOAD_FAILED_TITLE = 'Could not load clients';
+
+  static const String COLUMN_COMPANY_NAME = 'Company';
+  static const String COLUMN_COMPANY_PHONE = 'Phone';
+  static const String COLUMN_PRIMARY_CONTACT = 'Primary Contact';
+  static const String COLUMN_PRIMARY_ADDRESS = 'Primary Address';
+  static const String COLUMN_GST_NUMBER = 'GST Number';
+
+  static const String CLIENT_ACCEPT = 'Accept';
+  static const String CLIENT_REJECT = 'Reject';
+  static const String CLIENT_ACCEPT_TITLE = 'Accept this client?';
+  static const String CLIENT_ACCEPT_BODY =
+      'The client will be verified and moved to the clients list.';
+  static const String CLIENT_ACCEPTED_TITLE = 'Client accepted';
+  static const String CLIENT_UPDATED_TITLE = 'Client updated';
+  static const String CLIENT_DETAILS_TITLE = 'Client details';
+  static const String CLIENT_EDIT_TITLE = 'Edit client';
+
+  static const String FILTER_BY_COMPANY_NAME = 'company_name';
+  static const String FILTER_BY_ADDRESS = 'address';
+  static const String FILTER_BY_STATUS = 'status';
+  static const String FILTER_BY_VERIFIED_BY = 'verified_by';
+  static const String FILTER_BY_CREATED_BY = 'created_by';
+  static const String FILTER_BY_CITY_ID = 'city_id';
+  static const String SORT_BY_COMPANY_NAME = 'company_name';
+
+  static const String CLIENT_SECTION_ADDRESSES = 'Addresses';
+  static const String CLIENT_SECTION_CONTACTS = 'Contacts';
+  static const String CLIENT_SECTION_TRANSPORT = 'Transport agencies';
+  static const String CLIENT_PRIMARY_BADGE = 'Primary';
+  static const String FILTER_OPERATOR_EQUALS = '=';
+  static const String DATE_RANGE_HINT = 'Select dates';
+  static const String DATE_RANGE_HELP = 'Select date range';
+  static const String DATE_RANGE_APPLY = 'Apply';
+  static const String DATE_RANGE_ARROW = '→';
+  static const String DATE_RANGE_FROM = 'From';
+  static const String DATE_RANGE_UNTIL = 'Until';
+  static const String DATE_RANGE_CANCEL = 'Cancel';
+  static const String DATE_RANGE_CLEAR = 'Clear';
+  static const String DATE_RANGE_TODAY = 'Today';
+  static const String DATE_RANGE_LAST_7 = 'Last 7 days';
+  static const String DATE_RANGE_LAST_30 = 'Last 30 days';
+  static const String DATE_RANGE_LAST_90 = 'Last 90 days';
+  static const String DATE_RANGE_LAST_6M = 'Last 6 months';
+  static const String DATE_RANGE_LAST_YEAR = 'Last 1 year';
+  static const String SMALL_SCREEN_TITLE = 'Best viewed on a larger screen';
+  static const String SMALL_SCREEN_BODY =
+      'The Saiseeds admin portal is built for tablets and desktops. Open this '
+      'page on a wider screen for the full experience.';
+  static const String SMALL_SCREEN_HINT = 'Minimum width: 768px';
+  static const String CLIENT_STEP_DETAILS = 'Details';
+  static const String CLIENT_STEP_ADDRESSES = 'Addresses';
+  static const String CLIENT_STEP_CONTACTS = 'Contacts';
+  static const String CLIENT_STEP_TRANSPORT = 'Transport';
+  static const String CLIENT_STEP_PROGRESS = 'Step';
+  static const String CLIENT_ADD_ADDRESS = 'Add address';
+  static const String CLIENT_ADD_CONTACT = 'Add contact';
+  static const String CLIENT_ADD_TRANSPORT = 'Add transport agency';
+  static const String CLIENT_ADDRESS_LABEL = 'Label';
+  static const String CLIENT_ADDRESS_LINE_1 = 'Address line 1';
+  static const String CLIENT_ADDRESS_LINE_2 = 'Address line 2';
+  static const String CLIENT_ADDRESS_PINCODE = 'Pincode';
+  static const String CLIENT_ADDRESS_CITY = 'City';
+  static const String CLIENT_CONTACT_NAME = 'Name';
+  static const String CLIENT_CONTACT_PHONE = 'Phone number';
+  static const String CLIENT_CONTACT_ROLE = 'Role';
+  static const String CLIENT_TRANSPORT_NAME = 'Agency name';
+  static const String CLIENT_MARK_PRIMARY = 'Primary';
+  static const String CLIENT_REMOVE_ENTRY = 'Remove';
+  static const String STEP_BACK = 'Back';
+  static const String STEP_NEXT = 'Next';
+  static const String VALIDATION_ONE_PRIMARY = 'Exactly one entry must be primary.';
+  static const String VALIDATION_AT_LEAST_ONE = 'At least one entry is required.';
+  static const String VALIDATION_CITY_REQUIRED = 'City is required.';
+  static const String CLIENT_CREATED_BY_LABEL = 'Added by';
+  static const String CLIENT_COMPANY_NAME_HINT = 'Registered business name';
+  static const String CLIENT_GST_HINT = '15-character GSTIN';
+  static const String VALIDATION_GST_REQUIRED = 'GST number is required.';
+  static const String VALIDATION_GST_INVALID =
+      'Enter a valid 15-character GST number.';
   static const String TABLE_SELECT_ALL_ON_PAGE = 'Select all on this page';
   static const String TABLE_SELECT_ROW = 'Select row';
   static const String TABLE_CLEAR_SELECTION = 'Clear selection';
@@ -227,9 +320,7 @@ class AppStrings {
   static const String VALIDATION_PHONE_REQUIRED = 'Phone number is required.';
   static const String VALIDATION_PHONE_INVALID =
       'Enter a valid 10-digit phone number.';
-  static const String VALIDATION_EMAIL_INVALID =
-      'Enter a valid email address.';
-  static const String VALIDATION_CITY_REQUIRED = 'City is required.';
+  static const String VALIDATION_EMAIL_INVALID = 'Enter a valid email address.';
 
   static const String CREATE = 'Create';
   static const String UPDATE = 'Update';
@@ -269,12 +360,14 @@ class AppStrings {
   static const String COLUMN_EMAIL = 'Email';
   static const String COLUMN_CITY = 'City';
   static const String COLUMN_CREATED_BY = 'Created By';
+  static const String COLUMN_VERIFIED_BY = 'Verified By';
   static const String COLUMN_CREATED_AT = 'Created At';
   static const String COLUMN_STOCK_PERMISSION = 'Stock Access';
   static const String PERMISSION_ALLOWED = 'Allowed';
   static const String PERMISSION_DENIED = 'Denied';
 
-  static const String ADMINS_LOAD_FAILED_TITLE = 'Could not load administrators';
+  static const String ADMINS_LOAD_FAILED_TITLE =
+      'Could not load administrators';
   static const String SALES_PEOPLE_LOAD_FAILED_TITLE =
       'Could not load sales people';
   static const String ADMINS_EMPTY_STATE_TITLE = 'No administrators yet';

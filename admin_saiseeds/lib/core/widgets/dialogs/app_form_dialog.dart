@@ -15,6 +15,7 @@ class AppFormDialog extends StatelessWidget {
   final VoidCallback? onSubmit;
   final bool isSubmitting;
   final double width;
+  final Widget? leadingAction;
 
   const AppFormDialog({
     super.key,
@@ -26,10 +27,17 @@ class AppFormDialog extends StatelessWidget {
     required this.onSubmit,
     this.isSubmitting = false,
     this.width = AppSizes.formDialogWidth,
+    this.leadingAction,
   });
 
   @override
   Widget build(BuildContext context) {
+    return SelectionContainer.disabled(
+      child: _buildDialog(context),
+    );
+  }
+
+  Widget _buildDialog(BuildContext context) {
     return Dialog(
       backgroundColor: AppColors.TRANSPARENT,
       insetPadding: const EdgeInsets.all(AppSpacing.lg),
@@ -65,13 +73,21 @@ class AppFormDialog extends StatelessWidget {
               const AppHairline(),
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: PrimaryButton(
-                    label: submitLabel,
-                    isLoading: isSubmitting,
-                    onPressed: onSubmit,
-                  ),
+                child: Row(
+                  children: [
+                    if (leadingAction != null) ...[
+                      Expanded(child: leadingAction!),
+                      const SizedBox(width: AppSpacing.md),
+                    ],
+                    Expanded(
+                      flex: leadingAction == null ? 1 : 2,
+                      child: PrimaryButton(
+                        label: submitLabel,
+                        isLoading: isSubmitting,
+                        onPressed: onSubmit,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

@@ -204,9 +204,9 @@ class ApiClient {
     for (final dynamic value in data.values) {
       if (value is String && value.isNotEmpty) return value;
       if (value is List) {
-        final Iterable<String> messages = value
-            .whereType<String>()
-            .where((entry) => entry.isNotEmpty);
+        final Iterable<String> messages = value.whereType<String>().where(
+          (entry) => entry.isNotEmpty,
+        );
         if (messages.isNotEmpty) return messages.join('\n');
       }
     }

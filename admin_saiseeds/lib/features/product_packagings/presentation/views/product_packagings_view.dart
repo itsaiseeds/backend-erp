@@ -28,10 +28,9 @@ class ProductPackagingsView extends StatelessWidget {
     ProductsService.instance.loadProducts();
 
     return BlocProvider<ProductPackagingsCubit>(
-      create: (context) =>
-          ProductPackagingsCubit(
-            repository: ProductPackagingsRepository(apiClient: apiClient),
-          )..loadProductPackagings(),
+      create: (context) => ProductPackagingsCubit(
+        repository: ProductPackagingsRepository(apiClient: apiClient),
+      )..loadProductPackagings(),
       child: const _ProductPackagingsContent(),
     );
   }
@@ -68,8 +67,7 @@ class _ProductPackagingsContentState extends State<_ProductPackagingsContent> {
   }
 
   Future<void> _onDelete(ProductPackagingModel packaging) async {
-    final ProductPackagingsCubit cubit = context
-        .read<ProductPackagingsCubit>();
+    final ProductPackagingsCubit cubit = context.read<ProductPackagingsCubit>();
 
     final bool confirmed = await ConfirmationDialog.show(
       context,
@@ -99,8 +97,7 @@ class _ProductPackagingsContentState extends State<_ProductPackagingsContent> {
   }
 
   Future<void> _onRefresh() async {
-    final ProductPackagingsCubit cubit = context
-        .read<ProductPackagingsCubit>();
+    final ProductPackagingsCubit cubit = context.read<ProductPackagingsCubit>();
     await ProductsService.instance.loadProducts(forceRefresh: true);
     await cubit.loadProductPackagings();
   }

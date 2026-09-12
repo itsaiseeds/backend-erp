@@ -44,7 +44,7 @@ class AppColors {
 
   static const Color SIDEBAR_BG = Color(0xFFF9FAFB);
   static const Color SIDEBAR_ACTIVE_BG = Color(0xFFF3F4F6);
-  static const Color SIDEBAR_ITEM_HOVER = Color(0xFFF9FAFB);
+  static const Color SIDEBAR_ITEM_HOVER = Color(0xFFF4F9F5);
   static const Color SIDEBAR_BORDER = Color(0xFFF3F4F6);
   static const Color SIDEBAR_DIVIDER = Color(0xFFE5E7EB);
   static const Color SIDEBAR_TEXT = Color(0xFF6B7280);

@@ -74,4 +74,7 @@ def address_payload(address: Address) -> dict:
         "city": address.city.name,
         "state": address.state.name,
         "country": address.country.name,
+        "city_id": address.city_id,
+        "state_id": address.state_id,
+        "country_id": address.country_id,
     }

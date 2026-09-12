@@ -47,9 +47,8 @@ class _ProfileContent extends StatelessWidget {
 
   const _ProfileContent({required this.session});
 
-  String get _displayName => session.name.isEmpty
-      ? AppStrings.PROFILE_VALUE_UNKNOWN
-      : session.name;
+  String get _displayName =>
+      session.name.isEmpty ? AppStrings.PROFILE_VALUE_UNKNOWN : session.name;
 
   String get _displayPhone => session.phoneNumber.isEmpty
       ? AppStrings.PROFILE_VALUE_UNKNOWN
@@ -147,9 +146,7 @@ class _Identity extends StatelessWidget {
           children: [
             Text(
               AppStrings.PROFILE_SIGNED_IN_AS,
-              style: AppTypography.overline.copyWith(
-                color: AppColors.PRIMARY,
-              ),
+              style: AppTypography.overline.copyWith(color: AppColors.PRIMARY),
             ),
             const SizedBox(height: AppSpacing.sm),
             Row(

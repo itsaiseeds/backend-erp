@@ -71,10 +71,7 @@ class _BulkActionButtonsState extends State<BulkActionButtons> {
         if (selection.isEmpty) return const SizedBox.shrink();
         return OutlinedButton.icon(
           onPressed: _isDeleting ? null : () => _confirmAndDelete(selection),
-          icon: const Icon(
-            Icons.delete_outline_rounded,
-            size: AppSizes.iconSm,
-          ),
+          icon: const Icon(Icons.delete_outline_rounded, size: AppSizes.iconSm),
           label: Text(
             '${AppStrings.TABLE_BULK_DELETE} (${selection.length})',
             style: AppTypography.labelMedium.copyWith(color: AppColors.ERROR),

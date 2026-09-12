@@ -21,9 +21,7 @@ class AdminsView extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider<AdminsCubit>(
       create: (context) => AdminsCubit(
-        repository: AdminsRepository(
-          apiClient: context.read<ApiClient>(),
-        ),
+        repository: AdminsRepository(apiClient: context.read<ApiClient>()),
       )..loadAdmins(),
       child: const _AdminsContent(),
     );

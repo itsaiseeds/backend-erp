@@ -70,9 +70,8 @@ class _AdminFormDialogState extends State<AdminFormDialog> {
     final bool isCityValid = _isEditing || _selectedCity != null;
 
     setState(
-      () => _cityError = isCityValid
-          ? null
-          : AppStrings.VALIDATION_CITY_REQUIRED,
+      () =>
+          _cityError = isCityValid ? null : AppStrings.VALIDATION_CITY_REQUIRED,
     );
 
     if (!isFormValid || !isCityValid) return;

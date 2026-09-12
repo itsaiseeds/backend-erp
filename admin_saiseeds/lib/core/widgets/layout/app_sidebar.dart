@@ -44,6 +44,10 @@ class AppSidebar extends StatelessWidget {
       : AppSizes.sidebarExpandedWidth;
 
   Widget _buildBody() {
+    return SelectionContainer.disabled(child: _buildChrome());
+  }
+
+  Widget _buildChrome() {
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: AppColors.SIDEBAR_BG,
@@ -75,9 +79,8 @@ class AppSidebar extends StatelessWidget {
                   horizontal: isCollapsed ? AppSpacing.sm : AppSpacing.smd,
                 ),
                 itemCount: items.length,
-                separatorBuilder: (context, index) => const SidebarDivider(
-                  indent: AppSizes.sidebarDividerIndent,
-                ),
+                separatorBuilder: (context, index) =>
+                    const SidebarDivider(indent: AppSizes.sidebarDividerIndent),
                 itemBuilder: (context, index) {
                   final item = items[index];
                   return SidebarItem(
@@ -125,10 +128,7 @@ class AppSidebar extends StatelessWidget {
       children: [
         if (onLogout != null)
           Expanded(
-            child: SidebarLogoutButton(
-              isCollapsed: false,
-              onLogout: onLogout!,
-            ),
+            child: SidebarLogoutButton(isCollapsed: false, onLogout: onLogout!),
           ),
         if (toggle != null) ...[
           const SizedBox(width: AppSpacing.sm),
@@ -445,7 +445,18 @@ class _SidebarItemState extends State<SidebarItem> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isHighlighted = widget.isActive || _isHovered;
+    final Color fill;
+    if (widget.isActive) {
+      fill = AppColors.SIDEBAR_ITEM_SELECTED;
+    } else if (_isHovered) {
+      fill = AppColors.SIDEBAR_ITEM_HOVER;
+    } else {
+      fill = AppColors.TRANSPARENT;
+    }
+
+    final Color foreground = widget.isActive
+        ? AppColors.SIDEBAR_ICON_ACTIVE
+        : (_isHovered ? AppColors.SIDEBAR_TEXT_ACTIVE : AppColors.SIDEBAR_TEXT);
 
     final Widget tile = MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -455,15 +466,12 @@ class _SidebarItemState extends State<SidebarItem> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: _fillDuration,
+          curve: Curves.easeOutCubic,
           height: AppSizes.sidebarItemHeight,
           margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
           decoration: BoxDecoration(
-            color: isHighlighted
-                ? AppColors.SIDEBAR_ITEM_SELECTED
-                : AppColors.TRANSPARENT,
-            borderRadius: const BorderRadius.all(
-              Radius.circular(AppRadius.md),
-            ),
+            color: fill,
+            borderRadius: const BorderRadius.all(Radius.circular(AppRadius.md)),
           ),
           child: Stack(
             alignment: Alignment.centerLeft,
@@ -489,27 +497,38 @@ class _SidebarItemState extends State<SidebarItem> {
                       ? MainAxisAlignment.center
                       : MainAxisAlignment.start,
                   children: [
-                    Icon(
-                      widget.item.icon,
-                      size: AppSizes.iconLg,
-                      color: widget.isActive
-                          ? AppColors.SIDEBAR_ICON_ACTIVE
-                          : AppColors.SIDEBAR_ICON,
+                    TweenAnimationBuilder<Color?>(
+                      duration: _fillDuration,
+                      curve: Curves.easeOutCubic,
+                      tween: ColorTween(
+                        end: widget.isActive
+                            ? AppColors.SIDEBAR_ICON_ACTIVE
+                            : (_isHovered
+                                  ? AppColors.SIDEBAR_TEXT_ACTIVE
+                                  : AppColors.SIDEBAR_ICON),
+                      ),
+                      builder: (context, color, child) => Icon(
+                        widget.item.icon,
+                        size: AppSizes.iconLg,
+                        color: color,
+                      ),
                     ),
                     if (!widget.isCollapsed) ...[
                       const SizedBox(width: AppSpacing.smd),
                       Expanded(
-                        child: Text(
-                          widget.item.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: AnimatedDefaultTextStyle(
+                          duration: _fillDuration,
+                          curve: Curves.easeOutCubic,
                           style: AppTypography.bodyMedium.copyWith(
-                            color: widget.isActive
-                                ? AppColors.SIDEBAR_ICON_ACTIVE
-                                : AppColors.SIDEBAR_TEXT,
+                            color: foreground,
                             fontWeight: widget.isActive
                                 ? FontWeight.w600
                                 : FontWeight.w500,
+                          ),
+                          child: Text(
+                            widget.item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
