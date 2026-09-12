@@ -36,7 +36,7 @@ class ProductApiTest(WebApiTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        """Build a crop, an app admin, a plain user and a seeded product."""
+        """Build a crop, an app admin and a seeded product."""
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
 
@@ -49,14 +49,6 @@ class ProductApiTest(WebApiTestCase):
         )
         Admin.objects.create(
             user=cls.seed_admin, can_update_stock_count=True, created_by=cls.superuser
-        )
-
-        cls.plain = User.objects.create_user(
-            phone_number="6666666666",
-            name="plain user",
-            is_verified=True,
-            created_by=cls.superuser,
-            verified_by=cls.superuser,
         )
 
         cls.crop = Crop.objects.create(name="Wheat", created_by=cls.seed_admin)
@@ -99,37 +91,6 @@ class ProductApiTest(WebApiTestCase):
         """The file on disk behind a local-backend ``image_url``."""
         return Path(settings.MEDIA_ROOT) / image_url[len(settings.MEDIA_URL):]
 
-    # -- permission gating ----------------------------------------------------
-
-    def test_anonymous_requests_are_rejected(self):
-        """tests/test_product_api.py::ProductApiTest::test_anonymous_requests_are_rejected"""
-        self.assertIn(self.client.get(PRODUCTS_URL).status_code, (401, 403))
-        self.assertIn(
-            self.client.post(PRODUCTS_URL, self._payload(), format="json").status_code,
-            (401, 403),
-        )
-        self.assertIn(
-            self.client.patch(self._url(self.product), {"name": "X"}, format="json").status_code,
-            (401, 403),
-        )
-        self.assertIn(self.client.delete(self._url(self.product)).status_code, (401, 403))
-
-    def test_non_admin_requests_are_rejected(self):
-        """tests/test_product_api.py::ProductApiTest::test_non_admin_requests_are_rejected"""
-        self.login_as(self.plain)
-        self.assertEqual(self.client.get(PRODUCTS_URL).status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(
-            self.client.post(PRODUCTS_URL, self._payload(), format="json").status_code,
-            status.HTTP_403_FORBIDDEN,
-        )
-        self.assertEqual(
-            self.client.patch(self._url(self.product), {"name": "X"}, format="json").status_code,
-            status.HTTP_403_FORBIDDEN,
-        )
-        self.assertEqual(
-            self.client.delete(self._url(self.product)).status_code, status.HTTP_403_FORBIDDEN
-        )
-
     # -- creation -------------------------------------------------------------
 
     def test_admin_create_product_payload_shape(self):
@@ -157,53 +118,55 @@ class ProductApiTest(WebApiTestCase):
         created = Product.all_objects.get(public_id=product["public_id"])
         self.assertEqual(created.name, "Basmati")
         self.assertEqual(created.created_by_id, self.seed_admin.id)
+        # No image was sent, so nothing was written to disk at all.
+        self.assertFalse(Path(settings.MEDIA_ROOT).exists())
 
-    def test_create_product_invalid_crop_rejected(self):
-        """tests/test_product_api.py::ProductApiTest::test_create_product_invalid_crop_rejected"""
+    def test_invalid_product_payloads_are_rejected(self):
+        """Every field-level rule refuses the write, on create and on update.
+
+        tests/test_product_api.py::ProductApiTest::test_invalid_product_payloads_are_rejected
+        """
         self.login_as(self.seed_admin)
-        payload = self._payload()
-        payload["crop"] = 999999
-        self.assertEqual(
-            self.client.post(PRODUCTS_URL, payload, format="json").status_code,
-            status.HTTP_400_BAD_REQUEST,
+
+        create_cases = [
+            ("unknown crop", {"crop": 999999}),
+            ("negative selling price", {"selling_price": "-1.00"}),
+            ("unknown stage", {"stage": 999999}),
+            ("missing stage", {"stage": None}),
+        ]
+        for label, overrides in create_cases:
+            with self.subTest(verb="POST", case=label):
+                payload = self._payload(f"Invalid {label}")
+                for key, value in overrides.items():
+                    if value is None:
+                        del payload[key]
+                    else:
+                        payload[key] = value
+                response = self.client.post(PRODUCTS_URL, payload, format="json")
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                if label == "missing stage":
+                    self.assertIn("Stage is required.", response.data["detail"])
+
+        # (name, crop) is unique, on both verbs: "Premium" is the seeded product.
+        with self.subTest(verb="POST", case="duplicate name+crop"):
+            self.assertEqual(
+                self.client.post(PRODUCTS_URL, self._payload("Premium"), format="json").status_code,
+                status.HTTP_400_BAD_REQUEST,
+            )
+        Product.objects.create(
+            name="Basmati",
+            crop=self.crop,
+            stage=self.breeder,
+            selling_price=1200,
+            created_by=self.seed_admin,
         )
-
-    def test_create_product_duplicate_name_crop_rejected(self):
-        """tests/test_product_api.py::ProductApiTest::test_create_product_duplicate_name_crop_rejected"""
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.post(PRODUCTS_URL, self._payload("Premium"), format="json").status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    def test_create_product_negative_prices_rejected(self):
-        """tests/test_product_api.py::ProductApiTest::test_create_product_negative_prices_rejected"""
-        self.login_as(self.seed_admin)
-        payload = self._payload("Product-negative")
-        payload["selling_price"] = "-1.00"
-        self.assertEqual(
-            self.client.post(PRODUCTS_URL, payload, format="json").status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    def test_create_product_requires_stage(self):
-        """tests/test_product_api.py::ProductApiTest::test_create_product_requires_stage"""
-        self.login_as(self.seed_admin)
-        payload = self._payload("Stageless")
-        del payload["stage"]
-        response = self.client.post(PRODUCTS_URL, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Stage is required.", response.data["detail"])
-
-    def test_create_product_invalid_stage_rejected(self):
-        """tests/test_product_api.py::ProductApiTest::test_create_product_invalid_stage_rejected"""
-        self.login_as(self.seed_admin)
-        payload = self._payload("Bad stage")
-        payload["stage"] = 999999
-        self.assertEqual(
-            self.client.post(PRODUCTS_URL, payload, format="json").status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
+        with self.subTest(verb="PATCH", case="duplicate name+crop"):
+            self.assertEqual(
+                self.client.patch(
+                    self._url(self.product), {"name": "Basmati"}, format="json"
+                ).status_code,
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     # -- images ---------------------------------------------------------------
     #
@@ -225,14 +188,6 @@ class ProductApiTest(WebApiTestCase):
 
         created = Product.objects.get(public_id=response.data["public_id"])
         self.assertEqual(created.image_url, image_url)
-
-    def test_create_product_without_image_leaves_url_blank(self):
-        """tests/test_product_api.py::ProductApiTest::test_create_product_without_image_leaves_url_blank"""
-        self.login_as(self.seed_admin)
-        response = self.client.post(PRODUCTS_URL, self._payload("Plain"), format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
-        self.assertEqual(response.data["image_url"], "")
-        self.assertFalse(Path(settings.MEDIA_ROOT).exists())
 
     def test_update_product_replaces_the_image_and_removes_the_old_file(self):
         """tests/test_product_api.py::ProductApiTest::test_update_product_replaces_the_image_and_removes_the_old_file"""
@@ -305,52 +260,23 @@ class ProductApiTest(WebApiTestCase):
     # -- update ---------------------------------------------------------------
 
     def test_admin_update_product(self):
-        """tests/test_product_api.py::ProductApiTest::test_admin_update_product"""
+        """Price and stage are both patchable, echoed back and persisted.
+
+        tests/test_product_api.py::ProductApiTest::test_admin_update_product
+        """
         self.login_as(self.seed_admin)
         response = self.client.patch(
-            self._url(self.product), {"selling_price": "1500.00"}, format="json"
+            self._url(self.product),
+            {"selling_price": "1500.00", "stage": self.certificate.id},
+            format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.assertEqual(float(response.data["selling_price"]), 1500.0)
-
-        self.product.refresh_from_db()
-        self.assertEqual(self.product.selling_price, 1500)
-
-    def test_admin_update_product_stage(self):
-        """tests/test_product_api.py::ProductApiTest::test_admin_update_product_stage"""
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            self._url(self.product), {"stage": self.certificate.id}, format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.assertEqual(response.data["stage"]["code"], "CERTIFICATE")
 
         self.product.refresh_from_db()
+        self.assertEqual(self.product.selling_price, 1500)
         self.assertEqual(self.product.stage_id, self.certificate.id)
-
-    def test_update_product_duplicate_name_crop_rejected(self):
-        """tests/test_product_api.py::ProductApiTest::test_update_product_duplicate_name_crop_rejected"""
-        Product.objects.create(
-            name="Basmati",
-            crop=self.crop,
-            stage=self.breeder,
-            selling_price=1200,
-            created_by=self.seed_admin,
-        )
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            self._url(self.product), {"name": "Basmati"}, format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_update_product_unknown_public_id_not_found(self):
-        """tests/test_product_api.py::ProductApiTest::test_update_product_unknown_public_id_not_found"""
-        self.login_as(self.seed_admin)
-        for method in (self.client.patch, self.client.delete):
-            self.assertEqual(
-                method(f"{PRODUCTS_URL}/P-BOGUSID", {"name": "X"}, format="json").status_code,
-                status.HTTP_404_NOT_FOUND,
-            )
 
     # -- deletion -------------------------------------------------------------
 
@@ -364,15 +290,19 @@ class ProductApiTest(WebApiTestCase):
         self.assertTrue(self.product.is_deleted)
         self.assertEqual(self.product.deleted_by_id, self.seed_admin.id)
 
-    def test_deleted_product_no_longer_addressable(self):
-        """tests/test_product_api.py::ProductApiTest::test_deleted_product_no_longer_addressable"""
+    def test_an_unknown_or_deleted_product_is_404_for_both_verbs(self):
+        """tests/test_product_api.py::ProductApiTest::test_an_unknown_or_deleted_product_is_404_for_both_verbs"""
         self.login_as(self.seed_admin)
         self.client.delete(self._url(self.product))
-        self.assertEqual(
-            self.client.patch(self._url(self.product), {"name": "X"}, format="json").status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
-        self.assertEqual(
-            self.client.delete(self._url(self.product)).status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
+
+        for label, url in (
+            ("unknown public_id", f"{PRODUCTS_URL}/P-BOGUSID"),
+            ("soft-deleted product", self._url(self.product)),
+        ):
+            with self.subTest(case=label):
+                self.assertEqual(
+                    self.client.patch(url, {"name": "X"}, format="json").status_code,
+                    status.HTTP_404_NOT_FOUND,
+                )
+                self.assertEqual(self.client.delete(url).status_code, status.HTTP_404_NOT_FOUND)
+

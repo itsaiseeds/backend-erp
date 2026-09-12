@@ -4,6 +4,12 @@ pythonpath = ["."]
 # Collect both Test-prefixed classes (pytest default) and PascalCase classes
 # that end in "Test" (e.g. AuthFlowTest), matching the project's file naming.
 python_classes = ["Test*", "*Test"]
+# Applied automatically by tests/conftest.py::pytest_collection_modifyitems,
+# derived from the test's base class -- never declare them by hand.
+markers = [
+    "unit: needs no database (SimpleTestCase or a bare pytest function)",
+    "dml: needs the DML-seeded database (derives from tests.common.DMLTestCase)",
+]
 [tool.ruff]
 line-length = 100
 target-version = "py311"

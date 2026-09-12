@@ -1,9 +1,15 @@
-"""ORM-backed tests for the admin / salesperson update endpoints.
+"""ORM-backed tests for the admin / salesperson update and delete endpoints.
 
-These use the ``WebApiTestCase`` baseline (DML-seeded, superuser phone ``9999999999``) and add
-their own geography + profiles in ``setUpTestData``. Update flows are exercised
-over the test :class:`~rest_framework.test.APIClient` with a logged-in session,
-since these are session-only web endpoints.
+These use the ``WebApiTestCase`` baseline (DML-seeded, superuser phone
+``9999999999``) and add their own geography + profiles in ``setUpTestData``.
+Update flows are exercised over the test :class:`~rest_framework.test.APIClient`
+with a logged-in session, since these are session-only web endpoints.
+
+Who may call these endpoints is *not* retested here: ``UpdateAdminView`` is
+``superuser_required`` and ``UpdateSalesPersonView`` is ``admin_required``,
+both pinned in ``tests/test_view_contracts.py``. What is tested here is the
+behaviour those endpoints add on top -- which fields are writable, which
+payloads are refused, and what a soft delete leaves behind.
 """
 
 from __future__ import annotations
@@ -19,9 +25,12 @@ User = get_user_model()
 
 SUPERUSER_PHONE = "9999999999"
 
+ADMIN_URL = "/api/sales-admin/admins/{id}"
+SALESPERSON_URL = "/api/sales-admin/sales-people/{id}"
+
 
 class UserUpdateTest(WebApiTestCase):
-    """Cover permission gating, field updates and payload shape for admin/salesperson.
+    """Cover field updates, payload shape and soft delete for admin/salesperson.
 
     tests/test_user_update.py::UserUpdateTest
     """
@@ -31,9 +40,9 @@ class UserUpdateTest(WebApiTestCase):
         """Build the geography tree, an app admin and a salesperson."""
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
-        Admin.objects.create(
-                    user=cls.superuser, can_update_stock_count=False, created_by=cls.superuser
-                )
+        cls.superuser_admin = Admin.objects.create(
+            user=cls.superuser, can_update_stock_count=True, created_by=cls.superuser
+        )
         cls.country, _ = Country.objects.get_or_create(
             name="India", defaults={"iso_code": "IN", "created_by": cls.superuser}
         )
@@ -54,14 +63,6 @@ class UserUpdateTest(WebApiTestCase):
             user=cls.seed_admin, can_update_stock_count=True, created_by=cls.superuser
         )
 
-        cls.plain = User.objects.create_user(
-            phone_number="6666666666",
-            name="plain user",
-            is_verified=True,
-            created_by=cls.superuser,
-            verified_by=cls.superuser,
-        )
-
         cls.salesperson = SalesPerson.objects.create(
             user=User.objects.create_user(
                 phone_number="5555555555",
@@ -74,522 +75,217 @@ class UserUpdateTest(WebApiTestCase):
             created_by=cls.superuser,
         )
 
-    # -- permission gating (admin) ------------------------------------------
+    # -- helpers --------------------------------------------------------------
 
-    def test_anonymous_admin_update_rejected(self):
-        """tests/test_user_update.py::UserUpdateTest::test_anonymous_admin_update_rejected"""
-        self.clear_auth()
-        response = self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}", {"name": "x"}, format="json"
-        )
-        self.assertIn(response.status_code, (401, 403))
+    def _patch_admin(self, body, actor=None):
+        self.login_as(actor or self.superuser)
+        return self.client.patch(ADMIN_URL.format(id=self.admin.id), body, format="json")
 
-    def test_only_superuser_can_update_admin(self):
-        """tests/test_user_update.py::UserUpdateTest::test_only_superuser_can_update_admin"""
-        url = f"/api/sales-admin/admins/{self.admin.id}"
-        for user in (self.plain, self.seed_admin, self.salesperson.user):
-            self.login_as(user)
-            self.assertEqual(
-                self.client.patch(url, {"name": "x"}, format="json").status_code,
-                status.HTTP_403_FORBIDDEN,
-            )
-
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.patch(url, {"name": "Updated"}, format="json").status_code,
-            status.HTTP_200_OK,
+    def _patch_salesperson(self, body, actor=None):
+        self.login_as(actor or self.seed_admin)
+        return self.client.patch(
+            SALESPERSON_URL.format(id=self.salesperson.id), body, format="json"
         )
 
-    def test_update_admin_not_found(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_not_found"""
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.patch(
-                "/api/sales-admin/admins/999999", {"name": "x"}, format="json"
-            ).status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
+    # -- admin: writable fields ----------------------------------------------
 
-    def test_update_soft_deleted_admin_not_found(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_soft_deleted_admin_not_found"""
-        self.login_as(self.superuser)
-        self.admin.delete(deleted_by=self.superuser)
-        self.assertEqual(
-            self.client.patch(
-                f"/api/sales-admin/admins/{self.admin.id}", {"name": "x"}, format="json"
-            ).status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
+    def test_every_writable_admin_field_round_trips(self):
+        """Each field is patchable on its own, echoed back, and persisted.
 
-    # -- admin field updates -------------------------------------------------
+        tests/test_user_update.py::UserUpdateTest::test_every_writable_admin_field_round_trips
+        """
+        cases = [
+            # (payload field, sent value, response value, row holding it, attribute)
+            ("name", "Updated Admin", "Updated Admin", "user", "name"),
+            ("email", "updated@example.com", "updated@example.com", "user", "email"),
+            ("phone_number", "9999999998", "9999999998", "user", "phone_number"),
+            ("can_update_stock_count", False, False, "profile", "can_update_stock_count"),
+        ]
+        for field, sent, expected, row, attribute in cases:
+            with self.subTest(field=field):
+                response = self._patch_admin({field: sent})
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+                self.assertEqual(response.data[field], expected)
+                obj = self.seed_admin if row == "user" else self.admin
+                obj.refresh_from_db()
+                self.assertEqual(getattr(obj, attribute), expected)
 
-    def test_update_admin_name(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_name"""
-        self.login_as(self.superuser)
-        response = self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}",
-            {"name": "Updated Admin"},
-            format="json",
+    def test_an_admin_patch_touches_only_the_fields_it_names(self):
+        """A multi-field body updates all of them; a partial body leaves the rest alone.
+
+        tests/test_user_update.py::UserUpdateTest::test_an_admin_patch_touches_only_the_fields_it_names
+        """
+        response = self._patch_admin(
+            {"name": "Bulk Updated", "email": "bulk@example.com", "can_update_stock_count": False}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["name"], "Updated Admin")
-        self.seed_admin.refresh_from_db()
-        self.assertEqual(self.seed_admin.name, "Updated Admin")
-
-    def test_update_admin_email(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_email"""
-        self.login_as(self.superuser)
-        response = self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}",
-            {"email": "updated@example.com"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["email"], "updated@example.com")
-        self.seed_admin.refresh_from_db()
-        self.assertEqual(self.seed_admin.email, "updated@example.com")
-
-    def test_update_admin_can_update_stock_count(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_can_update_stock_count"""
-        self.login_as(self.superuser)
-        self.assertEqual(self.admin.can_update_stock_count, True)
-        response = self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}",
-            {"can_update_stock_count": False},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertFalse(response.data["can_update_stock_count"])
-        self.admin.refresh_from_db()
-        self.assertFalse(self.admin.can_update_stock_count)
-
-    def test_update_admin_multiple_fields(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_multiple_fields"""
-        self.login_as(self.superuser)
-        response = self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}",
-            {"name": "Bulk Updated", "email": "bulk@example.com", "can_update_stock_count": False},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["name"], "Bulk Updated")
-        self.assertEqual(response.data["email"], "bulk@example.com")
-        self.assertFalse(response.data["can_update_stock_count"])
         self.seed_admin.refresh_from_db()
         self.admin.refresh_from_db()
         self.assertEqual(self.seed_admin.name, "Bulk Updated")
         self.assertEqual(self.seed_admin.email, "bulk@example.com")
         self.assertFalse(self.admin.can_update_stock_count)
 
-    def test_update_admin_partial_body_leaves_others_unchanged(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_partial_body_leaves_others_unchanged"""
-        self.login_as(self.superuser)
-        self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}", {"name": "Only Name"}, format="json"
-        )
+        # A body naming only `name` must not disturb email or the stock flag.
+        self._patch_admin({"name": "Only Name"})
         self.seed_admin.refresh_from_db()
-        self.assertEqual(self.seed_admin.name, "Only Name")
-        self.assertIsNone(self.seed_admin.email)
         self.admin.refresh_from_db()
-        self.assertTrue(self.admin.can_update_stock_count)
+        self.assertEqual(self.seed_admin.name, "Only Name")
+        self.assertEqual(self.seed_admin.email, "bulk@example.com")
+        self.assertFalse(self.admin.can_update_stock_count)
 
-    def test_update_admin_empty_body_returns_unchanged(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_empty_body_returns_unchanged"""
-        self.login_as(self.superuser)
-        response = self.client.patch(f"/api/sales-admin/admins/{self.admin.id}", {}, format="json")
+        # An empty body is a no-op, not an error.
+        response = self._patch_admin({})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["name"], "seed admin")
+        self.assertEqual(response.data["name"], "Only Name")
 
-    def test_update_admin_invalid_email_rejected(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_invalid_email_rejected"""
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.patch(
-                f"/api/sales-admin/admins/{self.admin.id}",
-                {"email": "not-an-email"},
-                format="json",
-            ).status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
+    def test_invalid_admin_payloads_are_rejected(self):
+        """tests/test_user_update.py::UserUpdateTest::test_invalid_admin_payloads_are_rejected"""
+        cases = [
+            ("invalid email", {"email": "not-an-email"}),
+            ("malformed phone", {"phone_number": "12345"}),
+            ("phone already taken", {"phone_number": "5555555555"}),
+        ]
+        for label, body in cases:
+            with self.subTest(case=label):
+                self.assertEqual(
+                    self._patch_admin(body).status_code, status.HTTP_400_BAD_REQUEST
+                )
 
-    def test_update_admin_phone_number(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_phone_number"""
-        self.login_as(self.superuser)
-        response = self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}",
-            {"phone_number": "9999999998"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["phone_number"], "9999999998")
-        self.seed_admin.refresh_from_db()
-        self.assertEqual(self.seed_admin.phone_number, "9999999998")
+    def test_resending_an_admins_own_phone_number_is_allowed(self):
+        """Regression: the uniqueness check used to match the row being edited itself,
+        so an unchanged ``phone_number`` in the payload 400'd.
 
-    def test_update_admin_invalid_phone_number_rejected(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_invalid_phone_number_rejected"""
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.patch(
-                f"/api/sales-admin/admins/{self.admin.id}",
-                {"phone_number": "12345"},
-                format="json",
-            ).status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    def test_update_admin_duplicate_phone_number_rejected(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_duplicate_phone_number_rejected"""
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.patch(
-                f"/api/sales-admin/admins/{self.admin.id}",
-                {"phone_number": "5555555555"},
-                format="json",
-            ).status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    def test_update_admin_with_own_phone_number_is_allowed(self):
-        """PATCHing an admin with the phone they already have must succeed.
-
-        Regression: the uniqueness check previously matched the row being
-        edited itself, so an unchanged phone_number in the payload 400'd.
-
-        tests/test_user_update.py::UserUpdateTest::test_update_admin_with_own_phone_number_is_allowed
+        tests/test_user_update.py::UserUpdateTest::test_resending_an_admins_own_phone_number_is_allowed
         """
-        self.login_as(self.superuser)
-        response = self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}",
-            {"phone_number": self.seed_admin.phone_number, "name": "Same Phone"},
-            format="json",
+        response = self._patch_admin(
+            {"phone_number": self.seed_admin.phone_number, "name": "Same Phone"}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.seed_admin.refresh_from_db()
         self.assertEqual(self.seed_admin.name, "Same Phone")
 
-    def test_update_admin_payload_shape(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_admin_payload_shape"""
-        self.login_as(self.superuser)
-        response = self.client.patch(
-            f"/api/sales-admin/admins/{self.admin.id}",
-            {"name": "Payload Check"},
-            format="json",
-        )
-        admin = response.data
+    def test_admin_payload_shape(self):
+        """tests/test_user_update.py::UserUpdateTest::test_admin_payload_shape"""
+        admin = self._patch_admin({"name": "Payload Check"}).data
         self.assertEqual(admin["role"], "admin")
         self.assertEqual(admin["id"], self.admin.id)
-        self.assertIn("created_by", admin)
-        self.assertIn("created_at", admin)
-        self.assertIn("can_update_stock_count", admin)
+        for key in ("created_by", "created_at", "can_update_stock_count"):
+            self.assertIn(key, admin)
         for key in ("user_id", "city", "address", "is_deleted", "deleted_by", "totp"):
             self.assertNotIn(key, admin)
 
-    # -- permission gating (salesperson) -------------------------------------
+    # -- salesperson: writable fields ----------------------------------------
 
-    def test_anonymous_salesperson_update_rejected(self):
-        """tests/test_user_update.py::UserUpdateTest::test_anonymous_salesperson_update_rejected"""
-        self.clear_auth()
-        response = self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {"name": "x"},
-            format="json",
-        )
-        self.assertIn(response.status_code, (401, 403))
+    def test_every_writable_salesperson_field_round_trips(self):
+        """tests/test_user_update.py::UserUpdateTest::test_every_writable_salesperson_field_round_trips"""
+        cases = [
+            ("name", "Updated Person", "Updated Person", "user", "name"),
+            ("email", "person@example.com", "person@example.com", "user", "email"),
+            ("phone_number", "9999999990", "9999999990", "user", "phone_number"),
+        ]
+        for field, sent, expected, _row, attribute in cases:
+            with self.subTest(field=field):
+                response = self._patch_salesperson({field: sent})
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+                self.assertEqual(response.data[field], expected)
+                self.salesperson.user.refresh_from_db()
+                self.assertEqual(getattr(self.salesperson.user, attribute), expected)
 
-    def test_only_admin_can_update_salesperson(self):
-        """tests/test_user_update.py::UserUpdateTest::test_only_admin_can_update_salesperson"""
-        url = f"/api/sales-admin/sales-people/{self.salesperson.id}"
-        # A plain user and a salesperson are both forbidden.
-        for user in (self.plain, self.salesperson.user):
-            self.login_as(user)
-            self.assertEqual(
-                self.client.patch(url, {"name": "x"}, format="json").status_code,
-                status.HTTP_403_FORBIDDEN,
-            )
-        # A superuser may also update a salesperson.
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.patch(url, {"name": "x"}, format="json").status_code,
-            status.HTTP_200_OK,
-        )
-
-        # An application admin may update a salesperson.
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.patch(url, {"name": "Updated"}, format="json").status_code,
-            status.HTTP_200_OK,
-        )
-
-    def test_update_salesperson_not_found(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_not_found"""
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.patch(
-                "/api/sales-admin/sales-people/999999", {"name": "x"}, format="json"
-            ).status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
-
-    def test_update_soft_deleted_salesperson_not_found(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_soft_deleted_salesperson_not_found"""
-        self.login_as(self.seed_admin)
-        self.salesperson.delete(deleted_by=self.superuser)
-        self.assertEqual(
-            self.client.patch(
-                f"/api/sales-admin/sales-people/{self.salesperson.id}",
-                {"name": "x"},
-                format="json",
-            ).status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
-
-    # -- salesperson field updates -------------------------------------------
-
-    def test_update_salesperson_name(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_name"""
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {"name": "Updated Person"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["name"], "Updated Person")
-        self.salesperson.user.refresh_from_db()
-        self.assertEqual(self.salesperson.user.name, "Updated Person")
-
-    def test_update_salesperson_email(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_email"""
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {"email": "person@example.com"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["email"], "person@example.com")
-        self.salesperson.user.refresh_from_db()
-        self.assertEqual(self.salesperson.user.email, "person@example.com")
-
-    def test_update_salesperson_city(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_city"""
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {"city": self.city_2.id},
-            format="json",
-        )
+        # `city` is on the profile and serialises as a nested object, so it does
+        # not fit the flat table above.
+        response = self._patch_salesperson({"city": self.city_2.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.assertEqual(response.data["city"]["id"], self.city_2.id)
         self.salesperson.refresh_from_db()
         self.assertEqual(self.salesperson.city_id, self.city_2.id)
 
-    def test_update_salesperson_multiple_fields(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_multiple_fields"""
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {"name": "Bulk Person", "email": "bulk@example.com", "city": self.city_2.id},
-            format="json",
+    def test_a_salesperson_patch_touches_only_the_fields_it_names(self):
+        """tests/test_user_update.py::UserUpdateTest::test_a_salesperson_patch_touches_only_the_fields_it_names"""
+        response = self._patch_salesperson(
+            {"name": "Bulk Person", "email": "bulk@example.com", "city": self.city_2.id}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["name"], "Bulk Person")
-        self.assertEqual(response.data["email"], "bulk@example.com")
-        self.assertEqual(response.data["city"]["id"], self.city_2.id)
         self.salesperson.user.refresh_from_db()
         self.salesperson.refresh_from_db()
         self.assertEqual(self.salesperson.user.name, "Bulk Person")
         self.assertEqual(self.salesperson.user.email, "bulk@example.com")
         self.assertEqual(self.salesperson.city_id, self.city_2.id)
 
-    def test_update_salesperson_partial_body_leaves_others_unchanged(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_partial_body_leaves_others_unchanged"""
-        self.login_as(self.seed_admin)
-        self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {"name": "Only Person"},
-            format="json",
-        )
+        self._patch_salesperson({"name": "Only Person"})
         self.salesperson.user.refresh_from_db()
-        self.assertEqual(self.salesperson.user.name, "Only Person")
-        self.assertIsNone(self.salesperson.user.email)
         self.salesperson.refresh_from_db()
-        self.assertEqual(self.salesperson.city_id, self.city.id)
+        self.assertEqual(self.salesperson.user.name, "Only Person")
+        self.assertEqual(self.salesperson.user.email, "bulk@example.com")
+        self.assertEqual(self.salesperson.city_id, self.city_2.id)
 
-    def test_update_salesperson_invalid_city_rejected(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_invalid_city_rejected"""
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.patch(
-                f"/api/sales-admin/sales-people/{self.salesperson.id}",
-                {"city": 999999},
-                format="json",
-            ).status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
+    def test_invalid_salesperson_payloads_are_rejected(self):
+        """tests/test_user_update.py::UserUpdateTest::test_invalid_salesperson_payloads_are_rejected"""
+        cases = [
+            ("unknown city", {"city": 999999}),
+            ("malformed phone", {"phone_number": "12345"}),
+            ("phone already taken", {"phone_number": "7777777777"}),
+        ]
+        for label, body in cases:
+            with self.subTest(case=label):
+                self.assertEqual(
+                    self._patch_salesperson(body).status_code, status.HTTP_400_BAD_REQUEST
+                )
 
-    def test_update_salesperson_phone_number(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_phone_number"""
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {"phone_number": "9999999990"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        self.assertEqual(response.data["phone_number"], "9999999990")
-        self.salesperson.user.refresh_from_db()
-        self.assertEqual(self.salesperson.user.phone_number, "9999999990")
+    def test_resending_a_salespersons_own_phone_number_is_allowed(self):
+        """Same regression as for admins: an unchanged own phone must not 400.
 
-    def test_update_salesperson_invalid_phone_number_rejected(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_invalid_phone_number_rejected"""
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.patch(
-                f"/api/sales-admin/sales-people/{self.salesperson.id}",
-                {"phone_number": "12345"},
-                format="json",
-            ).status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    def test_update_salesperson_duplicate_phone_number_rejected(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_duplicate_phone_number_rejected"""
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.patch(
-                f"/api/sales-admin/sales-people/{self.salesperson.id}",
-                {"phone_number": "7777777777"},
-                format="json",
-            ).status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    def test_update_salesperson_with_own_phone_number_is_allowed(self):
-        """Same regression as for admins: unchanged own phone must not 400.
-
-        tests/test_user_update.py::UserUpdateTest::test_update_salesperson_with_own_phone_number_is_allowed
+        tests/test_user_update.py::UserUpdateTest::test_resending_a_salespersons_own_phone_number_is_allowed
         """
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {
-                "phone_number": self.salesperson.user.phone_number,
-                "name": "Same Phone Person",
-            },
-            format="json",
+        response = self._patch_salesperson(
+            {"phone_number": self.salesperson.user.phone_number, "name": "Same Phone Person"}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.salesperson.user.refresh_from_db()
         self.assertEqual(self.salesperson.user.name, "Same Phone Person")
 
-    def test_update_salesperson_payload_shape(self):
-        """tests/test_user_update.py::UserUpdateTest::test_update_salesperson_payload_shape"""
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}",
-            {"name": "Payload Person"},
-            format="json",
-        )
-        person = response.data
+    def test_salesperson_payload_shape(self):
+        """tests/test_user_update.py::UserUpdateTest::test_salesperson_payload_shape"""
+        person = self._patch_salesperson({"name": "Payload Person"}).data
         self.assertEqual(person["role"], "salesperson")
         self.assertEqual(person["id"], self.salesperson.id)
         self.assertIn("city", person)
         for key in ("user_id", "address", "is_deleted", "deleted_by", "totp"):
             self.assertNotIn(key, person)
 
+    # -- addressability: unknown and already-deleted rows --------------------
 
-class UserDeleteTest(WebApiTestCase):
-    """Cover delete permission gating and soft-delete behaviour for admin/salesperson.
+    def test_an_unknown_or_soft_deleted_row_is_404_for_both_verbs(self):
+        """Soft-deleted rows leave the API entirely -- PATCH and DELETE both 404.
 
-    tests/test_user_update.py::UserDeleteTest
-    """
+        tests/test_user_update.py::UserUpdateTest::test_an_unknown_or_soft_deleted_row_is_404_for_both_verbs
+        """
+        self.admin.delete(deleted_by=self.superuser)
+        self.salesperson.delete(deleted_by=self.superuser)
+        self.login_as(self.superuser)
 
-    @classmethod
-    def setUpTestData(cls):
-        """Build the geography tree, an app admin and a salesperson."""
-        super().setUpTestData()
-        cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
+        cases = [
+            ("unknown admin", ADMIN_URL.format(id=999999)),
+            ("deleted admin", ADMIN_URL.format(id=self.admin.id)),
+            ("unknown salesperson", SALESPERSON_URL.format(id=999999)),
+            ("deleted salesperson", SALESPERSON_URL.format(id=self.salesperson.id)),
+        ]
+        for label, url in cases:
+            with self.subTest(case=label):
+                self.assertEqual(
+                    self.client.patch(url, {"name": "x"}, format="json").status_code,
+                    status.HTTP_404_NOT_FOUND,
+                )
+                self.assertEqual(
+                    self.client.delete(url).status_code, status.HTTP_404_NOT_FOUND
+                )
 
-        cls.country, _ = Country.objects.get_or_create(
-            name="India", defaults={"iso_code": "IN", "created_by": cls.superuser}
-        )
-        cls.state = State.objects.create(
-            name="Maharashtra", code="MH", country=cls.country, created_by=cls.superuser
-        )
-        cls.city = City.objects.create(name="Pune", state=cls.state, created_by=cls.superuser)
+    # -- soft delete ----------------------------------------------------------
 
-        cls.seed_admin = User.objects.create_user(
-            phone_number="7777777777",
-            name="seed admin",
-            is_verified=True,
-            created_by=cls.superuser,
-            verified_by=cls.superuser,
-        )
-        cls.admin = Admin.objects.create(
-            user=cls.seed_admin, can_update_stock_count=True, created_by=cls.superuser
-        )
-        cls.superuser_admin = Admin.objects.create(
-            user=cls.superuser, can_update_stock_count=True, created_by=cls.superuser
-        )
-
-        cls.plain = User.objects.create_user(
-            phone_number="6666666666",
-            name="plain user",
-            is_verified=True,
-            created_by=cls.superuser,
-            verified_by=cls.superuser,
-        )
-
-        cls.salesperson = SalesPerson.objects.create(
-            user=User.objects.create_user(
-                phone_number="5555555555",
-                name="seed salesperson",
-                is_verified=True,
-                created_by=cls.superuser,
-                verified_by=cls.superuser,
-            ),
-            city=cls.city,
-            created_by=cls.superuser,
-        )
-
-    # -- permission gating (admin delete) -----------------------------------
-
-    def test_anonymous_admin_delete_rejected(self):
-        """tests/test_user_update.py::UserDeleteTest::test_anonymous_admin_delete_rejected"""
-        self.clear_auth()
-        response = self.client.delete(f"/api/sales-admin/admins/{self.admin.id}")
-        self.assertIn(response.status_code, (401, 403))
-
-    def test_only_superuser_can_delete_admin(self):
-        """tests/test_user_update.py::UserDeleteTest::test_only_superuser_can_delete_admin"""
-        url = f"/api/sales-admin/admins/{self.admin.id}"
-        # A plain user, an app admin and a salesperson are all forbidden.
-        for user in (self.plain, self.seed_admin, self.salesperson.user):
-            self.login_as(user)
-            self.assertEqual(
-                self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN
-            )
-
-        # A superuser may delete an admin.
+    def test_deleting_an_admin_soft_deletes_the_row(self):
+        """tests/test_user_update.py::UserUpdateTest::test_deleting_an_admin_soft_deletes_the_row"""
         self.login_as(self.superuser)
         self.assertEqual(
-            self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT
-        )
-
-    def test_delete_admin_not_found(self):
-        """tests/test_user_update.py::UserDeleteTest::test_delete_admin_not_found"""
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.delete("/api/sales-admin/admins/999999").status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
-
-    def test_delete_admin_soft_deletes_row(self):
-        """tests/test_user_update.py::UserDeleteTest::test_delete_admin_soft_deletes_row"""
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.delete(f"/api/sales-admin/admins/{self.admin.id}").status_code,
+            self.client.delete(ADMIN_URL.format(id=self.admin.id)).status_code,
             status.HTTP_204_NO_CONTENT,
         )
         self.admin.refresh_from_db()
@@ -597,83 +293,33 @@ class UserDeleteTest(WebApiTestCase):
         self.assertIsNotNone(self.admin.deleted_at)
         self.assertEqual(self.admin.deleted_by_id, self.superuser.id)
 
-    def test_delete_soft_deleted_admin_not_found(self):
-        """tests/test_user_update.py::UserDeleteTest::test_delete_soft_deleted_admin_not_found"""
+    def test_deleting_a_salesperson_soft_deletes_the_row(self):
+        """Both a superuser and an app admin may do it; the deleter is recorded.
+
+        tests/test_user_update.py::UserUpdateTest::test_deleting_a_salesperson_soft_deletes_the_row
+        """
+        url = SALESPERSON_URL.format(id=self.salesperson.id)
         self.login_as(self.superuser)
-        self.admin.delete(deleted_by=self.superuser)
-        self.assertEqual(
-            self.client.delete(f"/api/sales-admin/admins/{self.admin.id}").status_code,
-            status.HTTP_404_NOT_FOUND,
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT)
+
+        # Same again as an app admin, on a fresh row, to pin who gets recorded.
+        person = SalesPerson.objects.create(
+            user=User.objects.create_user(
+                phone_number="4444444444",
+                name="second salesperson",
+                is_verified=True,
+                created_by=self.superuser,
+                verified_by=self.superuser,
+            ),
+            city=self.city,
+            created_by=self.superuser,
         )
-
-    # -- permission gating (salesperson delete) -----------------------------
-
-    def test_anonymous_salesperson_delete_rejected(self):
-        """tests/test_user_update.py::UserDeleteTest::test_anonymous_salesperson_delete_rejected"""
-        self.clear_auth()
-        response = self.client.delete(
-            f"/api/sales-admin/sales-people/{self.salesperson.id}"
-        )
-        self.assertIn(response.status_code, (401, 403))
-
-    def test_admin_can_delete_salesperson(self):
-        """tests/test_user_update.py::UserDeleteTest::test_admin_can_delete_salesperson"""
         self.login_as(self.seed_admin)
         self.assertEqual(
-            self.client.delete(
-                f"/api/sales-admin/sales-people/{self.salesperson.id}"
-            ).status_code,
+            self.client.delete(SALESPERSON_URL.format(id=person.id)).status_code,
             status.HTTP_204_NO_CONTENT,
         )
-
-    def test_superuser_can_delete_salesperson(self):
-        """tests/test_user_update.py::UserDeleteTest::test_superuser_can_delete_salesperson"""
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.delete(
-                f"/api/sales-admin/sales-people/{self.salesperson.id}"
-            ).status_code,
-            status.HTTP_204_NO_CONTENT,
-        )
-
-    def test_plain_and_salesperson_cannot_delete_salesperson(self):
-        """tests/test_user_update.py::UserDeleteTest::test_plain_and_salesperson_cannot_delete_salesperson"""
-        url = f"/api/sales-admin/sales-people/{self.salesperson.id}"
-        for user in (self.plain, self.salesperson.user):
-            self.login_as(user)
-            self.assertEqual(
-                self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN
-            )
-
-    def test_delete_salesperson_not_found(self):
-        """tests/test_user_update.py::UserDeleteTest::test_delete_salesperson_not_found"""
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.delete("/api/sales-admin/sales-people/999999").status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
-
-    def test_delete_salesperson_soft_deletes_row(self):
-        """tests/test_user_update.py::UserDeleteTest::test_delete_salesperson_soft_deletes_row"""
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.delete(
-                f"/api/sales-admin/sales-people/{self.salesperson.id}"
-            ).status_code,
-            status.HTTP_204_NO_CONTENT,
-        )
-        self.salesperson.refresh_from_db()
-        self.assertTrue(self.salesperson.is_deleted)
-        self.assertIsNotNone(self.salesperson.deleted_at)
-        self.assertEqual(self.salesperson.deleted_by_id, self.seed_admin.id)
-
-    def test_delete_soft_deleted_salesperson_not_found(self):
-        """tests/test_user_update.py::UserDeleteTest::test_delete_soft_deleted_salesperson_not_found"""
-        self.login_as(self.superuser)
-        self.salesperson.delete(deleted_by=self.superuser)
-        self.assertEqual(
-            self.client.delete(
-                f"/api/sales-admin/sales-people/{self.salesperson.id}"
-            ).status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
+        person.refresh_from_db()
+        self.assertTrue(person.is_deleted)
+        self.assertIsNotNone(person.deleted_at)
+        self.assertEqual(person.deleted_by_id, self.seed_admin.id)

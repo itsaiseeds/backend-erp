@@ -16,9 +16,11 @@
 #   bash scripts/run.sh flutter-prod   # Build Flutter web app pointing at the prod API
 #   bash scripts/run.sh flutter-preprod # Build Flutter web app pointing at the preprod API
 #   bash scripts/run.sh schema       # Regenerate docs/api/openapi.yml
-#   bash scripts/run.sh test         # All tests (in web container)
-#   bash scripts/run.sh test-unit    # Run the pytest suite (in web container)
-#   bash scripts/run.sh test-dml     # DML-seeded Django tests (in web container)
+#   bash scripts/run.sh test         # All tests, in parallel (in web container)
+#   bash scripts/run.sh test-serial  # All tests on one worker (clearer failures)
+#   bash scripts/run.sh test-unit    # Only the no-database tests (fast)
+#   bash scripts/run.sh test-dml     # Only the DML-seeded database tests
+#   bash scripts/run.sh test-serial tests/x.py::C::t  # One test / class, verbose
 #   bash scripts/run.sh lint         # ruff check (in web container)
 #   bash scripts/run.sh typecheck    # mypy (in web container)
 #   bash scripts/run.sh hooks        # Install git pre-commit hooks (ruff lint)
@@ -48,9 +50,10 @@ if [[ -z "$COMMAND" ]]; then
     echo "  flutter-prod  Build Flutter web app for the production API"
     echo "  flutter-preprod Build Flutter web app for the preprod API"
     echo "  schema      Regenerate docs/api/openapi.yml"
-    echo "  test        Run all tests in web container"
-    echo "  test-unit   Run unit tests in web container"
-    echo "  test-dml    Run DML-seeded Django tests in web container"
+    echo "  test        Run all tests in parallel in web container"
+    echo "  test-serial Run all tests on a single worker (clearer failures)"
+    echo "  test-unit   Run only the no-database tests (fast)"
+    echo "  test-dml    Run only the DML-seeded database tests"
     echo "  lint        Run ruff check in web container"
     echo "  format      Run ruff format + autofix in web container"
     echo "  typecheck   Run mypy in web container"
@@ -261,18 +264,35 @@ webrun() {
     docker compose run --rm --no-deps --entrypoint "" -T web "$@"
 }
 
+# Number of pytest-xdist workers. Four is the measured sweet spot: each worker
+# pays for its own test database (create + migrate + dml.sql), so past four the
+# extra setup costs more than the parallelism saves. Override with TEST_WORKERS.
+TEST_WORKERS="${TEST_WORKERS:-4}"
+
+# --dist loadscope keeps every test in a class on one worker, so a class's
+# setUpTestData runs once rather than once per worker.
+cmd_test() {
+    echo "[test] Running the whole suite on ${TEST_WORKERS} workers in web container ..."
+    webrun python -m pytest -q -n "$TEST_WORKERS" --dist loadscope "$@"
+}
+
+# The unit/dml split is applied automatically by tests/conftest.py from each
+# test's base class: no database => unit, DMLTestCase => dml.
 cmd_test_unit() {
-    echo "[test-unit] Running unit tests in web container ..."
-    webrun python -m pytest -v
+    echo "[test-unit] Running the no-database tests in web container ..."
+    webrun python -m pytest -q -m unit "$@"
 }
 
 cmd_test_dml() {
-    echo "[test-dml] Running DML-seeded Django tests in web container ..."
-    webrun python -m pytest tests/ -v
+    echo "[test-dml] Running DML-seeded database tests on ${TEST_WORKERS} workers ..."
+    webrun python -m pytest -q -m dml -n "$TEST_WORKERS" --dist loadscope "$@"
 }
 
-cmd_test() {
-    cmd_test_unit
+# One worker, verbose: xdist interleaves output from every worker, which makes
+# a failure hard to read. Also takes a node id, so it doubles as "run one test".
+cmd_test_serial() {
+    echo "[test-serial] Running tests on a single worker in web container ..."
+    webrun python -m pytest -v "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -318,9 +338,10 @@ case "$COMMAND" in
     flutter-prod) cmd_flutter_prod ;;
     flutter-preprod) cmd_flutter_preprod ;;
     schema)     cmd_schema ;;
-    test)       cmd_test ;;
-    test-unit)  cmd_test_unit ;;
-    test-dml)   cmd_test_dml ;;
+    test)        cmd_test "$@" ;;
+    test-unit)   cmd_test_unit "$@" ;;
+    test-serial) cmd_test_serial "$@" ;;
+    test-dml)    cmd_test_dml "$@" ;;
     lint)       cmd_lint ;;
     format)     cmd_format ;;
     typecheck)  cmd_typecheck ;;

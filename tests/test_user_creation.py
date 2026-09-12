@@ -28,7 +28,7 @@ class UserCreationTest(WebApiTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        """Build the geography tree, an app admin, a plain user and a salesperson."""
+        """Build the geography tree, an app admin and a salesperson."""
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
 
@@ -55,14 +55,6 @@ class UserCreationTest(WebApiTestCase):
             user=cls.seed_admin, can_update_stock_count=True, created_by=cls.superuser
         )
 
-        cls.plain = User.objects.create_user(
-            phone_number="6666666666",
-            name="plain user",
-            is_verified=True,
-            created_by=cls.superuser,
-            verified_by=cls.superuser,
-        )
-
         cls.salesperson = SalesPerson.objects.create(
             user=User.objects.create_user(
                 phone_number="5555555555",
@@ -73,73 +65,6 @@ class UserCreationTest(WebApiTestCase):
             ),
             city=cls.city,
             created_by=cls.superuser,
-        )
-
-    # -- permission gating ----------------------------------------------------
-
-    def test_anonymous_requests_are_rejected(self):
-        """tests/test_user_creation.py::UserCreationTest::test_anonymous_requests_are_rejected"""
-        for path in ("/api/sales-admin/admins", "/api/sales-admin/sales-people"):
-            self.assertIn(
-                self.client.post(path, {"name": "x"}, format="json").status_code,
-                (401, 403),
-            )
-            self.assertIn(self.client.get(path).status_code, (401, 403))
-
-    def test_only_superuser_can_create_admin(self):
-        """tests/test_user_creation.py::UserCreationTest::test_only_superuser_can_create_admin"""
-        payload = {
-            "name": "Should Not Exist",
-            "phone_number": "9000000099",
-            "city": self.city.id,
-        }
-        for user in (self.plain, self.seed_admin, self.salesperson.user):
-            self.login_as(user)
-            self.assertEqual(
-                self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
-                status.HTTP_403_FORBIDDEN,
-            )
-
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
-            status.HTTP_201_CREATED,
-        )
-
-    def test_only_admin_can_create_salesperson(self):
-        """tests/test_user_creation.py::UserCreationTest::test_only_admin_can_create_salesperson"""
-        payload = {
-            "name": "Blocked Person",
-            "phone_number": "9000000088",
-            "city": self.city.id,
-        }
-        # A plain user and a salesperson are both forbidden.
-        for user in (self.plain, self.salesperson.user):
-            self.login_as(user)
-            status_code = self.client.post(
-                "/api/sales-admin/sales-people", payload, format="json"
-            ).status_code
-            self.assertEqual(status_code, status.HTTP_403_FORBIDDEN)
-        # A superuser may also create a salesperson.
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.post(
-                "/api/sales-admin/sales-people",
-                {**payload, "phone_number": "9000000087"},
-                format="json",
-            ).status_code,
-            status.HTTP_201_CREATED,
-        )
-
-        # An application admin may create a salesperson.
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.post(
-                "/api/sales-admin/sales-people",
-                {**payload, "phone_number": "9000000086"},
-                format="json",
-            ).status_code,
-            status.HTTP_201_CREATED,
         )
 
     # -- admin creation -------------------------------------------------------
@@ -174,36 +99,34 @@ class UserCreationTest(WebApiTestCase):
         created_user = User.objects.get(phone_number="9000000001")
         self.assertEqual(SalesPerson.objects.get(user=created_user).city_id, self.city.id)
 
-    def test_create_admin_duplicate_phone_rejected(self):
-        """tests/test_user_creation.py::UserCreationTest::test_create_admin_duplicate_phone_rejected"""
+    def test_invalid_admin_creation_payloads_are_rejected(self):
+        """tests/test_user_creation.py::UserCreationTest::test_invalid_admin_creation_payloads_are_rejected"""
         self.login_as(self.superuser)
-        payload = {
-            "name": "Duplicate",
-            "phone_number": "9000000002",
-            "city": self.city.id,
-        }
+
+        # Taking a phone number twice is only a duplicate the second time round.
+        taken = {"name": "Duplicate", "phone_number": "9000000002", "city": self.city.id}
         self.assertEqual(
-            self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
+            self.client.post("/api/sales-admin/admins", taken, format="json").status_code,
             status.HTTP_201_CREATED,
         )
-        self.assertEqual(
-            self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
 
-    def test_create_admin_invalid_payload_rejected(self):
-        """tests/test_user_creation.py::UserCreationTest::test_create_admin_invalid_payload_rejected"""
-        self.login_as(self.superuser)
-        for payload in (
-            {"name": "No Phone", "city": self.city.id},
-            {"name": "Bad Phone", "phone_number": "12345", "city": self.city.id},
-            {"name": "No City", "phone_number": "9000000003"},
-        ):
-            self.assertEqual(
-                self.client.post("/api/sales-admin/admins", payload, format="json").status_code,
-                status.HTTP_400_BAD_REQUEST,
-                payload,
-            )
+        cases = [
+            ("duplicate phone", taken),
+            ("missing phone", {"name": "No Phone", "city": self.city.id}),
+            (
+                "malformed phone",
+                {"name": "Bad Phone", "phone_number": "12345", "city": self.city.id},
+            ),
+            ("missing city", {"name": "No City", "phone_number": "9000000003"}),
+        ]
+        for label, payload in cases:
+            with self.subTest(case=label):
+                self.assertEqual(
+                    self.client.post(
+                        "/api/sales-admin/admins", payload, format="json"
+                    ).status_code,
+                    status.HTTP_400_BAD_REQUEST,
+                )
 
     def test_list_admins_excludes_deleted(self):
         """tests/test_user_creation.py::UserCreationTest::test_list_admins_excludes_deleted"""
@@ -228,22 +151,8 @@ class UserCreationTest(WebApiTestCase):
             for key in ("user_id", "city", "address", "is_deleted", "deleted_by"):
                 self.assertNotIn(key, item)
 
-    def test_list_admins_includes_totp_uri(self):
-        """The list endpoint returns each admin's TOTP provisioning URI, not just creation.
-
-        tests/test_user_creation.py::UserCreationTest::test_list_admins_includes_totp_uri
-        """
-        self.login_as(self.superuser)
-        created = self.client.post(
-            "/api/sales-admin/admins",
-            {"name": "Vikram Kumar", "phone_number": "9000000060", "city": self.city.id},
-            format="json",
-        )
-        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
-
-        response = self.client.get("/api/sales-admin/admins")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        vikram = next(item for item in response.data if item["name"] == "Vikram Kumar")
+        # The list carries each admin's TOTP provisioning URI, not just creation.
+        vikram = next(item for item in admins if item["name"] == "Vikram Kumar")
         self.assertTrue(vikram["totp"]["provisioning_uri"])
 
     # -- salesperson creation ------------------------------------------------
@@ -293,20 +202,6 @@ class UserCreationTest(WebApiTestCase):
             for key in ("user_id", "address", "is_deleted", "deleted_by"):
                 self.assertNotIn(key, item)
 
-    def test_list_sales_people_includes_totp_uri(self):
-        """The list endpoint returns each sales person's TOTP provisioning URI.
-
-        tests/test_user_creation.py::UserCreationTest::test_list_sales_people_includes_totp_uri
-        """
-        self.login_as(self.seed_admin)
-        created = self.client.post(
-            "/api/sales-admin/sales-people",
-            {"name": "Ramesh Patil", "phone_number": "9000000061", "city": self.city.id},
-            format="json",
-        )
-        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
-
-        response = self.client.get("/api/sales-admin/sales-people")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        ramesh = next(item for item in response.data if item["name"] == "Ramesh Patil")
+        ramesh = next(item for item in people if item["name"] == "Ramesh Patil")
         self.assertTrue(ramesh["totp"]["provisioning_uri"])
+

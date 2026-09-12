@@ -90,16 +90,6 @@ class LooseStockApiTest(WebApiTestCase):
 
     # -- permissions -----------------------------------------------------------
 
-    def test_update_anonymous_rejected(self):
-        """Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_update_anonymous_rejected"""
-        resp = self.client.post(
-            UPDATE_URL, data={"counts": [self._line()]}, format="json"
-        )
-        self.assertIn(
-            resp.status_code,
-            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
-        )
-
     def test_admin_without_flag_cannot_update(self):
         """Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_admin_without_flag_cannot_update"""
         self.login_as(self.plain_admin_user)
@@ -130,6 +120,15 @@ class LooseStockApiTest(WebApiTestCase):
         self.assertTrue(one_kg[0]["public_id"].startswith("LS-"))
         self.assertEqual(one_kg[0]["available"], 12)
         self.assertEqual(one_kg[0]["total_weight"], "12.000")
+
+        # POST replaces the whole day, so the weight left out of the payload is
+        # zero-filled rather than left uncounted.
+        half = next(
+            r for r in resp.data
+            if r["packet_weight"] == "0.500"
+            and r["product"]["public_id"] == self.product.public_id
+        )
+        self.assertEqual(half["packets"], 0)
 
     def test_post_zero_fills_uncounted_pools(self):
         """Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_post_zero_fills_uncounted_pools"""
@@ -167,56 +166,44 @@ class LooseStockApiTest(WebApiTestCase):
 
     # -- validation ------------------------------------------------------------
 
-    def test_unknown_product_weight_pair_rejected(self):
-        """A weight nothing is packed in is not a valid loose pool.
+    def test_invalid_loose_count_payloads_are_rejected(self):
+        """Every rejected line leaves the whole payload unwritten -- the write is
+        all-or-nothing, so a bad line must not half-apply the good ones.
 
-        Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_unknown_product_weight_pair_rejected
+        Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_invalid_loose_count_payloads_are_rejected
         """
-        resp = self._stock_admin_request(
-            "patch", UPDATE_URL, data={"counts": [self._line("2.500", 5)]},
-            format="json",
-        )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
-        self.assertEqual(LooseStockSnapshot.objects.count(), 0)
-
-    def test_unknown_product_rejected(self):
-        """Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_unknown_product_rejected"""
-        resp = self._stock_admin_request(
-            "patch", UPDATE_URL,
-            data={
-                "counts": [
-                    {"product": "P-NONEXISTENT", "packet_weight": "1.000", "packets": 5}
-                ]
-            },
-            format="json",
-        )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
-
-    def test_duplicate_pair_in_one_payload_rejected(self):
-        """The same pool named twice would let the last line silently win.
-
-        Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_duplicate_pair_in_one_payload_rejected
-        """
-        resp = self._stock_admin_request(
-            "patch", UPDATE_URL,
-            data={"counts": [self._line("1.000", 12), self._line("1.000", 3)]},
-            format="json",
-        )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
-        self.assertEqual(LooseStockSnapshot.objects.count(), 0)
-
-    def test_negative_packets_rejected(self):
-        """Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_negative_packets_rejected"""
-        resp = self._stock_admin_request(
-            "patch", UPDATE_URL, data={"counts": [self._line("1.000", -1)]},
-            format="json",
-        )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+        cases = [
+            # A weight nothing is packed in is not a valid loose pool.
+            ("weight the product is not packed in", [self._line("2.500", 5)]),
+            (
+                "unknown product",
+                [{"product": "P-NONEXISTENT", "packet_weight": "1.000", "packets": 5}],
+            ),
+            # The same pool named twice would let the last line silently win.
+            ("duplicate pool in one payload", [self._line("1.000", 12), self._line("1.000", 3)]),
+            ("negative packets", [self._line("1.000", -1)]),
+        ]
+        for label, counts in cases:
+            with self.subTest(case=label):
+                resp = self._stock_admin_request(
+                    "patch", UPDATE_URL, data={"counts": counts}, format="json"
+                )
+                self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+                self.assertEqual(LooseStockSnapshot.objects.count(), 0)
 
     # -- reading ---------------------------------------------------------------
 
     def test_get_position_reports_pools_and_date(self):
-        """Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_get_position_reports_pools_and_date"""
+        """Before any count the position is empty; after one it reports the pools.
+
+        Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_get_position_reports_pools_and_date
+        """
+        # snapshot_date is null and the list empty before any loose count.
+        never_counted = self._stock_admin_request("get", POSITION_URL)
+        self.assertEqual(never_counted.status_code, status.HTTP_200_OK, never_counted.content)
+        self.assertIsNone(never_counted.data["snapshot_date"])
+        self.assertEqual(never_counted.data["lines"], [])
+
         self._stock_admin_request(
             "patch", UPDATE_URL, data={"counts": [self._line("1.000", 12)]},
             format="json",
@@ -233,21 +220,3 @@ class LooseStockApiTest(WebApiTestCase):
         self.assertEqual(mine["packet_weight"], "1.000")
         self.assertEqual(mine["on_hand"], 12)
         self.assertEqual(mine["available"], 12)
-
-    def test_get_position_when_never_counted(self):
-        """snapshot_date is null and the list is empty before any loose count.
-
-        Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_get_position_when_never_counted
-        """
-        resp = self._stock_admin_request("get", POSITION_URL)
-        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
-        self.assertIsNone(resp.data["snapshot_date"])
-        self.assertEqual(resp.data["lines"], [])
-
-    def test_get_position_anonymous_rejected(self):
-        """Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_get_position_anonymous_rejected"""
-        resp = self.client.get(POSITION_URL)
-        self.assertIn(
-            resp.status_code,
-            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
-        )

@@ -1,6 +1,6 @@
 ---
 name: run-tests
-description: How to run backend-erp tests (pytest) inside the Docker web container — everything, only unit, all integration, one class, or a single test — plus the mandatory convention that every test's docstring contains its copy/paste pytest node id. Use when the user asks how to run tests, how to run one test or class, mentions test-integration, pytest, django_test, AuthFlowTest, or when writing/fixing a test file that needs its runnable node id.
+description: How to run backend-erp tests (pytest) inside the Docker web container — everything (in parallel, via pytest-xdist), serially, all integration, one class, or a single test — plus the mandatory convention that every test's docstring contains its copy/paste pytest node id. Use when the user asks how to run tests, how to run one test or class, mentions test-integration, pytest, django_test, AuthFlowTest, or when writing/fixing a test file that needs its runnable node id.
 ---
 
 # Running tests (backend-erp)
@@ -21,26 +21,65 @@ Prerequisites:
 
 | What you want                          | Command                                                              |
 | -------------------------------------- | -------------------------------------------------------------------- |
-| Everything (unit + integration)        | `bash scripts/run.sh test`                                            |
-| Unit tests only                        | `bash scripts/run.sh test-unit`                                       |
-| DML-backed Django tests                | `bash scripts/run.sh test-dml`                                        |
+| Everything, in parallel (the default)  | `bash scripts/run.sh test`                                            |
+| Everything, one worker (clearer output)| `bash scripts/run.sh test-serial`                                     |
+| No-database tests only (fast, ~8s)     | `bash scripts/run.sh test-unit`                                       |
+| DML-seeded database tests only         | `bash scripts/run.sh test-dml`                                        |
 | All integration tests                  | `bash scripts/run.sh test-integration`                                |
-| One DML test class                     | `bash scripts/run.sh test-dml`                                        |
+| One test class                         | `bash scripts/run.sh test-serial tests/test_crop_api.py::CropApiTest`  |
+| One test                               | `bash scripts/run.sh test-serial tests/test_crop_api.py::CropApiTest::test_admin_update_crop` |
 | One integration test class             | `bash scripts/run.sh test-integration tests/integration/test_sentry_probe.py::SentryProbeTest` |
 | Several tests at once                  | `bash scripts/run.sh test-integration "tests/a.py::C::t1 tests/a.py::C::t2"` |
 | Lint / typecheck                       | `bash scripts/run.sh lint` / `bash scripts/run.sh typecheck`           |
 
 Any extra `pytest` args can be appended after the node id, e.g.
-`bash scripts/run.sh test-integration tests/integration -k otp`.
+`bash scripts/run.sh test-serial tests/ -k otp`.
+
+## Parallel execution
+
+`test`, `test-unit` and `test-dml` run on `pytest-xdist` with `-n 4
+--dist loadscope`. Override the worker count with `TEST_WORKERS`:
+
+```bash
+TEST_WORKERS=8 bash scripts/run.sh test
+```
+
+Four is the measured sweet spot on a 16-core machine — each worker builds its
+own test database, so more workers eventually cost more in setup than they save.
+`test-unit` / `test-dml` select on markers that `tests/conftest.py` applies
+automatically from each test's base class (`DMLTestCase` => `dml`, anything
+else => `unit`); never add those markers by hand.
+`--dist loadscope` keeps a test class on one worker so its `setUpTestData` runs
+once. Use `test-serial` when you are reading a failure: xdist interleaves
+output from every worker.
+
+Full rationale and the parallel-safety rules for new tests:
+[`docs/testing.md`](../../../docs/testing.md).
+
+## Before adding a test: what NOT to write
+
+**Never add a per-endpoint authentication test** — no
+`test_anonymous_requests_are_rejected`, `test_non_admin_rejected`, or
+`test_session_login_does_not_authenticate` on any endpoint module. Every view
+inherits its credential scheme and role gating from `AdminApiView` or
+`AndroidBaseView`, and that contract is owned once by
+`tests/test_view_contracts.py`.
+
+When you add an endpoint, add its path to `EXPECTED_CONTRACTS` there — the
+suite fails until you do — then test only what the endpoint *does*. See
+[`docs/testing.md`](../../../docs/testing.md) for the full rule, including where
+the line falls between a view flag (contracts file) and a domain rule such as
+`can_update_stock_count` or row scoping (the endpoint's own module).
 
 ## From the VS Code UI
 
 Terminal > Run Task... (Ctrl+Shift+R on Windows):
 
-- `test` — full suite.
-- `test: unit` — unit only.
-- `test-integration: all tests` — whole integration suite.
-- `test-integration: pick a test` — **asks for a pytest node id**, then runs it.
+- `test` — whole suite, in parallel (the default test task).
+- `test: no-database only (fast)` — the `unit`-marked tests.
+- `test: database only` — the `dml`-marked tests.
+- `test: pick a test` — **asks for a pytest node id**, then runs it serially.
+- `test: serial (readable failures)` — whole suite, one worker, verbose.
 
 There is no launch.json (debug attach) in this project; tasks are the way to
 run tests.
