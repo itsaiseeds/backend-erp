@@ -348,6 +348,12 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+# The preprod deployment runs with DEBUG=True and serves its SPA from
+# Firebase Hosting, so that origin is trusted under DEBUG alongside the local
+# dev origins. It must be listed for BOTH CSRF and CORS - trusting it for CSRF
+# only still leaves the browser blocking the request at preflight.
+APP_WEB_ORIGIN = "https://sales-saiseeds.web.app"
+
 if DEBUG:
     DEV_SPA_PORT = os.environ.get("DEV_SPA_PORT", "5173").strip()
     CSRF_TRUSTED_ORIGINS += [
@@ -355,7 +361,7 @@ if DEBUG:
         f"http://127.0.0.1:{DEV_SPA_PORT}",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
-        "https://sales-saiseeds.web.app" # Preprod URL
+        APP_WEB_ORIGIN,
     ]
 
 # HSTS + related transport headers, opt-in via env so local http:// dev is
@@ -422,3 +428,8 @@ if DEBUG:
         r"^http://localhost:\d+$",
         r"^http://127\.0\.0\.1:\d+$",
     ]
+    # Preflight from the preprod SPA is cross-origin with credentials, so the
+    # exact origin has to be echoed back - a regex list of localhost ports does
+    # not cover it and `CORS_ALLOW_CREDENTIALS = True` rules out a wildcard.
+    if APP_WEB_ORIGIN not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(APP_WEB_ORIGIN)
