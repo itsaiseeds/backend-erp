@@ -11,6 +11,7 @@ from .CustomOrder import CustomOrder
 from .CustomOrderItem import CustomOrderItem
 from .DispatchDetails import DispatchDetails
 from .InventorySnapshot import InventorySnapshot
+from .LooseStockSnapshot import LooseStockSnapshot
 from .Order import Order
 from .OrderItem import OrderItem
 from .Pincode import Pincode
@@ -42,6 +43,7 @@ __all__ = [
     "Product",
     "ProductPackaging",
     "InventorySnapshot",
+    "LooseStockSnapshot",
     "DispatchDetails",
     "PrivateDispatchDetails",
     "Order",

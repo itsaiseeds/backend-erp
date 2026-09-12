@@ -36,7 +36,8 @@ class UpdateProductSerializer(serializers.Serializer):
         queryset=Stage.objects.all(), required=False
     )
     selling_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, required=False, min_value=0
+        max_digits=12, decimal_places=2, required=False, min_value=0,
+        help_text="Rate per kilogram; packet and bag prices derive from it and the weight sold.",
     )
     image = serializers.ImageField(required=False)
 

@@ -182,9 +182,16 @@ bag holds N packets. (This inverts an earlier model where a "packet" held
   `/media/…` path).
 - Upload **before** creating the row: files are named by a fresh UUID, so a
   failed upload never leaves a half-created record behind.
+- `Product.selling_price` is a **rate per kilogram** — never a per-packet or
+  per-bag figure. Every concrete price derives from it and the weight sold, via
+  `Product.price_for_weight(w)` (`rate * w`, rounded half-up to paise). Pricing
+  by weight is what lets a 500g and a 1kg packet of one product prefill
+  correctly, which a per-packet rate could not express.
 - `ProductPackaging.selling_price` is the **whole-bag** list price (Decimal
   12,2, `NOT NULL`, stored). `ProductOperations.add_packaging(...)` defaults it
-  to `packets * product.selling_price` at creation; **frozen** once stored.
+  to `packets * product.price_for_weight(packet_weight)` at creation;
+  **frozen** once stored. `ProductPackagingsView` applies the same default on
+  the create endpoint — keep the two in step.
 - `OrderItem.negotiated_selling_price` is the **per-bag** rate for that line
   (same unit as `ProductPackaging.selling_price`), defaulting to the packaging's
   `selling_price`.
@@ -192,30 +199,44 @@ bag holds N packets. (This inverts an earlier model where a "packet" held
   bags). `Order.total_amount` sums line totals; `Order.total_packets` counts
   small units (`quantity * packets`).
 
-### Stock units: two pools — whole bags per packaging, loose packets per product
-- Stock is a **daily physical count**, not a running ledger:
-  `InventorySnapshot` holds one row per (`snapshot_date`, `product_packaging`).
-- Two pools, in two different units, that never mix, tracked at **different
-  grains**:
-  - `bags` — sealed whole packagings, tracked **per `ProductPackaging`**. Same
-    unit as `OrderItem.quantity`, so packaged-order demand compares directly
-    with no conversion. Consumed by normal `Order`s.
-  - `loose_packets` — unpacked single packets, tracked **per `Product`**.
-    Counted per packaging in the snapshot but aggregated to the product for
-    availability (`on_hand_loose_packets(product)` sums a product's packaging
-    rows), because a `CustomOrder` names a raw product and a packet count —
-    never a packaging. Optional (defaults to 0). Consumed only by `CustomOrder`s.
+### Stock units: two pools in two tables — bags per packaging, loose packets per (product, weight)
+- Stock is a **physical count**, not a running ledger. Two pools, in two
+  different units, in **two separate tables**, that never mix:
+  - `InventorySnapshot.bags` — sealed whole packagings, one row per
+    (`snapshot_date`, `product_packaging`). Same unit as `OrderItem.quantity`,
+    so packaged-order demand compares directly with no conversion. Consumed by
+    normal `Order`s.
+  - `LooseStockSnapshot.packets` — one row per (`snapshot_date`, `product`,
+    `packet_weight`). Consumed only by `CustomOrder`s, whose
+    `CustomOrderItem` lines name the same pair.
+- **"Loose" means in a packet but not in a bag** — not unpacked. Such a packet
+  is identified by its product and its weight and nothing else, which is why the
+  loose table has **no packaging FK**: `ProductPackaging.packets` describes how
+  many packets go *in a bag* and says nothing about a packet sitting outside
+  one. A product packed as both 1kg × 20 and 1kg × 30 has **one** pool of loose
+  1kg packets, not two. (It previously had a `loose_packets` column on
+  `InventorySnapshot` keyed by packaging, which double-counted exactly this
+  case — do not reintroduce it.)
 - A packaged order can never be filled from loose stock, and a custom order
   deals only in loose packets — it never breaks open a bag. Moving stock between
-  the pools is a physical act recorded by **re-uploading the count**
-  (`bags - 1`, `loose_packets + N`) — never by a synthetic movement row.
-- **Only the latest `snapshot_date` is retained.** Recording a count for a newer
-  date hard-deletes every earlier row (a queryset delete, which bypasses
+  the pools is a physical act recorded by **re-uploading both counts**
+  (`bags - 1`, `packets + N`) — never by a synthetic movement row.
+- **The two pools run on independent date lifecycles.** Each purge is scoped to
+  its own table: `_purge_older_than` touches only `InventorySnapshot`,
+  `_purge_loose_older_than` only `LooseStockSnapshot`. A bag count for a new day
+  must never delete a loose count that is still accurate. Within each table only
+  the latest `snapshot_date` is retained (a queryset delete, which bypasses
   `SoftDeletedModel`'s instance-level soft delete by design).
+- **The bag count is compulsory; the loose count is not.**
+  `is_stock_count_complete` covers bags only, so a missing or stale loose count
+  never blocks verification. Because a loose count may be days old and still be
+  the truth, loose figures are read at `loose_date(...)` — the latest *loose*
+  snapshot date — never at `today()`, which would silently report zero the
+  morning after every count.
 - Reserved and consumed quantities are **derived from order status** (`Order`
   for bags, `CustomOrder` for loose packets), never stored. That is what makes
   verification and dispatch reversible, and what lets outstanding reservations
-  survive the daily purge. Do not add counter columns.
+  survive the purge. Do not add counter columns.
 
 ### Order verification & custom orders
 - `OrderOperations.verify_order` has **three** gates: (1) the actor is an admin
@@ -227,9 +248,14 @@ bag holds N packets. (This inverts an earlier model where a "packet" held
 - `CustomOrder` is **standalone** (no FK to `Order`), booked **only by a sales
   admin**, and has **no verification step**: `create_custom_order` auto-confirms
   it (born `CONFIRMED`, `verified_by`/`verified_at` set to the creating admin).
-  Creation is **blocked unless enough loose packets are in stock**
-  (`available_loose_packets` ≥ requested). Its `CustomOrderItem` lines carry
-  (`product`, `packets`) — no packaging.
+  Creation is **blocked unless enough loose packets are in the exact pool the
+  line names** (`available_loose_packets(product, packet_weight)` ≥ requested) —
+  a 1kg line is never filled from 500g stock. Its `CustomOrderItem` lines carry
+  (`product`, `packet_weight`, `packets`) — no packaging. One order may hold a
+  1kg line and a 500g line of the same product.
+- `CustomOrderItem.negotiated_selling_price` is the **per-packet** rate for
+  that line, defaulting to `product.price_for_weight(packet_weight)` — so a
+  500g line prefills at half a 1kg line of the same product.
 
 ### Auth / roles
 - Login is **TOTP** (authenticator app) for everyone except staff (Django admin

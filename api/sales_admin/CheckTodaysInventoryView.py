@@ -5,6 +5,11 @@ the session-only web base). It reports whether today's physical stock count is
 complete -- i.e. every active packaging has an ``InventorySnapshot`` row for
 today -- and which admins are authorised to upload that count
 (``Admin.can_update_stock_count``).
+
+``is_complete`` covers **sealed bags only**. The loose count is optional by
+design, so a missing or stale one never blocks order verification;
+``loose_snapshot_date`` reports when it was last taken (``null`` if never) so
+the frontend can surface how stale it is.
 """
 
 from __future__ import annotations
@@ -37,6 +42,7 @@ class CheckTodaysInventoryPayloadSerializer(serializers.Serializer):
 
     is_complete = serializers.BooleanField()
     snapshot_date = serializers.DateField()
+    loose_snapshot_date = serializers.DateField(allow_null=True)
     missing_packagings = MissingPackagingSerializer(many=True)
     stock_admins = StockAdminSerializer(many=True)
 
@@ -67,6 +73,11 @@ class CheckTodaysInventoryView(AdminApiView):
 
     @extend_schema(
         summary="Check whether today's stock count is complete",
+        description=(
+            "``is_complete`` covers sealed bags only -- the loose count is "
+            "optional and never blocks verification. ``loose_snapshot_date`` "
+            "is when loose stock was last counted, or null if never."
+        ),
         responses={200: CheckTodaysInventoryPayloadSerializer},
     )
     def get(self, request):
@@ -74,10 +85,12 @@ class CheckTodaysInventoryView(AdminApiView):
         stock_admins = Admin.objects.filter(
             can_update_stock_count=True
         ).select_related("user")
+        loose_date = InventoryOperations.latest_loose_snapshot_date()
         return Response(
             {
                 "is_complete": InventoryOperations.is_stock_count_complete(),
                 "snapshot_date": InventoryOperations.today().isoformat(),
+                "loose_snapshot_date": loose_date.isoformat() if loose_date else None,
                 "missing_packagings": [missing_packaging_payload(p) for p in missing],
                 "stock_admins": [stock_admin_payload(a) for a in stock_admins],
             }

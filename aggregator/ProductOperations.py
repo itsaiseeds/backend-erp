@@ -58,11 +58,13 @@ def add_packaging(
     """Create a packaging for ``product``.
 
     ``selling_price`` is the whole-packaging price. If omitted it defaults to
-    ``packets * product.selling_price`` (captured at creation time --
+    ``packets * product.price_for_weight(packet_weight)`` -- the per-kilogram
+    product rate turned into a packet price, then multiplied by the packets in
+    the bag (captured at creation time --
     later changes to the product's price do not propagate here).
     """
     if selling_price is None:
-        selling_price = packets * product.selling_price
+        selling_price = packets * product.price_for_weight(packet_weight)
     packaging = ProductPackaging(
         product=product,
         packet_weight=packet_weight,

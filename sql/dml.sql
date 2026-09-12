@@ -50,6 +50,7 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(34, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(35, 'aggregator', 'customorder');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(36, 'aggregator', 'customorderitem');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(37, 'aggregator', 'stage');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(38, 'aggregator', 'loosestocksnapshot');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -187,6 +188,10 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(126, 'Can change stage', 37, 'change_stage');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(127, 'Can delete stage', 37, 'delete_stage');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(128, 'Can view stage', 37, 'view_stage');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(129, 'Can add loose stock snapshot', 38, 'add_loosestocksnapshot');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(130, 'Can change loose stock snapshot', 38, 'change_loosestocksnapshot');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(131, 'Can delete loose stock snapshot', 38, 'delete_loosestocksnapshot');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(132, 'Can view loose stock snapshot', 38, 'view_loosestocksnapshot');
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)

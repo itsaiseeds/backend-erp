@@ -76,3 +76,27 @@ class ProductModelTest(DMLTestCase):
         assert payload["image_url"] == ""
         assert "buying_price" not in payload
         assert "margin_per_packet" not in payload
+
+    def test_price_for_weight_scales_the_per_kilogram_rate(self):
+        """tests/test_product_model.py::ProductModelTest::test_price_for_weight_scales_the_per_kilogram_rate"""
+        product = create_product(
+            name="Per Kilo", crop="Wheat",
+            stage=Stage.by_id(StageIds.BREEDER),
+            selling_price=Decimal("150.00"), actor=self.su,
+        )
+        assert product.price_for_weight(Decimal("1.000")) == Decimal("150.00")
+        assert product.price_for_weight(Decimal("0.500")) == Decimal("75.00")
+        assert product.price_for_weight(Decimal("2.500")) == Decimal("375.00")
+
+    def test_price_for_weight_rounds_to_paise(self):
+        """A per-kg rate on an odd weight must still land on a storable money value.
+
+        tests/test_product_model.py::ProductModelTest::test_price_for_weight_rounds_to_paise
+        """
+        product = create_product(
+            name="Odd Rate", crop="Wheat",
+            stage=Stage.by_id(StageIds.BREEDER),
+            selling_price=Decimal("99.99"), actor=self.su,
+        )
+        # 99.99 x 0.333 = 33.29667 -> 33.30
+        assert product.price_for_weight(Decimal("0.333")) == Decimal("33.30")

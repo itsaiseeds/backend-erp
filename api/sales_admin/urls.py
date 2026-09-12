@@ -12,6 +12,7 @@ from .CropsView import CropsView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .LogoutView import LogoutView
+from .LooseStockView import LooseStockView
 from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
 from .SalesPeopleView import SalesPeopleView
@@ -19,6 +20,7 @@ from .StockView import StockView
 from .UpdateAdminView import UpdateAdminView
 from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
+from .UpdateLooseStockView import UpdateLooseStockView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateSalesPersonView import UpdateSalesPersonView
@@ -43,6 +45,12 @@ urlpatterns = [
         UpdateTodaysInventoryView.as_view(),
         name="update-todays-inventory",
     ),
+    path(
+        "update-loose-stock",
+        UpdateLooseStockView.as_view(),
+        name="update-loose-stock",
+    ),
+    path("loose-stock", LooseStockView.as_view(), name="loose-stock"),
     path("get-stock/<str:public_id>", StockView.as_view(), name="get-stock"),
     path("products", ProductsView.as_view(), name="products"),
     path("products/<str:public_id>", UpdateProductView.as_view(), name="update-product"),

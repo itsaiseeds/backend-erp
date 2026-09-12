@@ -157,15 +157,14 @@ class InventoryApiTest(WebApiTestCase):
 
         # Count every active packaging (the DB may have seed-data packagings
         # beyond the two we created in setUpTestData).
-        counts = {
-            p: {"bags": 10, "loose_packets": 0}
-            for p in ProductPackaging.objects.all()
-        }
+        counts = dict.fromkeys(ProductPackaging.objects.all(), 10)
         record_stock_counts(counts=counts, actor=self.stock_admin_user)
         resp = self._stock_admin_request("get", CHECK_URL)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(resp.data["is_complete"])
         self.assertEqual(resp.data["missing_packagings"], [])
+        # is_complete covers bags only; loose was never counted.
+        self.assertIsNone(resp.data["loose_snapshot_date"])
 
     def test_check_inventory_returns_stock_admins(self):
         """Run: tests/test_inventory_api.py::InventoryApiTest::test_check_inventory_returns_stock_admins"""
@@ -264,7 +263,6 @@ class InventoryApiTest(WebApiTestCase):
             s for s in resp.data if s["packaging"]["public_id"] == self.pack2.public_id
         )
         self.assertEqual(pack2_snap["bags"], 0)
-        self.assertEqual(pack2_snap["loose_packets"], 0)
 
     def test_post_update_inventory_snapshot_shape(self):
         """Each snapshot has the expected fields.
@@ -285,7 +283,9 @@ class InventoryApiTest(WebApiTestCase):
         self.assertEqual(snap["snapshot_date"], datetime.date.today().isoformat())
         self.assertEqual(snap["bags"], 20)
         self.assertIn("packets_available", snap)
-        self.assertIn("product_loose_packets_available", snap)
+        # Bags only -- loose stock has its own endpoint and its own payload.
+        self.assertNotIn("loose_packets", snap)
+        self.assertNotIn("product_loose_packets_available", snap)
 
     def test_post_update_inventory_replaces_previous_day(self):
         """Recording today's count hard-deletes older-day rows.
@@ -413,10 +413,10 @@ class InventoryApiTest(WebApiTestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
         self.assertEqual(resp.data[0]["bags"], 20)
 
-    def test_patch_update_inventory_with_bags_and_loose_packets(self):
-        """PATCH accepts the {bags, loose_packets} object shape.
+    def test_update_inventory_rejects_the_old_object_count_shape(self):
+        """The {bags, loose_packets} object form is gone: counts are bare ints.
 
-        Run: tests/test_inventory_api.py::InventoryApiTest::test_patch_update_inventory_with_bags_and_loose_packets
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_update_inventory_rejects_the_old_object_count_shape
         """
         resp = self._stock_admin_request(
             "patch",
@@ -428,9 +428,7 @@ class InventoryApiTest(WebApiTestCase):
             },
             format="json",
         )
-        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
-        self.assertEqual(resp.data[0]["bags"], 15)
-        self.assertEqual(resp.data[0]["loose_packets"], 3)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
 
     # ------------------------------------------------------------------
     # GET get-stock/<public_id>
@@ -470,17 +468,17 @@ class InventoryApiTest(WebApiTestCase):
         self.assertEqual(resp.data["consumed"], 0)
         self.assertEqual(resp.data["available"], 50)
 
-    def test_get_stock_product_returns_loose_pool(self):
-        """P- prefix returns the loose-packet position.
+    def test_get_stock_product_returns_loose_pool_per_weight(self):
+        """P- prefix returns the loose position broken down by packet weight.
 
-        Run: tests/test_inventory_api.py::InventoryApiTest::test_get_stock_product_returns_loose_pool
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_get_stock_product_returns_loose_pool_per_weight
         """
-        from aggregator.InventoryOperations import record_stock_count
+        from aggregator.InventoryOperations import record_loose_stock
 
-        record_stock_count(
-            product_packaging=self.pack1,
-            bags=0,
-            loose_packets=30,
+        record_loose_stock(
+            product=self.product,
+            packet_weight=Decimal("0.500"),
+            packets=30,
             actor=self.stock_admin_user,
         )
         resp = self._stock_admin_request(
@@ -489,10 +487,15 @@ class InventoryApiTest(WebApiTestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data["public_id"], self.product.public_id)
         self.assertEqual(resp.data["name"], self.product.name)
-        self.assertEqual(resp.data["on_hand"], 30)
-        self.assertEqual(resp.data["reserved"], 0)
-        self.assertEqual(resp.data["consumed"], 0)
-        self.assertEqual(resp.data["available"], 30)
+        # One line per weight the product is packed in (0.500 and 1.000).
+        by_weight = {line["packet_weight"]: line for line in resp.data["lines"]}
+        self.assertEqual(set(by_weight), {"0.500", "1.000"})
+        self.assertEqual(by_weight["0.500"]["on_hand"], 30)
+        self.assertEqual(by_weight["0.500"]["available"], 30)
+        self.assertEqual(by_weight["0.500"]["reserved"], 0)
+        self.assertEqual(by_weight["0.500"]["consumed"], 0)
+        # The other weight was never counted, so it is empty -- not 30.
+        self.assertEqual(by_weight["1.000"]["on_hand"], 0)
 
     def test_get_stock_unknown_id_returns_404(self):
         """Run: tests/test_inventory_api.py::InventoryApiTest::test_get_stock_unknown_id_returns_404"""
@@ -516,27 +519,26 @@ class InventoryApiTest(WebApiTestCase):
         self.assertEqual(resp.data["on_hand"], 0)
         self.assertEqual(resp.data["available"], 0)
 
-    def test_get_stock_loose_sums_across_packagings(self):
-        """Loose-packet on_hand is the sum across all counted packagings of a product.
+    def test_get_stock_loose_never_sums_across_weights(self):
+        """Each packet weight is its own pool -- weights are never added together.
 
-        Run: tests/test_inventory_api.py::InventoryApiTest::test_get_stock_loose_sums_across_packagings
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_get_stock_loose_never_sums_across_weights
         """
-        from aggregator.InventoryOperations import record_stock_count
+        from aggregator.InventoryOperations import record_loose_stock
 
-        record_stock_count(
-            product_packaging=self.pack1,
-            bags=0,
-            loose_packets=20,
+        record_loose_stock(
+            product=self.product, packet_weight=Decimal("0.500"), packets=20,
             actor=self.stock_admin_user,
         )
-        record_stock_count(
-            product_packaging=self.pack2,
-            bags=0,
-            loose_packets=10,
+        record_loose_stock(
+            product=self.product, packet_weight=Decimal("1.000"), packets=10,
             actor=self.stock_admin_user,
         )
         resp = self._stock_admin_request(
             "get", f"/api/sales-admin/get-stock/{self.product.public_id}"
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.data["on_hand"], 30)
+        by_weight = {line["packet_weight"]: line for line in resp.data["lines"]}
+        # 20 half-kilo packets and 10 one-kilo packets, reported separately.
+        self.assertEqual(by_weight["0.500"]["on_hand"], 20)
+        self.assertEqual(by_weight["1.000"]["on_hand"], 10)

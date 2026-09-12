@@ -466,7 +466,9 @@ paths:
   /api/sales-admin/check-todays-inventory:
     get:
       operationId: api_sales_admin_check_todays_inventory_retrieve
-      description: Report whether today's stock count is complete (app admin only).
+      description: '``is_complete`` covers sealed bags only -- the loose count is
+        optional and never blocks verification. ``loose_snapshot_date`` is when loose
+        stock was last counted, or null if never.'
       summary: Check whether today's stock count is complete
       tags:
       - api
@@ -683,7 +685,8 @@ paths:
   /api/sales-admin/get-stock/{public_id}:
     get:
       operationId: api_sales_admin_get_stock_retrieve
-      description: Read the current stock position for a packaging or product.
+      description: A ``PP-…`` id returns the sealed-bag position of one packaging.
+        A ``P-…`` id returns that product's loose position, one line per packet weight.
       summary: Read the stock position for a packaging or product
       parameters:
       - in: path
@@ -700,7 +703,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StockPayload'
+                $ref: '#/components/schemas/StockPosition'
+          description: ''
+  /api/sales-admin/loose-stock:
+    get:
+      operationId: api_sales_admin_loose_stock_retrieve
+      description: Read the current loose-stock position for every counted pool.
+      summary: Read the loose-stock position
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LooseStockPosition'
           description: ''
   /api/sales-admin/product-packagings:
     get:
@@ -1017,11 +1036,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientPayload'
           description: ''
+  /api/sales-admin/update-loose-stock:
+    post:
+      operationId: api_sales_admin_update_loose_stock_create
+      description: Every (product, packet_weight) pair the business packs receives
+        a loose row for today. Pairs absent from ``counts`` are recorded as zero packets.
+        Does not touch the sealed-bag snapshot.
+      summary: Replace the whole loose-stock count
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LooseStockPayload'
+          description: ''
+    patch:
+      operationId: api_sales_admin_update_loose_stock_partial_update
+      description: Only the pairs named in ``counts`` are written; every other loose
+        row is left as it is.
+      summary: Partially update the loose-stock count
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LooseStockPayload'
+          description: ''
   /api/sales-admin/update-todays-inventory:
     post:
       operationId: api_sales_admin_update_todays_inventory_create
       description: Every active packaging receives a snapshot row for today. Packagings
-        absent from ``counts`` are recorded as zero bags.
+        absent from ``counts`` are recorded as zero bags. Loose stock is counted separately
+        and is not affected.
       summary: Replace today's entire stock count
       tags:
       - api
@@ -1379,6 +1460,10 @@ components:
         snapshot_date:
           type: string
           format: date
+        loose_snapshot_date:
+          type: string
+          format: date
+          nullable: true
         missing_packagings:
           type: array
           items:
@@ -1389,6 +1474,7 @@ components:
             $ref: '#/components/schemas/StockAdmin'
       required:
       - is_complete
+      - loose_snapshot_date
       - missing_packagings
       - snapshot_date
       - stock_admins
@@ -1762,7 +1848,8 @@ components:
 
         ``product`` is addressed by its ``public_id`` (``P-…``). ``selling_price``
         is the whole-packaging price; when omitted it is frozen to
-        ``packets * product.selling_price`` (see
+        ``packets * product.price_for_weight(packet_weight)`` -- the product's
+        per-kilogram rate applied to one packet, times the packets in the bag (see
         ``aggregator.ProductOperations.add_packaging``).
       properties:
         product:
@@ -1799,6 +1886,8 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Rate per kilogram; packet and bag prices derive from it and
+            the weight sold.
         image:
           type: string
           format: binary
@@ -1939,6 +2028,115 @@ components:
       - name
       - phone_number
       - role
+    LooseCountLineRequest:
+      type: object
+      description: 'One submitted loose line: a product, a packet weight and a packet
+        count.'
+      properties:
+        product:
+          type: string
+          minLength: 1
+          description: Product public_id (``P-…``).
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        packets:
+          type: integer
+          minimum: 0
+      required:
+      - packet_weight
+      - packets
+      - product
+    LooseStockLine:
+      type: object
+      description: Output shape for one loose pool's position.
+      properties:
+        product:
+          $ref: '#/components/schemas/LooseStockProductRef'
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        consumed:
+          type: integer
+        available:
+          type: integer
+      required:
+      - available
+      - consumed
+      - on_hand
+      - packet_weight
+      - product
+      - reserved
+    LooseStockPayload:
+      type: object
+      description: Output shape for one recorded loose line.
+      properties:
+        public_id:
+          type: string
+        snapshot_date:
+          type: string
+          format: date
+        product:
+          $ref: '#/components/schemas/LooseStockProductRef'
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        packets:
+          type: integer
+          minimum: 0
+        total_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,3})?$
+        reserved:
+          type: integer
+        consumed:
+          type: integer
+        available:
+          type: integer
+      required:
+      - available
+      - consumed
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - reserved
+      - snapshot_date
+      - total_weight
+    LooseStockPosition:
+      type: object
+      description: Output shape for the whole loose position.
+      properties:
+        snapshot_date:
+          type: string
+          format: date
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/LooseStockLine'
+      required:
+      - lines
+      - snapshot_date
+    LooseStockProductRef:
+      type: object
+      description: Output shape for the ``product`` reference inside a loose line.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
     MissingPackaging:
       type: object
       description: Output shape for one packaging that has not been counted today.
@@ -2016,6 +2214,15 @@ components:
           type: string
           minLength: 1
           maxLength: 255
+    PatchedUpdateLooseStockRequest:
+      type: object
+      description: 'Request validation: a list of loose lines.'
+      properties:
+        counts:
+          type: array
+          items:
+            $ref: '#/components/schemas/LooseCountLineRequest'
+          description: Loose lines, one per (product, packet_weight) pair.
     PatchedUpdateProductPackagingRequest:
       type: object
       description: Request validation for updating a ``ProductPackaging`` (all fields
@@ -2051,6 +2258,8 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Rate per kilogram; packet and bag prices derive from it and
+            the weight sold.
         image:
           type: string
           format: binary
@@ -2082,13 +2291,57 @@ components:
     PatchedUpdateTodaysInventoryRequest:
       type: object
       description: 'Request validation: a map of packaging ``public_id`` → today''s
-        count.'
+        bag count.'
       properties:
         counts:
           type: object
           additionalProperties:
-            type: string
-          description: Map of product-packaging public_id to its count.
+            type: integer
+            minimum: 0
+          description: Map of product-packaging public_id to its bag count.
+    ProductLooseStockPayload:
+      type: object
+      description: Output shape for a product's loose position, one line per packet
+        weight.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        snapshot_date:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductLooseWeightLine'
+      required:
+      - lines
+      - name
+      - public_id
+      - snapshot_date
+    ProductLooseWeightLine:
+      type: object
+      description: Output shape for one packet-weight line of a product's loose position.
+      properties:
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        consumed:
+          type: integer
+        available:
+          type: integer
+      required:
+      - available
+      - consumed
+      - on_hand
+      - packet_weight
+      - reserved
     ProductPackagingPayload:
       type: object
       description: Output shape for one packaging row.
@@ -2135,6 +2388,8 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Rate per kilogram; packet and bag prices derive from it and
+            the weight sold.
         image_url:
           type: string
       required:
@@ -2238,9 +2493,6 @@ components:
         bags:
           type: integer
           minimum: 0
-        loose_packets:
-          type: integer
-          minimum: 0
         total_packets:
           type: integer
           minimum: 0
@@ -2250,16 +2502,10 @@ components:
           pattern: ^-?\d{0,8}(?:\.\d{0,3})?$
         packets_available:
           type: integer
-          minimum: 0
-        product_loose_packets_available:
-          type: integer
-          minimum: 0
       required:
       - bags
-      - loose_packets
       - packaging
       - packets_available
-      - product_loose_packets_available
       - public_id
       - snapshot_date
       - total_packets
@@ -2334,16 +2580,12 @@ components:
           format: date
         on_hand:
           type: integer
-          minimum: 0
         reserved:
           type: integer
-          minimum: 0
         consumed:
           type: integer
-          minimum: 0
         available:
           type: integer
-          minimum: 0
       required:
       - available
       - consumed
@@ -2351,6 +2593,10 @@ components:
       - public_id
       - reserved
       - snapshot_date
+    StockPosition:
+      oneOf:
+      - $ref: '#/components/schemas/StockPayload'
+      - $ref: '#/components/schemas/ProductLooseStockPayload'
     Totp:
       type: object
       description: Swagger schema for a user's TOTP provisioning URI (used to render
@@ -2385,16 +2631,28 @@ components:
       - contacts
       - public_id
       - transport_agencies
+    UpdateLooseStockRequest:
+      type: object
+      description: 'Request validation: a list of loose lines.'
+      properties:
+        counts:
+          type: array
+          items:
+            $ref: '#/components/schemas/LooseCountLineRequest'
+          description: Loose lines, one per (product, packet_weight) pair.
+      required:
+      - counts
     UpdateTodaysInventoryRequest:
       type: object
       description: 'Request validation: a map of packaging ``public_id`` → today''s
-        count.'
+        bag count.'
       properties:
         counts:
           type: object
           additionalProperties:
-            type: string
-          description: Map of product-packaging public_id to its count.
+            type: integer
+            minimum: 0
+          description: Map of product-packaging public_id to its bag count.
       required:
       - counts
     UserRef:
