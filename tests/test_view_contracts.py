@@ -93,9 +93,25 @@ EXPECTED_CONTRACTS = {
     "android/api/v1/auth/reauthenticate": ("ReauthenticateView", TOKEN_SALESPERSON),
     "android/api/v1/client/<public_id>": ("GetClientView", TOKEN_SALESPERSON),
     "android/api/v1/create-client": ("CreateClientView", TOKEN_SALESPERSON),
+    "android/api/v1/create-multi-select-bag-order": (
+        "CreateMultiSelectBagOrderView",
+        TOKEN_SALESPERSON,
+    ),
     "android/api/v1/get-clients": ("GetClientsView", TOKEN_SALESPERSON),
+    "android/api/v1/sales-person-catalogue": (
+        "SalesPersonCatalogueView",
+        TOKEN_SALESPERSON,
+    ),
     "android/api/v1/update-client": ("UpdateClientView", TOKEN_SALESPERSON),
     "android/api/v1/utilities/cities": ("CitiesView", TOKEN_SALESPERSON),
+    "android/api/v1/utilities/client-addresses": (
+        "ClientAddressesView",
+        TOKEN_SALESPERSON,
+    ),
+    "android/api/v1/utilities/client-transport-agencies": (
+        "ClientTransportAgenciesView",
+        TOKEN_SALESPERSON,
+    ),
     "android/api/v1/utilities/countries": ("CountriesView", TOKEN_SALESPERSON),
     "android/api/v1/utilities/states": ("StatesView", TOKEN_SALESPERSON),
     # -- Sales-admin website (session-only) ----------------------------------

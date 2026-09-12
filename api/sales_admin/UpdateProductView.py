@@ -8,21 +8,33 @@ edited. Soft-deleted products are never found (404).
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from aggregator.models import Crop, Product, Stage
+from aggregator.ProductOperations import sync_product_description_items
 from api.admin import AdminApiView
 from common.models.timestamped import indian_now
 from common.storage import delete_image, upload_image
 
-from .ProductsView import ProductPayloadSerializer, product_payload
+from .ProductsView import (
+    DescriptionItemsField,
+    ProductPayloadSerializer,
+    product_payload,
+    products_queryset,
+)
 
 
 class UpdateProductSerializer(serializers.Serializer):
-    """Request validation for updating a ``Product`` (all fields optional)."""
+    """Request validation for updating a ``Product`` (all fields optional).
+
+    ``description_items`` is declarative, like the client lists on
+    ``UpdateClientView``: omit it to leave the bullets untouched, send a list to
+    replace them wholesale, send ``[]`` to clear them.
+    """
 
     name = serializers.CharField(
         max_length=255,
@@ -40,6 +52,7 @@ class UpdateProductSerializer(serializers.Serializer):
         help_text="Rate per kilogram; packet and bag prices derive from it and the weight sold.",
     )
     image = serializers.ImageField(required=False)
+    description_items = DescriptionItemsField()
 
     def validate(self, attrs):
         name = attrs.get("name", self.instance.name if self.instance is not None else None)
@@ -69,9 +82,7 @@ class UpdateProductView(AdminApiView):
         responses={200: ProductPayloadSerializer},
     )
     def patch(self, request, public_id: str):
-        product = get_object_or_404(
-            Product.objects.select_related("crop", "stage"), public_id=public_id
-        )
+        product = get_object_or_404(products_queryset(), public_id=public_id)
 
         serializer = UpdateProductSerializer(
             instance=product, data=request.data, partial=True
@@ -89,11 +100,23 @@ class UpdateProductView(AdminApiView):
             replaced_image_url = product.image_url
             product.image_url = upload_image(image, folder="products")
 
-        product.save()
+        rewrote_bullets = "description_items" in serializer.validated_data
+        with transaction.atomic():
+            product.save()
+            if rewrote_bullets:
+                sync_product_description_items(
+                    product,
+                    serializer.validated_data["description_items"],
+                    request.user,
+                )
 
         if replaced_image_url:
             delete_image(replaced_image_url)
 
+        if rewrote_bullets:
+            # The prefetched bullets are stale once they have been rewritten;
+            # refresh_from_db drops the prefetch cache so the response re-reads.
+            product.refresh_from_db()
         return Response(product_payload(product))
 
     @extend_schema(

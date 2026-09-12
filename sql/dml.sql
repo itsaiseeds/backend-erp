@@ -51,6 +51,7 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(35, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(36, 'aggregator', 'customorderitem');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(37, 'aggregator', 'stage');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(38, 'aggregator', 'loosestocksnapshot');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(39, 'aggregator', 'productdescriptionitem');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -192,6 +193,10 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(130, 'Can change loose stock snapshot', 38, 'change_loosestocksnapshot');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(131, 'Can delete loose stock snapshot', 38, 'delete_loosestocksnapshot');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(132, 'Can view loose stock snapshot', 38, 'view_loosestocksnapshot');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(133, 'Can add product description item', 39, 'add_productdescriptionitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(134, 'Can change product description item', 39, 'change_productdescriptionitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(135, 'Can delete product description item', 39, 'delete_productdescriptionitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(136, 'Can view product description item', 39, 'view_productdescriptionitem');
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)

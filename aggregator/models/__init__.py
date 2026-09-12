@@ -17,6 +17,7 @@ from .OrderItem import OrderItem
 from .Pincode import Pincode
 from .PrivateDispatchDetails import PrivateDispatchDetails
 from .Product import Product
+from .ProductDescriptionItem import ProductDescriptionItem
 from .ProductPackaging import ProductPackaging
 from .Stage import Stage, StageIds
 from .State import State
@@ -41,6 +42,7 @@ __all__ = [
     "Stage",
     "StageIds",
     "Product",
+    "ProductDescriptionItem",
     "ProductPackaging",
     "InventorySnapshot",
     "LooseStockSnapshot",

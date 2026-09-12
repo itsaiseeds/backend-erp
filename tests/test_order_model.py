@@ -12,7 +12,11 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.utils import IntegrityError
 
-from aggregator.ClientOperations import add_client_address, create_client
+from aggregator.ClientOperations import (
+    add_client_address,
+    add_client_transport_agency,
+    create_client,
+)
 from aggregator.InventoryOperations import record_stock_counts
 from aggregator.models import (
     Address,
@@ -27,6 +31,7 @@ from aggregator.models import (
     StageIds,
     State,
     StatusIds,
+    TransportAgency,
 )
 from aggregator.OrderOperations import (
     attach_dispatch_details,
@@ -239,3 +244,47 @@ class OrderModelTest(DMLTestCase):
         assert order.status.code == "UNDER_REVIEW"
         assert order.verified_by_id is None
         assert order.verified_at is None
+
+    # -- transport agency ------------------------------------------------------
+
+    def test_an_order_defaults_to_no_transport_agency(self):
+        """tests/test_order_model.py::OrderModelTest::test_an_order_defaults_to_no_transport_agency"""
+        order = self._order()
+        assert order.transport_agency_id is None
+        assert order_payload(order)["transport_agency"] is None
+        assert order_payload(order)["dispatch_mode"] == "PRIVATE"
+
+    def test_the_clients_own_transport_agency_is_accepted(self):
+        """tests/test_order_model.py::OrderModelTest::test_the_clients_own_transport_agency_is_accepted"""
+        agency = TransportAgency.objects.create(name="ABC Transport", created_by=self.su)
+        add_client_transport_agency(self.client_obj, agency, self.sp_user, is_primary=True)
+
+        order = create_order(
+            client=self.client_obj,
+            delivery_address=self.addr,
+            actor=self.sp_user,
+            items=self._items(),
+            transport_agency=agency,
+        )
+        assert order.transport_agency_id == agency.id
+        payload = order_payload(order)
+        assert payload["transport_agency"] == {"id": agency.id, "name": "ABC Transport"}
+        assert payload["dispatch_mode"] == "AGENCY"
+
+    def test_an_agency_belonging_to_another_client_is_rejected(self):
+        """tests/test_order_model.py::OrderModelTest::test_an_agency_belonging_to_another_client_is_rejected"""
+        other_client = create_client(
+            company_name="Rival", gst_number="27AAPFU0939F1ZB", actor=self.sp_user
+        )
+        agency = TransportAgency.objects.create(name="XYZ Transport", created_by=self.su)
+        add_client_transport_agency(other_client, agency, self.sp_user, is_primary=True)
+
+        with self.assertRaises(ValidationError) as caught:
+            create_order(
+                client=self.client_obj,
+                delivery_address=self.addr,
+                actor=self.sp_user,
+                items=self._items(),
+                transport_agency=agency,
+            )
+        assert "transport_agency" in caught.exception.message_dict

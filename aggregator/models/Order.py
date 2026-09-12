@@ -30,6 +30,12 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
     later: at most one of ``dispatch_details`` / ``private_dispatch_details``
     may ever be set, and exactly one is required once the order is dispatched.
 
+    ``transport_agency`` records *who* is meant to carry the order, chosen at
+    booking time from the client's own agencies. It is optional: null means a
+    private (own-vehicle) dispatch, which is the default assumption. It is
+    independent of the dispatch details above, which are filled in afterwards
+    with what actually happened.
+
     Exposed to the frontend by its ``public_id`` (``ORD-…``); the primary key is
     never sent out.
     """
@@ -78,6 +84,18 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
         null=True,
         blank=True,
         related_name="orders",
+    )
+    transport_agency = models.ForeignKey(
+        "aggregator.TransportAgency",
+        verbose_name="transport agency",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="orders",
+        help_text=(
+            "The client's transport agency carrying this order. Null means a "
+            "private (own-vehicle) dispatch, which is the default."
+        ),
     )
     special_comments = models.TextField("special comments", blank=True)
     verified_by = models.ForeignKey(
@@ -167,6 +185,18 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
             if not belongs:
                 errors["delivery_address"] = (
                     "Delivery address must belong to the selected client."
+                )
+
+        if self.client_id and self.transport_agency_id:
+            from .ClientTransportAgency import ClientTransportAgency
+
+            linked = ClientTransportAgency.objects.filter(
+                client_id=self.client_id,
+                transport_agency_id=self.transport_agency_id,
+            ).exists()
+            if not linked:
+                errors["transport_agency"] = (
+                    "Transport agency must belong to the selected client."
                 )
 
         if self.dispatch_details_id and self.private_dispatch_details_id:
