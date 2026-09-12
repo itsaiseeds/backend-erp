@@ -355,6 +355,7 @@ if DEBUG:
         f"http://127.0.0.1:{DEV_SPA_PORT}",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
+        "https://sales-saiseeds.web.app" # Preprod URL
     ]
 
 # HSTS + related transport headers, opt-in via env so local http:// dev is

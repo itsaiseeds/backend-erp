@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
@@ -53,10 +52,6 @@ class AndroidLoginTest(AndroidApiTestCase):
             city=city,
             created_by=cls.superuser,
         )
-
-    def setUp(self):
-        super().setUp()
-        cache.clear()  # reset the android_login per-IP throttle counter
 
     def _login(self, phone: str, otp: str):
         return self.client.post(URL, {"phone_number": phone, "otp": otp}, format="json")

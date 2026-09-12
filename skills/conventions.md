@@ -23,6 +23,10 @@ Keep **one source of truth per fact**:
   `is_dispatched`), and the operations layer (`OrderOperations`,
   `ClientOperations`) keep logic out of views and out of other apps.
 - If you are about to paste a block for the third time, extract it.
+- The same applies to tests: a behaviour inherited from a base class is tested
+  once, where it is implemented. Authentication and role gating live in
+  `tests/test_view_contracts.py` and are never retested per endpoint — see
+  [docs/testing.md](../docs/testing.md).
 
 ### YAGNI — You Aren't Gonna Need It
 

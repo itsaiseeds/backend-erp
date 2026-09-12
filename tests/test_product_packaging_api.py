@@ -30,7 +30,7 @@ class ProductPackagingApiTest(WebApiTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        """Build an app admin, a plain user, a crop and a product."""
+        """Build an app admin, a crop and a product."""
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
 
@@ -43,14 +43,6 @@ class ProductPackagingApiTest(WebApiTestCase):
         )
         Admin.objects.create(
             user=cls.seed_admin, can_update_stock_count=True, created_by=cls.superuser
-        )
-
-        cls.plain = User.objects.create_user(
-            phone_number="6666666666",
-            name="plain user",
-            is_verified=True,
-            created_by=cls.superuser,
-            verified_by=cls.superuser,
         )
 
         cls.crop = Crop.objects.create(name="Wheat", created_by=cls.seed_admin)
@@ -84,42 +76,6 @@ class ProductPackagingApiTest(WebApiTestCase):
         """Return the update/delete URL for a packaging (by public id)."""
         return f"{PACKAGINGS_URL}/{packaging.public_id}"
 
-    # -- permission gating ----------------------------------------------------
-
-    def test_anonymous_requests_are_rejected(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_anonymous_requests_are_rejected"""
-        self.assertIn(self.client.get(PACKAGINGS_URL).status_code, (401, 403))
-        self.assertIn(
-            self.client.post(PACKAGINGS_URL, self._payload(), format="json").status_code,
-            (401, 403),
-        )
-        self.assertIn(
-            self.client.patch(
-                self._url(self.packaging), {"selling_price": "7000.00"}, format="json"
-            ).status_code,
-            (401, 403),
-        )
-        self.assertIn(self.client.delete(self._url(self.packaging)).status_code, (401, 403))
-
-    def test_non_admin_requests_are_rejected(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_non_admin_requests_are_rejected"""
-        self.login_as(self.plain)
-        self.assertEqual(self.client.get(PACKAGINGS_URL).status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(
-            self.client.post(PACKAGINGS_URL, self._payload(), format="json").status_code,
-            status.HTTP_403_FORBIDDEN,
-        )
-        self.assertEqual(
-            self.client.patch(
-                self._url(self.packaging), {"selling_price": "7000.00"}, format="json"
-            ).status_code,
-            status.HTTP_403_FORBIDDEN,
-        )
-        self.assertEqual(
-            self.client.delete(self._url(self.packaging)).status_code,
-            status.HTTP_403_FORBIDDEN,
-        )
-
     # -- creation -------------------------------------------------------------
 
     def test_admin_create_packaging_payload_shape(self):
@@ -150,69 +106,62 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.assertEqual(created.product_id, self.product.id)
         self.assertEqual(created.created_by_id, self.seed_admin.id)
 
-    def test_admin_create_packaging_defaults_selling_price_from_weight(self):
-        """The default bag price is packets x packet_weight x the per-kg rate.
+    def test_an_omitted_selling_price_defaults_from_the_per_kilogram_rate(self):
+        """The default bag price is packets x packet_weight x the per-kg rate, and
+        therefore scales linearly with packet weight -- the point of a per-kg rate.
 
-        tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_create_packaging_defaults_selling_price_from_weight
+        tests/test_product_packaging_api.py::ProductPackagingApiTest::test_an_omitted_selling_price_defaults_from_the_per_kilogram_rate
         """
         self.login_as(self.seed_admin)
-        payload = self._payload(weight=50, packets=3)
-        payload.pop("selling_price")
-        response = self.client.post(PACKAGINGS_URL, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
-        # 1200/kg x 50kg = 60000 a packet, x 3 packets = 180000 a bag.
-        self.assertEqual(float(response.data["selling_price"]), 180000.0)
 
-    def test_default_packaging_price_scales_with_packet_weight(self):
-        """Halving the packet weight halves the bag price -- the point of a per-kg rate.
-
-        tests/test_product_packaging_api.py::ProductPackagingApiTest::test_default_packaging_price_scales_with_packet_weight
-        """
-        self.login_as(self.seed_admin)
-        prices = {}
-        for weight in (10, 20):
-            payload = self._payload(weight=weight, packets=2)
+        def _default_price(weight, packets):
+            payload = self._payload(weight=weight, packets=packets)
             payload.pop("selling_price")
             response = self.client.post(PACKAGINGS_URL, payload, format="json")
-            self.assertEqual(
-                response.status_code, status.HTTP_201_CREATED, response.content
-            )
-            prices[weight] = float(response.data["selling_price"])
-        self.assertEqual(prices[20], prices[10] * 2)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+            return float(response.data["selling_price"])
 
-    def test_create_packaging_invalid_product_public_id_rejected(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_create_packaging_invalid_product_public_id_rejected"""
+        # 1200/kg x 50kg = 60000 a packet, x 3 packets = 180000 a bag.
+        self.assertEqual(_default_price(weight=50, packets=3), 180000.0)
+        # Doubling the packet weight doubles the bag price.
+        self.assertEqual(_default_price(weight=20, packets=2), _default_price(10, 2) * 2)
+
+    def test_invalid_packaging_payloads_are_rejected(self):
+        """Field rules and the (product, weight, packets) uniqueness, both verbs.
+
+        tests/test_product_packaging_api.py::ProductPackagingApiTest::test_invalid_packaging_payloads_are_rejected
+        """
         self.login_as(self.seed_admin)
-        payload = self._payload()
-        payload["product"] = "P-BOGUSID"
-        self.assertEqual(
-            self.client.post(PACKAGINGS_URL, payload, format="json").status_code,
-            status.HTTP_400_BAD_REQUEST,
+
+        create_cases = [
+            ("unknown product", {**self._payload(), "product": "P-BOGUSID"}),
+            ("zero packet weight", self._payload(weight=0)),
+            ("negative packet weight", self._payload(weight=-1)),
+            ("zero packets", self._payload(packets=0)),
+            ("negative selling price", self._payload(selling_price="-1.00")),
+            # 25kg x 5 packets is the seeded packaging for this product.
+            ("duplicate weight+packets", self._payload(weight=25, packets=5)),
+        ]
+        for label, payload in create_cases:
+            with self.subTest(verb="POST", case=label):
+                self.assertEqual(
+                    self.client.post(PACKAGINGS_URL, payload, format="json").status_code,
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+        ProductPackaging.objects.create(
+            product=self.product,
+            packet_weight=50,
+            packets=2,
+            selling_price=3000,
+            created_by=self.seed_admin,
         )
-
-    def test_create_packaging_duplicate_rejected(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_create_packaging_duplicate_rejected"""
-        self.login_as(self.seed_admin)
-        self.assertEqual(
-            self.client.post(
-                PACKAGINGS_URL, self._payload(weight=25, packets=5), format="json"
-            ).status_code,
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    def test_create_packaging_invalid_values_rejected(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_create_packaging_invalid_values_rejected"""
-        self.login_as(self.seed_admin)
-        for payload in (
-            self._payload(weight=0),
-            self._payload(weight=-1),
-            self._payload(packets=0),
-            self._payload(selling_price="-1.00"),
-        ):
+        with self.subTest(verb="PATCH", case="duplicate weight+packets"):
             self.assertEqual(
-                self.client.post(PACKAGINGS_URL, payload, format="json").status_code,
+                self.client.patch(
+                    self._url(self.packaging), {"packet_weight": 50, "packets": 2}, format="json"
+                ).status_code,
                 status.HTTP_400_BAD_REQUEST,
-                payload,
             )
 
     # -- listing --------------------------------------------------------------
@@ -246,7 +195,11 @@ class ProductPackagingApiTest(WebApiTestCase):
     # -- update ---------------------------------------------------------------
 
     def test_admin_update_packaging(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_update_packaging"""
+        """A price change persists, and re-sending the row's own weight/packets is
+        not treated as a duplicate of itself.
+
+        tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_update_packaging
+        """
         self.login_as(self.seed_admin)
         response = self.client.patch(
             self._url(self.packaging), {"selling_price": "7000.00"}, format="json"
@@ -257,43 +210,12 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.packaging.refresh_from_db()
         self.assertEqual(self.packaging.selling_price, 7000)
 
-    def test_update_packaging_own_values_are_allowed(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_update_packaging_own_values_are_allowed"""
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            self._url(self.packaging),
-            {"packet_weight": 25, "packets": 5},
-            format="json",
+        self.assertEqual(
+            self.client.patch(
+                self._url(self.packaging), {"packet_weight": 25, "packets": 5}, format="json"
+            ).status_code,
+            status.HTTP_200_OK,
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    def test_update_packaging_duplicate_rejected(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_update_packaging_duplicate_rejected"""
-        ProductPackaging.objects.create(
-            product=self.product,
-            packet_weight=50,
-            packets=2,
-            selling_price=3000,
-            created_by=self.seed_admin,
-        )
-        self.login_as(self.seed_admin)
-        response = self.client.patch(
-            self._url(self.packaging),
-            {"packet_weight": 50, "packets": 2},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_update_packaging_unknown_public_id_not_found(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_update_packaging_unknown_public_id_not_found"""
-        self.login_as(self.seed_admin)
-        for method in (self.client.patch, self.client.delete):
-            self.assertEqual(
-                method(
-                    f"{PACKAGINGS_URL}/PP-BOGUSID", {"selling_price": "7000.00"}, format="json"
-                ).status_code,
-                status.HTTP_404_NOT_FOUND,
-            )
 
     # -- deletion -------------------------------------------------------------
 
@@ -307,17 +229,21 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.assertTrue(self.packaging.is_deleted)
         self.assertEqual(self.packaging.deleted_by_id, self.seed_admin.id)
 
-    def test_deleted_packaging_no_longer_addressable(self):
-        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_deleted_packaging_no_longer_addressable"""
+    def test_an_unknown_or_deleted_packaging_is_404_for_both_verbs(self):
+        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_an_unknown_or_deleted_packaging_is_404_for_both_verbs"""
         self.login_as(self.seed_admin)
         self.client.delete(self._url(self.packaging))
-        self.assertEqual(
-            self.client.patch(
-                self._url(self.packaging), {"selling_price": "7000.00"}, format="json"
-            ).status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
-        self.assertEqual(
-            self.client.delete(self._url(self.packaging)).status_code,
-            status.HTTP_404_NOT_FOUND,
-        )
+
+        for label, url in (
+            ("unknown public_id", f"{PACKAGINGS_URL}/PP-BOGUSID"),
+            ("soft-deleted packaging", self._url(self.packaging)),
+        ):
+            with self.subTest(case=label):
+                self.assertEqual(
+                    self.client.patch(
+                        url, {"selling_price": "7000.00"}, format="json"
+                    ).status_code,
+                    status.HTTP_404_NOT_FOUND,
+                )
+                self.assertEqual(self.client.delete(url).status_code, status.HTTP_404_NOT_FOUND)
+

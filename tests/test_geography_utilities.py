@@ -1,4 +1,7 @@
-"""ORM-backed tests for the admin-only countries and states utility endpoints.
+"""ORM-backed tests for the admin-only geography utility endpoints.
+
+Countries, states and the grouped city picker share one fixture and one
+``dml.sql`` load, so they live in one class.
 
 These use the ``WebApiTestCase`` baseline (DML-seeded, superuser phone
 ``9999999999``) and add their own geography in ``setUpTestData``. Request/
@@ -21,7 +24,7 @@ SUPERUSER_PHONE = "9999999999"
 
 
 class GeographyUtilitiesTest(WebApiTestCase):
-    """Cover the admin-only countries and states list endpoints.
+    """Cover the admin-only countries, states and grouped-city list endpoints.
 
     tests/test_geography_utilities.py::GeographyUtilitiesTest
     """
@@ -48,20 +51,6 @@ class GeographyUtilitiesTest(WebApiTestCase):
         )
         cls.pune = City.objects.create(name="Pune", state=cls.state, created_by=cls.superuser)
 
-    def test_countries_requires_admin(self):
-        """tests/test_geography_utilities.py::GeographyUtilitiesTest::test_countries_requires_admin"""
-        # Anonymous
-        self.assertIn(self.client.get("/api/utilities/countries").status_code, (401, 403))
-        # A bare superuser has no Admin profile, and `is_admin_user` deliberately
-        # does not count one -- same rule as every other sales-admin endpoint.
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.get("/api/utilities/countries").status_code, status.HTTP_403_FORBIDDEN
-        )
-        # App admin is allowed.
-        self.login_as(self.seed_admin)
-        self.assertEqual(self.client.get("/api/utilities/countries").status_code, status.HTTP_200_OK)
-
     def test_countries_list(self):
         """tests/test_geography_utilities.py::GeographyUtilitiesTest::test_countries_list"""
         self.login_as(self.seed_admin)
@@ -73,20 +62,6 @@ class GeographyUtilitiesTest(WebApiTestCase):
         india = next(c for c in payload if c["name"] == "India")
         self.assertEqual(india["id"], self.country.id)
         self.assertEqual(india["iso_code"], "IN")
-
-    def test_states_requires_admin(self):
-        """tests/test_geography_utilities.py::GeographyUtilitiesTest::test_states_requires_admin"""
-        # Anonymous
-        self.assertIn(self.client.get("/api/utilities/states").status_code, (401, 403))
-        # A bare superuser has no Admin profile, and `is_admin_user` deliberately
-        # does not count one -- same rule as every other sales-admin endpoint.
-        self.login_as(self.superuser)
-        self.assertEqual(
-            self.client.get("/api/utilities/states").status_code, status.HTTP_403_FORBIDDEN
-        )
-        # App admin is allowed.
-        self.login_as(self.seed_admin)
-        self.assertEqual(self.client.get("/api/utilities/states").status_code, status.HTTP_200_OK)
 
     def test_states_list(self):
         """tests/test_geography_utilities.py::GeographyUtilitiesTest::test_states_list"""
@@ -114,3 +89,18 @@ class GeographyUtilitiesTest(WebApiTestCase):
         unknown = self.client.get("/api/utilities/states", {"country": 999999})
         self.assertEqual(unknown.status_code, status.HTTP_200_OK)
         self.assertEqual(unknown.data, [])
+
+    def test_cities_grouped_by_state(self):
+        """The Android counterpart is tests/android/test_authenticated_endpoints.py.
+
+        tests/test_geography_utilities.py::GeographyUtilitiesTest::test_cities_grouped_by_state
+        """
+        self.login_as(self.seed_admin)
+        response = self.client.get("/api/utilities/cities")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data
+        self.assertIsInstance(payload, list)
+        maharashtra = next(state for state in payload if state["name"] == "Maharashtra")
+        self.assertEqual(maharashtra["id"], self.state.id)
+        pune = next(city for city in maharashtra["cities"] if city["name"] == "Pune")
+        self.assertEqual(pune["id"], self.pune.id)

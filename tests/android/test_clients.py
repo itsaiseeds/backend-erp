@@ -327,7 +327,10 @@ class AndroidClientApiTest(AndroidApiTestCase):
         )
 
     def test_no_filter_returns_the_first_page_and_the_catalogues(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_no_filter_returns_the_first_page_and_the_catalogues"""
+        """The page shape, the declared filters and sorts, and the card contents.
+
+        tests/android/test_clients.py::AndroidClientApiTest::test_no_filter_returns_the_first_page_and_the_catalogues
+        """
         self._seed_clients_in_two_cities()
 
         response = self.client.get(GET_CLIENTS_URL)
@@ -357,69 +360,83 @@ class AndroidClientApiTest(AndroidApiTestCase):
             ["created_at", "company_name"],
         )
 
-    def test_the_city_id_filter_advertises_only_this_sales_persons_cities(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_the_city_id_filter_advertises_only_this_sales_persons_cities"""
+        # Each card carries the client's primary contact and primary address.
+        card = next(c for c in response.data["results"] if c["company_name"] == "Acme Seeds")
+        self.assertEqual(card["primary_contact"]["phone_number"], "9876500001")
+        self.assertEqual(card["primary_address"]["pincode"], "395007")
+
+    def test_the_list_is_scoped_to_the_calling_sales_person(self):
+        """Another sales person's clients are neither listed nor advertised in the
+        city catalogue, even though the rows exist.
+
+        tests/android/test_clients.py::AndroidClientApiTest::test_the_list_is_scoped_to_the_calling_sales_person
+        """
         self._create()  # sales_person: one client in Surat
-        self._create(  # other_sales_person: one client in Ahmedabad -- must not leak
+        self._create(  # other_sales_person: one client in Ahmedabad
             actor=self.other_sales_person,
             gst=OTHER_GST,
             company_name="Beta Seeds",
             addresses=[self._address(city=self.other_city, pincode="380001")],
         )
+
         self.login_as(self.sales_person)
-
-        options = self.client.get(GET_CLIENTS_URL).data["available_filters"][0]["options"]
-
+        mine = self.client.get(GET_CLIENTS_URL)
+        self.assertEqual(
+            [c["company_name"] for c in mine.data["results"]], ["Acme Seeds"]
+        )
+        # The city catalogue must not leak Ahmedabad, where only the other
+        # sales person has a client.
+        options = mine.data["available_filters"][0]["options"]
         self.assertEqual([o["label"] for o in options], ["Surat"])
         self.assertEqual([o["value"] for o in options], [self.city.id])
 
-    def test_filtering_by_primary_address_city_returns_only_matching_clients(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_primary_address_city_returns_only_matching_clients"""
+        # Filtering by a city only the other sales person serves finds nothing.
+        theirs = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
+        self.assertEqual(theirs.data["results"], [])
+        self.assertEqual(theirs.data["total_count"], 0)
+        self.assertEqual(Client.objects.count(), 2)
+
+    def test_the_city_filter_matches_only_the_primary_address(self):
+        """One id, several comma-separated ids, and the primary-only rule.
+
+        tests/android/test_clients.py::AndroidClientApiTest::test_the_city_filter_matches_only_the_primary_address
+        """
         self._seed_clients_in_two_cities()
 
-        response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
+        one = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
+        self.assertEqual(one.status_code, status.HTTP_200_OK)
+        self.assertEqual([c["company_name"] for c in one.data["results"]], ["Beta Seeds"])
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["total_count"], 1)
-        self.assertEqual(
-            [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
-        )
-
-    def test_filtering_accepts_several_comma_separated_city_ids(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_accepts_several_comma_separated_city_ids"""
-        self._seed_clients_in_two_cities()
-
-        response = self.client.get(
+        both = self.client.get(
             GET_CLIENTS_URL, {"city_id": f"{self.city.id},{self.other_city.id}"}
         )
-
-        self.assertEqual(response.data["total_count"], 2)
+        self.assertEqual(both.data["total_count"], 2)
         self.assertEqual(
-            sorted(c["company_name"] for c in response.data["results"]),
+            sorted(c["company_name"] for c in both.data["results"]),
             ["Acme Seeds", "Beta Seeds"],
         )
 
-    def test_only_the_primary_address_city_is_matched(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_only_the_primary_address_city_is_matched"""
-        self.login_as(self.sales_person)
+        # A client whose *secondary* address is in Ahmedabad is not matched by it.
         self.client.post(
             CREATE_CLIENT_URL,
             self._body(
+                gst=self._gst(2),
+                company_name="Gamma Seeds",
                 addresses=[
                     self._address(is_primary=True),
                     self._address(
                         line_1="2 Side Road", city=self.other_city, pincode="380001"
                     ),
-                ]
+                ],
             ),
             format="json",
         )
-
-        matched = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
-        missed = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
-
-        self.assertEqual(matched.data["total_count"], 1)
-        self.assertEqual(missed.data["total_count"], 0)
+        by_secondary = self.client.get(
+            GET_CLIENTS_URL, {"city_id": str(self.other_city.id)}
+        )
+        self.assertNotIn(
+            "Gamma Seeds", [c["company_name"] for c in by_secondary.data["results"]]
+        )
 
     def test_filtering_by_status(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_status"""
@@ -442,17 +459,16 @@ class AndroidClientApiTest(AndroidApiTestCase):
             ["VERIFICATION_PENDING", "VERIFIED"],
         )
 
-    def test_an_unknown_status_code_is_rejected(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_an_unknown_status_code_is_rejected"""
-        self._create()
-
-        response = self.client.get(GET_CLIENTS_URL, {"status": "NOPE"})
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Unknown status", response.data["detail"])
+        # A code outside the catalogue is a 400, not an empty page.
+        unknown = self.client.get(GET_CLIENTS_URL, {"status": "NOPE"})
+        self.assertEqual(unknown.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Unknown status", unknown.data["detail"])
 
     def test_filtering_by_the_created_window(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_created_window"""
+        """Each bound narrows the page on its own; an inverted window is a 400.
+
+        tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_the_created_window
+        """
         self._create()
         acme = Client.objects.get(company_name="Acme Seeds")
         Client.objects.filter(pk=acme.pk).update(created_at="2020-01-01T00:00:00Z")
@@ -469,67 +485,19 @@ class AndroidClientApiTest(AndroidApiTestCase):
             [c["company_name"] for c in old.data["results"]], ["Acme Seeds"]
         )
 
-    def test_an_inverted_created_window_is_rejected(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_an_inverted_created_window_is_rejected"""
-        self._create()
-
-        response = self.client.get(
+        inverted = self.client.get(
             GET_CLIENTS_URL,
             {"created_gte": "2026-02-01T00:00:00Z", "created_lte": "2026-01-01T00:00:00Z"},
         )
+        self.assertEqual(inverted.status_code, status.HTTP_400_BAD_REQUEST)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    def test_the_text_filters_match_the_name_and_the_primary_address(self):
+        """``company_name`` and ``address`` each match a substring, ignore
+        non-primary addresses, AND together, and refuse a blank value.
 
-    def test_filtering_by_company_name_substring(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_company_name_substring"""
-        self._create(company_name="Acme Seeds")
-        self._create(gst=OTHER_GST, company_name="Beta Traders")
-        self.login_as(self.sales_person)
-
-        hit = self.client.get(GET_CLIENTS_URL, {"company_name": "cme se"})
-        miss = self.client.get(GET_CLIENTS_URL, {"company_name": "nonesuch"})
-
-        self.assertEqual(
-            [c["company_name"] for c in hit.data["results"]], ["Acme Seeds"]
-        )
-        self.assertEqual(miss.data["total_count"], 0)
-        self.assertEqual(
-            next(
-                f["kind"]
-                for f in hit.data["available_filters"]
-                if f["filter"] == "company_name"
-            ),
-            "text",
-        )
-
-    def test_filtering_by_primary_address_substring(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_filtering_by_primary_address_substring"""
-        self._create(company_name="Acme Seeds")  # primary: 1 Ring Road, Surat
-        self._create(
-            gst=OTHER_GST,
-            company_name="Beta Traders",
-            addresses=[
-                self._address(line_1="7 Harbour Street", city=self.other_city, pincode="380001"),
-            ],
-        )
-        self.login_as(self.sales_person)
-
-        by_street = self.client.get(GET_CLIENTS_URL, {"address": "harbour"})
-        by_city = self.client.get(GET_CLIENTS_URL, {"address": "surat"})
-        by_pincode = self.client.get(GET_CLIENTS_URL, {"address": "3800"})
-
-        self.assertEqual(
-            [c["company_name"] for c in by_street.data["results"]], ["Beta Traders"]
-        )
-        self.assertEqual(
-            [c["company_name"] for c in by_city.data["results"]], ["Acme Seeds"]
-        )
-        self.assertEqual(
-            [c["company_name"] for c in by_pincode.data["results"]], ["Beta Traders"]
-        )
-
-    def test_address_filter_ignores_non_primary_addresses(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_address_filter_ignores_non_primary_addresses"""
+        tests/android/test_clients.py::AndroidClientApiTest::test_the_text_filters_match_the_name_and_the_primary_address
+        """
+        # Acme Seeds: 1 Ring Road, Surat 395007 (primary) + a Dockside secondary.
         self.login_as(self.sales_person)
         self.client.post(
             CREATE_CLIENT_URL,
@@ -541,61 +509,74 @@ class AndroidClientApiTest(AndroidApiTestCase):
             ),
             format="json",
         )
-
-        response = self.client.get(GET_CLIENTS_URL, {"address": "dockside"})
-
-        self.assertEqual(response.data["total_count"], 0)
-
-    def test_a_blank_text_filter_is_rejected(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_a_blank_text_filter_is_rejected"""
-        self._create()
-
-        response = self.client.get(GET_CLIENTS_URL, {"company_name": "   "})
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_company_name_and_address_filters_and_together(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_company_name_and_address_filters_and_together"""
-        self._create(company_name="Acme Seeds")  # Surat
+        # Acme Traders: 7 Harbour Street, Ahmedabad 380001 (primary).
         self._create(
             gst=OTHER_GST,
             company_name="Acme Traders",
-            addresses=[self._address(city=self.other_city, pincode="380001")],  # Ahmedabad
+            addresses=[
+                self._address(line_1="7 Harbour Street", city=self.other_city, pincode="380001")
+            ],
         )
         self.login_as(self.sales_person)
 
-        response = self.client.get(
-            GET_CLIENTS_URL, {"company_name": "acme", "address": "ahmedabad"}
-        )
+        cases = [
+            ("company_name substring", {"company_name": "cme se"}, ["Acme Seeds"]),
+            ("company_name miss", {"company_name": "nonesuch"}, []),
+            ("address street", {"address": "harbour"}, ["Acme Traders"]),
+            ("address city", {"address": "surat"}, ["Acme Seeds"]),
+            ("address pincode", {"address": "3800"}, ["Acme Traders"]),
+            # The Dockside address is not primary, so it is never matched.
+            ("address ignores non-primary", {"address": "dockside"}, []),
+            # Both filters AND together rather than widening the page.
+            (
+                "name and address together",
+                {"company_name": "acme", "address": "ahmedabad"},
+                ["Acme Traders"],
+            ),
+        ]
+        for label, query, expected in cases:
+            with self.subTest(filter=label):
+                response = self.client.get(GET_CLIENTS_URL, query)
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    [c["company_name"] for c in response.data["results"]], expected
+                )
 
         self.assertEqual(
-            [c["company_name"] for c in response.data["results"]], ["Acme Traders"]
+            next(
+                f["kind"]
+                for f in self.client.get(GET_CLIENTS_URL).data["available_filters"]
+                if f["filter"] == "company_name"
+            ),
+            "text",
         )
+        # A whitespace-only value is a mistake, not "no filter".
+        blank = self.client.get(GET_CLIENTS_URL, {"company_name": "   "})
+        self.assertEqual(blank.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_the_page_carries_the_primary_contact_and_address(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_the_page_carries_the_primary_contact_and_address"""
-        self._create()
+    def test_malformed_filter_values_are_rejected_and_unknown_params_ignored(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_malformed_filter_values_are_rejected_and_unknown_params_ignored"""
+        self._seed_clients_in_two_cities()
 
-        response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
+        empty = self.client.get(GET_CLIENTS_URL, {"city_id": ""})
+        self.assertEqual(empty.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("at least one value", empty.data["detail"])
 
-        card = response.data["results"][0]
-        self.assertEqual(card["company_name"], "Acme Seeds")
-        self.assertEqual(card["primary_contact"]["phone_number"], "9876500001")
-        self.assertEqual(card["primary_address"]["pincode"], "395007")
+        non_integer = self.client.get(GET_CLIENTS_URL, {"city_id": "1,not-a-number"})
+        self.assertEqual(non_integer.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_only_my_own_clients_are_listed(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_only_my_own_clients_are_listed"""
-        self._create()
-        self.login_as(self.other_sales_person)
+        # A param the view does not declare is ignored rather than rejected, so
+        # an older client's extra query string keeps working.
+        ignored = self.client.get(GET_CLIENTS_URL, {"gst_number": "27AAPFU"})
+        self.assertEqual(ignored.status_code, status.HTTP_200_OK)
+        self.assertEqual(ignored.data["total_count"], 2)
 
-        response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
+    def test_sorting(self):
+        """Newest first by default, ``company_name`` ascending and descending, and
+        a 400 for a column that is not a declared sort.
 
-        self.assertEqual(response.data["results"], [])
-        self.assertEqual(response.data["total_count"], 0)
-        self.assertEqual(Client.objects.count(), 1)
-
-    def test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical"""
+        tests/android/test_clients.py::AndroidClientApiTest::test_sorting
+        """
         self.login_as(self.sales_person)
         for index, name in enumerate(("Charlie", "Alpha", "Bravo")):
             self.client.post(
@@ -604,47 +585,30 @@ class AndroidClientApiTest(AndroidApiTestCase):
                 format="json",
             )
 
-        default = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.city.id)})
-        by_name = self.client.get(
-            GET_CLIENTS_URL, {"city_id": str(self.city.id), "sort": "company_name"}
-        )
+        city = {"city_id": str(self.city.id)}
+        cases = [
+            ("default (newest first)", city, ["Bravo Seeds", "Alpha Seeds", "Charlie Seeds"]),
+            (
+                "company_name ascending",
+                {**city, "sort": "company_name"},
+                ["Alpha Seeds", "Bravo Seeds", "Charlie Seeds"],
+            ),
+            (
+                "company_name descending",
+                {**city, "sort": "-company_name"},
+                ["Charlie Seeds", "Bravo Seeds", "Alpha Seeds"],
+            ),
+        ]
+        for label, query, expected in cases:
+            with self.subTest(sort=label):
+                response = self.client.get(GET_CLIENTS_URL, query)
+                self.assertEqual(
+                    [c["company_name"] for c in response.data["results"]], expected
+                )
 
-        self.assertEqual(
-            [c["company_name"] for c in default.data["results"]],
-            ["Bravo Seeds", "Alpha Seeds", "Charlie Seeds"],
-        )
-        self.assertEqual(
-            [c["company_name"] for c in by_name.data["results"]],
-            ["Alpha Seeds", "Bravo Seeds", "Charlie Seeds"],
-        )
-
-    def test_a_descending_sort_is_accepted(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_a_descending_sort_is_accepted"""
-        self.login_as(self.sales_person)
-        for index, name in enumerate(("Alpha", "Bravo")):
-            self.client.post(
-                CREATE_CLIENT_URL,
-                self._body(gst=self._gst(index), company_name=f"{name} Seeds"),
-                format="json",
-            )
-
-        response = self.client.get(
-            GET_CLIENTS_URL, {"city_id": str(self.city.id), "sort": "-company_name"}
-        )
-
-        self.assertEqual(
-            [c["company_name"] for c in response.data["results"]],
-            ["Bravo Seeds", "Alpha Seeds"],
-        )
-
-    def test_an_unknown_sort_is_rejected(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_an_unknown_sort_is_rejected"""
-        self._create()
-
-        response = self.client.get(GET_CLIENTS_URL, {"sort": "gst_number"})
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Unknown sort", response.data["detail"])
+        unknown = self.client.get(GET_CLIENTS_URL, {"sort": "gst_number"})
+        self.assertEqual(unknown.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Unknown sort", unknown.data["detail"])
 
     def test_results_are_paginated(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_results_are_paginated"""
@@ -671,42 +635,13 @@ class AndroidClientApiTest(AndroidApiTestCase):
         self.assertIsNone(page_2.data["next_page_number"])
         self.assertEqual(page_2.data["previous_page_number"], 1)
 
-    def test_an_unrecognised_query_param_is_ignored(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_an_unrecognised_query_param_is_ignored"""
-        self._seed_clients_in_two_cities()
-
-        response = self.client.get(GET_CLIENTS_URL, {"gst_number": "27AAPFU"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["total_count"], 2)
-
-    def test_an_empty_filter_value_is_rejected(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_an_empty_filter_value_is_rejected"""
-        self._create()
-
-        response = self.client.get(GET_CLIENTS_URL, {"city_id": ""})
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("at least one value", response.data["detail"])
-
-    def test_non_integer_filter_values_are_rejected(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_non_integer_filter_values_are_rejected"""
-        self._create()
-
-        response = self.client.get(GET_CLIENTS_URL, {"city_id": "1,not-a-number"})
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_an_admin_without_a_sales_profile_is_rejected(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_an_admin_without_a_sales_profile_is_rejected"""
-        self.login_as(self.admin_user)
-
-        self.assertEqual(self.client.get(GET_CLIENTS_URL).status_code, 403)
-
     # -- single client detail -----------------------------------------------
 
     def test_client_detail_returns_core_data_and_every_list(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_client_detail_returns_core_data_and_every_list"""
+        """The full record before and after a sales admin verifies it.
+
+        tests/android/test_clients.py::AndroidClientApiTest::test_client_detail_returns_core_data_and_every_list
+        """
         created = self._create(
             addresses=[
                 self._address(is_primary=True, label="HQ"),
@@ -737,41 +672,29 @@ class AndroidClientApiTest(AndroidApiTestCase):
             {"ABC Transport", "XYZ Logistics"},
         )
 
-    def test_client_detail_is_scoped_to_the_caller(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_client_detail_is_scoped_to_the_caller"""
-        public_id = self._create().data["public_id"]
-        self.login_as(self.other_sales_person)
-
-        response = self.client.get(CLIENT_URL.format(public_id=public_id))
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_client_detail_unknown_public_id_is_404(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_client_detail_unknown_public_id_is_404"""
-        self.login_as(self.sales_person)
-
-        response = self.client.get(CLIENT_URL.format(public_id="C-DOESNOTEXIST"))
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_client_detail_reflects_verification(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_client_detail_reflects_verification"""
-        public_id = self._create().data["public_id"]
+        # Once a sales admin verifies it, the same record reflects that.
         verify_client(Client.objects.get(public_id=public_id), self.admin_user)
-        self.login_as(self.sales_person)
-
         body = self.client.get(CLIENT_URL.format(public_id=public_id)).data
-
         self.assertEqual(body["status"], "VERIFIED")
         self.assertTrue(body["is_verified"])
         self.assertEqual(body["verified_by"], self.admin_user.name)
         self.assertIsNotNone(body["verified_at"])
 
-    def test_client_detail_needs_a_sales_profile(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_client_detail_needs_a_sales_profile"""
+    def test_client_detail_is_404_for_anything_the_caller_does_not_own(self):
+        """An unknown id and another sales person's client are indistinguishable.
+
+        tests/android/test_clients.py::AndroidClientApiTest::test_client_detail_is_404_for_anything_the_caller_does_not_own
+        """
         public_id = self._create().data["public_id"]
-        self.login_as(self.admin_user)
 
-        response = self.client.get(CLIENT_URL.format(public_id=public_id))
+        self.login_as(self.sales_person)
+        self.assertEqual(
+            self.client.get(CLIENT_URL.format(public_id="C-DOESNOTEXIST")).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
 
-        self.assertEqual(response.status_code, 403)
+        self.login_as(self.other_sales_person)
+        self.assertEqual(
+            self.client.get(CLIENT_URL.format(public_id=public_id)).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )

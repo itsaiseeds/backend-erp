@@ -35,7 +35,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        """A sales person who owns a client, an admin, and a plain user."""
+        """Two sales people who own clients, and the admin who verifies them."""
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
 
@@ -56,14 +56,6 @@ class SalesAdminClientApiTest(WebApiTestCase):
             verified_by=cls.superuser,
         )
         Admin.objects.create(user=cls.admin_user, created_by=cls.superuser)
-
-        cls.plain = User.objects.create_user(
-            phone_number="9000000003",
-            name="Plain User",
-            is_verified=True,
-            created_by=cls.superuser,
-            verified_by=cls.superuser,
-        )
 
     @classmethod
     def _make_sales_person(cls, phone, name):
@@ -129,31 +121,17 @@ class SalesAdminClientApiTest(WebApiTestCase):
             actor=self.sales_person,
         )
 
-    # -- permission gating ----------------------------------------------------
-
-    def test_a_sales_person_cannot_verify_a_client(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_a_sales_person_cannot_verify_a_client"""
-        self.login_as(self.sales_person)
-
-        response = self.client.post(
-            VERIFY_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_anonymous_requests_are_rejected(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_anonymous_requests_are_rejected"""
-        self.assertIn(self.client.get(GET_CLIENTS_URL).status_code, (401, 403))
-
     # -- verification ---------------------------------------------------------
 
-    def test_verifying_records_the_admin_and_the_time(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_verifying_records_the_admin_and_the_time"""
-        self.login_as(self.admin_user)
+    def test_verifying_records_the_admin_and_cannot_be_repeated(self):
+        """The first verify stamps who and when; a second one is a 400.
 
-        response = self.client.post(
-            VERIFY_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
-        )
+        tests/test_client_api.py::SalesAdminClientApiTest::test_verifying_records_the_admin_and_cannot_be_repeated
+        """
+        self.login_as(self.admin_user)
+        body = {"public_id": self.pending.public_id}
+
+        response = self.client.post(VERIFY_CLIENT_URL, body, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "VERIFIED")
@@ -161,57 +139,58 @@ class SalesAdminClientApiTest(WebApiTestCase):
         self.assertEqual(response.data["verified_by"], "Sales Admin")
         self.assertIsNotNone(response.data["verified_at"])
 
-    def test_a_client_cannot_be_verified_twice(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_a_client_cannot_be_verified_twice"""
-        self.login_as(self.admin_user)
-        body = {"public_id": self.pending.public_id}
-        self.client.post(VERIFY_CLIENT_URL, body, format="json")
-
-        response = self.client.post(VERIFY_CLIENT_URL, body, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        repeat = self.client.post(VERIFY_CLIENT_URL, body, format="json")
+        self.assertEqual(repeat.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_an_unknown_client_is_not_found(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_unknown_client_is_not_found"""
+        """Both the verify and the detail endpoint 404 on an unknown public id.
+
+        tests/test_client_api.py::SalesAdminClientApiTest::test_an_unknown_client_is_not_found
+        """
         self.login_as(self.admin_user)
 
-        response = self.client.post(
-            VERIFY_CLIENT_URL, {"public_id": "C-NOPE"}, format="json"
+        self.assertEqual(
+            self.client.post(
+                VERIFY_CLIENT_URL, {"public_id": "C-NOPE"}, format="json"
+            ).status_code,
+            status.HTTP_404_NOT_FOUND,
         )
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(
+            self.client.get(CLIENT_URL.format(public_id="C-NOPE")).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
 
     # -- admin updates --------------------------------------------------------
 
-    def test_an_admin_may_change_the_core_details(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_admin_may_change_the_core_details"""
+    def test_an_admin_update_writes_only_what_it_names(self):
+        """Core fields are writable, omitted lists survive untouched, and the
+        verification fields are read-only on this endpoint.
+
+        tests/test_client_api.py::SalesAdminClientApiTest::test_an_admin_update_writes_only_what_it_names
+        """
         self.login_as(self.admin_user)
 
         response = self.client.post(
             UPDATE_CLIENT_URL,
-            {"public_id": self.pending.public_id, "company_name": "Acme Seeds Pvt Ltd"},
+            {
+                "public_id": self.pending.public_id,
+                "company_name": "Acme Seeds Pvt Ltd",
+                # Sent but ignored: verification happens through verify-client.
+                "status": "VERIFIED",
+            },
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["company_name"], "Acme Seeds Pvt Ltd")
-
-    def test_a_list_left_out_is_untouched(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_a_list_left_out_is_untouched"""
-        self.login_as(self.admin_user)
-
-        response = self.client.post(
-            UPDATE_CLIENT_URL,
-            {"public_id": self.pending.public_id, "company_phone": "9876500009"},
-            format="json",
-        )
-
+        self.assertEqual(response.data["status"], "VERIFICATION_PENDING")
+        # No list was named, so all three are left exactly as they were.
         self.assertEqual(len(response.data["addresses"]), 1)
         self.assertEqual(len(response.data["contacts"]), 1)
         self.assertEqual(len(response.data["transport_agencies"]), 1)
 
-    def test_an_admin_may_replace_a_list(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_admin_may_replace_a_list"""
+    def test_a_named_list_is_replaced_wholesale_and_may_not_be_emptied(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_a_named_list_is_replaced_wholesale_and_may_not_be_emptied"""
         self.login_as(self.admin_user)
 
         response = self.client.post(
@@ -222,43 +201,20 @@ class SalesAdminClientApiTest(WebApiTestCase):
             },
             format="json",
         )
-
         self.assertEqual(
             [contact["name"] for contact in response.data["contacts"]], ["Suresh"]
         )
         self.assertTrue(response.data["contacts"][0]["is_primary"])
 
-    def test_an_emptied_list_is_rejected(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_emptied_list_is_rejected"""
-        self.login_as(self.admin_user)
-
-        response = self.client.post(
+        # Replacing a list with nothing would leave the client with no contact.
+        emptied = self.client.post(
             UPDATE_CLIENT_URL,
             {"public_id": self.pending.public_id, "contacts": []},
             format="json",
         )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_the_verification_fields_are_not_writable_here(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_the_verification_fields_are_not_writable_here"""
-        self.login_as(self.admin_user)
-
-        response = self.client.post(
-            UPDATE_CLIENT_URL,
-            {"public_id": self.pending.public_id, "status": "VERIFIED"},
-            format="json",
-        )
-
-        self.assertEqual(response.data["status"], "VERIFICATION_PENDING")
+        self.assertEqual(emptied.status_code, status.HTTP_400_BAD_REQUEST)
 
     # -- the client list ----------------------------------------------------
-
-    def test_get_clients_needs_an_admin(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_get_clients_needs_an_admin"""
-        self.login_as(self.sales_person)
-
-        self.assertEqual(self.client.get(GET_CLIENTS_URL).status_code, 403)
 
     def test_no_filter_returns_every_client_and_the_catalogues(self):
         """tests/test_client_api.py::SalesAdminClientApiTest::test_no_filter_returns_every_client_and_the_catalogues"""
@@ -293,23 +249,16 @@ class SalesAdminClientApiTest(WebApiTestCase):
             [("created_at", "Created"), ("company_name", "Company Name")],
         )
 
-    def test_the_card_names_the_sales_person_who_created_the_client(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_the_card_names_the_sales_person_who_created_the_client"""
+    def test_a_card_names_the_sales_person_and_the_verifying_admin(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_a_card_names_the_sales_person_and_the_verifying_admin"""
         self.login_as(self.admin_user)
 
         card = self.client.get(GET_CLIENTS_URL).data["results"][0]
-
         self.assertEqual(card["company_name"], "Acme Seeds")
         self.assertEqual(card["created_by"], "Sales One")
         self.assertEqual(card["primary_contact"]["phone_number"], "9876500001")
         self.assertEqual(card["primary_address"]["pincode"], "395007")
-
-    def test_the_card_names_the_admin_who_verified_the_client(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_the_card_names_the_admin_who_verified_the_client"""
-        self.login_as(self.admin_user)
-
         # Unverified: the field is present but null.
-        card = self.client.get(GET_CLIENTS_URL).data["results"][0]
         self.assertIsNone(card["verified_by"])
 
         self.client.post(
@@ -341,115 +290,77 @@ class SalesAdminClientApiTest(WebApiTestCase):
             [{"value": self.admin_user.id, "label": "Sales Admin"}],
         )
 
-    def test_filtering_by_verified_by(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_verified_by"""
-        self._make_client(company_name="Beta Seeds", gst_index=1)
-        self.login_as(self.admin_user)
-        self.client.post(
-            VERIFY_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+    def test_every_declared_filter_narrows_the_list(self):
+        """One fixture pair, then each filter in turn -- the generic filter
+        machinery itself is unit-tested in ``tests/test_paginated_filters.py``,
+        so what is checked here is that each declared filter is wired to the
+        column it claims.
+
+        tests/test_client_api.py::SalesAdminClientApiTest::test_every_declared_filter_narrows_the_list
+        """
+        # Acme Seeds (from setUp): Sales One, Surat, unverified.
+        # Beta Traders: Sales Two, Ahmedabad, verified by the admin.
+        beta = self._make_client(
+            company_name="Beta Traders",
+            gst_index=1,
+            actor=self.other_sales_person,
+            city=self.other_city,
+            pincode="380001",
         )
-
-        response = self.client.get(
-            GET_CLIENTS_URL, {"verified_by": str(self.admin_user.id)}
-        )
-
-        self.assertEqual(
-            [c["company_name"] for c in response.data["results"]], ["Acme Seeds"]
-        )
-
-    def test_filtering_by_created_by(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_created_by"""
-        self._make_client(company_name="Beta Seeds", gst_index=1, actor=self.other_sales_person)
-        self.login_as(self.admin_user)
-
-        response = self.client.get(
-            GET_CLIENTS_URL, {"created_by": str(self.other_sales_person.id)}
-        )
-
-        self.assertEqual(
-            [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
-        )
-        entries = response.data["available_filters"]
-        options = next(f for f in entries if f["filter"] == "created_by")["options"]
-        self.assertEqual(
-            sorted(o["label"] for o in options), ["Sales One", "Sales Two"]
-        )
-
-    def test_filtering_by_primary_address_city(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_primary_address_city"""
-        self._make_client(
-            company_name="Beta Seeds", gst_index=1, city=self.other_city, pincode="380001"
-        )
-        self.login_as(self.admin_user)
-
-        response = self.client.get(GET_CLIENTS_URL, {"city_id": str(self.other_city.id)})
-
-        self.assertEqual(
-            [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
-        )
-
-    def test_filtering_by_status(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_status"""
-        beta = self._make_client(company_name="Beta Seeds", gst_index=1)
         verify_client(beta, self.admin_user)
         self.login_as(self.admin_user)
 
-        response = self.client.get(GET_CLIENTS_URL, {"status": "VERIFIED"})
+        cases = [
+            ("created_by", {"created_by": str(self.other_sales_person.id)}, ["Beta Traders"]),
+            ("verified_by", {"verified_by": str(self.admin_user.id)}, ["Beta Traders"]),
+            ("city_id", {"city_id": str(self.other_city.id)}, ["Beta Traders"]),
+            ("status", {"status": "VERIFIED"}, ["Beta Traders"]),
+            ("company_name substring", {"company_name": "cme se"}, ["Acme Seeds"]),
+        ]
+        for label, query, expected in cases:
+            with self.subTest(filter=label):
+                response = self.client.get(GET_CLIENTS_URL, query)
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    [c["company_name"] for c in response.data["results"]], expected
+                )
 
-        self.assertEqual(
-            [c["company_name"] for c in response.data["results"]], ["Beta Seeds"]
-        )
+        # The created_by catalogue lists every sales person with a client.
+        options = next(
+            f for f in self.client.get(GET_CLIENTS_URL).data["available_filters"]
+            if f["filter"] == "created_by"
+        )["options"]
+        self.assertEqual(sorted(o["label"] for o in options), ["Sales One", "Sales Two"])
 
-    def test_filtering_by_company_name_substring(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_filtering_by_company_name_substring"""
-        self._make_client(company_name="Beta Traders", gst_index=1)
-        self.login_as(self.admin_user)
+    def test_sorting_and_pagination(self):
+        """Default order is newest first, ``company_name`` is alphabetical, an
+        unknown sort is a 400, and pages are 10 long.
 
-        response = self.client.get(GET_CLIENTS_URL, {"company_name": "cme se"})
-
-        self.assertEqual(
-            [c["company_name"] for c in response.data["results"]], ["Acme Seeds"]
-        )
-
-    def test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_default_sort_is_newest_first_and_company_name_sort_is_alphabetical"""
-        self._make_client(company_name="Zeta Seeds", gst_index=1)
-        self.login_as(self.admin_user)
-
-        default = self.client.get(GET_CLIENTS_URL)
-        by_name = self.client.get(GET_CLIENTS_URL, {"sort": "company_name"})
-
-        self.assertEqual(
-            [c["company_name"] for c in default.data["results"]],
-            ["Zeta Seeds", "Acme Seeds"],
-        )
-        self.assertEqual(
-            [c["company_name"] for c in by_name.data["results"]],
-            ["Acme Seeds", "Zeta Seeds"],
-        )
-
-    def test_an_unknown_sort_is_rejected(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_unknown_sort_is_rejected"""
-        self.login_as(self.admin_user)
-
-        response = self.client.get(GET_CLIENTS_URL, {"sort": "gst_number"})
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_results_are_paginated(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_results_are_paginated"""
+        tests/test_client_api.py::SalesAdminClientApiTest::test_sorting_and_pagination
+        """
         for index in range(1, 12):
             self._make_client(company_name=f"Client {index:02d}", gst_index=index)
+        zeta = self._make_client(company_name="Zeta Seeds", gst_index=12)
         self.login_as(self.admin_user)
 
         page_1 = self.client.get(GET_CLIENTS_URL)
-        self.assertEqual(page_1.data["total_count"], 12)
+        self.assertEqual(page_1.data["total_count"], 13)
         self.assertEqual(len(page_1.data["results"]), 10)
         self.assertEqual(page_1.data["next_page_number"], 2)
+        # Newest first by default: Zeta was created last.
+        self.assertEqual(page_1.data["results"][0]["company_name"], zeta.company_name)
 
         page_2 = self.client.get(GET_CLIENTS_URL, {"page": 2})
-        self.assertEqual(len(page_2.data["results"]), 2)
+        self.assertEqual(len(page_2.data["results"]), 3)
         self.assertIsNone(page_2.data["next_page_number"])
+
+        by_name = self.client.get(GET_CLIENTS_URL, {"sort": "company_name"})
+        self.assertEqual(by_name.data["results"][0]["company_name"], "Acme Seeds")
+
+        self.assertEqual(
+            self.client.get(GET_CLIENTS_URL, {"sort": "gst_number"}).status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     # -- single client detail -----------------------------------------------
 
@@ -484,25 +395,3 @@ class SalesAdminClientApiTest(WebApiTestCase):
         self.assertEqual(body["status"], "VERIFIED")
         self.assertTrue(body["is_verified"])
         self.assertEqual(body["verified_by"], self.admin_user.name)
-
-    def test_client_detail_unknown_public_id_is_404(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_client_detail_unknown_public_id_is_404"""
-        self.login_as(self.admin_user)
-
-        response = self.client.get(CLIENT_URL.format(public_id="C-NOPE"))
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_client_detail_needs_an_admin(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_client_detail_needs_an_admin"""
-        self.login_as(self.sales_person)
-
-        response = self.client.get(CLIENT_URL.format(public_id=self.pending.public_id))
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_client_detail_rejects_anonymous(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_client_detail_rejects_anonymous"""
-        response = self.client.get(CLIENT_URL.format(public_id=self.pending.public_id))
-
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

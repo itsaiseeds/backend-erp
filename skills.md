@@ -15,7 +15,7 @@
 | **Container** | Docker Compose (web + db) |
 | **Schema management** | **Raw SQL only** — `sql/ddl.sql` holds the full schema; no migration files exist (`migrate` is commented out; the pytest test DB is synced from the models) |
 | **Seed data** | Raw SQL, dev-only — `sql/dml.sql` (content types + permissions + reconciliation superuser) |
-| **Testing** | pytest + pytest-django |
+| **Testing** | pytest + pytest-django + pytest-xdist (parallel by default) |
 | **CI/CD** | GitHub Actions → Render |
 | **Deployment** | Render (web + cron) + Neon DB (serverless PostgreSQL) |
 
@@ -32,6 +32,7 @@
 | [skills/django.md](skills/django.md) | Settings, apps, middleware, MIGRATION_MODULES |
 | [skills/docker.md](skills/docker.md) | Dockerfile, docker-compose, services, volumes |
 | [skills/conventions.md](skills/conventions.md) | DRY / YAGNI / KISS principles, code style, patterns, naming, adding new features |
+| [docs/testing.md](docs/testing.md) | Test suite conventions: what not to test twice, combining cases, parallel execution |
 
 ---
 
@@ -109,13 +110,18 @@ docker compose exec web python manage.py collectstatic
 
 ### Run tests (inside the Docker web container)
 ```bash
-bash scripts/run.sh test               # full pytest suite
-bash scripts/run.sh test-unit          # pytest -v (whole suite)
-bash scripts/run.sh test-dml           # pytest tests/ -v (whole suite, DML baseline)
+bash scripts/run.sh test               # everything, 4 xdist workers (~23s)
+bash scripts/run.sh test-unit          # no-database tests only (~8s)
+bash scripts/run.sh test-dml           # DML-seeded database tests only (~23s)
+bash scripts/run.sh test-serial        # everything, one worker (clearer failures)
+TEST_WORKERS=8 bash scripts/run.sh test  # override the worker count
 bash scripts/run.sh lint               # ruff check
 bash scripts/run.sh typecheck          # mypy
 ```
 
+Read [docs/testing.md](docs/testing.md) **before adding a test** — in
+particular, authentication and role gating are owned once by
+`tests/test_view_contracts.py` and must not be retested per endpoint.
 See the `run-tests` skill for single-test / single-class node IDs.
 
 ### Run management commands

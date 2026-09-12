@@ -227,7 +227,7 @@
             }
         },
         {
-            "label": "test: unit",
+            "label": "test: no-database only (fast)",
             "type": "shell",
             "command": "bash",
             "args": [
@@ -244,12 +244,47 @@
             }
         },
         {
-            "label": "test: DML-backed Django",
+            "label": "test: database only",
             "type": "shell",
             "command": "bash",
             "args": [
                 "scripts/run.sh",
                 "test-dml"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "test: pick a test",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "test-serial",
+                "${input:pytestNodeId}"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "test: serial (readable failures)",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run.sh",
+                "test-serial"
             ],
             "group": "test",
             "presentation": {
@@ -293,6 +328,14 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "pytestNodeId",
+            "type": "promptString",
+            "description": "pytest node id, e.g. tests/test_crop_api.py::CropApiTest::test_admin_update_crop",
+            "default": "tests/"
         }
     ]
 }

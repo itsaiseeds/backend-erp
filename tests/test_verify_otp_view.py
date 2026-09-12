@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.core.cache import cache
 from django.utils import timezone
 
 from aggregator.models import City, Country, State
@@ -57,12 +56,12 @@ class VerifyOTPTest(WebApiTestCase):
             created_by=cls.superuser,
         )
 
-    def setUp(self):
-        super().setUp()
-        # DRF throttles store per-IP counters in the default cache; without
-        # clearing between tests one test's requests would count against the
-        # next test's budget on the shared 127.0.0.1 origin.
-        cache.clear()
+    def _verify(self, phone: str, otp: str):
+        return self.client.post(
+            "/api/sales-admin/auth/otp/verify",
+            {"phone_number": phone, "otp": otp},
+            format="json",
+        )
 
     def test_superuser_can_verify_otp_and_receive_credentials(self):
         """tests/test_verify_otp_view.py::VerifyOTPTest::test_superuser_can_verify_otp_and_receive_credentials"""
@@ -82,60 +81,34 @@ class VerifyOTPTest(WebApiTestCase):
         self.assertTrue(response.data["can_create_sales_person"])
         self.assertIn("sessionid", response.cookies)
 
-    def test_invalid_otp_is_rejected(self):
-        """tests/test_verify_otp_view.py::VerifyOTPTest::test_invalid_otp_is_rejected"""
-        response = self.client.post(
-            "/api/sales-admin/auth/otp/verify",
-            {"phone_number": self.superuser.phone_number, "otp": "000000"},
-            format="json",
-        )
+    def test_only_a_superuser_with_a_valid_code_may_log_in(self):
+        """Everyone else gets the same generic 400, whatever the reason.
 
-        self.assertEqual(response.status_code, 400)
+        The superuser is the only role the sales-admin website logs in; a wrong
+        code, an account with no TOTP secret, a plain user and a sales person
+        must be indistinguishable from one another in the response.
 
-    def test_unenrolled_user_cannot_verify_otp(self):
-        """tests/test_verify_otp_view.py::VerifyOTPTest::test_unenrolled_user_cannot_verify_otp"""
-        response = self.client.post(
-            "/api/sales-admin/auth/otp/verify",
-            {"phone_number": self.unenrolled_user.phone_number, "otp": "000000"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-
-    def test_normal_user_cannot_verify_otp(self):
-        """tests/test_verify_otp_view.py::VerifyOTPTest::test_normal_user_cannot_verify_otp"""
-        response = self.client.post(
-            "/api/sales-admin/auth/otp/verify",
-            {
-                "phone_number": self.normal_user.phone_number,
-                "otp": self.normal_user.totp.now(),
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-
-    def test_salesperson_cannot_verify_otp(self):
-        """tests/test_verify_otp_view.py::VerifyOTPTest::test_salesperson_cannot_verify_otp"""
-        response = self.client.post(
-            "/api/sales-admin/auth/otp/verify",
-            {
-                "phone_number": self.salesperson.user.phone_number,
-                "otp": self.salesperson.user.totp.now(),
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 400)
+        tests/test_verify_otp_view.py::VerifyOTPTest::test_only_a_superuser_with_a_valid_code_may_log_in
+        """
+        cases = [
+            ("superuser, wrong code", self.superuser.phone_number, "000000"),
+            ("unenrolled user", self.unenrolled_user.phone_number, "000000"),
+            (
+                "plain user, valid code",
+                self.normal_user.phone_number,
+                self.normal_user.totp.now(),
+            ),
+            (
+                "sales person, valid code",
+                self.salesperson.user.phone_number,
+                self.salesperson.user.totp.now(),
+            ),
+        ]
+        for label, phone, otp in cases:
+            with self.subTest(case=label):
+                self.assertEqual(self._verify(phone, otp).status_code, 400)
 
     # -- Security hardening --------------------------------------------------
-
-    def _verify(self, phone: str, otp: str):
-        return self.client.post(
-            "/api/sales-admin/auth/otp/verify",
-            {"phone_number": phone, "otp": otp},
-            format="json",
-        )
 
     def test_replayed_otp_is_rejected(self):
         """A code accepted once cannot be reused inside its window.
@@ -165,18 +138,6 @@ class VerifyOTPTest(WebApiTestCase):
         self.assertEqual(response.status_code, 400)
         self.superuser.refresh_from_db()
         self.assertTrue(self.superuser.is_totp_locked())
-
-    def test_locked_account_refuses_even_correct_code(self):
-        """A caller who is locked out cannot log in even with a valid code.
-
-        tests/test_verify_otp_view.py::VerifyOTPTest::test_locked_account_refuses_even_correct_code
-        """
-        self.superuser.totp_lockout_until = timezone.now() + timedelta(minutes=5)
-        self.superuser.save(update_fields=["totp_lockout_until"])
-
-        response = self._verify(self.superuser.phone_number, self.superuser.totp.now())
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["detail"], "Invalid phone number or TOTP code.")
 
     def test_expired_lockout_lets_valid_code_through(self):
         """Once the lockout window has passed a valid code is accepted again.
@@ -235,8 +196,13 @@ class VerifyOTPTest(WebApiTestCase):
         self.superuser.totp_lockout_until = timezone.now() + timedelta(minutes=5)
         self.superuser.save(update_fields=["totp_lockout_until"])
 
+        # A locked-out caller is refused even with a currently valid code...
         locked = self._verify(self.superuser.phone_number, self.superuser.totp.now())
-        unknown = self._verify("1231231234", "000000")
+        self.assertEqual(locked.status_code, 400)
+        self.assertEqual(locked.data["detail"], "Invalid phone number or TOTP code.")
 
+        # ...and a phone number nobody holds gets the byte-identical answer, so
+        # the response never reveals which of the two happened.
+        unknown = self._verify("1231231234", "000000")
         self.assertEqual(locked.status_code, unknown.status_code)
         self.assertEqual(locked.data, unknown.data)
