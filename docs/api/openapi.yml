@@ -148,6 +148,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientPayload'
           description: ''
+  /android/api/v1/create-multi-select-bag-order:
+    post:
+      operationId: android_api_v1_create_multi_select_bag_order
+      description: Book an order of sealed bags for one of the caller's clients.
+      summary: Book an order from multi-selected catalogue bags
+      tags:
+      - android
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMultiSelectBagOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateMultiSelectBagOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateMultiSelectBagOrderRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPayload'
+          description: ''
   /android/api/v1/get-clients:
     get:
       operationId: android_api_v1_get_clients_list
@@ -219,6 +247,76 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientListPage'
           description: ''
+  /android/api/v1/sales-person-catalogue:
+    get:
+      operationId: android_api_v1_sales_person_catalogue_list
+      description: |-
+        The bags a sales person can book: filter by crop / product / stage / name
+        / price, sort by price / stage / name.
+      summary: Browse the product catalogue (filter by crop / product / stage / name
+        / price, sortable)
+      parameters:
+      - in: query
+        name: crop
+        schema:
+          type: string
+        description: Crop id(s) of the product (see options). Comma-separated (any
+          match); AND-ed with the other filters.
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: Case-insensitive substring of the product name. Single value;
+          AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: price_gte
+        schema:
+          type: number
+        description: Price of the whole bag (inclusive bounds). Inclusive lower bound.
+      - in: query
+        name: price_lte
+        schema:
+          type: number
+        description: Price of the whole bag (inclusive bounds). Inclusive upper bound.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s), e.g. P-E79QA0E2OIHF. Comma-separated (any
+          match); AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (price, stage, name); prefix a key
+          with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: stage
+        schema:
+          type: string
+        description: Seed stage of the product. Comma-separated (any match); AND-ed
+          with the other filters.
+      tags:
+      - android
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CataloguePage'
+          description: ''
   /android/api/v1/update-client:
     post:
       operationId: android_api_v1_update_client_create
@@ -264,6 +362,56 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AndroidState'
+          description: ''
+  /android/api/v1/utilities/client-addresses:
+    get:
+      operationId: android_api_v1_utilities_client_addresses
+      description: List one of the caller's clients' address links.
+      summary: List a client's address links (delivery address picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
+        required: true
+      tags:
+      - android
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientAddressLink'
+          description: ''
+  /android/api/v1/utilities/client-transport-agencies:
+    get:
+      operationId: android_api_v1_utilities_client_transport_agencies
+      description: List one of the caller's clients' transport-agency links.
+      summary: List a client's transport agency links (carrier picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
+        required: true
+      tags:
+      - android
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientTransportAgencyLink'
           description: ''
   /android/api/v1/utilities/countries:
     get:
@@ -1451,6 +1599,125 @@ components:
       - country_id
       - id
       - name
+    BagOrderItemRequest:
+      type: object
+      description: 'One line of the order: a bag and how many of it.'
+      properties:
+        product_packaging_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        quantity:
+          type: integer
+          minimum: 1
+      required:
+      - product_packaging_public_id
+      - quantity
+    CatalogueItem:
+      type: object
+      description: Output shape for one catalogue row -- a bag (schema only).
+      properties:
+        public_id:
+          type: string
+          description: Send this as product_packaging_public_id when creating an order.
+        name:
+          type: string
+        packets:
+          type: integer
+          description: Packets in one bag.
+        packet_weight:
+          type: string
+          description: Weight of one packet, in kg.
+        total_weight:
+          type: string
+          description: Weight of the whole bag, in kg.
+        selling_price:
+          type: string
+          description: Price of the whole bag.
+        product:
+          $ref: '#/components/schemas/CatalogueProduct'
+      required:
+      - name
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - selling_price
+      - total_weight
+    CataloguePage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogueItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    CatalogueProduct:
+      type: object
+      description: Output shape for the product card on a catalogue row (schema only).
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        crop:
+          type: string
+          nullable: true
+        stage:
+          $ref: '#/components/schemas/CatalogueStage'
+        image_url:
+          type: string
+        description_items:
+          type: array
+          items:
+            type: string
+      required:
+      - crop
+      - description_items
+      - image_url
+      - name
+      - public_id
+      - stage
+    CatalogueStage:
+      type: object
+      description: Output shape for the ``stage`` reference on a catalogue row.
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        sequence:
+          type: integer
+      required:
+      - code
+      - name
+      - sequence
     CheckTodaysInventoryPayload:
       type: object
       description: Output shape for the readiness report.
@@ -1501,6 +1768,49 @@ components:
       required:
       - id
       - name
+    ClientAddressLink:
+      type: object
+      description: Output shape for one client-address link (schema only).
+      properties:
+        id:
+          type: integer
+          description: This link's id. Send it as client_address_id when creating
+            an order.
+        label:
+          type: string
+        is_primary:
+          type: boolean
+        line_1:
+          type: string
+        line_2:
+          type: string
+        pincode:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        city_id:
+          type: integer
+        state_id:
+          type: integer
+        country_id:
+          type: integer
+      required:
+      - city
+      - city_id
+      - country
+      - country_id
+      - id
+      - is_primary
+      - label
+      - line_1
+      - line_2
+      - pincode
+      - state
+      - state_id
     ClientAddressPayload:
       type: object
       description: Output shape for one client address (schema only).
@@ -1521,15 +1831,24 @@ components:
           type: string
         country:
           type: string
+        city_id:
+          type: integer
+        state_id:
+          type: integer
+        country_id:
+          type: integer
       required:
       - city
+      - city_id
       - country
+      - country_id
       - is_primary
       - label
       - line_1
       - line_2
       - pincode
       - state
+      - state_id
     ClientAddressRequest:
       type: object
       description: |-
@@ -1724,6 +2043,22 @@ components:
       - transport_agencies
       - verified_at
       - verified_by
+    ClientTransportAgencyLink:
+      type: object
+      description: Output shape for one client-transport-agency link (schema only).
+      properties:
+        id:
+          type: integer
+          description: This link's id. Send it as client_transport_agency_id when
+            creating an order.
+        name:
+          type: string
+        is_primary:
+          type: boolean
+      required:
+      - id
+      - is_primary
+      - name
     ClientTransportAgencyPayload:
       type: object
       description: Output shape for one client transport agency (schema only).
@@ -1841,6 +2176,44 @@ components:
           maxLength: 255
       required:
       - name
+    CreateMultiSelectBagOrderRequest:
+      type: object
+      description: |-
+        Request validation for booking a bag order.
+
+        The address and the agency arrive as *link* ids, so each resolves with a
+        single lookup scoped to the client -- an id belonging to somebody else
+        simply does not match, and the "belongs to this client" rule
+        ``Order.clean()`` enforces is satisfied by construction.
+      properties:
+        client_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        client_address_id:
+          type: integer
+          description: A link id from GET /android/api/v1/utilities/client-addresses.
+        client_transport_agency_id:
+          type: integer
+          nullable: true
+          description: A link id from GET /android/api/v1/utilities/client-transport-agencies.
+            Omit or send null for a private (own-vehicle) dispatch.
+        special_comments:
+          type: string
+          default: ''
+        expected_delivery_date:
+          type: string
+          format: date
+          nullable: true
+          description: Defaults to the day after booking.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BagOrderItemRequest'
+      required:
+      - client_address_id
+      - client_public_id
+      - items
     CreateProductPackagingRequest:
       type: object
       description: |-
@@ -1891,6 +2264,15 @@ components:
         image:
           type: string
           format: binary
+        description_items:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 255
+          description: Feature bullets, in display order. Sending the list replaces
+            it wholesale; [] clears it.
+          maxItems: 30
       required:
       - crop
       - name
@@ -1943,6 +2325,14 @@ components:
       required:
       - id
       - name
+    DispatchModeEnum:
+      enum:
+      - AGENCY
+      - PRIVATE
+      type: string
+      description: |-
+        * `AGENCY` - AGENCY
+        * `PRIVATE` - PRIVATE
     FilterCatalogueEntry:
       type: object
       description: Schema for one ``available_filters`` entry.
@@ -2150,6 +2540,79 @@ components:
       required:
       - product
       - public_id
+    OrderItemPayload:
+      type: object
+      description: Output shape for one order line (schema only).
+      properties:
+        packaging:
+          type: object
+          additionalProperties: {}
+        negotiated_selling_price:
+          type: string
+        quantity:
+          type: integer
+        line_total:
+          type: string
+      required:
+      - line_total
+      - negotiated_selling_price
+      - packaging
+      - quantity
+    OrderPayload:
+      type: object
+      description: Output shape for a booked order (schema only; built by hand).
+      properties:
+        public_id:
+          type: string
+        client:
+          type: object
+          additionalProperties: {}
+        delivery_address:
+          type: string
+        status:
+          type: string
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+        transport_agency:
+          allOf:
+          - $ref: '#/components/schemas/TransportAgencyRef'
+          nullable: true
+        dispatch_mode:
+          $ref: '#/components/schemas/DispatchModeEnum'
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemPayload'
+      required:
+      - actual_delivery_date
+      - client
+      - delivery_address
+      - dispatch_mode
+      - expected_delivery_date
+      - items
+      - public_id
+      - special_comments
+      - status
+      - total_amount
+      - total_packets
+      - transport_agency
+      - verified_at
     PackagingProductRef:
       type: object
       description: Output shape for the ``product`` reference inside a snapshot.
@@ -2244,7 +2707,12 @@ components:
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
     PatchedUpdateProductRequest:
       type: object
-      description: Request validation for updating a ``Product`` (all fields optional).
+      description: |-
+        Request validation for updating a ``Product`` (all fields optional).
+
+        ``description_items`` is declarative, like the client lists on
+        ``UpdateClientView``: omit it to leave the bullets untouched, send a list to
+        replace them wholesale, send ``[]`` to clear them.
       properties:
         name:
           type: string
@@ -2263,6 +2731,15 @@ components:
         image:
           type: string
           format: binary
+        description_items:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 255
+          description: Feature bullets, in display order. Sending the list replaces
+            it wholesale; [] clears it.
+          maxItems: 30
     PatchedUpdateSalesPersonRequest:
       type: object
       description: |-
@@ -2392,8 +2869,13 @@ components:
             the weight sold.
         image_url:
           type: string
+        description_items:
+          type: array
+          items:
+            type: string
       required:
       - crop
+      - description_items
       - image_url
       - name
       - public_id
@@ -2606,6 +3088,17 @@ components:
           type: string
       required:
       - provisioning_uri
+    TransportAgencyRef:
+      type: object
+      description: Output shape for the ``transport_agency`` reference on an order.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     UpdateClientRequest:
       type: object
       description: Request validation for a sales person's client update.

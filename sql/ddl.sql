@@ -743,6 +743,30 @@ CREATE INDEX IF NOT EXISTS aggregator_productpackaging_is_deleted_idx ON public.
 CREATE INDEX IF NOT EXISTS aggregator_productpackaging_created_by_id_idx ON public.aggregator_productpackaging USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_productpackaging_deleted_by_id_idx ON public.aggregator_productpackaging USING btree (deleted_by_id);
 
+-- aggregator_productdescriptionitem -------------------------------------------
+-- One marketing bullet on a product, rendered as a feature list in the Android
+-- catalogue. Ordered by sequence; the whole list is rewritten at once by
+-- ProductOperations.sync_product_description_items.
+CREATE TABLE IF NOT EXISTS public.aggregator_productdescriptionitem (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	product_id int8 NOT NULL,
+	"text" varchar(255) NOT NULL,
+	sequence int2 NOT NULL DEFAULT 0,
+	CONSTRAINT aggregator_productdescriptionitem_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_productdescriptionitem_product_text UNIQUE (product_id, "text"),
+	CONSTRAINT aggregator_productdescriptionitem_sequence_check CHECK (sequence >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_productdescriptionitem_product_id_idx ON public.aggregator_productdescriptionitem USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_productdescriptionitem_is_deleted_idx ON public.aggregator_productdescriptionitem USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_productdescriptionitem_created_by_id_idx ON public.aggregator_productdescriptionitem USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_productdescriptionitem_deleted_by_id_idx ON public.aggregator_productdescriptionitem USING btree (deleted_by_id);
+
 -- aggregator_dispatchdetails --------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.aggregator_dispatchdetails (
 	id bigserial NOT NULL,
@@ -807,6 +831,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_order (
 	actual_delivery_date date NULL,
 	dispatch_details_id int8 NULL,
 	private_dispatch_details_id int8 NULL,
+	transport_agency_id int8 NULL,
 	special_comments text NOT NULL,
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
@@ -821,6 +846,7 @@ CREATE INDEX IF NOT EXISTS aggregator_order_delivery_address_id_idx ON public.ag
 CREATE INDEX IF NOT EXISTS aggregator_order_status_id_idx ON public.aggregator_order USING btree (status_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_dispatch_details_id_idx ON public.aggregator_order USING btree (dispatch_details_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_private_dispatch_details_id_idx ON public.aggregator_order USING btree (private_dispatch_details_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_transport_agency_id_idx ON public.aggregator_order USING btree (transport_agency_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_is_deleted_idx ON public.aggregator_order USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_order_created_by_id_idx ON public.aggregator_order USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_deleted_by_id_idx ON public.aggregator_order USING btree (deleted_by_id);
@@ -1031,6 +1057,10 @@ ALTER TABLE public.aggregator_productpackaging ADD CONSTRAINT aggregator_product
 ALTER TABLE public.aggregator_productpackaging ADD CONSTRAINT aggregator_productpackaging_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_productpackaging ADD CONSTRAINT aggregator_productpackaging_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
+ALTER TABLE public.aggregator_productdescriptionitem ADD CONSTRAINT aggregator_productdescriptionitem_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_productdescriptionitem ADD CONSTRAINT aggregator_productdescriptionitem_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_productdescriptionitem ADD CONSTRAINT aggregator_productdescriptionitem_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
 ALTER TABLE public.aggregator_dispatchdetails ADD CONSTRAINT aggregator_dispatchdetails_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_dispatchdetails ADD CONSTRAINT aggregator_dispatchdetails_dispatched_by_id_fk FOREIGN KEY (dispatched_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_dispatchdetails ADD CONSTRAINT aggregator_dispatchdetails_from_city_id_fk FOREIGN KEY (from_city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
@@ -1048,6 +1078,7 @@ ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_delivery_add
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_dispatch_details_id_fk FOREIGN KEY (dispatch_details_id) REFERENCES public.aggregator_dispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_private_dispatch_details_id_fk FOREIGN KEY (private_dispatch_details_id) REFERENCES public.aggregator_privatedispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_transport_agency_id_fk FOREIGN KEY (transport_agency_id) REFERENCES public.aggregator_transportagency(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_verified_by_id_fk FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;

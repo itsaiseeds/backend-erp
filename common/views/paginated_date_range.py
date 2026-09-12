@@ -174,6 +174,13 @@ def parse_str(raw: str) -> str:
     return value
 
 
+def parse_decimal(raw: str):
+    """Parser for decimal bounds -- money, weights."""
+    return serializers.DecimalField(
+        max_digits=12, decimal_places=2
+    ).to_internal_value(raw.strip())
+
+
 def parse_date(raw: str):
     """Parser for ISO ``YYYY-MM-DD`` date bounds."""
     return serializers.DateField().to_internal_value(raw.strip())
@@ -199,6 +206,7 @@ def humanize(name: str) -> str:
 _PARSER_KIND: dict[ValueParser, str] = {
     parse_int: "int",
     parse_str: "text",
+    parse_decimal: "decimal",
     parse_date: "date",
     parse_datetime: "datetime",
 }

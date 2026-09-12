@@ -25,6 +25,7 @@ from .models import (
     ProductPackaging,
     Status,
     StatusIds,
+    TransportAgency,
 )
 from .ProductOperations import packaging_payload
 
@@ -42,6 +43,7 @@ def create_order(
     status: StatusIds = StatusIds.BOOKED,
     special_comments: str = "",
     expected_delivery_date=None,
+    transport_agency: TransportAgency | None = None,
 ) -> Order:
     """Create an order and its items atomically.
 
@@ -49,6 +51,10 @@ def create_order(
     optional ``"negotiated_selling_price"``. When omitted, the item line uses
     ``product_packaging.selling_price`` (the whole-packaging price captured on
     the packaging at creation).
+
+    ``transport_agency`` must be one of the client's own agencies (``Order.clean``
+    enforces it). Leave it ``None`` for a private, own-vehicle dispatch -- the
+    default assumption.
     """
     order = Order(
         client=client,
@@ -56,6 +62,7 @@ def create_order(
         status=Status.by_id(status),
         created_by=actor,
         special_comments=special_comments,
+        transport_agency=transport_agency,
     )
     if expected_delivery_date is not None:
         order.expected_delivery_date = expected_delivery_date
@@ -260,7 +267,11 @@ def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
 
 
 def order_payload(order: Order) -> dict:
-    """Frontend-facing dict for an order, keyed by public ids only."""
+    """Frontend-facing dict for an order, keyed by public ids only.
+
+    ``dispatch_mode`` is derived, not stored: an order with no transport agency
+    is dispatched privately (own vehicle), which is the default.
+    """
     return {
         "public_id": order.public_id,
         "client": {
@@ -274,6 +285,12 @@ def order_payload(order: Order) -> dict:
             order.actual_delivery_date.isoformat() if order.actual_delivery_date else None
         ),
         "special_comments": order.special_comments,
+        "transport_agency": (
+            {"id": order.transport_agency_id, "name": order.transport_agency.name}
+            if order.transport_agency_id
+            else None
+        ),
+        "dispatch_mode": "AGENCY" if order.transport_agency_id else "PRIVATE",
         "verified_at": order.verified_at.isoformat() if order.verified_at else None,
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,

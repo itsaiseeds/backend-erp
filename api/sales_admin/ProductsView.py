@@ -8,13 +8,80 @@ Soft-deleted products are never returned.
 
 from __future__ import annotations
 
+from django.db import transaction
+from django.db.models import Prefetch
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
-from aggregator.models import Crop, Product, Stage
+from aggregator.models import Crop, Product, ProductDescriptionItem, Stage
+from aggregator.ProductOperations import (
+    description_items_payload,
+    sync_product_description_items,
+)
 from api.admin import AdminApiView
 from common.storage import upload_image
+
+# Upper bound on a product's feature list -- a marketing card, not an essay.
+MAX_DESCRIPTION_ITEMS = 30
+
+
+class DescriptionItemsField(serializers.ListField):
+    """A product's feature bullets, in display order.
+
+    Declared as a list of plain strings rather than nested objects on purpose:
+    ``POST /api/sales-admin/products`` is ``multipart/form-data`` (it carries
+    ``image``), and a list of scalars survives multipart as repeated
+    ``description_items`` keys while a list of objects does not. The sequence
+    each bullet is stored with is its position in the list.
+
+    Sending the field replaces the whole list; sending ``[]`` clears it.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault(
+            "child",
+            serializers.CharField(
+                max_length=255, allow_blank=False, trim_whitespace=True
+            ),
+        )
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("allow_empty", True)
+        kwargs.setdefault("max_length", MAX_DESCRIPTION_ITEMS)
+        kwargs.setdefault(
+            "help_text",
+            "Feature bullets, in display order. Sending the list replaces it "
+            "wholesale; [] clears it.",
+        )
+        super().__init__(**kwargs)
+
+    def run_validation(self, data=serializers.empty):
+        items = super().run_validation(data)
+        if items is serializers.empty or items is None:
+            return items
+        seen = set()
+        for text in items:
+            key = text.casefold()
+            if key in seen:
+                raise serializers.ValidationError(
+                    f"Duplicate description item: '{text}'."
+                )
+            seen.add(key)
+        return items
+
+
+def products_queryset():
+    """Products with everything ``product_payload`` reads, prefetched.
+
+    ``description_items`` would otherwise be one query per product on the list
+    endpoint.
+    """
+    return Product.objects.select_related("crop", "stage").prefetch_related(
+        Prefetch(
+            "description_items",
+            queryset=ProductDescriptionItem.objects.order_by("sequence", "pk"),
+        )
+    )
 
 
 class CropRefSerializer(serializers.Serializer):
@@ -48,6 +115,7 @@ class ProductPayloadSerializer(serializers.Serializer):
         ),
     )
     image_url = serializers.CharField(allow_blank=True)
+    description_items = serializers.ListField(child=serializers.CharField())
 
 
 class CreateProductSerializer(serializers.Serializer):
@@ -74,6 +142,7 @@ class CreateProductSerializer(serializers.Serializer):
         help_text="Rate per kilogram; packet and bag prices derive from it and the weight sold.",
     )
     image = serializers.ImageField(required=False)
+    description_items = DescriptionItemsField()
 
     def validate(self, attrs):
         name = attrs["name"].strip()
@@ -101,6 +170,7 @@ def product_payload(product):
         },
         "selling_price": product.selling_price,
         "image_url": product.image_url,
+        "description_items": description_items_payload(product),
     }
 
 
@@ -115,7 +185,7 @@ class ProductsView(AdminApiView):
         responses={200: ProductPayloadSerializer(many=True)},
     )
     def get(self, request):
-        products = Product.objects.select_related("crop", "stage").order_by("name")
+        products = products_queryset().order_by("name")
         return Response([product_payload(product) for product in products])
 
     @extend_schema(
@@ -131,12 +201,18 @@ class ProductsView(AdminApiView):
         # aborts with a 400 before any product row exists.
         image = data.get("image")
         image_url = upload_image(image, folder="products") if image else ""
-        product = Product.objects.create(
-            name=data["name"],
-            crop=data["crop"],
-            stage=data["stage"],
-            selling_price=data["selling_price"],
-            image_url=image_url,
-            created_by=request.user,
-        )
+        # The product and its bullets go in together: a rejected bullet must not
+        # leave a half-built product behind.
+        with transaction.atomic():
+            product = Product.objects.create(
+                name=data["name"],
+                crop=data["crop"],
+                stage=data["stage"],
+                selling_price=data["selling_price"],
+                image_url=image_url,
+                created_by=request.user,
+            )
+            sync_product_description_items(
+                product, data.get("description_items", []), request.user
+            )
         return Response(product_payload(product), status=status.HTTP_201_CREATED)

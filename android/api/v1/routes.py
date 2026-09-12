@@ -8,13 +8,17 @@ declares the same key in its own ``ROUTES``.
 from __future__ import annotations
 
 from .CitiesView import CitiesView
+from .ClientAddressesView import ClientAddressesView
+from .ClientTransportAgenciesView import ClientTransportAgenciesView
 from .CountriesView import CountriesView
 from .CreateClientView import CreateClientView
+from .CreateMultiSelectBagOrderView import CreateMultiSelectBagOrderView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .LoginView import LoginView
 from .LogoutView import LogoutView
 from .ReauthenticateView import ReauthenticateView
+from .SalesPersonCatalogueView import SalesPersonCatalogueView
 from .StatesView import StatesView
 from .UpdateClientView import UpdateClientView
 
@@ -25,8 +29,12 @@ ROUTES: dict[str, type] = {
     "utilities/countries": CountriesView,
     "utilities/states": StatesView,
     "utilities/cities": CitiesView,
+    "utilities/client-addresses": ClientAddressesView,
+    "utilities/client-transport-agencies": ClientTransportAgenciesView,
     "get-clients": GetClientsView,
     "client/<public_id>": GetClientView,
     "create-client": CreateClientView,
     "update-client": UpdateClientView,
+    "sales-person-catalogue": SalesPersonCatalogueView,
+    "create-multi-select-bag-order": CreateMultiSelectBagOrderView,
 }
