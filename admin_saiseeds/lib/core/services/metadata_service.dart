@@ -12,6 +12,7 @@ class MetadataService {
   List<StateModel> _states = const [];
   final Map<int, CityModel> _citiesById = {};
   bool _isLoaded = false;
+  Future<bool>? _inFlight;
 
   set apiClient(ApiClient client) => _apiClient = client;
 
@@ -23,9 +24,28 @@ class MetadataService {
 
   CityModel? cityById(int? id) => id == null ? null : _citiesById[id];
 
-  Future<bool> loadCities({bool forceRefresh = false}) async {
-    if (_isLoaded && !forceRefresh) return true;
+  StateModel? stateOfCity(int? cityId) {
+    if (cityId == null) return null;
+    for (final state in _states) {
+      for (final city in state.cities) {
+        if (city.id == cityId) return state;
+      }
+    }
+    return null;
+  }
 
+  Future<bool> loadCities({bool forceRefresh = false}) {
+    if (_isLoaded && !forceRefresh) return Future<bool>.value(true);
+
+    final Future<bool>? pending = _inFlight;
+    if (pending != null) return pending;
+
+    final Future<bool> request = _fetchCities();
+    _inFlight = request;
+    return request.whenComplete(() => _inFlight = null);
+  }
+
+  Future<bool> _fetchCities() async {
     try {
       final dynamic response = await (_apiClient ??= ApiClient()).get(
         UtilitiesEndpoints.cities,
@@ -56,5 +76,6 @@ class MetadataService {
     _states = const [];
     _citiesById.clear();
     _isLoaded = false;
+    _inFlight = null;
   }
 }

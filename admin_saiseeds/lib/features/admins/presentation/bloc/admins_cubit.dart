@@ -39,8 +39,7 @@ class AdminsState extends Equatable {
     this.errorMessage,
   });
 
-  bool get isEmptySource =>
-      status == AdminsStatus.loaded && allAdmins.isEmpty;
+  bool get isEmptySource => status == AdminsStatus.loaded && allAdmins.isEmpty;
 
   AdminsState copyWith({
     AdminsStatus? status,
@@ -193,9 +192,7 @@ class AdminsCubit extends SafeCubit<AdminsState> {
       await loadAdmins();
       return true;
     } catch (error) {
-      emit(
-        state.copyWith(isMutating: false, errorMessage: _messageOf(error)),
-      );
+      emit(state.copyWith(isMutating: false, errorMessage: _messageOf(error)));
       return false;
     }
   }
@@ -226,9 +223,8 @@ class AdminsCubit extends SafeCubit<AdminsState> {
       sortValue: _sortValue,
     );
 
-    final ListQueryResult<AdminModel> paged = ListQuery.withoutPagination<AdminModel>(
-      source: sorted,
-    );
+    final ListQueryResult<AdminModel> paged =
+        ListQuery.withoutPagination<AdminModel>(source: sorted);
 
     return source.copyWith(
       visibleAdmins: paged.items,
@@ -266,7 +262,6 @@ class AdminsCubit extends SafeCubit<AdminsState> {
     }
   }
 
-  static String _messageOf(Object error) => error is ApiException
-      ? error.message
-      : AppStrings.SOMETHING_WENT_WRONG;
+  static String _messageOf(Object error) =>
+      error is ApiException ? error.message : AppStrings.SOMETHING_WENT_WRONG;
 }

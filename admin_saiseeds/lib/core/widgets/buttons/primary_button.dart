@@ -30,9 +30,7 @@ class PrimaryButton extends StatelessWidget {
         : baseColor;
 
     return MouseRegion(
-      cursor: _isDisabled
-          ? SystemMouseCursors.basic
-          : SystemMouseCursors.click,
+      cursor: _isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: ElevatedButton(
         onPressed: _isDisabled ? null : onPressed,
         style: ElevatedButton.styleFrom(

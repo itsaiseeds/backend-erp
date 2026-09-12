@@ -61,8 +61,7 @@ class ListQuery {
     final List<T> sorted = List<T>.from(source);
     if (sortBy == null || sortBy.isEmpty) return sorted;
 
-    final bool isDescending =
-        sortOrder == AppFilterSearchBar.SORT_DESCENDING;
+    final bool isDescending = sortOrder == AppFilterSearchBar.SORT_DESCENDING;
 
     sorted.sort((a, b) {
       final Comparable<Object>? left = sortValue(a, sortBy);
@@ -112,9 +111,7 @@ class ListQuery {
     final int end = (start + limit) > totalItems ? totalItems : start + limit;
 
     return ListQueryResult<T>(
-      items: start >= totalItems
-          ? <T>[]
-          : source.sublist(start, end),
+      items: start >= totalItems ? <T>[] : source.sublist(start, end),
       totalItems: totalItems,
       totalPages: totalPages,
       page: safePage,

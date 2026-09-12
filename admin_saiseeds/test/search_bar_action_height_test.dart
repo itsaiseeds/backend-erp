@@ -1,64 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:admin_saiseeds/core/theme/app_spacing.dart';
-import 'package:admin_saiseeds/core/theme/app_theme.dart';
-import 'package:admin_saiseeds/core/widgets/buttons/add_action_button.dart';
-import 'package:admin_saiseeds/core/widgets/buttons/icon_action_button.dart';
-import 'package:admin_saiseeds/core/widgets/inputs/app_filter_search_bar.dart';
-import 'package:admin_saiseeds/core/widgets/tables/app_data_column.dart';
-import 'package:admin_saiseeds/core/widgets/tables/app_data_table.dart';
 
-void main() {
-  testWidgets('search bar actions size correctly against the bar', (tester) async {
-    tester.view.devicePixelRatio = 1.0;
-    tester.view.physicalSize = const Size(1600, 1000);
-    addTearDown(tester.view.reset);
+const double kBarHeight = 48;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light,
-        home: Scaffold(
-          body: AppDataTable<String>(
-            items: const <String>[],
-            isLoading: false,
-            currentPage: 1,
-            totalPages: 0,
-            totalItems: 0,
-            configKey: 'height_probe',
-            columns: const [AppDataColumn(id: 'name', label: 'Name')],
-            cellBuilder: (context, item, column) => const SizedBox.shrink(),
-            searchBarActions: [
-              IconActionButton(
-                expand: true,
-                icon: Icons.refresh_rounded,
-                onPressed: () {},
+Widget _row({required double searchBarIntrinsicHeight}) {
+  return MaterialApp(
+    home: Scaffold(
+      body: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: searchBarIntrinsicHeight,
+                child: const ColoredBox(color: Color(0xFFEEEEEE)),
               ),
-              AddActionButton(tooltip: 'Add', onPressed: () {}),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Align(
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: kBarHeight,
+                height: kBarHeight,
+                child: ColoredBox(
+                  color: Color(0xFF2E7D32),
+                  child: SizedBox.shrink(key: ValueKey('refresh')),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
+    ),
+  );
+}
+
+void main() {
+  testWidgets('action keeps its height when the search bar is one row',
+      (tester) async {
+    await tester.pumpWidget(_row(searchBarIntrinsicHeight: kBarHeight));
+    expect(tester.getSize(find.byKey(const ValueKey('refresh'))).height,
+        kBarHeight);
+  });
+
+  testWidgets('action keeps its height when filter chips wrap to two rows',
+      (tester) async {
+    await tester.pumpWidget(_row(searchBarIntrinsicHeight: 96));
+
+    expect(
+      tester.getSize(find.byKey(const ValueKey('refresh'))).height,
+      kBarHeight,
+      reason: 'refresh must not grow with the search bar',
     );
-    await tester.pumpAndSettle();
-
-    final double barHeight = tester
-        .getSize(find.byType(AppFilterSearchBar))
-        .height;
-    double paintedHeight(Finder button) {
-      final Finder box = find.descendant(
-        of: button,
-        matching: find.byWidgetPredicate(
-          (w) => w is Container && w.decoration is BoxDecoration,
-        ),
-      );
-      return tester.getSize(box.first).height;
-    }
-
-    final double refreshHeight = paintedHeight(find.byType(IconActionButton));
-    final double addHeight = paintedHeight(find.byType(AddActionButton));
-
-    final double expected = barHeight - (AppSizes.actionButtonInset * 2);
-    expect(refreshHeight, expected);
-    expect(addHeight, expected);
   });
 }

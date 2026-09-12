@@ -29,10 +29,7 @@ class AppBadge extends StatelessWidget {
           foreground: AppColors.WARNING,
         );
       case AppBadgeVariant.error:
-        return (
-          background: AppColors.ERROR_LIGHT,
-          foreground: AppColors.ERROR,
-        );
+        return (background: AppColors.ERROR_LIGHT, foreground: AppColors.ERROR);
       case AppBadgeVariant.info:
         return (background: AppColors.INFO_LIGHT, foreground: AppColors.INFO);
       case AppBadgeVariant.neutral:

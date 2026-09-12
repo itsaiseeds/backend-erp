@@ -93,11 +93,12 @@ class AppSizes {
   static const double profileStatusDot = 8.0;
   static const double hairlineThickness = 1.0;
 
-
   static const double tableHeaderHeight = 44.0;
   static const double tableRowHeight = 44.0;
   static const double tableCompactRowHeight = 38.0;
   static const double tableSearchBarHeight = 52.0;
+  static const double clientSwitcherHeight = 44.0;
+  static const double clientSwitcherWidth = 420.0;
   static const double tableControlHeight = 36.0;
   static const double tableSortOrderWidth = 38.0;
   static const double tableSelectColumnWidth = 56.0;
@@ -135,6 +136,15 @@ class AppSizes {
   static const double tableColumnWidthWide = 260.0;
 
   static const double formDialogWidth = 560.0;
+  static const double stepDotSize = 28.0;
+  static const double dateRangePopoverWidth = 640.0;
+  static const double dateRangePresetsWidth = 140.0;
+  static const double dateRangeCellSize = 32.0;
+  static const double smallScreenNoticeWidth = 360.0;
+  static const double smallScreenLogo = 64.0;
+  static const double smallScreenIconBox = 72.0;
+  static const double smallScreenIcon = 34.0;
+  static const double tableActionButtonHeight = 30.0;
   static const double detailDialogWidth = 620.0;
   static const double dialogMaxHeight = 720.0;
   static const double dialogIconTile = 40.0;

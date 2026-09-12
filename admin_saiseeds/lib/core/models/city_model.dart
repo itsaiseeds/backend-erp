@@ -3,11 +3,7 @@ class CityModel {
   final String name;
   final String stateName;
 
-  const CityModel({
-    required this.id,
-    required this.name,
-    this.stateName = '',
-  });
+  const CityModel({required this.id, required this.name, this.stateName = ''});
 
   factory CityModel.fromJson(
     Map<String, dynamic> json, {

@@ -22,9 +22,7 @@ class AuthRepository {
     );
 
     if (response is! Map) {
-      throw const ApiException(
-        message: AppStrings.ERROR_UNEXPECTED_RESPONSE,
-      );
+      throw const ApiException(message: AppStrings.ERROR_UNEXPECTED_RESPONSE);
     }
 
     final session = AuthSession.fromJson(Map<String, dynamic>.from(response));

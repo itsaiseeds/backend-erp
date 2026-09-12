@@ -3,7 +3,15 @@ import '../../constants/app_strings.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
+import 'date_range_field.dart';
 import 'searchable_popup_menu.dart';
+
+class FilterValueOption {
+  final String value;
+  final String label;
+
+  const FilterValueOption({required this.value, required this.label});
+}
 
 typedef FilterSearchCallback =
     void Function({
@@ -27,6 +35,11 @@ class AppFilterSearchBar extends StatefulWidget {
   final Map<String, String> initialFilters;
   final String Function(String key) getHumanReadableFilterName;
   final String Function(String key) getHumanReadableSortName;
+  final List<FilterValueOption> Function(String key)? filterValueOptions;
+  final String Function(String key, String value)? getFilterValueLabel;
+  final bool Function(String key)? isDateRangeFilter;
+  final String Function(String key)? getFilterDescription;
+  final String Function(String key)? getSortDescription;
   final bool showSort;
   final bool showFilters;
   final double minHeight;
@@ -43,6 +56,11 @@ class AppFilterSearchBar extends StatefulWidget {
     this.initialSortOrder,
     this.filterByOptions = const [],
     this.initialFilters = const {},
+    this.filterValueOptions,
+    this.getFilterValueLabel,
+    this.isDateRangeFilter,
+    this.getFilterDescription,
+    this.getSortDescription,
     this.showSort = true,
     this.showFilters = true,
     this.minHeight = AppSizes.tableSearchBarHeight,
@@ -200,7 +218,9 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
     return _localFilters.entries.map((entry) {
       return _FilterChip(
         label: widget.getHumanReadableFilterName(entry.key),
-        value: entry.value,
+        value: widget.getFilterValueLabel == null
+            ? entry.value
+            : widget.getFilterValueLabel!(entry.key, entry.value),
         onEdit: () {
           final String value = entry.value;
           setState(() => _localFilters.remove(entry.key));
@@ -217,21 +237,34 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
   Widget _buildInlineFilterEditor() {
     return Container(
       height: AppSizes.tableControlHeight,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd),
+      padding: const EdgeInsets.only(
+        left: AppSpacing.smd,
+        right: AppSpacing.xs,
+      ),
       decoration: BoxDecoration(
-        color: AppColors.PRIMARY_SURFACE,
-        border: Border.all(
-          color: AppColors.PRIMARY,
-          width: AppSizes.borderMedium,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: AppColors.SURFACE,
+        border: Border.all(color: AppColors.PRIMARY),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Tooltip(
+            message:
+                widget.getFilterDescription?.call(_activeFilterField!) ?? '',
+            child: Text(
+              widget.getHumanReadableFilterName(_activeFilterField!),
+              style: AppTypography.labelSmall.copyWith(
+                color: AppColors.TEXT_PRIMARY,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
           Text(
-            widget.getHumanReadableFilterName(_activeFilterField!),
-            style: AppTypography.labelSmall,
+            AppStrings.FILTER_OPERATOR_EQUALS,
+            style: AppTypography.labelSmall.copyWith(
+              color: AppColors.TEXT_SECONDARY,
+            ),
           ),
           const SizedBox(width: AppSpacing.xs),
           ConstrainedBox(
@@ -239,33 +272,7 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
               minWidth: AppSizes.tableFilterValueMinWidth,
               maxWidth: AppSizes.tableFilterValueMaxWidth,
             ),
-            child: IntrinsicWidth(
-              child: TextField(
-                controller: _inlineEditingController,
-                focusNode: _inlineFocusNode,
-                style: AppTypography.labelMedium,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                  hintText: AppStrings.TABLE_FILTER_VALUE_HINT,
-                  hintStyle: AppTypography.labelMedium.copyWith(
-                    color: AppColors.TEXT_DISABLED,
-                  ),
-                  filled: false,
-                ),
-                onSubmitted: (_) => _performSearch(),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          _InlineIconButton(
-            icon: Icons.check_circle_rounded,
-            color: AppColors.SUCCESS,
-            tooltip: AppStrings.TABLE_APPLY_FILTER,
-            onTap: () => _applyInlineFilter(focusSearchField: true),
+            child: IntrinsicWidth(child: _buildFilterValueInput()),
           ),
           const SizedBox(width: AppSpacing.xxs),
           _InlineIconButton(
@@ -284,12 +291,101 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
     );
   }
 
+  List<FilterValueOption> _optionsForActiveFilter() {
+    final String? field = _activeFilterField;
+    if (field == null || widget.filterValueOptions == null) return const [];
+    return widget.filterValueOptions!(field);
+  }
+
+  Widget _buildFilterValueInput() {
+    final String? field = _activeFilterField;
+
+    if (field != null && (widget.isDateRangeFilter?.call(field) ?? false)) {
+      return DateRangeField(
+        value: _inlineEditingController.text,
+        onChanged: (value) {
+          _inlineEditingController.text = value;
+          _applyInlineFilter(focusSearchField: true);
+        },
+      );
+    }
+
+    final List<FilterValueOption> options = _optionsForActiveFilter();
+
+    if (options.isEmpty) {
+      return TextField(
+        controller: _inlineEditingController,
+        focusNode: _inlineFocusNode,
+        style: AppTypography.labelMedium,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+          hintText: AppStrings.TABLE_FILTER_VALUE_HINT,
+          hintStyle: AppTypography.labelMedium.copyWith(
+            color: AppColors.TEXT_DISABLED,
+          ),
+          filled: false,
+        ),
+        onSubmitted: (_) => _performSearch(),
+      );
+    }
+
+    final String current = _inlineEditingController.text;
+    final FilterValueOption? selected = _selectedOption(options, current);
+
+    return SearchablePopupMenu<FilterValueOption>(
+      items: options,
+      itemToString: (option) => option.label,
+      isSelected: (option) => option.value == current,
+      onSelected: (option) {
+        _inlineEditingController.text = option.value;
+        _applyInlineFilter(focusSearchField: true);
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              selected?.label ?? AppStrings.TABLE_FILTER_VALUE_HINT,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.labelMedium.copyWith(
+                color: selected == null
+                    ? AppColors.TEXT_DISABLED
+                    : AppColors.TEXT_PRIMARY,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.arrow_drop_down_rounded,
+            size: AppSizes.iconMd,
+            color: AppColors.TEXT_SECONDARY,
+          ),
+        ],
+      ),
+    );
+  }
+
+  static FilterValueOption? _selectedOption(
+    List<FilterValueOption> options,
+    String value,
+  ) {
+    for (final option in options) {
+      if (option.value == value) return option;
+    }
+    return null;
+  }
+
   Widget _buildAddFilterButton() {
     if (widget.filterByOptions.isEmpty) return const SizedBox.shrink();
 
     return SearchablePopupMenu<String>(
       items: widget.filterByOptions,
       itemToString: widget.getHumanReadableFilterName,
+      itemDescription: widget.getFilterDescription,
       isSelected: _localFilters.containsKey,
       onSelected: _beginEditingFilter,
       child: Container(

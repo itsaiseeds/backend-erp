@@ -62,10 +62,7 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.subtitle,
-            style: AppTypography.bodySmall,
-          ),
+          Text(widget.subtitle, style: AppTypography.bodySmall),
           const SizedBox(height: AppSpacing.md),
           Flexible(
             child: SingleChildScrollView(
@@ -117,7 +114,9 @@ class _ColumnToggleTile extends StatelessWidget {
           vertical: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: isHidden ? AppColors.SURFACE_VARIANT : AppColors.PRIMARY_SURFACE,
+          color: isHidden
+              ? AppColors.SURFACE_VARIANT
+              : AppColors.PRIMARY_SURFACE,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isHidden ? AppColors.BORDER : AppColors.PRIMARY_LIGHT,

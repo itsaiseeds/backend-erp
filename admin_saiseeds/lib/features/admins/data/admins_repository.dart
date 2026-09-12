@@ -48,11 +48,7 @@ class AdminsRepository {
   }) async {
     await _apiClient.patch(
       AdminsEndpoints.detail(id),
-      body: {
-        'name': name,
-        'email': email,
-        'phone_number': phoneNumber,
-      },
+      body: {'name': name, 'email': email, 'phone_number': phoneNumber},
     );
   }
 

@@ -145,6 +145,9 @@ class ClientAddressPayloadSerializer(serializers.Serializer):
     city = serializers.CharField()
     state = serializers.CharField()
     country = serializers.CharField()
+    city_id = serializers.IntegerField()
+    state_id = serializers.IntegerField()
+    country_id = serializers.IntegerField()
 
 
 class ClientContactPayloadSerializer(serializers.Serializer):

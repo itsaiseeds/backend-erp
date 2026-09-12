@@ -21,9 +21,8 @@ class CityPickerField extends StatelessWidget {
     this.enabled = true,
   });
 
-  static String label(CityModel city) => city.stateName.isEmpty
-      ? city.name
-      : '${city.name}, ${city.stateName}';
+  static String label(CityModel city) =>
+      city.stateName.isEmpty ? city.name : '${city.name}, ${city.stateName}';
 
   @override
   Widget build(BuildContext context) {
