@@ -25,6 +25,7 @@ from .models import (
     Pincode,
     PrivateDispatchDetails,
     Product,
+    ProductDescriptionItem,
     ProductPackaging,
     Stage,
     State,
@@ -271,8 +272,19 @@ class ProductAdminForm(forms.ModelForm):
         return product
 
 
+class ProductDescriptionItemInline(CreatedByStampInlineMixin, admin.TabularInline):
+    """The product's marketing bullets, edited in ``sequence`` order.
+
+    Ordered by the model's own Meta, so the rows appear here in exactly the
+    order the Android catalogue renders them.
+    """
+
+    model = ProductDescriptionItem
+    extra = 0
+
+
 @admin.register(Product)
-class ProductAdmin(SoftDeleteModelAdmin):
+class ProductAdmin(SoftDeleteParentAdmin):
     form = ProductAdminForm
     list_display = ("public_id", "name", "crop", "stage", "selling_price", "created_at")
     search_fields = ("public_id", "name", "crop__name")
@@ -281,6 +293,17 @@ class ProductAdmin(SoftDeleteModelAdmin):
     list_select_related = ("crop", "stage")
     readonly_fields = ("image_url",)
     ordering = ("name",)
+    inlines = (ProductDescriptionItemInline,)
+
+
+@admin.register(ProductDescriptionItem)
+class ProductDescriptionItemAdmin(SoftDeleteModelAdmin):
+    list_display = ("product", "sequence", "text", "created_at")
+    search_fields = ("product__name", "product__public_id", "text")
+    list_filter = ("product__crop",)
+    autocomplete_fields = ("product",)
+    list_select_related = ("product",)
+    ordering = ("product__name", "sequence")
 
 
 class ProductPackagingAdminForm(forms.ModelForm):

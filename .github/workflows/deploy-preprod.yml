@@ -1,9 +1,7 @@
 name: Sync preprod
 
 on:
-  workflow_run:
-    workflows: ["Tests"]
-    types: [completed]
+  push:
     branches: [master]
 
 permissions:
