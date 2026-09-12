@@ -144,8 +144,7 @@ class _ProductPackagingFormDialogState
 
     setState(() => _isSubmitting = true);
 
-    final ProductPackagingsCubit cubit = context
-        .read<ProductPackagingsCubit>();
+    final ProductPackagingsCubit cubit = context.read<ProductPackagingsCubit>();
 
     final bool succeeded = _isEditing
         ? await cubit.updateProductPackaging(

@@ -18,11 +18,16 @@ class SellingPriceAutofill {
     _isManuallyEdited = true;
   }
 
-  String? nextValue({required num? productSellingPrice, required String packets}) {
+  String? nextValue({
+    required num? productSellingPrice,
+    required String packets,
+  }) {
     if (_isManuallyEdited) return null;
 
     final int? packetCount = int.tryParse(packets.trim());
-    if (productSellingPrice == null || packetCount == null || packetCount <= 0) {
+    if (productSellingPrice == null ||
+        packetCount == null ||
+        packetCount <= 0) {
       return null;
     }
 

@@ -21,9 +21,7 @@ class SalesPeopleView extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider<SalesPeopleCubit>(
       create: (context) => SalesPeopleCubit(
-        repository: SalesPeopleRepository(
-          apiClient: context.read<ApiClient>(),
-        ),
+        repository: SalesPeopleRepository(apiClient: context.read<ApiClient>()),
       )..loadSalesPeople(),
       child: const _SalesPeopleContent(),
     );

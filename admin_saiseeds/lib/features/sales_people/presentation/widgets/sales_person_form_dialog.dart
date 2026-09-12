@@ -73,9 +73,8 @@ class _SalesPersonFormDialogState extends State<SalesPersonFormDialog> {
     final bool isCityValid = _selectedCity != null;
 
     setState(
-      () => _cityError = isCityValid
-          ? null
-          : AppStrings.VALIDATION_CITY_REQUIRED,
+      () =>
+          _cityError = isCityValid ? null : AppStrings.VALIDATION_CITY_REQUIRED,
     );
 
     if (!isFormValid || !isCityValid) return;

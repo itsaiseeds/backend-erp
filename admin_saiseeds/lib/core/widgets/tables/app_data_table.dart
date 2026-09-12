@@ -58,6 +58,11 @@ class AppDataTable<T> extends StatefulWidget {
   final String? currentSortOrder;
   final Map<String, String> currentFilters;
   final String Function(String filter)? getHumanReadableFilterName;
+  final List<FilterValueOption> Function(String filter)? filterValueOptions;
+  final String Function(String filter, String value)? getFilterValueLabel;
+  final bool Function(String filter)? isDateRangeFilter;
+  final String Function(String filter)? getFilterDescription;
+  final String Function(String sort)? getSortDescription;
   final String Function(String sort)? getHumanReadableSortName;
   final String searchHintText;
   final List<Widget> searchBarActions;
@@ -112,6 +117,11 @@ class AppDataTable<T> extends StatefulWidget {
     this.currentSortOrder,
     this.currentFilters = const {},
     this.getHumanReadableFilterName,
+    this.filterValueOptions,
+    this.getFilterValueLabel,
+    this.isDateRangeFilter,
+    this.getFilterDescription,
+    this.getSortDescription,
     this.getHumanReadableSortName,
     this.searchHintText = AppStrings.SEARCH,
     this.searchBarActions = const [],
@@ -443,27 +453,39 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-            Expanded(
-              child: AppFilterSearchBar(
-                controller: _searchController,
-                hintText: widget.searchHintText,
-                sortByOptions: widget.sortByOptions,
-                filterByOptions: widget.filterByOptions,
-                initialSortBy: widget.currentSortBy,
-                initialSortOrder: widget.currentSortOrder,
-                initialFilters: widget.currentFilters,
-                getHumanReadableFilterName:
-                    widget.getHumanReadableFilterName ?? (value) => value,
-                getHumanReadableSortName:
-                    widget.getHumanReadableSortName ?? (value) => value,
-                onSearch: _onSearch,
-                minHeight: widget.searchBarHeight,
+              Expanded(
+                child: AppFilterSearchBar(
+                  controller: _searchController,
+                  hintText: widget.searchHintText,
+                  sortByOptions: widget.sortByOptions,
+                  filterByOptions: widget.filterByOptions,
+                  filterValueOptions: widget.filterValueOptions,
+                  getFilterValueLabel: widget.getFilterValueLabel,
+                  isDateRangeFilter: widget.isDateRangeFilter,
+                  getFilterDescription: widget.getFilterDescription,
+                  getSortDescription: widget.getSortDescription,
+                  initialSortBy: widget.currentSortBy,
+                  initialSortOrder: widget.currentSortOrder,
+                  initialFilters: widget.currentFilters,
+                  getHumanReadableFilterName:
+                      widget.getHumanReadableFilterName ?? (value) => value,
+                  getHumanReadableSortName:
+                      widget.getHumanReadableSortName ?? (value) => value,
+                  onSearch: _onSearch,
+                  minHeight: widget.searchBarHeight,
+                ),
               ),
-            ),
-            for (final action in widget.searchBarActions) ...[
-              const SizedBox(width: AppSpacing.smd),
-              AspectRatio(aspectRatio: 1, child: action),
-            ],
+              for (final action in widget.searchBarActions) ...[
+                const SizedBox(width: AppSpacing.smd),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: widget.searchBarHeight,
+                    height: widget.searchBarHeight,
+                    child: action,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -945,7 +967,8 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
         if (maxScroll <= 0) return const SizedBox.shrink();
 
         final double currentScroll = _bodyScrollController.offset;
-        final double thumbWidth = (maxWidth / (maxWidth + maxScroll)) * maxWidth;
+        final double thumbWidth =
+            (maxWidth / (maxWidth + maxScroll)) * maxWidth;
         final double trackWidth =
             maxWidth - (AppSizes.tableScrollTrackInset * 2);
         final double thumbOffset =
@@ -1131,7 +1154,9 @@ class _TableRowState<T> extends State<_TableRow<T>> {
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
         onTap: _isInteractive ? () => widget.onTap!(widget.item) : null,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
           height: widget.rowHeight,
           decoration: BoxDecoration(
             color: background,

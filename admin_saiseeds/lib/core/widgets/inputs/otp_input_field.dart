@@ -33,10 +33,7 @@ class _OtpInputFieldState extends State<OtpInputField> {
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(
-      widget.length,
-      (_) => TextEditingController(),
-    );
+    _controllers = List.generate(widget.length, (_) => TextEditingController());
     _focusNodes = List.generate(widget.length, (_) => FocusNode());
     for (final node in _focusNodes) {
       node.addListener(_onFocusChanged);
@@ -214,9 +211,7 @@ class _OtpInputFieldState extends State<OtpInputField> {
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           showCursor: false,
-          style: AppTypography.otpDigit.copyWith(
-            color: _digitColorFor(index),
-          ),
+          style: AppTypography.otpDigit.copyWith(color: _digitColorFor(index)),
           decoration: InputDecoration(
             counterText: '',
             filled: true,

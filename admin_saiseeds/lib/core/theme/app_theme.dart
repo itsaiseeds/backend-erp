@@ -12,6 +12,9 @@ class AppTheme {
       useMaterial3: true,
       fontFamily: GoogleFonts.inter().fontFamily,
       scaffoldBackgroundColor: AppColors.BACKGROUND,
+      hoverColor: AppColors.TRANSPARENT,
+      splashColor: AppColors.TRANSPARENT,
+      highlightColor: AppColors.TRANSPARENT,
       colorScheme: const ColorScheme(
         brightness: Brightness.light,
         primary: AppColors.PRIMARY,

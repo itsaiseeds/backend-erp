@@ -89,8 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final bool isResolved = state.status == SessionStatus.loaded;
 
         final String activeId =
-            !isResolved ||
-                SidebarItems.isAccessible(_activeItemId, role: role)
+            !isResolved || SidebarItems.isAccessible(_activeItemId, role: role)
             ? _activeItemId
             : SidebarItems.DEFAULT_ITEM_ID;
 

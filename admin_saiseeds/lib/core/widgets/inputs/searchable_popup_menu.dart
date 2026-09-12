@@ -8,6 +8,7 @@ import '../../theme/app_typography.dart';
 class SearchablePopupMenu<T> extends StatefulWidget {
   final List<T> items;
   final String Function(T item) itemToString;
+  final String Function(T item)? itemDescription;
   final ValueChanged<T> onSelected;
   final bool Function(T item)? isSelected;
   final List<T> Function(String query)? optionsBuilder;
@@ -17,6 +18,7 @@ class SearchablePopupMenu<T> extends StatefulWidget {
     super.key,
     required this.items,
     required this.itemToString,
+    this.itemDescription,
     required this.onSelected,
     required this.child,
     this.isSelected,
@@ -150,6 +152,14 @@ class _SearchablePopupMenuState<T> extends State<SearchablePopupMenu<T>> {
   OverlayEntry _createOverlayEntry() {
     final RenderBox renderBox = context.findRenderObject() as RenderBox;
     final Size size = renderBox.size;
+    final double menuWidth = size.width < AppSizes.tableFilterMenuWidth
+        ? AppSizes.tableFilterMenuWidth
+        : size.width;
+
+    final Offset anchorOrigin = renderBox.localToGlobal(Offset.zero);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool overflowsRight =
+        anchorOrigin.dx + menuWidth + AppSpacing.md > screenWidth;
 
     return OverlayEntry(
       builder: (overlayContext) {
@@ -163,13 +173,17 @@ class _SearchablePopupMenuState<T> extends State<SearchablePopupMenu<T>> {
               ),
             ),
             Positioned(
-              width: size.width < AppSizes.tableFilterMenuWidth
-                  ? AppSizes.tableFilterMenuWidth
-                  : size.width,
+              width: menuWidth,
               child: CompositedTransformFollower(
                 link: _layerLink,
                 showWhenUnlinked: false,
-                offset: Offset(0, size.height + AppSpacing.xs),
+                targetAnchor: overflowsRight
+                    ? Alignment.bottomRight
+                    : Alignment.bottomLeft,
+                followerAnchor: overflowsRight
+                    ? Alignment.topRight
+                    : Alignment.topLeft,
+                offset: const Offset(0, AppSpacing.xs),
                 child: Material(
                   color: AppColors.TRANSPARENT,
                   child: Container(
@@ -223,6 +237,7 @@ class _SearchablePopupMenuState<T> extends State<SearchablePopupMenu<T>> {
                               final T item = _suggestions[index];
                               return _SuggestionTile(
                                 label: widget.itemToString(item),
+                                description: widget.itemDescription?.call(item),
                                 isSelected:
                                     widget.isSelected?.call(item) ?? false,
                                 isHighlighted: index == _highlightedIndex,
@@ -265,12 +280,14 @@ class _SearchablePopupMenuState<T> extends State<SearchablePopupMenu<T>> {
 
 class _SuggestionTile extends StatelessWidget {
   final String label;
+  final String? description;
   final bool isSelected;
   final bool isHighlighted;
   final VoidCallback onTap;
 
   const _SuggestionTile({
     required this.label,
+    this.description,
     required this.isSelected,
     required this.isHighlighted,
     required this.onTap,
@@ -289,13 +306,30 @@ class _SuggestionTile extends StatelessWidget {
             horizontal: AppSpacing.smd,
             vertical: AppSpacing.smd,
           ),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.labelMedium.copyWith(
-              color: isSelected ? AppColors.PRIMARY : AppColors.TEXT_PRIMARY,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.labelMedium.copyWith(
+                  color: isSelected
+                      ? AppColors.PRIMARY
+                      : AppColors.TEXT_PRIMARY,
+                ),
+              ),
+              if (description != null && description!.trim().isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  description!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.caption,
+                ),
+              ],
+            ],
           ),
         ),
       ),

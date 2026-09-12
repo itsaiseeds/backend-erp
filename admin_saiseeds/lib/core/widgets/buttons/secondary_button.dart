@@ -30,9 +30,7 @@ class SecondaryButton extends StatelessWidget {
         : AppColors.PRIMARY;
 
     return MouseRegion(
-      cursor: _isDisabled
-          ? SystemMouseCursors.basic
-          : SystemMouseCursors.click,
+      cursor: _isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: OutlinedButton(
         onPressed: _isDisabled ? null : onPressed,
         style: OutlinedButton.styleFrom(

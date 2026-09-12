@@ -29,9 +29,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } on ApiException catch (e) {
       final message = e.message.trim();
       emit(
-        AuthState.failure(
-          message.isEmpty ? AppStrings.LOGIN_FAILED : message,
-        ),
+        AuthState.failure(message.isEmpty ? AppStrings.LOGIN_FAILED : message),
       );
     } catch (_) {
       emit(const AuthState.failure(AppStrings.LOGIN_FAILED));

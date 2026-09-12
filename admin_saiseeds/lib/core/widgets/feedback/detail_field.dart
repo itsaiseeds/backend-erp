@@ -70,7 +70,10 @@ class DetailFieldGrid extends StatelessWidget {
             rows.add(const SizedBox(height: AppSpacing.md));
           }
           rows.add(
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            ),
           );
         }
 

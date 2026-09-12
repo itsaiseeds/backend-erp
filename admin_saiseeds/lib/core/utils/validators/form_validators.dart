@@ -7,9 +7,7 @@ class FormValidators {
 
   static const int MINIMUM_COUNT = 1;
 
-  static final RegExp _emailPattern = RegExp(
-    r'^[\w.+-]+@[\w-]+\.[\w.-]+$',
-  );
+  static final RegExp _emailPattern = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
 
   static final RegExp _digitsOnly = RegExp(r'^[0-9]+$');
 

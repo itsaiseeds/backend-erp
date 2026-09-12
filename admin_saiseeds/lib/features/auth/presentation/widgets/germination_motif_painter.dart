@@ -23,9 +23,8 @@ class GerminationMotifPainter extends CustomPainter {
   static const double _seedOpacity = 0.20;
   static const double _sproutOpacity = 0.26;
 
-  Color _stroke(double opacity) => strokeColor.withValues(
-    alpha: (opacity * opacityScale).clamp(0.0, 1.0),
-  );
+  Color _stroke(double opacity) =>
+      strokeColor.withValues(alpha: (opacity * opacityScale).clamp(0.0, 1.0));
 
   @override
   void paint(Canvas canvas, Size size) {
