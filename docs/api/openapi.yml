@@ -1815,6 +1815,8 @@ components:
       type: object
       description: Output shape for one client address (schema only).
       properties:
+        id:
+          type: integer
         label:
           type: string
         is_primary:
@@ -1842,6 +1844,7 @@ components:
       - city_id
       - country
       - country_id
+      - id
       - is_primary
       - label
       - line_1
@@ -2067,7 +2070,10 @@ components:
           type: string
         is_primary:
           type: boolean
+        id:
+          type: integer
       required:
+      - id
       - is_primary
       - name
     ClientTransportAgencyRequest:

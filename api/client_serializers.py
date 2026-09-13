@@ -136,7 +136,7 @@ class ClientListsSerializer(serializers.Serializer):
 
 class ClientAddressPayloadSerializer(serializers.Serializer):
     """Output shape for one client address (schema only)."""
-
+    id = serializers.IntegerField()
     label = serializers.CharField()
     is_primary = serializers.BooleanField()
     line_1 = serializers.CharField()
@@ -164,6 +164,7 @@ class ClientTransportAgencyPayloadSerializer(serializers.Serializer):
 
     name = serializers.CharField()
     is_primary = serializers.BooleanField()
+    id = serializers.IntegerField()
 
 
 class ClientPayloadSerializer(serializers.Serializer):
