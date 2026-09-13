@@ -809,7 +809,7 @@ paths:
     post:
       operationId: api_sales_admin_dispatch_order_create
       description: Record a dispatch against a verified order (app admin only).
-      summary: Dispatch a verified order (by agency or own vehicle)
+      summary: Dispatch a verified order
       parameters:
       - in: path
         name: public_id
@@ -2802,34 +2802,31 @@ components:
       description: |-
         Request validation for recording a dispatch.
 
-        The kind of dispatch is read off the order in ``context["order"]`` -- it is
-        whether that order has a ``transport_agency`` -- so this serializer only
-        checks that the body matches the kind, never decides it.
+        Every field is required. There is no per-kind branching: an agency dispatch
+        and an own-vehicle one carry exactly the same details, and which table they
+        land in is the order's business, not the request's.
       properties:
-        dispatch_date:
-          type: string
-          format: date
         from_city_id:
           type: integer
-        to_city_id:
-          type: integer
-        lr_number:
-          type: string
-          description: 'Agency dispatches only, and optional even then: leave it out
-            while the transporter''s consignment note is still pending.'
-          maxLength: 64
-        vehicle_number:
+          description: Where the goods left from. An input until a warehouse can default
+            it.
+        driver_name:
           type: string
           minLength: 1
-          maxLength: 32
+          maxLength: 255
         driver_number:
           type: string
           minLength: 1
           maxLength: 10
+        vehicle_number:
+          type: string
+          minLength: 1
+          maxLength: 32
       required:
-      - dispatch_date
+      - driver_name
+      - driver_number
       - from_city_id
-      - to_city_id
+      - vehicle_number
     FilterCatalogueEntry:
       type: object
       description: Schema for one ``available_filters`` entry.
@@ -3058,10 +3055,14 @@ components:
         selling_price:
           type: string
           description: The bag's own list price, not what this order was charged.
+        negotiated_selling_price:
+          type: string
+          description: The per-bag rate this order was actually charged for the line.
         quantity:
           type: integer
           description: Bags of this kind on the order.
       required:
+      - negotiated_selling_price
       - packet_weight
       - packets
       - product
