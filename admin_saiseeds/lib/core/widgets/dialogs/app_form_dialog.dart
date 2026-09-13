@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../constants/app_strings.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
@@ -16,6 +17,7 @@ class AppFormDialog extends StatelessWidget {
   final bool isSubmitting;
   final double width;
   final Widget? leadingAction;
+  final double? fixedHeight;
 
   const AppFormDialog({
     super.key,
@@ -28,12 +30,27 @@ class AppFormDialog extends StatelessWidget {
     this.isSubmitting = false,
     this.width = AppSizes.formDialogWidth,
     this.leadingAction,
+    this.fixedHeight,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Enter advances or submits, whichever the form's onSubmit currently means.
+    // A disabled onSubmit (mid-request) leaves the key unhandled.
     return SelectionContainer.disabled(
-      child: _buildDialog(context),
+      child: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.enter): () {
+            if (isSubmitting) return;
+            onSubmit?.call();
+          },
+          const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+            if (isSubmitting) return;
+            onSubmit?.call();
+          },
+        },
+        child: Focus(autofocus: true, child: _buildDialog(context)),
+      ),
     );
   }
 
@@ -42,7 +59,10 @@ class AppFormDialog extends StatelessWidget {
       backgroundColor: AppColors.TRANSPARENT,
       insetPadding: const EdgeInsets.all(AppSpacing.lg),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: AppSizes.dialogMaxHeight),
+        constraints: BoxConstraints(
+          maxHeight: fixedHeight ?? AppSizes.dialogMaxHeight,
+          minHeight: fixedHeight ?? 0,
+        ),
         child: Container(
           width: width,
           clipBehavior: Clip.antiAlias,
@@ -52,7 +72,9 @@ class AppFormDialog extends StatelessWidget {
             border: Border.all(color: AppColors.BORDER),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: fixedHeight == null
+                ? MainAxisSize.min
+                : MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AppDialogHeader(
@@ -64,12 +86,20 @@ class AppFormDialog extends StatelessWidget {
                     : () => Navigator.of(context).pop(),
               ),
               const AppHairline(),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: content,
+              if (fixedHeight == null)
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: content,
+                  ),
+                )
+              else
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: content,
+                  ),
                 ),
-              ),
               const AppHairline(),
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),

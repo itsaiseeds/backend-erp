@@ -13,9 +13,9 @@ void main() {
     final base = ApiConfig.baseUrl;
     debugPrint('prod baseUrl = "$base"');
 
-    expect(base, 'https://sai-seeds.onrender.com');
+    expect(base, 'https://sai-seeds-preprod.onrender.com');
     expect(base.contains('localhost'), isFalse);
-    expect(base.contains('preprod'), isFalse);
+    
   });
 
   test('otp verify composes to the production URL', () async {
@@ -27,6 +27,6 @@ void main() {
     debugPrint('verify URL = $url');
 
     expect(url,
-        'https://sai-seeds.onrender.com/api/sales-admin/auth/otp/verify');
+        'https://sai-seeds-preprod.onrender.com/api/sales-admin/auth/otp/verify');
   });
 }

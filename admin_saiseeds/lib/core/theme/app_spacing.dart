@@ -137,6 +137,7 @@ class AppSizes {
 
   static const double formDialogWidth = 560.0;
   static const double stepDotSize = 28.0;
+  static const double productImagePreview = 200.0;
   static const double dateRangePopoverWidth = 640.0;
   static const double dateRangePresetsWidth = 140.0;
   static const double dateRangeCellSize = 32.0;
@@ -146,7 +147,10 @@ class AppSizes {
   static const double smallScreenIcon = 34.0;
   static const double tableActionButtonHeight = 30.0;
   static const double detailDialogWidth = 620.0;
+  static const double imageViewerButton = 40.0;
+  static const double detailDialogFixedHeight = 560.0;
   static const double dialogMaxHeight = 720.0;
+  static const double formDialogFixedHeight = 620.0;
   static const double dialogIconTile = 40.0;
   static const double dialogCloseTile = 32.0;
   static const double addButtonTile = 40.0;

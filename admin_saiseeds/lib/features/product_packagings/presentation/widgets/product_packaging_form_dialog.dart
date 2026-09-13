@@ -80,12 +80,14 @@ class _ProductPackagingFormDialogState
     _products = ProductsService.instance.products;
     _selectedProduct = _resolveSelectedProduct();
     _packetsController.addListener(_onPacketsChanged);
+    _packetWeightController.addListener(_onPacketWeightChanged);
     _loadProducts();
   }
 
   @override
   void dispose() {
     _packetsController.removeListener(_onPacketsChanged);
+    _packetWeightController.removeListener(_onPacketWeightChanged);
     _packetWeightController.dispose();
     _packetsController.dispose();
     _sellingPriceController.dispose();
@@ -110,6 +112,8 @@ class _ProductPackagingFormDialogState
 
   void _onPacketsChanged() => _applyAutofill();
 
+  void _onPacketWeightChanged() => _applyAutofill();
+
   void _onProductSelected(ProductModel product) {
     setState(() {
       _selectedProduct = product;
@@ -121,6 +125,7 @@ class _ProductPackagingFormDialogState
   void _applyAutofill() {
     final String? computed = _autofill.nextValue(
       productSellingPrice: _selectedProduct?.sellingPriceValue,
+      packetWeight: _packetWeightController.text,
       packets: _packetsController.text,
     );
     if (computed == null || computed == _sellingPriceController.text) return;
@@ -213,11 +218,11 @@ class _ProductPackagingFormDialogState
                 value: product.cropName,
               ),
               DetailField(
-                label: AppStrings.COLUMN_BUYING_PRICE,
-                value: product.buyingPrice,
+                label: AppStrings.COLUMN_STAGE,
+                value: product.stageName,
               ),
               DetailField(
-                label: AppStrings.COLUMN_SELLING_PRICE,
+                label: AppStrings.COLUMN_BAG_SELLING_PRICE,
                 value: product.sellingPrice,
               ),
             ],
@@ -285,8 +290,9 @@ class _ProductPackagingFormDialogState
             const SizedBox(height: AppSpacing.md),
             AppTextField(
               controller: _sellingPriceController,
-              label: AppStrings.FIELD_SELLING_PRICE,
-              hint: AppStrings.FIELD_SELLING_PRICE_HINT,
+              label: AppStrings.FIELD_BAG_SELLING_PRICE,
+              hint: AppStrings.FIELD_BAG_SELLING_PRICE_HINT,
+              helperText: AppStrings.FIELD_BAG_SELLING_PRICE_HELPER,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
