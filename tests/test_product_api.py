@@ -53,7 +53,7 @@ class ProductApiTest(WebApiTestCase):
 
         cls.crop = Crop.objects.create(name="Wheat", created_by=cls.seed_admin)
         cls.breeder = Stage.by_id(StageIds.BREEDER)
-        cls.certificate = Stage.by_id(StageIds.CERTIFICATE)
+        cls.certificate = Stage.by_id(StageIds.CERTIFIED)
         cls.product = Product.objects.create(
             name="Premium",
             crop=cls.crop,
@@ -272,7 +272,7 @@ class ProductApiTest(WebApiTestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.assertEqual(float(response.data["selling_price"]), 1500.0)
-        self.assertEqual(response.data["stage"]["code"], "CERTIFICATE")
+        self.assertEqual(response.data["stage"]["code"], "CERTIFIED")
 
         self.product.refresh_from_db()
         self.assertEqual(self.product.selling_price, 1500)

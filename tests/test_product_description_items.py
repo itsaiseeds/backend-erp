@@ -59,7 +59,7 @@ class ProductDescriptionItemApiTest(WebApiTestCase):
         cls.product = Product.objects.create(
             name="Sai-3353",
             crop=cls.crop,
-            stage=Stage.by_id(StageIds.CERTIFICATE),
+            stage=Stage.by_id(StageIds.CERTIFIED),
             selling_price=Decimal("250.00"),
             created_by=cls.admin_user,
         )

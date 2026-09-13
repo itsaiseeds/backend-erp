@@ -122,7 +122,7 @@ class SalesAdminOrderReadApiTest(WebApiTestCase):
         product = Product.objects.create(
             name=product_name,
             crop_id=1,
-            stage=Stage.by_id(StageIds.CERTIFICATE),
+            stage=Stage.by_id(StageIds.CERTIFIED),
             selling_price=Decimal("100.00"),
             created_by=cls.superuser,
         )
