@@ -1815,6 +1815,10 @@ components:
       type: object
       description: Output shape for one client address (schema only).
       properties:
+        id:
+          type: integer
+          description: This link's id. Send it as client_address_id when creating
+            an order.
         label:
           type: string
         is_primary:
@@ -1842,6 +1846,7 @@ components:
       - city_id
       - country
       - country_id
+      - id
       - is_primary
       - label
       - line_1
@@ -2067,7 +2072,12 @@ components:
           type: string
         is_primary:
           type: boolean
+        id:
+          type: integer
+          description: This link's id. Send it as client_transport_agency_id when
+            creating an order.
       required:
+      - id
       - is_primary
       - name
     ClientTransportAgencyRequest:
