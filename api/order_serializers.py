@@ -68,6 +68,9 @@ class OrderCardPackagingSerializer(serializers.Serializer):
     selling_price = serializers.CharField(
         help_text="The bag's own list price, not what this order was charged."
     )
+    negotiated_selling_price = serializers.CharField(
+        help_text="The per-bag rate this order was actually charged for the line."
+    )
     quantity = serializers.IntegerField(help_text="Bags of this kind on the order.")
 
 

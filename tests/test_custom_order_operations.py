@@ -160,6 +160,8 @@ class CustomOrderOperationsTest(DMLTestCase):
         attach_dispatch_details(
             order, dispatched_by=self.stock_admin, dispatch_date=date or self.today,
             from_city=self.city, to_city=self.city2, lr_number="LR-CO",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
         )
         update_custom_order_status(order, StatusIds.DISPATCHED)
 

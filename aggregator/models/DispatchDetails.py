@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from authentication.validators import validate_phone_number
 from common.models import SoftDeletedModel, TimeStampedModel
 
 
@@ -9,6 +10,12 @@ class DispatchDetails(TimeStampedModel, SoftDeletedModel):
     """Dispatch via a third-party transporter (carries an LR number).
 
     Recorded by a sales admin (``dispatched_by``); it has no ``created_by``.
+
+    The vehicle and the driver are recorded here as well as on
+    ``PrivateDispatchDetails``: knowing who physically took the goods and in
+    what matters just as much when a transporter carries them -- it is what a
+    delivery query is chased with. The LR number is the one thing unique to
+    this kind of dispatch, and it is the one thing that may be pending.
     """
 
     client = models.ForeignKey(
@@ -47,6 +54,13 @@ class DispatchDetails(TimeStampedModel, SoftDeletedModel):
             "so a dispatch is recorded without one and it is filled in later."
         ),
     )
+    driver_name = models.CharField("driver name", max_length=255)
+    driver_number = models.CharField(
+        "driver number",
+        max_length=10,
+        validators=[validate_phone_number],
+    )
+    vehicle_number = models.CharField("vehicle number", max_length=32)
 
     class Meta:
         verbose_name = "dispatch details"
