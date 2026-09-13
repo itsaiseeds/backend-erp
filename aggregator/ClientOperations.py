@@ -450,6 +450,7 @@ def client_payload(client: Client) -> dict:
         "created_by": client.created_by.name if client.created_by else None,
         "addresses": [
             {
+                "id": link.id,
                 "label": link.label,
                 "is_primary": link.is_primary,
                 **address_payload(link.address),
@@ -472,7 +473,7 @@ def client_payload(client: Client) -> dict:
             for link in client.client_contacts.select_related("contact").all()
         ],
         "transport_agencies": [
-            {"name": link.transport_agency.name, "is_primary": link.is_primary}
+            {"name": link.transport_agency.name, "is_primary": link.is_primary, "id": link.id}
             for link in client.client_transport_agencies.select_related(
                 "transport_agency"
             ).all()
