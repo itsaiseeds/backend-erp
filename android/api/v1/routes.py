@@ -15,6 +15,7 @@ from .CreateClientView import CreateClientView
 from .CreateMultiSelectBagOrderView import CreateMultiSelectBagOrderView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
+from .GetOrdersView import GetOrdersView
 from .LoginView import LoginView
 from .LogoutView import LogoutView
 from .ReauthenticateView import ReauthenticateView
@@ -32,6 +33,7 @@ ROUTES: dict[str, type] = {
     "utilities/client-addresses": ClientAddressesView,
     "utilities/client-transport-agencies": ClientTransportAgenciesView,
     "get-clients": GetClientsView,
+    "get-orders": GetOrdersView,
     "client/<public_id>": GetClientView,
     "create-client": CreateClientView,
     "update-client": UpdateClientView,
