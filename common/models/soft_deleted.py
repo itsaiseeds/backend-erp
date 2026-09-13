@@ -84,6 +84,29 @@ class SoftDeletedModel(models.Model):
         """Physically remove the row, bypassing soft-delete checks."""
         return super().delete(using=using, keep_parents=keep_parents)
 
+    def mark_deleted(self, actor, using=None):
+        """Soft delete without the ``delete_<model>`` permission check.
+
+        The inverse of :meth:`restore`, and the counterpart to :meth:`delete`
+        for rows the API itself maintains: link tables, order lines and the
+        like, whose lifecycle belongs to an endpoint rather than to the Django
+        admin. Neither a sales person nor a sales admin holds the Django
+        ``delete_<model>`` permission :meth:`delete` demands, so those paths
+        would otherwise be unable to remove a row they own outright.
+
+        ``actor`` is still recorded in ``deleted_by`` -- the audit trail is the
+        part that matters; only the permission gate is skipped.
+        """
+        if self.is_deleted:
+            return
+        self.deleted_by = actor
+        self.deleted_at = indian_now()
+        self.is_deleted = True
+        self.save(
+            using=using,
+            update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"],
+        )
+
     def restore(self, using=None):
         """Clear the deleted flags, bringing the record back."""
         if self.is_deleted:

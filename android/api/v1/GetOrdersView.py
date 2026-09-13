@@ -52,6 +52,7 @@ from aggregator.models import Order, OrderItem
 from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import order_list_payload
 from android.api.paginated_views import AndroidPaginatedDateRangeListView
+from api.order_serializers import OrderCardPackagingSerializer
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
     QuerysetFilter,
@@ -76,14 +77,6 @@ _TOTAL_PRICE = Coalesce(
     Value(0),
     output_field=DecimalField(max_digits=14, decimal_places=2),
 )
-
-
-class OrderListProductSerializer(serializers.Serializer):
-    """Output shape for one product line summarized on an order card."""
-
-    public_id = serializers.CharField()
-    name = serializers.CharField()
-    quantity = serializers.IntegerField()
 
 
 class OrderListClientSerializer(serializers.Serializer):
@@ -114,7 +107,14 @@ class OrderListItemSerializer(serializers.Serializer):
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()
     item_count = serializers.IntegerField()
-    products = OrderListProductSerializer(many=True)
+    packagings = OrderCardPackagingSerializer(many=True)
+    verified = serializers.BooleanField(
+        help_text="Whether a sales admin has approved the order."
+    )
+    verified_by = serializers.CharField(
+        allow_null=True, help_text="Sales admin who approved it; null until verified."
+    )
+    verified_at = serializers.DateTimeField(allow_null=True)
 
 
 class OrderListPageSerializer(serializers.Serializer):
@@ -271,7 +271,9 @@ class GetOrdersView(AndroidPaginatedDateRangeListView):
     def get_queryset(self, request: Request) -> QuerySet:
         return (
             Order.objects.filter(created_by=request.user)
-            .select_related("client", "status", "delivery_address__city")
+            .select_related(
+                "client", "status", "verified_by", "delivery_address__city"
+            )
             .prefetch_related(
                 Prefetch(
                     "items",
@@ -284,4 +286,14 @@ class GetOrdersView(AndroidPaginatedDateRangeListView):
         )
 
     def serialize_page(self, page_items: list[Order], request: Request) -> list[dict]:
-        return [order_list_payload(order) for order in page_items]
+        return [
+            {
+                **order_list_payload(order),
+                "verified": order.is_verified,
+                "verified_by": order.verified_by.name if order.verified_by else None,
+                "verified_at": (
+                    order.verified_at.isoformat() if order.verified_at else None
+                ),
+            }
+            for order in page_items
+        ]

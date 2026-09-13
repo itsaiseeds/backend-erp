@@ -9,23 +9,32 @@ from django.urls import path
 from .AdminsView import AdminsView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .CropsView import CropsView
+from .DispatchOrderView import DispatchOrderView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
+from .GetOrdersView import GetOrdersView
+from .GetOrderView import GetOrderView
+from .HoldOrderView import HoldOrderView
 from .LogoutView import LogoutView
 from .LooseStockView import LooseStockView
 from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
+from .RejectOrderView import RejectOrderView
+from .RevertDispatchView import RevertDispatchView
 from .SalesPeopleView import SalesPeopleView
 from .StockView import StockView
+from .UnverifyOrderView import UnverifyOrderView
 from .UpdateAdminView import UpdateAdminView
 from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
 from .UpdateLooseStockView import UpdateLooseStockView
+from .UpdateOrderView import UpdateOrderView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateSalesPersonView import UpdateSalesPersonView
 from .UpdateTodaysInventoryView import UpdateTodaysInventoryView
 from .VerifyClientView import VerifyClientView
+from .VerifyOrderView import VerifyOrderView
 from .VerifyOTPView import VerifyOTPView
 
 urlpatterns = [
@@ -72,4 +81,28 @@ urlpatterns = [
     path("update-client/", UpdateClientView.as_view(), name="update-client"),
     path("get-clients/", GetClientsView.as_view(), name="get-clients"),
     path("client/<str:public_id>", GetClientView.as_view(), name="client-detail"),
+    # Order routes follow the same convention: ``orders/`` is a collection and
+    # ``order/<public_id>`` a collection item, while the lifecycle verbs carry
+    # the id in the path because each acts on one named order.
+    path("orders/", GetOrdersView.as_view(), name="orders"),
+    path("order/<str:public_id>", GetOrderView.as_view(), name="order-detail"),
+    path("edit-order/<str:public_id>", UpdateOrderView.as_view(), name="edit-order"),
+    path("verify-order/<str:public_id>", VerifyOrderView.as_view(), name="verify-order"),
+    path(
+        "unverify-order/<str:public_id>",
+        UnverifyOrderView.as_view(),
+        name="unverify-order",
+    ),
+    path(
+        "dispatch-order/<str:public_id>",
+        DispatchOrderView.as_view(),
+        name="dispatch-order",
+    ),
+    path(
+        "revert-dispatch/<str:public_id>",
+        RevertDispatchView.as_view(),
+        name="revert-dispatch",
+    ),
+    path("hold-order/<str:public_id>", HoldOrderView.as_view(), name="hold-order"),
+    path("reject-order/<str:public_id>", RejectOrderView.as_view(), name="reject-order"),
 ]

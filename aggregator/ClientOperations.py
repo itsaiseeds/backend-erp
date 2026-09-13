@@ -166,12 +166,10 @@ def _unlink(link: LinkT, actor: User) -> None:
 
     ``SoftDeletedModel.delete()`` is deliberately bypassed: it requires the
     Django ``delete_<model>`` permission, which a sales person does not hold,
-    and these link tables are maintained by the API itself.
+    and these link tables are maintained by the API itself. ``mark_deleted``
+    is that bypass, shared with every other API-maintained table.
     """
-    link.is_deleted = True
-    link.deleted_at = indian_now()
-    link.deleted_by = actor
-    link.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+    link.mark_deleted(actor)
 
 
 def _primary_index(items: list[dict], label: str) -> int:

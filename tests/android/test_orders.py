@@ -30,7 +30,8 @@ from aggregator.models import (
 )
 from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import create_order
-from authentication.models import SalesPerson
+from authentication.models import Admin, SalesPerson
+from common.models import indian_now
 from tests.android.common import AndroidApiTestCase
 
 User = get_user_model()
@@ -70,7 +71,12 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
             cls.other_sales_person, "Rival Seeds", "27AAPFU0939F1ZG", cls.city, "395007"
         )
 
-        cls.alpha_bag = cls._bag("Alpha Seed", Decimal("1000.00"), packets=10)
+        cls.alpha_bag = cls._bag(
+            "Alpha Seed",
+            Decimal("1000.00"),
+            packets=10,
+            image_url="/media/products/alpha.jpg",
+        )
         cls.beta_bag = cls._bag("Beta Seed", Decimal("500.00"), packets=5)
         cls.alpha_product = cls.alpha_bag.product
         cls.beta_product = cls.beta_bag.product
@@ -111,12 +117,13 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         )
 
     @classmethod
-    def _bag(cls, product_name, price, *, packets):
+    def _bag(cls, product_name, price, *, packets, image_url=""):
         product = Product.objects.create(
             name=product_name,
             crop_id=1,
             stage=Stage.by_id(StageIds.CERTIFICATE),
             selling_price=Decimal("100.00"),
+            image_url=image_url,
             created_by=cls.superuser,
         )
         return ProductPackaging.objects.create(
@@ -207,7 +214,8 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         self.assertEqual(card["total_packets"], 25)
         self.assertEqual(card["item_count"], 2)
         self.assertEqual(
-            sorted(p["name"] for p in card["products"]), ["Alpha Seed", "Beta Seed"]
+            sorted(p["product"]["name"] for p in card["packagings"]),
+            ["Alpha Seed", "Beta Seed"],
         )
 
     def test_the_list_is_scoped_to_the_calling_sales_person(self):
@@ -340,3 +348,69 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
             with self.subTest(sort=label):
                 response = self.client.get(GET_ORDERS_URL, query)
                 self.assertEqual(self._ids(response), expected)
+
+    def test_a_verified_order_reports_who_approved_it(self):
+        """The approval fields are rendered as strings, not model instances.
+
+        Every other order in this suite is unverified, so ``verified_by`` is
+        null and any value that cannot be serialized stays hidden. Setting it
+        here is what exercises the non-null path.
+
+        tests/android/test_orders.py::AndroidOrderListApiTest::test_a_verified_order_reports_who_approved_it
+        """
+        self._seed_orders()
+        approver = User.objects.create_user(
+            phone_number="9000000399",
+            name="Sales Admin",
+            is_verified=True,
+            created_by=self.superuser,
+            verified_by=self.superuser,
+        )
+        Admin.objects.create(user=approver, created_by=self.superuser)
+        self.first.verified_by = approver
+        self.first.verified_at = indian_now()
+        self.first.save(update_fields=["verified_by", "verified_at", "updated_at"])
+
+        response = self.client.get(GET_ORDERS_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        card = next(
+            row
+            for row in response.data["results"]
+            if row["public_id"] == self.first.public_id
+        )
+        self.assertEqual(card["verified_by"], "Sales Admin")
+        self.assertIsNotNone(card["verified_at"])
+        # BOOKED, not CONFIRMED -- ``verified`` tracks the status, not the stamp.
+        self.assertFalse(card["verified"])
+
+        other = next(
+            row
+            for row in response.data["results"]
+            if row["public_id"] == self.second.public_id
+        )
+        self.assertIsNone(other["verified_by"])
+        self.assertIsNone(other["verified_at"])
+
+    def test_each_product_on_the_card_carries_its_picture(self):
+        """The image comes off the prefetched product, blank when none is set.
+
+        tests/android/test_orders.py::AndroidOrderListApiTest::test_each_product_on_the_card_carries_its_picture
+        """
+        self._seed_orders()
+
+        response = self.client.get(GET_ORDERS_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        card = next(
+            row
+            for row in response.data["results"]
+            if row["public_id"] == self.third.public_id
+        )
+        images = {
+            p["product"]["name"]: p["product"]["image_url"]
+            for p in card["packagings"]
+        }
+        self.assertEqual(images["Alpha Seed"], "/media/products/alpha.jpg")
+        # Beta Seed has no picture: an empty string, never null.
+        self.assertEqual(images["Beta Seed"], "")

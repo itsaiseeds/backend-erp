@@ -17,7 +17,6 @@ from rest_framework.response import Response
 from aggregator.models import Crop, Product, Stage
 from aggregator.ProductOperations import sync_product_description_items
 from api.admin import AdminApiView
-from common.models.timestamped import indian_now
 from common.storage import delete_image, upload_image
 
 from .ProductsView import (
@@ -125,10 +124,5 @@ class UpdateProductView(AdminApiView):
     )
     def delete(self, request, public_id: str):
         product = get_object_or_404(Product.objects.all(), public_id=public_id)
-        product.is_deleted = True
-        product.deleted_at = indian_now()
-        product.deleted_by = request.user
-        product.save(
-            update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"],
-        )
+        product.mark_deleted(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -37,7 +37,16 @@ class DispatchDetails(TimeStampedModel, SoftDeletedModel):
         on_delete=models.PROTECT,
         related_name="dispatches_to",
     )
-    lr_number = models.CharField("LR number", max_length=64)
+    lr_number = models.CharField(
+        "LR number",
+        max_length=64,
+        blank=True,
+        help_text=(
+            "The transporter's consignment note number. Blank while it is still "
+            "pending: the carrier often issues it after the goods are collected, "
+            "so a dispatch is recorded without one and it is filled in later."
+        ),
+    )
 
     class Meta:
         verbose_name = "dispatch details"
@@ -45,7 +54,7 @@ class DispatchDetails(TimeStampedModel, SoftDeletedModel):
         ordering = ["-dispatch_date"]
 
     def __str__(self):
-        return f"LR {self.lr_number}"
+        return f"LR {self.lr_number}" if self.lr_number else "LR pending"
 
     def clean(self):
         super().clean()
