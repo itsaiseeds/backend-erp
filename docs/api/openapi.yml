@@ -1817,6 +1817,8 @@ components:
       properties:
         id:
           type: integer
+          description: This link's id. Send it as client_address_id when creating
+            an order.
         label:
           type: string
         is_primary:
@@ -2072,6 +2074,8 @@ components:
           type: boolean
         id:
           type: integer
+          description: This link's id. Send it as client_transport_agency_id when
+            creating an order.
       required:
       - id
       - is_primary

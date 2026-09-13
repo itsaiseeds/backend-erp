@@ -450,6 +450,7 @@ def client_payload(client: Client) -> dict:
         "created_by": client.created_by.name if client.created_by else None,
         "addresses": [
             {
+                "id": link.id,
                 "label": link.label,
                 "is_primary": link.is_primary,
                 **address_payload(link.address),
