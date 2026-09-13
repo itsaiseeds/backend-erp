@@ -472,7 +472,7 @@ def client_payload(client: Client) -> dict:
             for link in client.client_contacts.select_related("contact").all()
         ],
         "transport_agencies": [
-            {"name": link.transport_agency.name, "is_primary": link.is_primary}
+            {"name": link.transport_agency.name, "is_primary": link.is_primary, "id": link.id}
             for link in client.client_transport_agencies.select_related(
                 "transport_agency"
             ).all()

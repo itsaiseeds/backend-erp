@@ -68,6 +68,7 @@ def address_payload(address: Address) -> dict:
     so a client can lay the address out itself.
     """
     return {
+        "id": address.id,
         "line_1": address.address_line_1,
         "line_2": address.address_line_2,
         "pincode": address.pincode.code,
