@@ -44,6 +44,7 @@ class PrivateDispatchDetails(TimeStampedModel, SoftDeletedModel):
         max_length=10,
         validators=[validate_phone_number],
     )
+    driver_name = models.CharField("driver name", max_length=255)
 
     class Meta:
         verbose_name = "private dispatch details"

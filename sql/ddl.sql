@@ -781,6 +781,9 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchdetails (
 	from_city_id int8 NOT NULL,
 	to_city_id int8 NOT NULL,
 	lr_number varchar(64) NOT NULL,
+	driver_name varchar(255) NOT NULL,
+	driver_number varchar(10) NOT NULL,
+	vehicle_number varchar(32) NOT NULL,
 	CONSTRAINT aggregator_dispatchdetails_pkey PRIMARY KEY (id)
 );
 CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_client_id_idx ON public.aggregator_dispatchdetails USING btree (client_id);
@@ -805,6 +808,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_privatedispatchdetails (
 	to_city_id int8 NOT NULL,
 	vehicle_number varchar(32) NOT NULL,
 	driver_number varchar(10) NOT NULL,
+	driver_name varchar(255) NOT NULL,
 	CONSTRAINT aggregator_privatedispatchdetails_pkey PRIMARY KEY (id)
 );
 CREATE INDEX IF NOT EXISTS aggregator_privatedispatchdetails_client_id_idx ON public.aggregator_privatedispatchdetails USING btree (client_id);

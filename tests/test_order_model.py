@@ -150,6 +150,8 @@ class OrderModelTest(DMLTestCase):
             client=self.client_obj, dispatched_by=self.adm_user,
             dispatch_date=datetime.date.today(),
             from_city=self.city, to_city=self.city2, lr_number="LR1",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
         )
         pd = PrivateDispatchDetails.objects.create(
             client=self.client_obj, dispatched_by=self.adm_user,
@@ -175,6 +177,8 @@ class OrderModelTest(DMLTestCase):
         attach_dispatch_details(
             order, dispatched_by=self.adm_user, dispatch_date=datetime.date.today(),
             from_city=self.city, to_city=self.city2, lr_number="LR100",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
         )
         update_order_status(order, StatusIds.DISPATCHED)
         assert order.status.code == "DISPATCHED"
@@ -187,6 +191,8 @@ class OrderModelTest(DMLTestCase):
             attach_dispatch_details(
                 order, dispatched_by=self.plain_user, dispatch_date=datetime.date.today(),
                 from_city=self.city, to_city=self.city2, lr_number="LRX",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
             )
 
     def test_order_payload_has_no_pk(self):

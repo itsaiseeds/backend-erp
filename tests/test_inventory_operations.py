@@ -258,6 +258,8 @@ class InventoryOperationsTest(DMLTestCase):
         attach_dispatch_details(
             order, dispatched_by=self.stock_admin, dispatch_date=self.today,
             from_city=self.city, to_city=self.city2, lr_number="LR777",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
         )
         update_order_status(order, StatusIds.DISPATCHED)
 
@@ -279,6 +281,8 @@ class InventoryOperationsTest(DMLTestCase):
             order, dispatched_by=self.stock_admin,
             dispatch_date=self.today - datetime.timedelta(days=3),
             from_city=self.city, to_city=self.city2, lr_number="LR778",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
         )
         update_order_status(order, StatusIds.DISPATCHED)
 
