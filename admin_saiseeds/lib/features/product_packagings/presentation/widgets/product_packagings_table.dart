@@ -79,7 +79,7 @@ class ProductPackagingsTableState extends State<ProductPackagingsTable> {
     ),
     AppDataColumn(
       id: ProductPackagingsTable.COLUMN_SELLING_PRICE,
-      label: AppStrings.COLUMN_SELLING_PRICE,
+      label: AppStrings.COLUMN_BAG_SELLING_PRICE,
       width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
@@ -115,7 +115,7 @@ class ProductPackagingsTableState extends State<ProductPackagingsTable> {
       case AppStrings.SORT_BY_TOTAL_WEIGHT:
         return AppStrings.COLUMN_TOTAL_WEIGHT;
       case AppStrings.SORT_BY_SELLING_PRICE:
-        return AppStrings.COLUMN_SELLING_PRICE;
+        return AppStrings.COLUMN_BAG_SELLING_PRICE;
       default:
         return sort;
     }

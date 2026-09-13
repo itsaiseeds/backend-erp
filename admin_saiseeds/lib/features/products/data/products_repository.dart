@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
@@ -26,17 +27,21 @@ class ProductsRepository {
   Future<void> createProduct({
     required String name,
     required int cropId,
-    required String buyingPrice,
+    required int stageId,
     required String sellingPrice,
+    ProductImageUpload? image,
+    List<String> descriptionItems = const [],
   }) async {
     await _apiClient.post(
       ProductsEndpoints.create,
-      body: {
-        'name': name,
-        'crop': cropId,
-        'buying_price': buyingPrice,
-        'selling_price': sellingPrice,
-      },
+      body: _body(
+        name: name,
+        cropId: cropId,
+        stageId: stageId,
+        sellingPrice: sellingPrice,
+        image: image,
+        descriptionItems: descriptionItems,
+      ),
     );
   }
 
@@ -44,18 +49,57 @@ class ProductsRepository {
     required String publicId,
     required String name,
     required int cropId,
-    required String buyingPrice,
+    required int stageId,
     required String sellingPrice,
+    ProductImageUpload? image,
+    List<String> descriptionItems = const [],
   }) async {
     await _apiClient.patch(
       ProductsEndpoints.detail(publicId),
-      body: {
+      body: _body(
+        name: name,
+        cropId: cropId,
+        stageId: stageId,
+        sellingPrice: sellingPrice,
+        image: image,
+        descriptionItems: descriptionItems,
+      ),
+    );
+  }
+
+  static dynamic _body({
+    required String name,
+    required int cropId,
+    required int stageId,
+    required String sellingPrice,
+    required ProductImageUpload? image,
+    required List<String> descriptionItems,
+  }) {
+    final List<String> items = descriptionItems
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+
+    if (image == null) {
+      return {
         'name': name,
         'crop': cropId,
-        'buying_price': buyingPrice,
+        'stage': stageId,
         'selling_price': sellingPrice,
-      },
-    );
+        'description_items': items,
+      };
+    }
+
+    // An ImageField needs multipart; the list repeats its key, which is how
+    // DRF reads a many-valued field out of form data.
+    return FormData.fromMap({
+      'name': name,
+      'crop': '$cropId',
+      'stage': '$stageId',
+      'selling_price': sellingPrice,
+      'description_items': items,
+      'image': MultipartFile.fromBytes(image.bytes, filename: image.filename),
+    });
   }
 
   Future<void> deleteProduct(String publicId) async {

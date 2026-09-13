@@ -8,6 +8,7 @@ class AppTextField extends StatefulWidget {
   final TextEditingController? controller;
   final String? label;
   final String? hint;
+  final String? helperText;
   final String? errorText;
   final String? Function(String?)? validator;
   final bool obscureText;
@@ -30,6 +31,7 @@ class AppTextField extends StatefulWidget {
     this.controller,
     this.label,
     this.hint,
+    this.helperText,
     this.errorText,
     this.validator,
     this.obscureText = false,
@@ -111,6 +113,11 @@ class _AppTextFieldState extends State<AppTextField> {
           decoration: InputDecoration(
             hintText: widget.hint,
             errorText: widget.errorText,
+            helperText: widget.helperText,
+            helperMaxLines: 3,
+            helperStyle: AppTypography.bodySmall.copyWith(
+              color: AppColors.TEXT_SECONDARY,
+            ),
             hintStyle: AppTypography.bodyMedium.copyWith(
               color: AppColors.TEXT_DISABLED,
             ),

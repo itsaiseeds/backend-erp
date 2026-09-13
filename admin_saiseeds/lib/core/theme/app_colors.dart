@@ -59,6 +59,7 @@ class AppColors {
   static const Color SHIMMER_HIGHLIGHT = Color(0xFFF8F9F8);
 
   static const Color OVERLAY = Color(0x80000000);
+  static const Color OVERLAY_STRONG = Color(0xE6000000);
   static const Color TRANSPARENT = Color(0x00000000);
 
   static const Color TABLE_HEADER_BG = Color(0xFF1E7A34);

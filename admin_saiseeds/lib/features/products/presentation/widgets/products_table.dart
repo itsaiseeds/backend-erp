@@ -12,9 +12,9 @@ class ProductsTable extends StatefulWidget {
   static const String CONFIG_KEY = 'products';
   static const String COLUMN_NAME = 'name';
   static const String COLUMN_CROP = 'crop';
-  static const String COLUMN_BUYING_PRICE = 'buying_price';
+  static const String COLUMN_STAGE = 'stage';
   static const String COLUMN_SELLING_PRICE = 'selling_price';
-  static const String COLUMN_MARGIN_PER_PACKET = 'margin_per_packet';
+  static const String COLUMN_DESCRIPTION = 'description_items';
 
   final List<ProductModel> products;
   final bool isLoading;
@@ -68,19 +68,14 @@ class ProductsTableState extends State<ProductsTable> {
       width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
-      id: ProductsTable.COLUMN_BUYING_PRICE,
-      label: AppStrings.COLUMN_BUYING_PRICE,
-      width: AppSizes.tableColumnWidthCompact,
+      id: ProductsTable.COLUMN_STAGE,
+      label: AppStrings.COLUMN_STAGE,
+      width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
       id: ProductsTable.COLUMN_SELLING_PRICE,
       label: AppStrings.COLUMN_SELLING_PRICE,
       width: AppSizes.tableColumnWidthCompact,
-    ),
-    AppDataColumn(
-      id: ProductsTable.COLUMN_MARGIN_PER_PACKET,
-      label: AppStrings.COLUMN_MARGIN_PER_PACKET,
-      width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
       id: AppStrings.TABLE_ACTIONS_COLUMN_LABEL,
@@ -110,12 +105,8 @@ class ProductsTableState extends State<ProductsTable> {
     switch (sort) {
       case AppStrings.SORT_BY_NAME:
         return AppStrings.COLUMN_NAME;
-      case AppStrings.SORT_BY_BUYING_PRICE:
-        return AppStrings.COLUMN_BUYING_PRICE;
       case AppStrings.SORT_BY_SELLING_PRICE:
         return AppStrings.COLUMN_SELLING_PRICE;
-      case AppStrings.SORT_BY_MARGIN_PER_PACKET:
-        return AppStrings.COLUMN_MARGIN_PER_PACKET;
       default:
         return sort;
     }
@@ -143,9 +134,7 @@ class ProductsTableState extends State<ProductsTable> {
       ],
       sortByOptions: const [
         AppStrings.SORT_BY_NAME,
-        AppStrings.SORT_BY_BUYING_PRICE,
         AppStrings.SORT_BY_SELLING_PRICE,
-        AppStrings.SORT_BY_MARGIN_PER_PACKET,
       ],
       filterByOptions: const [
         AppStrings.FILTER_BY_NAME,
@@ -175,12 +164,10 @@ class ProductsTableState extends State<ProductsTable> {
         return _textCell(product.name, isStrong: true);
       case ProductsTable.COLUMN_CROP:
         return _textCell(product.cropName);
-      case ProductsTable.COLUMN_BUYING_PRICE:
-        return _textCell(product.buyingPrice);
+      case ProductsTable.COLUMN_STAGE:
+        return _textCell(product.stageName);
       case ProductsTable.COLUMN_SELLING_PRICE:
         return _textCell(product.sellingPrice);
-      case ProductsTable.COLUMN_MARGIN_PER_PACKET:
-        return _textCell(product.marginPerPacket);
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
