@@ -306,3 +306,41 @@ def order_payload(order: Order) -> dict:
             ).all()
         ],
     }
+
+
+def order_list_payload(order: Order) -> dict:
+    """Compact dict for the Android order list: one card per order.
+
+    Narrower than :func:`order_payload` -- it carries what a list row shows
+    (who, where, how much, what state) and summarises the lines instead of
+    embedding the full packaging payload of each.
+
+    Reads the item rows off the instance, so a ``prefetch_related("items")`` in
+    the view keeps this query-free.
+    """
+    items = list(order.items.all())
+    city = order.delivery_address.city if order.delivery_address_id else None
+    return {
+        "public_id": order.public_id,
+        "created_at": order.created_at.isoformat(),
+        "status": order.status.code if order.status_id else None,
+        "client": {
+            "public_id": order.client.public_id,
+            "company_name": order.client.company_name,
+        },
+        "delivery_address": str(order.delivery_address),
+        "city": {"id": city.id, "name": city.name} if city else None,
+        "expected_delivery_date": order.expected_delivery_date.isoformat(),
+        "dispatch_mode": "AGENCY" if order.transport_agency_id else "PRIVATE",
+        "total_amount": str(order.total_amount),
+        "total_packets": order.total_packets,
+        "item_count": len(items),
+        "products": [
+            {
+                "public_id": item.product_packaging.product.public_id,
+                "name": item.product_packaging.product.name,
+                "quantity": item.quantity,
+            }
+            for item in items
+        ],
+    }

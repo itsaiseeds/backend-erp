@@ -98,6 +98,7 @@ EXPECTED_CONTRACTS = {
         TOKEN_SALESPERSON,
     ),
     "android/api/v1/get-clients": ("GetClientsView", TOKEN_SALESPERSON),
+    "android/api/v1/get-orders": ("GetOrdersView", TOKEN_SALESPERSON),
     "android/api/v1/sales-person-catalogue": (
         "SalesPersonCatalogueView",
         TOKEN_SALESPERSON,
