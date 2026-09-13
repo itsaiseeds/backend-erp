@@ -10,6 +10,8 @@ class AppDetailDialog extends StatelessWidget {
   final String subtitle;
   final Widget content;
   final double width;
+  final Widget? footer;
+  final double? fixedHeight;
 
   const AppDetailDialog({
     super.key,
@@ -18,6 +20,8 @@ class AppDetailDialog extends StatelessWidget {
     required this.subtitle,
     required this.content,
     this.width = AppSizes.detailDialogWidth,
+    this.footer,
+    this.fixedHeight,
   });
 
   @override
@@ -26,7 +30,10 @@ class AppDetailDialog extends StatelessWidget {
       backgroundColor: AppColors.TRANSPARENT,
       insetPadding: const EdgeInsets.all(AppSpacing.lg),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: AppSizes.dialogMaxHeight),
+        constraints: BoxConstraints(
+          maxHeight: fixedHeight ?? AppSizes.dialogMaxHeight,
+          minHeight: fixedHeight ?? 0,
+        ),
         child: Container(
           width: width,
           clipBehavior: Clip.antiAlias,
@@ -36,7 +43,9 @@ class AppDetailDialog extends StatelessWidget {
             border: Border.all(color: AppColors.BORDER),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: fixedHeight == null
+                ? MainAxisSize.min
+                : MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AppDialogHeader(
@@ -46,12 +55,27 @@ class AppDetailDialog extends StatelessWidget {
                 onClose: () => Navigator.of(context).pop(),
               ),
               const AppHairline(),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: content,
+              if (fixedHeight == null)
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: content,
+                  ),
+                )
+              else
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: content,
+                  ),
                 ),
-              ),
+              if (footer != null) ...[
+                const AppHairline(),
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: footer,
+                ),
+              ],
             ],
           ),
         ),

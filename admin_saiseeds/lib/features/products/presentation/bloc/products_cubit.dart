@@ -152,15 +152,19 @@ class ProductsCubit extends SafeCubit<ProductsState> {
   Future<bool> createProduct({
     required String name,
     required int cropId,
-    required String buyingPrice,
+    required int stageId,
     required String sellingPrice,
+    ProductImageUpload? image,
+    List<String> descriptionItems = const [],
   }) {
     return _mutate(
       () => _repository.createProduct(
         name: name,
         cropId: cropId,
-        buyingPrice: buyingPrice,
+        stageId: stageId,
         sellingPrice: sellingPrice,
+        image: image,
+        descriptionItems: descriptionItems,
       ),
     );
   }
@@ -169,16 +173,20 @@ class ProductsCubit extends SafeCubit<ProductsState> {
     required String publicId,
     required String name,
     required int cropId,
-    required String buyingPrice,
+    required int stageId,
     required String sellingPrice,
+    ProductImageUpload? image,
+    List<String> descriptionItems = const [],
   }) {
     return _mutate(
       () => _repository.updateProduct(
         publicId: publicId,
         name: name,
         cropId: cropId,
-        buyingPrice: buyingPrice,
+        stageId: stageId,
         sellingPrice: sellingPrice,
+        image: image,
+        descriptionItems: descriptionItems,
       ),
     );
   }
@@ -207,9 +215,9 @@ class ProductsCubit extends SafeCubit<ProductsState> {
       searchableValues: (product) => [
         product.name,
         product.cropName,
-        product.buyingPrice,
+        product.stageName,
         product.sellingPrice,
-        product.marginPerPacket,
+        ...product.descriptionItems,
       ],
     );
 
@@ -252,12 +260,8 @@ class ProductsCubit extends SafeCubit<ProductsState> {
     switch (field) {
       case AppStrings.SORT_BY_NAME:
         return product.name.toLowerCase();
-      case AppStrings.SORT_BY_BUYING_PRICE:
-        return product.buyingPriceValue;
       case AppStrings.SORT_BY_SELLING_PRICE:
         return product.sellingPriceValue;
-      case AppStrings.SORT_BY_MARGIN_PER_PACKET:
-        return product.marginPerPacketValue;
       default:
         return null;
     }

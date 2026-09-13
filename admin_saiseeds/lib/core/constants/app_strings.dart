@@ -405,21 +405,44 @@ class AppStrings {
       'Crop association and pricing on record.';
 
   static const String COLUMN_CROP = 'Crop';
-  static const String COLUMN_BUYING_PRICE = 'Buying Price';
-  static const String COLUMN_SELLING_PRICE = 'Selling Price';
-  static const String COLUMN_MARGIN_PER_PACKET = 'Margin Per Packet';
+  static const String COLUMN_STAGE = 'Stage';
+  static const String COLUMN_DESCRIPTION = 'Description';
+  static const String PRODUCT_STAGE_HINT = 'Select a stage';
+  static const String PRODUCT_STEP_BASIC = 'Basics';
+  static const String PRODUCT_STEP_DETAILS = 'Details';
+  static const String PRODUCT_STEP_IMAGE = 'Image';
+  static const String PRODUCT_PICK_IMAGE = 'Choose image';
+  static const String PRODUCT_REPLACE_IMAGE = 'Replace image';
+  static const String PRODUCT_REMOVE_IMAGE = 'Remove image';
+  static const String PRODUCT_IMAGE_EMPTY = 'No image selected';
+  static const String IMAGE_ZOOM_IN = 'Zoom in';
+  static const String IMAGE_ZOOM_OUT = 'Zoom out';
+  static const String IMAGE_RESET = 'Reset zoom';
+  static const String IMAGE_LOAD_FAILED = 'Image could not be loaded.';
+  static const String IMAGE_VIEW_HINT = 'Click to enlarge';
+  static const String PRODUCT_IMAGE_OPTIONAL = 'Optional. PNG or JPG.';
+  static const String PRODUCT_DESCRIPTION_LABEL = 'Description points';
+  static const String PRODUCT_ADD_POINT = 'Add point';
+  static const String PRODUCT_POINT_HINT = 'Enter a description point';
+  static const String PRODUCT_REMOVE_POINT = 'Remove point';
+  static const String VALIDATION_STAGE_REQUIRED = 'Stage is required.';
+  static const String COLUMN_SELLING_PRICE = 'Selling Price (per Kg)';
+  static const String COLUMN_BAG_SELLING_PRICE = 'Selling Price';
+  static const String FIELD_BAG_SELLING_PRICE = 'Selling Price (total)';
+  static const String FIELD_BAG_SELLING_PRICE_HINT = 'Enter total bag price';
+  static const String FIELD_BAG_SELLING_PRICE_HELPER =
+      'Autofilled as product rate x packet weight x packets. Edit to override.';
 
-  static const String SORT_BY_BUYING_PRICE = 'buying_price';
   static const String SORT_BY_SELLING_PRICE = 'selling_price';
-  static const String SORT_BY_MARGIN_PER_PACKET = 'margin_per_packet';
   static const String FILTER_BY_CROP = 'crop';
 
   static const String FIELD_PRODUCT_NAME = 'Product Name';
   static const String FIELD_PRODUCT_NAME_HINT = 'Enter product name';
-  static const String FIELD_BUYING_PRICE = 'Buying Price';
-  static const String FIELD_BUYING_PRICE_HINT = 'Enter buying price';
-  static const String FIELD_SELLING_PRICE = 'Selling Price';
-  static const String FIELD_SELLING_PRICE_HINT = 'Enter selling price';
+  static const String FIELD_SELLING_PRICE = 'Selling Price (per Kg)';
+  static const String FIELD_SELLING_PRICE_HINT = 'Enter price per kilogram';
+  static const String FIELD_SELLING_PRICE_HELPER =
+      'Rate per kilogram. Packet and bag prices derive from this and the '
+      'weight sold.';
   static const String FIELD_CROP = 'Crop';
   static const String FIELD_CROP_HINT = 'Select a crop';
 
