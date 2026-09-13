@@ -264,7 +264,9 @@ the detail views are three lines each (`get_object_or_404` + `Response(client_pa
 
 | Endpoint | Scope | Payload |
 |---|---|---|
-| `GET /android/api/v1/get-orders` | the caller's **own** orders | compact card per order (`order_list_payload` — client, delivery city, totals, product lines), paginated / filtered / sorted |
+| `GET /android/api/v1/get-orders` | the caller's **own** orders | compact card per order (`order_list_payload` — client, delivery city, totals, and the bags ordered), paginated / filtered / sorted |
+| `GET /api/sales-admin/orders/` | **every** order (admin) | the same card plus the transport agency, the bags, who booked it, who approved it and who onboarded the client |
+| `GET /api/sales-admin/order/<public_id>` | **any** order (admin) | the order in full (`order_detail_payload`) — every line, plus the client's own full payload with address and agency ids |
 
 Filters are `?client=` (client public ids), `?product=` (product public ids),
 `?city_id=` (delivery city) and `?status=` (order lifecycle code); sorts are
@@ -277,7 +279,68 @@ The scoping is the queryset itself (`Order.objects.filter(created_by=request.use
 the item join, so `?product=` narrowing that join cannot make the sort (or the
 card total) count only the matching lines.
 
-`order_payload` / `order_list_payload` live in `aggregator/OrderOperations.py`.
+`order_payload` / `order_list_payload` / `order_detail_payload` live in
+`aggregator/OrderOperations.py`. An order card's `packagings` is one entry per
+line -- the **bag** ordered, how many of it, and the product it holds (with
+the picture the card renders). The bag is the unit an order is placed in, so
+two sizes of the same seed are two entries rather than one product listed
+twice. Its `selling_price` is the bag's own list price, not what the order
+was charged -- the negotiated figure is on the detail payload's `items`. The admin list adds one more filter,
+`?created_by=` (the booking sales person), and its option lists are unscoped —
+an admin picks from every sales person, client, product and city.
+
+## The order lifecycle
+
+Six sales-admin verbs move an order between statuses, each with its reversal.
+Which statuses a verb may be applied from lives beside the transition itself in
+`aggregator/OrderOperations.py` (`VERIFIABLE_STATUS_CODES` and friends, all
+derived from `StatusIds`), so the rule holds however the function is reached —
+`api/sales_admin/OrderTransitionView.py` is only the shared HTTP shape.
+
+| Verb | From | To |
+|---|---|---|
+| `POST verify-order/<public_id>` | BOOKED, UNDER_REVIEW, ON_HOLD | CONFIRMED |
+| `POST unverify-order/<public_id>` | CONFIRMED | UNDER_REVIEW |
+| `POST dispatch-order/<public_id>` | CONFIRMED | DISPATCHED |
+| `POST revert-dispatch/<public_id>` | DISPATCHED | CONFIRMED |
+| `POST hold-order/<public_id>` | BOOKED, UNDER_REVIEW, CONFIRMED | ON_HOLD |
+| `POST reject-order/<public_id>` | BOOKED, UNDER_REVIEW, CONFIRMED, ON_HOLD | REJECTED |
+
+UNDER_REVIEW is verifiable **because** `unverify-order` lands there — otherwise
+unverifying would be a one-way trap. REJECTED appears in no `from` set:
+rejection is terminal. Only a verified order can be dispatched.
+
+Which kind of dispatch `dispatch-order` records is read off the **order**, not
+the request: an order carrying a `transport_agency` goes by that carrier and one
+without it goes on our own vehicle -- the same rule `dispatch_mode` reports on
+every order payload. An agency dispatch's `lr_number` is **optional**, because
+the transporter usually issues the consignment note after collection; it is
+stored blank and filled in later. A private dispatch requires `vehicle_number`
+and `driver_number`. Fields belonging to the other kind are refused rather than
+ignored.
+
+`verify-order` is gated on **today's** stock count being complete and on every
+bag having enough available stock; the check and the status change are one
+atomic transaction, so a shortfall leaves the order exactly as it was. Holding
+or rejecting a CONFIRMED order releases the bags it reserved, with no
+bookkeeping — reserved and consumed are derived from `Order.status`, never stored.
+
+`PATCH /api/sales-admin/edit-order/<public_id>` corrects everything else, with
+`items` as a declarative list (see below). It is **refused outright once the
+order is DISPATCHED or DELIVERED**: the goods have left, so the order is
+history. `verified_by` / `verified_at` / `created_by` / `created_at` are not
+fields on it at all.
+
+Two rules that are not merely conventions there:
+
+- **the client cannot be changed.** An order belongs to the client it was booked
+  for; moving it would invalidate its delivery address, its transport agency and
+  the prices its lines were negotiated at. There is no client field, and the
+  address and agency are named by *link* id scoped to the order's own client, so
+  a foreign one cannot be attached either.
+- **`special_comments` accumulates.** Whatever is sent is appended as a new line
+  (`OrderOperations.appended_comment`), so a later remark can never erase an
+  earlier one; a blank one is a no-op rather than a blank line.
 
 ## Client lists are declarative
 
@@ -299,6 +362,23 @@ only replace the three lists of a client they created, while a sales admin may
 also change `company_name` / `company_phone` / `gst_number` on any client.
 Status, `verified_by` and `verified_at` belong to
 `POST /api/sales-admin/verify-client/` alone.
+
+**Order items follow the same idiom.** `PATCH /api/sales-admin/edit-order/<public_id>`
+takes the complete desired `items` list and `sync_order_items` reconciles it,
+matching lines by their `product_packaging` -- the natural key the
+`uniq_orderitem_order_packaging` constraint already enforces. A line the admin
+leaves out is removed; a list must keep at least one entry.
+
+Two traps that constraint sets, both handled in `sync_order_items`:
+
+- it is **not** soft-delete aware, so a packaging removed and later re-added must
+  have its original row **restored**, not re-inserted -- a second insert would
+  raise `IntegrityError` and surface as a 500 rather than a 400. Existing lines
+  are therefore looked up through `OrderItem.all_objects`.
+- removal cannot call `SoftDeletedModel.delete()`, which demands the Django
+  `delete_<model>` permission no app admin holds. `SoftDeletedModel.mark_deleted(actor)`
+  is the shared bypass for every API-maintained table -- it still records
+  `deleted_by`, and skips only the permission gate.
 
 ## The pre-auth TOTP login POST needs no X-CSRFToken
 

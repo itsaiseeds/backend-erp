@@ -805,6 +805,75 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/dispatch-order/{public_id}:
+    post:
+      operationId: api_sales_admin_dispatch_order_create
+      description: Record a dispatch against a verified order (app admin only).
+      summary: Dispatch a verified order (by agency or own vehicle)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispatchOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DispatchOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DispatchOrderRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/edit-order/{public_id}:
+    patch:
+      operationId: api_sales_admin_edit_order_partial_update
+      description: Update an order, including its lines (app admin only).
+      summary: Update an order (including its items)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrderRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /api/sales-admin/get-clients/:
     get:
       operationId: sales_admin_get_clients_list
@@ -911,6 +980,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/StockPosition'
           description: ''
+  /api/sales-admin/hold-order/{public_id}:
+    post:
+      operationId: api_sales_admin_hold_order_create
+      description: Put an order on hold, releasing any stock it reserved.
+      summary: Put an order on hold
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /api/sales-admin/loose-stock:
     get:
       operationId: api_sales_admin_loose_stock_retrieve
@@ -926,6 +1018,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LooseStockPosition'
+          description: ''
+  /api/sales-admin/order/{public_id}:
+    get:
+      operationId: api_sales_admin_order_retrieve
+      description: Get one order in full, by ``public_id`` (app admin only).
+      summary: Get an order in full (order + items + the client's full details)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/orders/:
+    get:
+      operationId: sales_admin_get_orders_list
+      description: 'List every order: filter by sales person / client / product /
+        city / status.'
+      summary: List orders (filter by sales person / client / product / city / status,
+        sortable)
+      parameters:
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the order is delivered to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client id(s) the order was booked for (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: created_by
+        schema:
+          type: string
+        description: User id(s) of the sales person who booked the order (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product id(s) the order contains (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, price); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Order lifecycle status. Comma-separated (any match); AND-ed with
+          the other filters.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderListPage'
           description: ''
   /api/sales-admin/product-packagings:
     get:
@@ -1117,6 +1297,52 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/reject-order/{public_id}:
+    post:
+      operationId: api_sales_admin_reject_order_create
+      description: Reject an order for good, releasing any stock it reserved.
+      summary: Reject an order (terminal)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/revert-dispatch/{public_id}:
+    post:
+      operationId: api_sales_admin_revert_dispatch_create
+      description: Undo a dispatch, returning the order to CONFIRMED.
+      summary: Revert a dispatch (DISPATCHED -> CONFIRMED)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /api/sales-admin/sales-people:
     get:
       operationId: api_sales_admin_sales_people_list
@@ -1214,6 +1440,29 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/unverify-order/{public_id}:
+    post:
+      operationId: api_sales_admin_unverify_order_create
+      description: Withdraw an order's approval, returning it to UNDER_REVIEW.
+      summary: Unverify an order (CONFIRMED -> UNDER_REVIEW)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /api/sales-admin/update-client/:
     post:
       operationId: api_sales_admin_update_client_create
@@ -1392,6 +1641,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientPayload'
           description: ''
+  /api/sales-admin/verify-order/{public_id}:
+    post:
+      operationId: api_sales_admin_verify_order_create
+      description: Approve an order against stock availability (app admin only).
+      summary: Verify an order against today's stock count
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /api/test-sentry/:
     get:
       operationId: api_test_sentry_retrieve
@@ -1505,6 +1777,130 @@ paths:
           description: ''
 components:
   schemas:
+    AdminOrderListCity:
+      type: object
+      description: Output shape for the ``city`` reference on an order card.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    AdminOrderListClient:
+      type: object
+      description: Output shape for the ``client`` reference on an order card.
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+      required:
+      - company_name
+      - public_id
+    AdminOrderListItem:
+      type: object
+      description: Output shape for one order card (schema only).
+      properties:
+        public_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          nullable: true
+        client:
+          $ref: '#/components/schemas/AdminOrderListClient'
+        client_created_by:
+          type: string
+          nullable: true
+          description: Sales person who onboarded the client.
+        created_by:
+          type: string
+          nullable: true
+          description: Sales person who booked the order.
+        verified_by:
+          type: string
+          nullable: true
+          description: Sales admin who approved the order; null until verified.
+        delivery_address:
+          type: string
+        city:
+          allOf:
+          - $ref: '#/components/schemas/AdminOrderListCity'
+          nullable: true
+        transport_agency:
+          allOf:
+          - $ref: '#/components/schemas/TransportAgencyRef'
+          nullable: true
+        dispatch_mode:
+          $ref: '#/components/schemas/DispatchModeEnum'
+        expected_delivery_date:
+          type: string
+          format: date
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        item_count:
+          type: integer
+        packagings:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderCardPackaging'
+      required:
+      - city
+      - client
+      - client_created_by
+      - created_at
+      - created_by
+      - delivery_address
+      - dispatch_mode
+      - expected_delivery_date
+      - item_count
+      - packagings
+      - public_id
+      - status
+      - total_amount
+      - total_packets
+      - transport_agency
+      - verified_by
+    AdminOrderListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminOrderListItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
     AdminPayload:
       type: object
       description: Swagger schema for one admin row (no city, address or audit keys).
@@ -2401,6 +2797,39 @@ components:
       description: |-
         * `AGENCY` - AGENCY
         * `PRIVATE` - PRIVATE
+    DispatchOrderRequest:
+      type: object
+      description: |-
+        Request validation for recording a dispatch.
+
+        The kind of dispatch is read off the order in ``context["order"]`` -- it is
+        whether that order has a ``transport_agency`` -- so this serializer only
+        checks that the body matches the kind, never decides it.
+      properties:
+        dispatch_date:
+          type: string
+          format: date
+        from_city_id:
+          type: integer
+        to_city_id:
+          type: integer
+        lr_number:
+          type: string
+          description: 'Agency dispatches only, and optional even then: leave it out
+            while the transporter''s consignment note is still pending.'
+          maxLength: 64
+        vehicle_number:
+          type: string
+          minLength: 1
+          maxLength: 32
+        driver_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+      required:
+      - dispatch_date
+      - from_city_id
+      - to_city_id
     FilterCatalogueEntry:
       type: object
       description: Schema for one ``available_filters`` entry.
@@ -2608,13 +3037,125 @@ components:
       required:
       - product
       - public_id
+    OrderCardPackaging:
+      type: object
+      description: |-
+        Output shape for one bag on an order card, and how many of it.
+
+        One entry per order line. The bag is the unit an order is placed in, so two
+        sizes of the same seed are two entries rather than one product listed twice.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/OrderCardProduct'
+        packet_weight:
+          type: string
+        packets:
+          type: integer
+        total_weight:
+          type: string
+        selling_price:
+          type: string
+          description: The bag's own list price, not what this order was charged.
+        quantity:
+          type: integer
+          description: Bags of this kind on the order.
+      required:
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - quantity
+      - selling_price
+      - total_weight
+    OrderCardProduct:
+      type: object
+      description: |-
+        Output shape for the product a bag on an order *card* holds.
+
+        Wider than ``packaging_payload``'s own ``product`` block by exactly one
+        field: the picture the card renders. ``packaging_payload`` is left alone
+        because it is embedded in every order payload and across the sales-admin
+        API, where the image does not belong.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        image_url:
+          type: string
+          description: 'The product''s picture: an absolute URL when deployed, a MEDIA_URL-relative
+            path in development, empty when none is set.'
+      required:
+      - image_url
+      - name
+      - public_id
+    OrderDetailPayload:
+      type: object
+      description: |-
+        Output shape for one order in full (``order_detail_payload``).
+
+        Identical to the Android booking response except that ``client`` carries the
+        whole client -- every address and transport agency, each with its link id --
+        rather than just the company name and GST number.
+      properties:
+        public_id:
+          type: string
+        client:
+          $ref: '#/components/schemas/ClientPayload'
+        delivery_address:
+          type: string
+        status:
+          type: string
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+        transport_agency:
+          allOf:
+          - $ref: '#/components/schemas/TransportAgencyRef'
+          nullable: true
+        dispatch_mode:
+          $ref: '#/components/schemas/DispatchModeEnum'
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemPayload'
+      required:
+      - actual_delivery_date
+      - client
+      - delivery_address
+      - dispatch_mode
+      - expected_delivery_date
+      - items
+      - public_id
+      - special_comments
+      - status
+      - total_amount
+      - total_packets
+      - transport_agency
+      - verified_at
     OrderItemPayload:
       type: object
       description: Output shape for one order line (schema only).
       properties:
         packaging:
-          type: object
-          additionalProperties: {}
+          $ref: '#/components/schemas/PackagingPayload'
         negotiated_selling_price:
           type: string
         quantity:
@@ -2625,6 +3166,27 @@ components:
       - line_total
       - negotiated_selling_price
       - packaging
+      - quantity
+    OrderItemWriteRequest:
+      type: object
+      description: 'One desired line of the order: a bag, how many, and optionally
+        at what price.'
+      properties:
+        product_packaging_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        quantity:
+          type: integer
+          minimum: 1
+        negotiated_selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Whole-bag rate for this line. Omit it to leave an existing
+            line's price alone, or to charge a new line the bag's list price.
+      required:
+      - product_packaging_public_id
       - quantity
     OrderListCity:
       type: object
@@ -2679,10 +3241,21 @@ components:
           type: integer
         item_count:
           type: integer
-        products:
+        packagings:
           type: array
           items:
-            $ref: '#/components/schemas/OrderListProduct'
+            $ref: '#/components/schemas/OrderCardPackaging'
+        verified:
+          type: boolean
+          description: Whether a sales admin has approved the order.
+        verified_by:
+          type: string
+          nullable: true
+          description: Sales admin who approved it; null until verified.
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
       required:
       - city
       - client
@@ -2691,11 +3264,14 @@ components:
       - dispatch_mode
       - expected_delivery_date
       - item_count
-      - products
+      - packagings
       - public_id
       - status
       - total_amount
       - total_packets
+      - verified
+      - verified_at
+      - verified_by
     OrderListPage:
       type: object
       description: Output shape for the paginated envelope (schema only).
@@ -2730,20 +3306,6 @@ components:
       - results
       - total_count
       - total_pages
-    OrderListProduct:
-      type: object
-      description: Output shape for one product line summarized on an order card.
-      properties:
-        public_id:
-          type: string
-        name:
-          type: string
-        quantity:
-          type: integer
-      required:
-      - name
-      - public_id
-      - quantity
     OrderPayload:
       type: object
       description: Output shape for a booked order (schema only; built by hand).
@@ -2799,6 +3361,31 @@ components:
       - total_packets
       - transport_agency
       - verified_at
+    PackagingPayload:
+      type: object
+      description: Output shape for one bag (``ProductOperations.packaging_payload``).
+      properties:
+        public_id:
+          type: string
+        product:
+          type: object
+          additionalProperties: {}
+          description: 'The bag''s product: {public_id, name}.'
+        packet_weight:
+          type: string
+        packets:
+          type: integer
+        total_weight:
+          type: string
+        selling_price:
+          type: string
+      required:
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - selling_price
+      - total_weight
     PackagingProductRef:
       type: object
       description: Output shape for the ``product`` reference inside a snapshot.
@@ -2872,6 +3459,40 @@ components:
           items:
             $ref: '#/components/schemas/LooseCountLineRequest'
           description: Loose lines, one per (product, packet_weight) pair.
+    PatchedUpdateOrderRequest:
+      type: object
+      description: |-
+        Request validation for an admin's order update -- every field optional.
+
+        No field may declare a ``default``: the view applies a field only when the
+        key is present in ``validated_data``, and DRF injects a declared default
+        even for an absent key, which would silently rewrite an untouched column.
+      properties:
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id belonging to the order's client.
+        client_transport_agency_id:
+          type: integer
+          nullable: true
+          description: A ClientTransportAgency link id belonging to the order's client;
+            send null for a private (own-vehicle) dispatch.
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+          description: A remark to add to the order. Appended as a new line -- it
+            never replaces what is already there.
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemWriteRequest'
     PatchedUpdateProductPackagingRequest:
       type: object
       description: Request validation for updating a ``ProductPackaging`` (all fields
@@ -3224,6 +3845,24 @@ components:
       - cities
       - id
       - name
+    StatusEnum:
+      enum:
+      - BOOKED
+      - UNDER_REVIEW
+      - CONFIRMED
+      - DISPATCHED
+      - DELIVERED
+      - ON_HOLD
+      - REJECTED
+      type: string
+      description: |-
+        * `BOOKED` - BOOKED
+        * `UNDER_REVIEW` - UNDER_REVIEW
+        * `CONFIRMED` - CONFIRMED
+        * `DISPATCHED` - DISPATCHED
+        * `DELIVERED` - DELIVERED
+        * `ON_HOLD` - ON_HOLD
+        * `REJECTED` - REJECTED
     StockAdmin:
       type: object
       description: Output shape for one admin authorised to record the daily count.

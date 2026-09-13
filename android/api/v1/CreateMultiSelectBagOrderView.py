@@ -46,6 +46,10 @@ from aggregator.models import (
 from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import create_order, order_payload
 from android.api.base import AndroidBaseView
+from api.order_serializers import (
+    OrderItemPayloadSerializer,
+    TransportAgencyRefSerializer,
+)
 
 # Upper bound on distinct bags in one order -- a booking screen, not a bulk import.
 MAX_ORDER_ITEMS = 100
@@ -68,22 +72,6 @@ class BagOrderItemSerializer(serializers.Serializer):
             "min_value": "Quantity must be at least 1.",
         },
     )
-
-
-class TransportAgencyRefSerializer(serializers.Serializer):
-    """Output shape for the ``transport_agency`` reference on an order."""
-
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-
-
-class OrderItemPayloadSerializer(serializers.Serializer):
-    """Output shape for one order line (schema only)."""
-
-    packaging = serializers.DictField()
-    negotiated_selling_price = serializers.CharField()
-    quantity = serializers.IntegerField()
-    line_total = serializers.CharField()
 
 
 class OrderPayloadSerializer(serializers.Serializer):
