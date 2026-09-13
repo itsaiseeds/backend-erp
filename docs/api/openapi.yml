@@ -247,6 +247,64 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientListPage'
           description: ''
+  /android/api/v1/get-orders:
+    get:
+      operationId: android_api_v1_get_orders_list
+      description: 'List the caller''s orders: filter by client / product / city /
+        status, sort.'
+      summary: List my orders (filter by client / product / city / status, sortable)
+      parameters:
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the order is delivered to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client public id(s) the order was booked for (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) the order contains (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, price); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Order lifecycle status. Comma-separated (any match); AND-ed with
+          the other filters.
+      tags:
+      - android
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListPage'
+          description: ''
   /android/api/v1/sales-person-catalogue:
     get:
       operationId: android_api_v1_sales_person_catalogue_list
@@ -2567,6 +2625,124 @@ components:
       - line_total
       - negotiated_selling_price
       - packaging
+      - quantity
+    OrderListCity:
+      type: object
+      description: Output shape for the ``city`` reference on an order card.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    OrderListClient:
+      type: object
+      description: Output shape for the ``client`` reference on an order card.
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+      required:
+      - company_name
+      - public_id
+    OrderListItem:
+      type: object
+      description: Output shape for one order card (schema only).
+      properties:
+        public_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          nullable: true
+        client:
+          $ref: '#/components/schemas/OrderListClient'
+        delivery_address:
+          type: string
+        city:
+          allOf:
+          - $ref: '#/components/schemas/OrderListCity'
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        dispatch_mode:
+          type: string
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        item_count:
+          type: integer
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderListProduct'
+      required:
+      - city
+      - client
+      - created_at
+      - delivery_address
+      - dispatch_mode
+      - expected_delivery_date
+      - item_count
+      - products
+      - public_id
+      - status
+      - total_amount
+      - total_packets
+    OrderListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderListItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    OrderListProduct:
+      type: object
+      description: Output shape for one product line summarized on an order card.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: integer
+      required:
+      - name
+      - public_id
       - quantity
     OrderPayload:
       type: object

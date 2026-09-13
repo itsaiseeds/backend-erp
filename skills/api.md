@@ -260,6 +260,25 @@ See `android/api/v1/GetClientsView.py` for the real thing.
 the detail views are three lines each (`get_object_or_404` + `Response(client_payload(client))`).
 `GET /api/sales-admin/get-clients/` is still a 501 stub.
 
+## Reading orders
+
+| Endpoint | Scope | Payload |
+|---|---|---|
+| `GET /android/api/v1/get-orders` | the caller's **own** orders | compact card per order (`order_list_payload` — client, delivery city, totals, product lines), paginated / filtered / sorted |
+
+Filters are `?client=` (client public ids), `?product=` (product public ids),
+`?city_id=` (delivery city) and `?status=` (order lifecycle code); sorts are
+`created_at` (default, newest first) and `price` (the order total). Every
+option list is built from the caller's own orders, so the pickers never name a
+client, product or city that belongs to another sales person.
+
+The scoping is the queryset itself (`Order.objects.filter(created_by=request.user)`)
+— no filter can widen it. `price` is a per-order `Subquery`, not a `Sum` over
+the item join, so `?product=` narrowing that join cannot make the sort (or the
+card total) count only the matching lines.
+
+`order_payload` / `order_list_payload` live in `aggregator/OrderOperations.py`.
+
 ## Client lists are declarative
 
 A client's addresses, contact people and transport agencies are never patched
