@@ -53,7 +53,7 @@ class AndroidCatalogueApiTest(AndroidApiTestCase):
         # The DML baseline already ships two products with one packaging each.
         # Everything below is this class's own, so the assertions can name it.
         cls.certificate = cls._product(
-            "Zeta Certificate", cls.bajari, StageIds.CERTIFICATE, "100.00"
+            "Zeta Certificate", cls.bajari, StageIds.CERTIFIED, "100.00"
         )
         cls.breeder = cls._product(
             "Alpha Breeder", cls.castor, StageIds.BREEDER, "300.00"
@@ -179,16 +179,19 @@ class AndroidCatalogueApiTest(AndroidApiTestCase):
         )
 
     def test_stage_filter_accepts_several_codes(self):
-        ids = self._ids("?stage=BREEDER,CERTIFICATE")
+        ids = self._ids("?stage=BREEDER,CERTIFIED")
         self.assertIn(self.dear.public_id, ids)
         self.assertIn(self.cheap.public_id, ids)
         self.assertNotIn(self.mid.public_id, ids)
 
     def test_an_unknown_stage_is_rejected(self):
+        """``CERTIFICATE`` is the pre-rename spelling of ``CERTIFIED``, so this
+        also pins that an app build sending the old code gets a 400 rather than
+        silently matching nothing."""
         self.login_as(self.sales_person)
-        response = self.client.get(f"{CATALOGUE_URL}?stage=CERTIFIED")
+        response = self.client.get(f"{CATALOGUE_URL}?stage=CERTIFICATE")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("CERTIFIED", response.data["detail"])
+        self.assertIn("CERTIFICATE", response.data["detail"])
 
     def test_name_filter_matches_a_substring_case_insensitively(self):
         self.assertEqual(self._ids("?name=alpha"), [self.dear.public_id])

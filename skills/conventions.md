@@ -162,7 +162,7 @@ backend-erp/
   `order_statuses()` / `client_statuses()` id ranges) in the same change. The
   same rule applies to `StageIds` and `aggregator_stage`.
 - `Product.stage` is the same pattern applied to a product's seed
-  classification: `BREEDER`, `FOUNDATION`, `RESEARCH`, `CERTIFICATE`. It is a
+  classification: `BREEDER`, `FOUNDATION`, `RESEARCH`, `CERTIFIED`. It is a
   required FK — resolve it with `Stage.by_id(StageIds.BREEDER)`.
 
 ### Unit model: a **packet** is the small unit; a **bag** is the container

@@ -54,6 +54,6 @@ void main() {
     });
 
     expect(product.stageId, 4);
-    expect(product.stageName, 'Certificate');
+    expect(product.stageName, 'Certified');
   });
 }

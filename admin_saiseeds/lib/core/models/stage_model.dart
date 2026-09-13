@@ -47,17 +47,17 @@ class Stages {
     code: 'RESEARCH',
     name: 'Research',
   );
-  static const StageModel certificate = StageModel(
+  static const StageModel certified = StageModel(
     id: 4,
-    code: 'CERTIFICATE',
-    name: 'Certificate',
+    code: 'CERTIFIED',
+    name: 'Certified',
   );
 
   static const List<StageModel> all = [
     breeder,
     foundation,
     research,
-    certificate,
+    certified,
   ];
 
   static StageModel? byId(int? id) {

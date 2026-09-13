@@ -19,7 +19,7 @@ class StageIds(IntEnum):
     BREEDER = 1
     FOUNDATION = 2
     RESEARCH = 3
-    CERTIFICATE = 4
+    CERTIFIED = 4
 
 
 class Stage(TimeStampedModel, SoftDeletedModel, CreatedByModel):

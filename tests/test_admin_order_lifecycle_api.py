@@ -106,7 +106,7 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         product = Product.objects.create(
             name="Alpha Seed",
             crop_id=1,
-            stage=Stage.by_id(StageIds.CERTIFICATE),
+            stage=Stage.by_id(StageIds.CERTIFIED),
             selling_price=Decimal("100.00"),
             created_by=cls.superuser,
         )

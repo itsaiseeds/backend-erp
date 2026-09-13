@@ -14,7 +14,7 @@ Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
   have bags), so the picker needs no second call.
 * ``?product=<P-...,...>`` -- bags of those products, by product public id.
 * ``?stage=<CODE,...>`` -- ``BREEDER`` / ``FOUNDATION`` / ``RESEARCH`` /
-  ``CERTIFICATE``; the entry carries all four as options.
+  ``CERTIFIED``; the entry carries all four as options.
 * ``?name=<term>`` -- case-insensitive substring of the product name.
 * ``?price_gte=`` / ``?price_lte=`` -- inclusive bounds on the bag's selling
   price (send either or both).
