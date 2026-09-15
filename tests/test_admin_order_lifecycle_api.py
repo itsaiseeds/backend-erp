@@ -158,12 +158,22 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         )
 
     def _dispatch_body(self, **overrides):
-        """The one body every dispatch takes, whichever kind the order is."""
+        """The one body every dispatch takes, whichever kind the order is.
+
+        ``items`` carries a lot number per line and must cover the order; every
+        order booked here has the single ``self.bag`` line.
+        """
         body = {
             "from_city_id": self.city.id,
             "driver_name": "Ramesh Driver",
             "driver_number": "9876500002",
             "vehicle_number": "GJ05AB1234",
+            "items": [
+                {
+                    "product_packaging_public_id": self.bag.public_id,
+                    "lot_number": "LOT-2026-01",
+                }
+            ],
         }
         body.update(overrides)
         return body
@@ -383,7 +393,13 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
     def test_every_dispatch_field_is_mandatory(self):
         """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_every_dispatch_field_is_mandatory"""
         order = self._verified_order()
-        required = ("from_city_id", "driver_name", "driver_number", "vehicle_number")
+        required = (
+            "from_city_id",
+            "driver_name",
+            "driver_number",
+            "vehicle_number",
+            "items",
+        )
 
         for field in required:
             with self.subTest(missing=field):
@@ -405,6 +421,108 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         self.assertEqual(
             response.status_code, status.HTTP_400_BAD_REQUEST, response.data
         )
+
+    # -- the challan the dispatch writes --------------------------------------
+
+    def test_dispatching_writes_the_challan_and_its_lot_numbers(self):
+        """The DispatchEntry snapshots the receiver; its lines carry the lots.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_dispatching_writes_the_challan_and_its_lot_numbers
+        """
+        order = self._verified_order(by_agency=True)
+
+        response = self._post(DISPATCH_URL, order, self._dispatch_body())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        entry = order.dispatch_entry
+        self.assertTrue(entry.public_id.startswith("DE-"))
+        self.assertEqual(entry.dispatch_details_id, order.dispatch_details_id)
+        self.assertFalse(entry.is_private)
+        self.assertEqual(entry.client_id, self.acme.pk)
+        self.assertEqual(entry.client_address_id, order.delivery_address_id)
+        # The receiver is snapshotted from the client's primary contact.
+        self.assertEqual(entry.contact_name, "Ramesh")
+        self.assertEqual(entry.contact_number, "9876500001")
+        self.assertEqual(entry.dispatch_date, indian_now().date())
+        self.assertEqual(entry.vehicle_number, "GJ05AB1234")
+
+        line = entry.items.get()
+        self.assertEqual(line.product_packaging_id, self.bag.pk)
+        self.assertEqual(line.lot_number, "LOT-2026-01")
+        self.assertEqual(line.quantity, 2)
+        self.assertEqual(line.negotiated_selling_price, Decimal("1000.00"))
+
+    def test_a_private_dispatch_writes_a_challan_with_no_transporter(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_private_dispatch_writes_a_challan_with_no_transporter"""
+        order = self._verified_order()
+
+        response = self._post(DISPATCH_URL, order, self._dispatch_body())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        entry = order.dispatch_entry
+        self.assertIsNone(entry.dispatch_details_id)
+        self.assertTrue(entry.is_private)
+        self.assertEqual(entry.lr_number, "")
+
+    def test_a_lot_number_is_required_for_every_line(self):
+        """Missing, unknown and duplicated packagings are each refused.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_lot_number_is_required_for_every_line
+        """
+        order = self._verified_order()
+        lot = {"product_packaging_public_id": self.bag.public_id, "lot_number": "L1"}
+        stranger = {"product_packaging_public_id": "PP-NOTONORDER", "lot_number": "L2"}
+        cases = (
+            ([stranger], "No lot number for"),
+            ([lot, stranger], "Not on this order"),
+            ([lot, lot], "listed twice"),
+        )
+
+        for items, fragment in cases:
+            with self.subTest(items=items):
+                self._assert_refused(
+                    self._post(DISPATCH_URL, order, self._dispatch_body(items=items)),
+                    fragment,
+                )
+
+        order.refresh_from_db()
+        self.assertFalse(hasattr(order, "dispatch_entry"))
+
+    def test_re_dispatching_rewrites_the_same_challan(self):
+        """One order, one DE-... -- reverting and dispatching again reuses it.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_re_dispatching_rewrites_the_same_challan
+        """
+        order = self._dispatched_order()
+        first = order.dispatch_entry
+        original_public_id = first.public_id
+
+        self._post(REVERT_URL, order)
+        order.refresh_from_db()
+        response = self._post(
+            DISPATCH_URL,
+            order,
+            self._dispatch_body(
+                vehicle_number="GJ05ZZ9999",
+                items=[
+                    {
+                        "product_packaging_public_id": self.bag.public_id,
+                        "lot_number": "LOT-2026-02",
+                    }
+                ],
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        entry = order.dispatch_entry
+        self.assertEqual(entry.public_id, original_public_id)
+        self.assertEqual(entry.vehicle_number, "GJ05ZZ9999")
+        self.assertEqual(entry.items.get().lot_number, "LOT-2026-02")
+        # A new journey gets a new DispatchDetails row, so the LR starts blank.
+        self.assertEqual(entry.lr_number, "")
 
     # -- revert dispatch ------------------------------------------------------
 

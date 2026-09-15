@@ -12,6 +12,7 @@ from .CropsView import CropsView
 from .DispatchOrderView import DispatchOrderView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
+from .GetDispatchChallansView import GetDispatchChallansView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
 from .HoldOrderView import HoldOrderView
@@ -33,6 +34,7 @@ from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateSalesPersonView import UpdateSalesPersonView
 from .UpdateTodaysInventoryView import UpdateTodaysInventoryView
+from .UploadLRNumberView import UploadLRNumberView
 from .VerifyClientView import VerifyClientView
 from .VerifyOrderView import VerifyOrderView
 from .VerifyOTPView import VerifyOTPView
@@ -99,9 +101,20 @@ urlpatterns = [
         name="dispatch-order",
     ),
     path(
+        "upload-lr-number/<str:public_id>",
+        UploadLRNumberView.as_view(),
+        name="upload-lr-number",
+    ),
+    path(
         "revert-dispatch/<str:public_id>",
         RevertDispatchView.as_view(),
         name="revert-dispatch",
+    ),
+    # A collection, like ``orders/`` above -- hence the trailing slash.
+    path(
+        "dispatch-challans/",
+        GetDispatchChallansView.as_view(),
+        name="dispatch-challans",
     ),
     path("hold-order/<str:public_id>", HoldOrderView.as_view(), name="hold-order"),
     path("reject-order/<str:public_id>", RejectOrderView.as_view(), name="reject-order"),
