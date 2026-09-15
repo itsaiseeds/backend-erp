@@ -52,6 +52,8 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(36, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(37, 'aggregator', 'stage');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(38, 'aggregator', 'loosestocksnapshot');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(39, 'aggregator', 'productdescriptionitem');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(40, 'aggregator', 'dispatchentry');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(41, 'aggregator', 'dispatchentryitem');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -197,6 +199,14 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(134, 'Can change product description item', 39, 'change_productdescriptionitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(135, 'Can delete product description item', 39, 'delete_productdescriptionitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(136, 'Can view product description item', 39, 'view_productdescriptionitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(137, 'Can add dispatch entry', 40, 'add_dispatchentry');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(138, 'Can change dispatch entry', 40, 'change_dispatchentry');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(139, 'Can delete dispatch entry', 40, 'delete_dispatchentry');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(140, 'Can view dispatch entry', 40, 'view_dispatchentry');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(141, 'Can add dispatch entry item', 41, 'add_dispatchentryitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(142, 'Can change dispatch entry item', 41, 'change_dispatchentryitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(143, 'Can delete dispatch entry item', 41, 'delete_dispatchentryitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(144, 'Can view dispatch entry item', 41, 'view_dispatchentryitem');
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)
