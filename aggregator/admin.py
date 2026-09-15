@@ -434,6 +434,25 @@ class DispatchEntryAdmin(SoftDeleteParentAdmin):
         return obj.lr_number or "-"
 
 
+@admin.register(DispatchEntryItem)
+class DispatchEntryItemAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "dispatch_entry",
+        "product_packaging",
+        "lot_number",
+        "quantity",
+        "negotiated_selling_price",
+        "created_at",
+    )
+    search_fields = (
+        "dispatch_entry__public_id",
+        "lot_number",
+        "product_packaging__product__name",
+    )
+    autocomplete_fields = ("dispatch_entry", "product_packaging")
+    list_select_related = ("dispatch_entry", "product_packaging__product")
+
+
 class OrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):
     model = OrderItem
     extra = 0
