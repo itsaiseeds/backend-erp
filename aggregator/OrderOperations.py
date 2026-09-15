@@ -262,6 +262,7 @@ def dispatch_order(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    lot_numbers: dict[str, str],
 ) -> Order:
     """Record a dispatch against a verified order and move it to DISPATCHED.
 
@@ -285,14 +286,30 @@ def dispatch_order(
     default it from.
 
     The ``lr_number`` is not set here. It is the one field a transporter issues
-    after collection, so a dispatch is always recorded without it.
+    after collection, so a dispatch is always recorded without it -- it is
+    recorded later by ``DispatchOperations.set_lr_number``. Re-dispatching
+    therefore drops the previous LR with the previous ``DispatchDetails`` row:
+    that note described the previous journey.
+
+    ``lot_numbers`` maps each line's ``ProductPackaging.public_id`` to the batch
+    those bags came from, and must name every line exactly once. It is what the
+    challan is written from: the dispatch itself is one journey, but the goods
+    on it are traced batch by batch.
 
     The details are attached *before* the status moves: ``Order.clean`` rejects
     a DISPATCHED order that carries no dispatch record, so the other order would
     fail validation. No stock is written -- CONFIRMED to DISPATCHED moves the
     bags from reserved to consumed on its own.
     """
+    from .DispatchOperations import sync_dispatch_entry, validated_lot_numbers
+
     assert_order_status(order, DISPATCHABLE_STATUS_CODES, "dispatch")
+
+    # Validated before anything is written, so a bad lot number costs nothing.
+    validated_lot_numbers(order, lot_numbers)
+
+    dispatched_at = indian_now()
+    to_city = order.delivery_address.city
 
     attach = (
         attach_dispatch_details
@@ -302,12 +319,23 @@ def dispatch_order(
     attach(
         order,
         dispatched_by=actor,
-        dispatch_date=indian_now().date(),
+        dispatch_date=dispatched_at.date(),
         from_city=from_city,
-        to_city=order.delivery_address.city,
+        to_city=to_city,
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+    )
+    sync_dispatch_entry(
+        order,
+        actor=actor,
+        dispatched_at=dispatched_at,
+        from_city=from_city,
+        to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
+        lot_numbers=lot_numbers,
     )
     return update_order_status(order, StatusIds.DISPATCHED)
 

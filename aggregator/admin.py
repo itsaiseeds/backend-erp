@@ -18,6 +18,8 @@ from .models import (
     CustomOrder,
     CustomOrderItem,
     DispatchDetails,
+    DispatchEntry,
+    DispatchEntryItem,
     InventorySnapshot,
     LooseStockSnapshot,
     Order,
@@ -389,6 +391,47 @@ class PrivateDispatchDetailsAdmin(SoftDeleteModelAdmin):
     search_fields = ("client__company_name", "vehicle_number", "driver_number")
     autocomplete_fields = ("client", "dispatched_by", "from_city", "to_city")
     list_select_related = ("client", "from_city", "to_city")
+
+
+class DispatchEntryItemInline(CreatedByStampInlineMixin, admin.TabularInline):
+    model = DispatchEntryItem
+    extra = 0
+    autocomplete_fields = ("product_packaging",)
+
+
+@admin.register(DispatchEntry)
+class DispatchEntryAdmin(SoftDeleteParentAdmin):
+    list_display = (
+        "public_id",
+        "order",
+        "client",
+        "lr_number",
+        "dispatch_date",
+        "from_city",
+        "to_city",
+        "vehicle_number",
+    )
+    search_fields = (
+        "public_id",
+        "order__public_id",
+        "client__company_name",
+        "dispatch_details__lr_number",
+        "vehicle_number",
+    )
+    autocomplete_fields = (
+        "order",
+        "dispatch_details",
+        "client",
+        "client_address",
+        "from_city",
+        "to_city",
+    )
+    list_select_related = ("order", "client", "dispatch_details", "from_city", "to_city")
+    inlines = (DispatchEntryItemInline,)
+
+    @admin.display(description="LR number")
+    def lr_number(self, obj):
+        return obj.lr_number or "-"
 
 
 class OrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):

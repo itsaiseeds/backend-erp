@@ -879,6 +879,76 @@ CREATE INDEX IF NOT EXISTS aggregator_orderitem_is_deleted_idx ON public.aggrega
 CREATE INDEX IF NOT EXISTS aggregator_orderitem_created_by_id_idx ON public.aggregator_orderitem USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_orderitem_deleted_by_id_idx ON public.aggregator_orderitem USING btree (deleted_by_id);
 
+-- aggregator_dispatchentry ----------------------------------------------------
+-- The challan record for one order, written when the order is dispatched and
+-- rewritten in place if it is reverted and dispatched again (hence the UNIQUE
+-- on order_id). The receiver columns are a SNAPSHOT: a reprinted challan must
+-- still say what went out with the goods, whatever the client looks like now.
+-- There is no lr_number column -- it lives on aggregator_dispatchdetails, which
+-- dispatch_details_id points at; NULL there means a private (own-vehicle)
+-- dispatch, which has no transporter and so no LR.
+CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	order_id int8 NOT NULL,
+	dispatch_details_id int8 NULL,
+	client_id int8 NOT NULL,
+	client_address_id int8 NOT NULL,
+	contact_name varchar(255) NOT NULL,
+	contact_number varchar(10) NOT NULL,
+	dispatched_at timestamptz NOT NULL,
+	from_city_id int8 NOT NULL,
+	to_city_id int8 NOT NULL,
+	vehicle_number varchar(32) NOT NULL,
+	driver_name varchar(255) NOT NULL,
+	driver_number varchar(10) NOT NULL,
+	CONSTRAINT aggregator_dispatchentry_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_dispatchentry_public_id_key UNIQUE (public_id),
+	CONSTRAINT aggregator_dispatchentry_order_id_key UNIQUE (order_id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_public_id_like ON public.aggregator_dispatchentry USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_dispatch_details_id_idx ON public.aggregator_dispatchentry USING btree (dispatch_details_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_client_id_idx ON public.aggregator_dispatchentry USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_client_address_id_idx ON public.aggregator_dispatchentry USING btree (client_address_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_from_city_id_idx ON public.aggregator_dispatchentry USING btree (from_city_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_to_city_id_idx ON public.aggregator_dispatchentry USING btree (to_city_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_dispatched_at_idx ON public.aggregator_dispatchentry USING btree (dispatched_at);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_is_deleted_idx ON public.aggregator_dispatchentry USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_deleted_by_id_idx ON public.aggregator_dispatchentry USING btree (deleted_by_id);
+
+-- aggregator_dispatchentryitem ------------------------------------------------
+-- One challan line: an aggregator_orderitem copied at dispatch time, plus the
+-- lot number those bags came from. Copied rather than joined so a later edit to
+-- the order cannot rewrite a challan already in the driver's hand.
+CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentryitem (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	dispatch_entry_id int8 NOT NULL,
+	product_packaging_id int8 NOT NULL,
+	negotiated_selling_price numeric(12, 2) NOT NULL,
+	quantity int8 NOT NULL,
+	lot_number varchar(64) NOT NULL,
+	CONSTRAINT aggregator_dispatchentryitem_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_dispatchentryitem_entry_packaging UNIQUE (dispatch_entry_id, product_packaging_id),
+	CONSTRAINT ck_dispatchentryitem_positive CHECK (negotiated_selling_price >= 0 AND quantity > 0),
+	CONSTRAINT aggregator_dispatchentryitem_quantity_check CHECK (quantity >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_dispatch_entry_id_idx ON public.aggregator_dispatchentryitem USING btree (dispatch_entry_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_product_packaging_id_idx ON public.aggregator_dispatchentryitem USING btree (product_packaging_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_is_deleted_idx ON public.aggregator_dispatchentryitem USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_created_by_id_idx ON public.aggregator_dispatchentryitem USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_deleted_by_id_idx ON public.aggregator_dispatchentryitem USING btree (deleted_by_id);
+
 -- aggregator_inventorysnapshot ------------------------------------------------
 -- The day's sealed-bag count, one row per (snapshot_date, product_packaging).
 -- Bags only: they are consumed by normal order items and are the unit

@@ -82,6 +82,8 @@ graph TD
         PDD["PrivateDispatchDetails<br/>(dispatched_by=sales admin)"]
         ORD["Order<br/>(public_id ORD-…)"]
         OI["OrderItem"]
+        DE["DispatchEntry<br/>(public_id DE-…, the challan)"]
+        DEI["DispatchEntryItem<br/>(order line + lot_number)"]
         INV["InventorySnapshot<br/>(public_id INV-…, daily bag count)"]
         LS["LooseStockSnapshot<br/>(public_id LS-…, optional loose count)"]
         CORD["CustomOrder<br/>(public_id CORD-…, admin-only)"]
@@ -98,6 +100,9 @@ graph TD
         ORD --> STATUS
         ORD --> DD
         ORD --> PDD
+        ORD --> DE
+        DE --> DD
+        DE --> DEI
         ORD --> OI --> PP
         INV --> PP
         LS --> PROD
@@ -242,6 +247,8 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `StageIds` | `aggregator/models/Stage.py` | `enum.IntEnum` — the single source of truth for the stage CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`int(StageIds.BREEDER) == 1`). | used by → `ProductsView`, `UpdateProductView`, tests |
 | `Order` | `aggregator/models/Order.py` | Booked order exposed by `public_id` (`ORD-…`); `verified_by`/`verified_at` record the verifying sales admin (required once the status is `CONFIRMED`); lifecycle statuses limited to `StatusIds.order_statuses()`. No stored total — `total_amount` and `total_bags` are `@property`s summed from `items` | FK → `Client`, `Address`, `Status`; 1:N → `OrderItem` |
 | `OrderItem` | `aggregator/models/OrderItem.py` | One order line: a `ProductPackaging` (a bag) at a `negotiated_selling_price` (**per-bag**) × `quantity`; `line_total = negotiated_selling_price * quantity`. Defaulted to `packaging.selling_price` when omitted at creation via `OrderOperations.add_order_item` | FK → `Order`, `ProductPackaging` |
+| `DispatchEntry` | `aggregator/models/DispatchEntry.py` | The **challan** for one order (`DE-…`), written by `dispatch-order` alongside the `DispatchDetails` / `PrivateDispatchDetails` row and **rewritten in place** on a re-dispatch, so one order keeps one `DE-…`. Where those tables record *the dispatch*, this records *the paperwork*: the same journey plus a **snapshot** of the receiver (`client_address`, `contact_name`, `contact_number` as they stood at dispatch) so a reprint still says what went out. Deliberately has **no `lr_number` column** — it lives on `DispatchDetails` and is read through the `lr_number` property; `dispatch_details` null means a private dispatch (`is_private`), which has no transporter and so no LR. `dispatched_at` is re-stamped per consignment, unlike `created_at` | O2O → `Order`; FK → `DispatchDetails` (nullable), `Client`, `Address`, `City` x2; 1:N → `DispatchEntryItem` |
+| `DispatchEntryItem` | `aggregator/models/DispatchEntryItem.py` | One challan line: an `OrderItem`'s packaging, quantity and negotiated price **copied** at dispatch time, plus the `lot_number` those bags came from — the one field that exists nowhere else. Copied rather than joined so a later edit to the order cannot rewrite a challan already in the driver's hand. Unique per (`dispatch_entry`, `product_packaging`) | FK → `DispatchEntry`, `ProductPackaging` |
 | `Product` | `aggregator/models/Product.py` | Sellable product exposed by `public_id` (`P-…`); `selling_price` is a **rate per kilogram** (never used directly in order totals — see `ProductPackaging`); `price_for_weight(w)` turns it into the price of one `w`-kg packet, which is what `ProductPackaging` and `CustomOrderItem` defaults are built from. Carries a required `stage` (seed classification) and an optional `image_url` — written by `common.storage`: an absolute Supabase Storage URL when deployed, a `MEDIA_URL`-relative path on local disk in dev/tests | FK → `Crop`, `Stage`; 1:N → `ProductPackaging` |
 | `ProductPackaging` | `aggregator/models/ProductPackaging.py` | A **bag**: a container of `packets` small units, each `packet_weight` kg, for a `Product` (`PP-…`). Stores a **whole-bag** `selling_price` (Decimal 12,2, NOT NULL); `ProductOperations.add_packaging(...)` defaults it to `packets * product.price_for_weight(packet_weight)` when omitted; **frozen** once stored. Downstream `OrderItem.negotiated_selling_price` defaults to this value | FK → `Product`; 1:N → `OrderItem` |
 | `InventorySnapshot` | `aggregator/models/InventorySnapshot.py` | The day's **sealed-bag** count, one row per (`snapshot_date`, `product_packaging`) (`INV-…`). Bags only — the unit `OrderItem.quantity` uses, consumed by `Order`; loose stock lives in `LooseStockSnapshot`. Written only by an admin with `can_update_stock_count`. **Compulsory**: `is_stock_count_complete` gates order verification. Only the latest `snapshot_date` survives — a newer count hard-deletes every earlier row, a purge scoped to this table alone. Reserved/consumed are **derived** from order status, never stored, which is what makes verification and dispatch reversible | FK → `ProductPackaging`, `User` (`created_by`) |
