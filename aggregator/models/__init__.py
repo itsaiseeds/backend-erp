@@ -10,6 +10,8 @@ from .Crop import Crop
 from .CustomOrder import CustomOrder
 from .CustomOrderItem import CustomOrderItem
 from .DispatchDetails import DispatchDetails
+from .DispatchEntry import DispatchEntry
+from .DispatchEntryItem import DispatchEntryItem
 from .InventorySnapshot import InventorySnapshot
 from .InwardEntryMixin import InwardEntryMixin
 from .InwardOtherMaterial import InwardOtherMaterial
@@ -54,6 +56,8 @@ __all__ = [
     "LooseStockSnapshot",
     "DispatchDetails",
     "PrivateDispatchDetails",
+    "DispatchEntry",
+    "DispatchEntryItem",
     "Order",
     "OrderItem",
     "CustomOrder",

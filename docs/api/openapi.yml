@@ -805,6 +805,65 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/dispatch-challans/:
+    get:
+      operationId: sales_admin_get_dispatch_challans
+      description: List the delivery challans of dispatched orders whose LR is recorded.
+      summary: List dispatch challans (filter by client / destination city, sortable)
+      parameters:
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the goods were sent to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client id(s) the goods were consigned to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: end_date_time
+        schema:
+          type: string
+          format: date-time
+        description: ISO 8601. End date time of the window.
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (dispatch_date, created_at); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: start_date_time
+        schema:
+          type: string
+          format: date-time
+        description: ISO 8601. Start date time of the window.
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispatchChallanPage'
+          description: ''
   /api/sales-admin/dispatch-order/{public_id}:
     post:
       operationId: api_sales_admin_dispatch_order_create
@@ -2205,6 +2264,42 @@ paths:
                 items:
                   $ref: '#/components/schemas/SnapshotPayload'
           description: ''
+  /api/sales-admin/upload-lr-number/{public_id}:
+    post:
+      operationId: api_sales_admin_upload_lr_number_create
+      description: Record the transporter's LR against a dispatched order (app admin
+        only).
+      summary: Record the LR number of an agency dispatch
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadLRNumberRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UploadLRNumberRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadLRNumberRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /api/sales-admin/verify-client/:
     post:
       operationId: api_sales_admin_verify_client_create
@@ -2764,6 +2859,145 @@ components:
       - code
       - name
       - sequence
+    ChallanAddress:
+      type: object
+      description: Output shape for the consignee's address, as snapshotted at dispatch.
+      properties:
+        line_1:
+          type: string
+        line_2:
+          type: string
+        pincode:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        city_id:
+          type: integer
+        state_id:
+          type: integer
+        country_id:
+          type: integer
+      required:
+      - city
+      - city_id
+      - country
+      - country_id
+      - line_1
+      - line_2
+      - pincode
+      - state
+      - state_id
+    ChallanDispatch:
+      type: object
+      description: Output shape for the journey block (schema only).
+      properties:
+        public_id:
+          type: string
+        lr_number:
+          type: string
+        dispatch_date:
+          type: string
+          format: date
+        is_private:
+          type: boolean
+        vehicle_number:
+          type: string
+        driver_name:
+          type: string
+        driver_number:
+          type: string
+        from_city:
+          type: string
+        to_city:
+          type: string
+      required:
+      - dispatch_date
+      - driver_name
+      - driver_number
+      - from_city
+      - is_private
+      - lr_number
+      - public_id
+      - to_city
+      - vehicle_number
+    ChallanLine:
+      type: object
+      description: 'Output shape for one challan line: a bag, its lot and its money.'
+      properties:
+        public_id:
+          type: string
+          description: The packaging's public id.
+        product:
+          type: object
+          additionalProperties: {}
+        packet_weight:
+          type: string
+        packets:
+          type: integer
+        total_weight:
+          type: string
+        selling_price:
+          type: string
+        lot_number:
+          type: string
+        quantity:
+          type: integer
+        negotiated_selling_price:
+          type: string
+        line_total:
+          type: string
+      required:
+      - line_total
+      - lot_number
+      - negotiated_selling_price
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - quantity
+      - selling_price
+      - total_weight
+    ChallanParty:
+      type: object
+      description: Output shape for our own consignor block (schema only).
+      properties:
+        company_name:
+          type: string
+        company_address:
+          type: string
+        gst_number:
+          type: string
+        state_name:
+          type: string
+      required:
+      - company_address
+      - company_name
+      - gst_number
+      - state_name
+    ChallanReceiver:
+      type: object
+      description: Output shape for the consignee block (schema only).
+      properties:
+        company_name:
+          type: string
+        gst_number:
+          type: string
+        address:
+          $ref: '#/components/schemas/ChallanAddress'
+        contact_person_name:
+          type: string
+        contact_person_number:
+          type: string
+      required:
+      - address
+      - company_name
+      - contact_person_name
+      - contact_person_number
+      - gst_number
     CheckTodaysInventoryPayload:
       type: object
       description: Output shape for the readiness report.
@@ -3478,6 +3712,93 @@ components:
       required:
       - id
       - name
+    DispatchChallanItem:
+      type: object
+      description: Output shape for one challan (schema only).
+      properties:
+        order_public_id:
+          type: string
+        our_details:
+          $ref: '#/components/schemas/ChallanParty'
+        receiver_details:
+          $ref: '#/components/schemas/ChallanReceiver'
+        hsn_code:
+          type: string
+        financial_year:
+          type: string
+          description: Indian FY, e.g. "2026-2027".
+        dispatch:
+          $ref: '#/components/schemas/ChallanDispatch'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChallanLine'
+        item_count:
+          type: integer
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+      required:
+      - dispatch
+      - financial_year
+      - hsn_code
+      - item_count
+      - items
+      - order_public_id
+      - our_details
+      - receiver_details
+      - total_amount
+      - total_packets
+    DispatchChallanPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DispatchChallanItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    DispatchItemLotRequest:
+      type: object
+      description: The lot number for one line of the order being dispatched.
+      properties:
+        product_packaging_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        lot_number:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+      - lot_number
+      - product_packaging_public_id
     DispatchModeEnum:
       enum:
       - AGENCY
@@ -3511,10 +3832,16 @@ components:
           type: string
           minLength: 1
           maxLength: 32
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DispatchItemLotRequest'
+          description: One lot number per line of the order; every line must appear.
       required:
       - driver_name
       - driver_number
       - from_city_id
+      - items
       - vehicle_number
     FilterCatalogueEntry:
       type: object
@@ -5127,6 +5454,17 @@ components:
           description: Map of product-packaging public_id to its bag count.
       required:
       - counts
+    UploadLRNumberRequest:
+      type: object
+      description: Request validation for recording an LR number.
+      properties:
+        lr_number:
+          type: string
+          minLength: 1
+          description: The transporter's consignment note number.
+          maxLength: 64
+      required:
+      - lr_number
     UserRef:
       type: object
       description: Swagger schema for a compact ``{id, name}`` user reference.

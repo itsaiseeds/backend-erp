@@ -20,7 +20,15 @@ definition. ``from_city_id`` is still an input until there is a warehouse to
 default it from.
 
 The transporter's ``lr_number`` is not accepted here -- it is issued after
-collection, so every agency dispatch starts with it blank.
+collection, so every agency dispatch starts with it blank. It is recorded later
+by ``POST /api/sales-admin/upload-lr-number/<public_id>``.
+
+``items`` is the one addition to the four: a **lot number per line**, keyed by
+``product_packaging_public_id`` (the id ``GET /order/<public_id>`` hands back for
+each line). It must name every line of the order exactly once -- the dispatch
+writes the order's challan, and a challan that cannot say which batch a bag came
+from is not a challan. Which packaging is which is checked against the order
+itself, in ``DispatchOperations``.
 """
 
 from __future__ import annotations
@@ -37,6 +45,25 @@ from authentication.validators import validate_phone_number
 
 from .GetOrderView import ORDER_PUBLIC_ID_PARAMETER
 from .OrderTransitionView import OrderTransitionView
+
+
+class DispatchItemLotSerializer(serializers.Serializer):
+    """The lot number for one line of the order being dispatched."""
+
+    product_packaging_public_id = serializers.CharField(
+        max_length=20,
+        error_messages={
+            "blank": "product_packaging_public_id is required.",
+            "required": "product_packaging_public_id is required.",
+        },
+    )
+    lot_number = serializers.CharField(
+        max_length=64,
+        error_messages={
+            "blank": "lot_number is required.",
+            "required": "lot_number is required.",
+        },
+    )
 
 
 class DispatchOrderSerializer(serializers.Serializer):
@@ -74,6 +101,25 @@ class DispatchOrderSerializer(serializers.Serializer):
             "blank": "vehicle_number is required.",
         },
     )
+    items = DispatchItemLotSerializer(
+        many=True,
+        allow_empty=False,
+        error_messages={"required": "items is required."},
+        help_text="One lot number per line of the order; every line must appear.",
+    )
+
+    def validate_items(self, value):
+        """Reject a packaging listed twice -- one lot number per line, no more.
+
+        Whether the list *covers* the order is not checked here: that needs the
+        order, which the serializer does not have. ``dispatch_order`` does it.
+        """
+        public_ids = [item["product_packaging_public_id"] for item in value]
+        if len(set(public_ids)) != len(public_ids):
+            raise serializers.ValidationError(
+                "The same product packaging is listed twice."
+            )
+        return value
 
 
 class DispatchOrderView(OrderTransitionView):
@@ -102,4 +148,8 @@ class DispatchOrderView(OrderTransitionView):
             driver_name=data["driver_name"],
             driver_number=data["driver_number"],
             vehicle_number=data["vehicle_number"],
+            lot_numbers={
+                item["product_packaging_public_id"]: item["lot_number"]
+                for item in data["items"]
+            },
         )

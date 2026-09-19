@@ -315,9 +315,44 @@ the request: an order carrying a `transport_agency` goes by that carrier and one
 without it goes on our own vehicle -- the same rule `dispatch_mode` reports on
 every order payload. An agency dispatch's `lr_number` is **optional**, because
 the transporter usually issues the consignment note after collection; it is
-stored blank and filled in later. A private dispatch requires `vehicle_number`
-and `driver_number`. Fields belonging to the other kind are refused rather than
-ignored.
+stored blank and filled in later by `POST upload-lr-number/<public_id>`. A
+private dispatch requires `vehicle_number` and `driver_number`. Fields belonging
+to the other kind are refused rather than ignored.
+
+`dispatch-order` also takes `items` — **one lot number per line**, keyed by
+`product_packaging_public_id` (the id `GET order/<public_id>` hands back for each
+line), which must name every line of the order exactly once. That is what writes
+the order's **challan**: a `DispatchEntry` (`DE-…`, one per order) plus a
+`DispatchEntryItem` per line. The entry **snapshots** the receiver — the client's
+address and primary contact as they stood at dispatch — so a challan reprinted
+next year still says what went out with the goods. Re-dispatching an order
+rewrites the same entry in place rather than making a second one, so `DE-…` names
+that order's challan for as long as the order lives.
+
+## Dispatch challans
+
+`POST /api/sales-admin/upload-lr-number/<public_id>` records the transporter's
+consignment note on the order's `DispatchDetails`. **A private dispatch is a
+400**: the number identifies a third party's consignment, and when the goods went
+on our own vehicle there is no third party to issue one. The challan reads it
+through `DispatchEntry.lr_number` rather than storing a second copy.
+
+`GET /api/sales-admin/dispatch-challans/` lists dispatched orders whose challan
+is complete, each row being the printable challan itself: our consignor block
+(`aggregator/CompanyDetails.py` — placeholder values until the real registration
+details land), the snapshotted consignee, a hard-coded HSN code, the Indian
+financial year (April–March, so `2026-2027`), the journey and every lot-numbered
+line. What "complete" means depends on who carried the goods: an **agency**
+dispatch appears only once its LR is recorded, while a **private** one appears
+straight away — there is no note to wait for. Either way the order must still
+**be** dispatched (DISPATCHED or DELIVERED): `revert-dispatch` rewinds the status
+but leaves the dispatch rows attached, so the status is what takes a reverted
+order off the list.
+
+Unlike `orders/`, its **date window is required**, and it filters on
+`dispatch_entry.dispatched_at` — a challan belongs to the period the goods left
+in, not the period the order was booked in. Filter by `?client=` / `?city_id=`
+(destination), sort by `dispatch_date` (default, newest first) or `created_at`.
 
 `verify-order` is gated on **today's** stock count being complete and on every
 bag having enough available stock; the check and the status change are one
