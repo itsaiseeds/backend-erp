@@ -136,7 +136,30 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/upload-lr-number/<str:public_id>": ("UploadLRNumberView", SESSION_ADMIN),
     "api/sales-admin/verify-order/<str:public_id>": ("VerifyOrderView", SESSION_ADMIN),
     "api/sales-admin/get-stock/<str:public_id>": ("StockView", SESSION_ADMIN),
+    "api/sales-admin/inward-other-material/<str:public_id>": (
+        "UpdateInwardOtherMaterialView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/inward-other-materials": ("InwardOtherMaterialsView", SESSION_ADMIN),
+    "api/sales-admin/inward-raw-material/<str:public_id>": (
+        "UpdateInwardRawMaterialView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/inward-raw-materials": ("InwardRawMaterialsView", SESSION_ADMIN),
     "api/sales-admin/loose-stock": ("LooseStockView", SESSION_ADMIN),
+    "api/sales-admin/other-material-recipe/<str:public_id>": (
+        "DeleteOtherMaterialRecipeView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/other-material-recipes": ("OtherMaterialRecipesView", SESSION_ADMIN),
+    "api/sales-admin/other-material-stock": ("OtherMaterialStockView", SESSION_ADMIN),
+    "api/sales-admin/other-material-types": ("OtherMaterialTypesView", SESSION_ADMIN),
+    "api/sales-admin/other-material-types/<int:id>": (
+        "UpdateOtherMaterialTypeView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/parties": ("PartiesView", SESSION_ADMIN),
+    "api/sales-admin/parties/<int:id>": ("UpdatePartyView", SESSION_ADMIN),
     "api/sales-admin/product-packagings": ("ProductPackagingsView", SESSION_ADMIN),
     "api/sales-admin/product-packagings/<str:public_id>": (
         "UpdateProductPackagingView",
@@ -144,6 +167,7 @@ EXPECTED_CONTRACTS = {
     ),
     "api/sales-admin/products": ("ProductsView", SESSION_ADMIN),
     "api/sales-admin/products/<str:public_id>": ("UpdateProductView", SESSION_ADMIN),
+    "api/sales-admin/raw-material-stock": ("RawMaterialStockView", SESSION_ADMIN),
     "api/sales-admin/sales-people": ("SalesPeopleView", SESSION_ADMIN),
     "api/sales-admin/sales-people/<int:id>": ("UpdateSalesPersonView", SESSION_ADMIN),
     "api/sales-admin/update-client/": ("UpdateClientView", SESSION_ADMIN),

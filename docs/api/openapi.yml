@@ -1062,6 +1062,259 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
           description: ''
+  /api/sales-admin/inward-other-material/{public_id}:
+    patch:
+      operationId: api_sales_admin_inward_other_material_partial_update
+      description: Confirm a lot unchanged or soft-delete it (app admin only).
+      summary: Update an inward other-material lot (no writable fields)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_inward_other_material_destroy
+      description: Confirm a lot unchanged or soft-delete it (app admin only).
+      summary: Delete an inward other-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/inward-other-materials:
+    get:
+      operationId: sales_admin_inward_other_materials_list
+      description: List (GET) or create (POST) inward other-material lots (app admin
+        only).
+      summary: List inward other-material lots (filter by party / material type /
+        product, sortable)
+      parameters:
+      - in: query
+        name: material_type
+        schema:
+          type: string
+        description: Material type id(s) (see the recipe). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see the recipe). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, party, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_inward_other_materials_create
+      description: List (GET) or create (POST) inward other-material lots (app admin
+        only).
+      summary: Create an inward other-material lot
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialPayload'
+          description: ''
+  /api/sales-admin/inward-raw-material/{public_id}:
+    patch:
+      operationId: api_sales_admin_inward_raw_material_partial_update
+      description: Update the lifecycle or soft-delete a raw-material lot (app admin
+        only).
+      summary: Update an inward raw-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_inward_raw_material_destroy
+      description: Update the lifecycle or soft-delete a raw-material lot (app admin
+        only).
+      summary: Delete an inward raw-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/inward-raw-materials:
+    get:
+      operationId: sales_admin_inward_raw_materials_list
+      description: List (GET) or create (POST) inward raw-material lots (app admin
+        only).
+      summary: List inward raw-material lots (filter by product / party / status,
+        sortable)
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s). Comma-separated (any match); AND-ed with
+          the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, product, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Lot status (lab_testing / in_use). Comma-separated (any match);
+          AND-ed with the other filters.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_inward_raw_materials_create
+      description: List (GET) or create (POST) inward raw-material lots (app admin
+        only).
+      summary: Create an inward raw-material lot
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: ''
   /api/sales-admin/loose-stock:
     get:
       operationId: api_sales_admin_loose_stock_retrieve
@@ -1166,6 +1419,329 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminOrderListPage'
           description: ''
+  /api/sales-admin/other-material-recipe/{public_id}:
+    delete:
+      operationId: api_sales_admin_other_material_recipe_destroy
+      description: Delete a single other material recipe (app admin only).
+      summary: Delete an other material recipe
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/other-material-recipes:
+    get:
+      operationId: sales_admin_other_material_recipes_list
+      description: List (GET) or create (POST) other material recipes (app admin only).
+      summary: List other material recipes (filter by product / material type, sortable)
+      parameters:
+      - in: query
+        name: material_type
+        schema:
+          type: string
+        description: Material type id(s). Comma-separated (any match); AND-ed with
+          the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s). Comma-separated (any match); AND-ed with
+          the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (product, packet_weight, created_at);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_other_material_recipes_create
+      description: List (GET) or create (POST) other material recipes (app admin only).
+      summary: Create an other material recipe
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecipeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateRecipeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateRecipeRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipePayload'
+          description: ''
+  /api/sales-admin/other-material-stock:
+    get:
+      operationId: api_sales_admin_other_material_stock_retrieve
+      description: Read the other-material on-hand position (app admin only).
+      summary: Other-material on-hand stock, per material type
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtherMaterialStock'
+          description: ''
+  /api/sales-admin/other-material-types:
+    get:
+      operationId: api_sales_admin_other_material_types_list
+      description: List (GET) or create (POST) other material types (app admin only).
+      summary: List other material types
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OtherMaterialTypePayload'
+          description: ''
+    post:
+      operationId: api_sales_admin_other_material_types_create
+      description: List (GET) or create (POST) other material types (app admin only).
+      summary: Create an other material type
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOtherMaterialTypeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateOtherMaterialTypeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateOtherMaterialTypeRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtherMaterialTypePayload'
+          description: ''
+  /api/sales-admin/other-material-types/{id}:
+    patch:
+      operationId: api_sales_admin_other_material_types_partial_update
+      description: Update or delete a single other material type (app admin only).
+      summary: Update an other material type
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOtherMaterialTypeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOtherMaterialTypeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOtherMaterialTypeRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtherMaterialTypePayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_other_material_types_destroy
+      description: Update or delete a single other material type (app admin only).
+      summary: Delete an other material type
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/parties:
+    get:
+      operationId: sales_admin_parties_list
+      description: List (GET) or create (POST) parties (app admin only).
+      summary: List parties (filter by city / name, sortable)
+      parameters:
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) of the party's city. Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: Case-insensitive substring of the party name. Single value; AND-ed
+          with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (name, created_at); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartyListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_parties_create
+      description: List (GET) or create (POST) parties (app admin only).
+      summary: Create a party
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePartyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreatePartyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreatePartyRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartyPayload'
+          description: ''
+  /api/sales-admin/parties/{id}:
+    patch:
+      operationId: api_sales_admin_parties_partial_update
+      description: Update or delete a single party (app admin only).
+      summary: Update a party
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePartyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePartyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePartyRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartyPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_parties_destroy
+      description: Update or delete a single party (app admin only).
+      summary: Delete a party
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/sales-admin/product-packagings:
     get:
       operationId: api_sales_admin_product_packagings_list
@@ -1356,6 +1932,22 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/raw-material-stock:
+    get:
+      operationId: api_sales_admin_raw_material_stock_retrieve
+      description: Read the incoming raw-material position (app admin only).
+      summary: Raw-material incoming stock, per product
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
   /api/sales-admin/reject-order/{public_id}:
     post:
       operationId: api_sales_admin_reject_order_create
@@ -2874,6 +3466,53 @@ components:
           maxLength: 255
       required:
       - name
+    CreateInwardOtherMaterialRequest:
+      type: object
+      description: |-
+        Request validation for booking a new other-material lot.
+
+        ``effective_date`` is absent on purpose: booking stamps it with today
+        (see ``InwardOtherMaterialsView.post``).
+      properties:
+        party:
+          type: integer
+        recipe:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Amount received, in the recipe's material unit.
+      required:
+      - party
+      - quantity
+      - recipe
+    CreateInwardRawMaterialRequest:
+      type: object
+      description: |-
+        Request validation for booking a new raw-material lot.
+
+        ``status`` is not accepted: every lot starts ``lab_testing`` and is moved to
+        ``in_use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
+        that flip and is deliberately absent here.
+      properties:
+        product:
+          type: integer
+        party:
+          type: integer
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms received from the party.
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - party
+      - product
+      - quantity_kg
     CreateMultiSelectBagOrderRequest:
       type: object
       description: |-
@@ -2912,6 +3551,32 @@ components:
       - client_address_id
       - client_public_id
       - items
+    CreateOtherMaterialTypeRequest:
+      type: object
+      description: Request validation for creating a new ``OtherMaterialType``.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        unit_type:
+          $ref: '#/components/schemas/UnitTypeEnum'
+      required:
+      - name
+      - unit_type
+    CreatePartyRequest:
+      type: object
+      description: Request validation for creating a new ``Party``.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        city:
+          type: integer
+      required:
+      - city
+      - name
     CreateProductPackagingRequest:
       type: object
       description: |-
@@ -2976,6 +3641,30 @@ components:
       - name
       - selling_price
       - stage
+    CreateRecipeRequest:
+      type: object
+      description: Request validation for creating a new ``OtherMaterialRecipe``.
+      properties:
+        product:
+          type: integer
+        material_type:
+          type: integer
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+          description: Weight of the covered packet, in kilograms (the product variant).
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Multiples of the material per pack, in the material type's
+            unit (2 leaflets, 2.000 kg cover, 5 litre).
+      required:
+      - material_type
+      - packet_weight
+      - product
+      - quantity
     CreateSalesPersonRequest:
       type: object
       description: Request validation for creating a new ``SalesPerson`` (city only).
@@ -3197,6 +3886,187 @@ components:
       required:
       - label
       - value
+    InwardOtherMaterialListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InwardOtherMaterialPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    InwardOtherMaterialPartyRef:
+      type: object
+      description: Output shape for the ``party`` reference on a lot.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    InwardOtherMaterialPayload:
+      type: object
+      description: Output shape for one inward-other-material lot.
+      properties:
+        public_id:
+          type: string
+        recipe:
+          $ref: '#/components/schemas/InwardOtherMaterialRecipeRef'
+        party:
+          $ref: '#/components/schemas/InwardOtherMaterialPartyRef'
+        quantity:
+          type: string
+          description: Amount received, in the recipe's unit.
+        effective_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - effective_date
+      - party
+      - public_id
+      - quantity
+      - recipe
+    InwardOtherMaterialProductRef:
+      type: object
+      description: Output shape for the ``product`` reference inside a recipe ref.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
+    InwardOtherMaterialRecipeRef:
+      type: object
+      description: Output shape for the ``recipe`` reference on a lot.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/InwardOtherMaterialProductRef'
+        packet_weight:
+          type: string
+          description: Weight of the covered packet, in kg.
+      required:
+      - packet_weight
+      - product
+      - public_id
+    InwardRawMaterialListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InwardRawMaterialPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    InwardRawMaterialPartyRef:
+      type: object
+      description: Output shape for the ``party`` reference on a lot.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    InwardRawMaterialPayload:
+      type: object
+      description: Output shape for one raw-material lot.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/InwardRawMaterialProductRef'
+        party:
+          $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        quantity_kg:
+          type: string
+          description: Kilograms received.
+        status:
+          type: string
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+        effective_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - effective_date
+      - lab_sampling_date
+      - party
+      - product
+      - public_id
+      - quantity_kg
+      - status
+    InwardRawMaterialProductRef:
+      type: object
+      description: Output shape for the ``product`` reference on a lot.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
     LoginRequest:
       type: object
       properties:
@@ -3689,6 +4559,62 @@ components:
       - total_packets
       - transport_agency
       - verified_at
+    OtherMaterialStock:
+      type: object
+      description: Output shape for the whole other-material position.
+      properties:
+        as_of:
+          type: string
+          format: date
+          description: The day the numbers are as of.
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/OtherMaterialStockLine'
+      required:
+      - as_of
+      - lines
+    OtherMaterialStockLine:
+      type: object
+      description: Output shape for one material type's on-hand position.
+      properties:
+        material_type:
+          $ref: '#/components/schemas/OtherMaterialTypeRef'
+        on_hand:
+          type: string
+          description: Sum of units with a reached effective date.
+      required:
+      - material_type
+      - on_hand
+    OtherMaterialTypePayload:
+      type: object
+      description: Output shape for one material-type row.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+      required:
+      - id
+      - name
+      - unit_type
+    OtherMaterialTypeRef:
+      type: object
+      description: Output shape for the ``material_type`` reference on a line.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+          description: Count / kg / litre -- the unit of on_hand.
+      required:
+      - id
+      - name
+      - unit_type
     PackagingPayload:
       type: object
       description: Output shape for one bag (``ProductOperations.packaging_payload``).
@@ -3745,6 +4671,65 @@ components:
       - packets
       - product
       - public_id
+    PartyCityRef:
+      type: object
+      description: Output shape for the ``city`` reference on a party.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    PartyListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PartyPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    PartyPayload:
+      type: object
+      description: Output shape for one party row.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        city:
+          $ref: '#/components/schemas/PartyCityRef'
+      required:
+      - city
+      - id
+      - name
     PatchedUpdateAdminRequest:
       type: object
       description: |-
@@ -3778,6 +4763,22 @@ components:
           type: string
           minLength: 1
           maxLength: 255
+    PatchedUpdateInwardRawMaterialRequest:
+      type: object
+      description: |-
+        Request validation for updating a raw-material lot (all fields optional).
+
+        Only ``lab_sampling_date`` and ``status`` are accepted: flipping to
+        ``in_use`` stamps the effective date with today, reverting to
+        ``lab_testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
+        are immutable. Any unknown key is ignored.
+      properties:
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          $ref: '#/components/schemas/UpdateInwardRawMaterialStatusEnum'
     PatchedUpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'
@@ -3816,11 +4817,32 @@ components:
           description: A remark to add to the order. Appended as a new line -- it
             never replaces what is already there.
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/UpdateOrderStatusEnum'
         items:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemWriteRequest'
+    PatchedUpdateOtherMaterialTypeRequest:
+      type: object
+      description: Request validation for updating an ``OtherMaterialType`` (all fields
+        optional).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        unit_type:
+          $ref: '#/components/schemas/UnitTypeEnum'
+    PatchedUpdatePartyRequest:
+      type: object
+      description: Request validation for updating a ``Party`` (all fields optional).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        city:
+          type: integer
     PatchedUpdateProductPackagingRequest:
       type: object
       description: Request validation for updating a ``ProductPackaging`` (all fields
@@ -4027,6 +5049,38 @@ components:
       required:
       - name
       - public_id
+    RawMaterialStock:
+      type: object
+      description: Output shape for the whole incoming raw-material position.
+      properties:
+        as_of:
+          type: string
+          format: date
+          description: The day the numbers are as of.
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/RawMaterialStockLine'
+      required:
+      - as_of
+      - lines
+    RawMaterialStockLine:
+      type: object
+      description: Output shape for one product's incoming position.
+      properties:
+        product:
+          type: string
+          description: Product public id.
+        name:
+          type: string
+          description: Product name.
+        incoming_kg:
+          type: string
+          description: Sum of in-use KG with a reached effective date.
+      required:
+      - incoming_kg
+      - name
+      - product
     ReauthenticateResponse:
       type: object
       description: |-
@@ -4062,6 +5116,87 @@ components:
       - name
       - phone_number
       - role
+    RecipeListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipePayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    RecipeMaterialTypeRef:
+      type: object
+      description: Output shape for the ``material_type`` reference on a recipe.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+      required:
+      - id
+      - name
+      - unit_type
+    RecipePayload:
+      type: object
+      description: Output shape for one recipe row.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/RecipeProductRef'
+        material_type:
+          $ref: '#/components/schemas/RecipeMaterialTypeRef'
+        packet_weight:
+          type: string
+          description: Weight of the covered packet, in kg.
+        quantity:
+          type: string
+          description: Amount per pack, in the material type's unit.
+      required:
+      - material_type
+      - packet_weight
+      - product
+      - public_id
+      - quantity
+    RecipeProductRef:
+      type: object
+      description: Output shape for the ``product`` reference on a recipe.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
     SalesPersonPayload:
       type: object
       description: Swagger schema for one sales person row (city only).
@@ -4173,24 +5308,6 @@ components:
       - cities
       - id
       - name
-    StatusEnum:
-      enum:
-      - BOOKED
-      - UNDER_REVIEW
-      - CONFIRMED
-      - DISPATCHED
-      - DELIVERED
-      - ON_HOLD
-      - REJECTED
-      type: string
-      description: |-
-        * `BOOKED` - BOOKED
-        * `UNDER_REVIEW` - UNDER_REVIEW
-        * `CONFIRMED` - CONFIRMED
-        * `DISPATCHED` - DISPATCHED
-        * `DELIVERED` - DELIVERED
-        * `ON_HOLD` - ON_HOLD
-        * `REJECTED` - REJECTED
     StockAdmin:
       type: object
       description: Output shape for one admin authorised to record the daily count.
@@ -4252,6 +5369,16 @@ components:
       required:
       - id
       - name
+    UnitTypeEnum:
+      enum:
+      - count
+      - kg
+      - litre
+      type: string
+      description: |-
+        * `count` - count
+        * `kg` - kg
+        * `litre` - litre
     UpdateClientRequest:
       type: object
       description: Request validation for a sales person's client update.
@@ -4277,6 +5404,14 @@ components:
       - contacts
       - public_id
       - transport_agencies
+    UpdateInwardRawMaterialStatusEnum:
+      enum:
+      - lab_testing
+      - in_use
+      type: string
+      description: |-
+        * `lab_testing` - lab testing
+        * `in_use` - in use
     UpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'
@@ -4288,6 +5423,24 @@ components:
           description: Loose lines, one per (product, packet_weight) pair.
       required:
       - counts
+    UpdateOrderStatusEnum:
+      enum:
+      - BOOKED
+      - UNDER_REVIEW
+      - CONFIRMED
+      - DISPATCHED
+      - DELIVERED
+      - ON_HOLD
+      - REJECTED
+      type: string
+      description: |-
+        * `BOOKED` - BOOKED
+        * `UNDER_REVIEW` - UNDER_REVIEW
+        * `CONFIRMED` - CONFIRMED
+        * `DISPATCHED` - DISPATCHED
+        * `DELIVERED` - DELIVERED
+        * `ON_HOLD` - ON_HOLD
+        * `REJECTED` - REJECTED
     UpdateTodaysInventoryRequest:
       type: object
       description: 'Request validation: a map of packaging ``public_id`` → today''s
