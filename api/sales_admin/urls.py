@@ -9,16 +9,24 @@ from django.urls import path
 from .AdminsView import AdminsView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .CropsView import CropsView
+from .DeleteOtherMaterialRecipeView import DeleteOtherMaterialRecipeView
 from .DispatchOrderView import DispatchOrderView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
 from .HoldOrderView import HoldOrderView
+from .InwardOtherMaterialsView import InwardOtherMaterialsView
+from .InwardRawMaterialsView import InwardRawMaterialsView
 from .LogoutView import LogoutView
 from .LooseStockView import LooseStockView
+from .OtherMaterialRecipesView import OtherMaterialRecipesView
+from .OtherMaterialStockView import OtherMaterialStockView
+from .OtherMaterialTypesView import OtherMaterialTypesView
+from .PartiesView import PartiesView
 from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
+from .RawMaterialStockView import RawMaterialStockView
 from .RejectOrderView import RejectOrderView
 from .RevertDispatchView import RevertDispatchView
 from .SalesPeopleView import SalesPeopleView
@@ -27,8 +35,12 @@ from .UnverifyOrderView import UnverifyOrderView
 from .UpdateAdminView import UpdateAdminView
 from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
+from .UpdateInwardOtherMaterialView import UpdateInwardOtherMaterialView
+from .UpdateInwardRawMaterialView import UpdateInwardRawMaterialView
 from .UpdateLooseStockView import UpdateLooseStockView
 from .UpdateOrderView import UpdateOrderView
+from .UpdateOtherMaterialTypeView import UpdateOtherMaterialTypeView
+from .UpdatePartyView import UpdatePartyView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateSalesPersonView import UpdateSalesPersonView
@@ -105,4 +117,60 @@ urlpatterns = [
     ),
     path("hold-order/<str:public_id>", HoldOrderView.as_view(), name="hold-order"),
     path("reject-order/<str:public_id>", RejectOrderView.as_view(), name="reject-order"),
+    # Inward movement: master data, bookings, recipe and stock positions. The
+    # lookups (parties, other-material-types) are id-addressed like ``crops``;
+    # the bookable rows (inward-raw-material, inward-other-material) and recipes
+    # are public-id-addressed like ``products``.
+    path("parties", PartiesView.as_view(), name="parties"),
+    path("parties/<int:id>", UpdatePartyView.as_view(), name="update-party"),
+    path(
+        "other-material-types",
+        OtherMaterialTypesView.as_view(),
+        name="other-material-types",
+    ),
+    path(
+        "other-material-types/<int:id>",
+        UpdateOtherMaterialTypeView.as_view(),
+        name="update-other-material-type",
+    ),
+    path(
+        "other-material-recipes",
+        OtherMaterialRecipesView.as_view(),
+        name="other-material-recipes",
+    ),
+    path(
+        "other-material-recipe/<str:public_id>",
+        DeleteOtherMaterialRecipeView.as_view(),
+        name="delete-other-material-recipe",
+    ),
+    path(
+        "inward-raw-materials",
+        InwardRawMaterialsView.as_view(),
+        name="inward-raw-materials",
+    ),
+    path(
+        "inward-raw-material/<str:public_id>",
+        UpdateInwardRawMaterialView.as_view(),
+        name="update-inward-raw-material",
+    ),
+    path(
+        "inward-other-materials",
+        InwardOtherMaterialsView.as_view(),
+        name="inward-other-materials",
+    ),
+    path(
+        "inward-other-material/<str:public_id>",
+        UpdateInwardOtherMaterialView.as_view(),
+        name="update-inward-other-material",
+    ),
+    path(
+        "raw-material-stock",
+        RawMaterialStockView.as_view(),
+        name="raw-material-stock",
+    ),
+    path(
+        "other-material-stock",
+        OtherMaterialStockView.as_view(),
+        name="other-material-stock",
+    ),
 ]

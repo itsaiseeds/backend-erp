@@ -1017,6 +1017,146 @@ CREATE INDEX IF NOT EXISTS aggregator_customorderitem_is_deleted_idx ON public.a
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_created_by_id_idx ON public.aggregator_customorderitem USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_deleted_by_id_idx ON public.aggregator_customorderitem USING btree (deleted_by_id);
 
+-- aggregator_party ------------------------------------------------------------
+-- A supplier/party that inward materials (raw or other) come from. Lookup
+-- master data: name is unique within its city. Referenced by
+-- aggregator_inwardrawmaterial and aggregator_inwardothermaterial.
+CREATE TABLE IF NOT EXISTS public.aggregator_party (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	"name" varchar(255) NOT NULL,
+	city_id int8 NOT NULL,
+	CONSTRAINT aggregator_party_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_party_name_city UNIQUE (name, city_id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_party_city_id_idx ON public.aggregator_party USING btree (city_id);
+CREATE INDEX IF NOT EXISTS aggregator_party_is_deleted_idx ON public.aggregator_party USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_party_created_by_id_idx ON public.aggregator_party USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_party_deleted_by_id_idx ON public.aggregator_party USING btree (deleted_by_id);
+
+-- aggregator_inwardrawmaterial ------------------------------------------------
+-- Inward movement of raw material (product replenishment). The entry's date is
+-- created_at; flipping status to 'in_use' stamps effective_date with today and,
+-- once that date has come, the lot counts toward stock. status='lab_testing'
+-- rows are held back until the lab signs off.
+CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	effective_date date NULL,
+	lab_sampling_date date NULL,
+	product_id int8 NOT NULL,
+	party_id int8 NOT NULL,
+	quantity_kg numeric(10, 3) NOT NULL,
+	status varchar(16) NOT NULL,
+	CONSTRAINT aggregator_inwardrawmaterial_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_inwardrawmaterial_public_id_key UNIQUE (public_id),
+	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0),
+	CONSTRAINT aggregator_inwardrawmaterial_status_check CHECK (status IN ('lab_testing', 'in_use'))
+);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_public_id_like ON public.aggregator_inwardrawmaterial USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_effective_date_idx ON public.aggregator_inwardrawmaterial USING btree (effective_date);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_status_idx ON public.aggregator_inwardrawmaterial USING btree (status);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_product_id_idx ON public.aggregator_inwardrawmaterial USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_party_id_idx ON public.aggregator_inwardrawmaterial USING btree (party_id);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_is_deleted_idx ON public.aggregator_inwardrawmaterial USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_created_by_id_idx ON public.aggregator_inwardrawmaterial USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_deleted_by_id_idx ON public.aggregator_inwardrawmaterial USING btree (deleted_by_id);
+
+-- aggregator_othermaterialtype ---------------------------------------------------
+-- Master list of "other material" kinds (bag_outer_cover, packet_outer_cover,
+-- leaflets, ...). unit_type is the unit of measure (count / kg / litre) for
+-- quantities of this material; a recipe referencing the type inherits it.
+CREATE TABLE IF NOT EXISTS public.aggregator_othermaterialtype (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	"name" varchar(255) NOT NULL,
+	unit_type varchar(16) NOT NULL,
+	CONSTRAINT aggregator_othermaterialtype_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_othermatertype_name UNIQUE (name),
+	CONSTRAINT aggregator_othermaterialtype_unit_type_check CHECK (unit_type IN ('count', 'kg', 'litre'))
+);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialtype_is_deleted_idx ON public.aggregator_othermaterialtype USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialtype_created_by_id_idx ON public.aggregator_othermaterialtype USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialtype_deleted_by_id_idx ON public.aggregator_othermaterialtype USING btree (deleted_by_id);
+
+-- aggregator_othermaterialrecipe --------------------------------------------------
+-- One product pack's requirement of one other material. quantity is the amount
+-- of the material per pack, in the material type's unit. packet_weight
+-- distinguishes product variants that need different materials (a 2 kg and a
+-- 4 kg bag of the same product get 2.000 and 4.000 rows). Recipes are never
+-- edited in place: a change means soft-deleting the old row and creating a new
+-- one, so inward entries keep the version they were booked against.
+CREATE TABLE IF NOT EXISTS public.aggregator_othermaterialrecipe (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	product_id int8 NOT NULL,
+	material_type_id int8 NOT NULL,
+	packet_weight numeric(8,3) NOT NULL,
+	quantity numeric(10, 3) NOT NULL,
+	CONSTRAINT aggregator_othermaterialrecipe_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_othermaterialrecipe_public_id_key UNIQUE (public_id),
+	CONSTRAINT uniq_othermaterrecipe_product_type_weight UNIQUE (product_id, material_type_id, packet_weight),
+	CONSTRAINT ck_othermaterrecipe_positive CHECK (packet_weight > 0 AND quantity > 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_public_id_like ON public.aggregator_othermaterialrecipe USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_product_id_idx ON public.aggregator_othermaterialrecipe USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_material_type_id_idx ON public.aggregator_othermaterialrecipe USING btree (material_type_id);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_is_deleted_idx ON public.aggregator_othermaterialrecipe USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_created_by_id_idx ON public.aggregator_othermaterialrecipe USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_deleted_by_id_idx ON public.aggregator_othermaterialrecipe USING btree (deleted_by_id);
+
+-- aggregator_inwardothermaterial --------------------------------------------------
+-- Inward movement of other (packing) materials. quantity is the amount
+-- received from the party, measured in the recipe's material unit. No status:
+-- other material is usable directly, and booking stamps effective_date with
+-- today so the entry counts toward on-hand stock from its arrival day.
+CREATE TABLE IF NOT EXISTS public.aggregator_inwardothermaterial (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	effective_date date NULL,
+	party_id int8 NOT NULL,
+	recipe_id int8 NOT NULL,
+	quantity numeric(10, 3) NOT NULL,
+	CONSTRAINT aggregator_inwardothermaterial_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_inwardothermaterial_public_id_key UNIQUE (public_id),
+	CONSTRAINT ck_inwardothermater_quantity_positive CHECK (quantity > 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_public_id_like ON public.aggregator_inwardothermaterial USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_effective_date_idx ON public.aggregator_inwardothermaterial USING btree (effective_date);
+CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_party_id_idx ON public.aggregator_inwardothermaterial USING btree (party_id);
+CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_recipe_id_idx ON public.aggregator_inwardothermaterial USING btree (recipe_id);
+CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_is_deleted_idx ON public.aggregator_inwardothermaterial USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_created_by_id_idx ON public.aggregator_inwardothermaterial USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_deleted_by_id_idx ON public.aggregator_inwardothermaterial USING btree (deleted_by_id);
+
 -- Foreign keys for the sales-domain tables ------------------------------------
 ALTER TABLE public.aggregator_status ADD CONSTRAINT aggregator_status_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_status ADD CONSTRAINT aggregator_status_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
@@ -1112,6 +1252,28 @@ ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customor
 ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_party ADD CONSTRAINT aggregator_party_city_id_fk FOREIGN KEY (city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_party ADD CONSTRAINT aggregator_party_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_party ADD CONSTRAINT aggregator_party_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_party_id_fk FOREIGN KEY (party_id) REFERENCES public.aggregator_party(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_othermaterialtype ADD CONSTRAINT aggregator_othermaterialtype_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_othermaterialtype ADD CONSTRAINT aggregator_othermaterialtype_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_othermaterialrecipe ADD CONSTRAINT aggregator_othermaterialrecipe_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_othermaterialrecipe ADD CONSTRAINT aggregator_othermaterialrecipe_material_type_id_fk FOREIGN KEY (material_type_id) REFERENCES public.aggregator_othermaterialtype(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_othermaterialrecipe ADD CONSTRAINT aggregator_othermaterialrecipe_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_othermaterialrecipe ADD CONSTRAINT aggregator_othermaterialrecipe_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_party_id_fk FOREIGN KEY (party_id) REFERENCES public.aggregator_party(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_recipe_id_fk FOREIGN KEY (recipe_id) REFERENCES public.aggregator_othermaterialrecipe(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 
 -- =============================================================================

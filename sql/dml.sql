@@ -52,6 +52,11 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(36, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(37, 'aggregator', 'stage');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(38, 'aggregator', 'loosestocksnapshot');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(39, 'aggregator', 'productdescriptionitem');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(40, 'aggregator', 'party');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(41, 'aggregator', 'inwardrawmaterial');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(42, 'aggregator', 'othermaterialtype');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(43, 'aggregator', 'othermaterialrecipe');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(44, 'aggregator', 'inwardothermaterial');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -197,6 +202,26 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(134, 'Can change product description item', 39, 'change_productdescriptionitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(135, 'Can delete product description item', 39, 'delete_productdescriptionitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(136, 'Can view product description item', 39, 'view_productdescriptionitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(137, 'Can add party', 40, 'add_party');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(138, 'Can change party', 40, 'change_party');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(139, 'Can delete party', 40, 'delete_party');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(140, 'Can view party', 40, 'view_party');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(141, 'Can add inward raw material', 41, 'add_inwardrawmaterial');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(142, 'Can change inward raw material', 41, 'change_inwardrawmaterial');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(143, 'Can delete inward raw material', 41, 'delete_inwardrawmaterial');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(144, 'Can view inward raw material', 41, 'view_inwardrawmaterial');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(145, 'Can add other material type', 42, 'add_othermaterialtype');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(146, 'Can change other material type', 42, 'change_othermaterialtype');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(147, 'Can delete other material type', 42, 'delete_othermaterialtype');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(148, 'Can view other material type', 42, 'view_othermaterialtype');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(149, 'Can add other material recipe', 43, 'add_othermaterialrecipe');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(150, 'Can change other material recipe', 43, 'change_othermaterialrecipe');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(151, 'Can delete other material recipe', 43, 'delete_othermaterialrecipe');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(152, 'Can view other material recipe', 43, 'view_othermaterialrecipe');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(153, 'Can add inward other material', 44, 'add_inwardothermaterial');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(154, 'Can change inward other material', 44, 'change_inwardothermaterial');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(155, 'Can delete inward other material', 44, 'delete_inwardothermaterial');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(156, 'Can view inward other material', 44, 'view_inwardothermaterial');
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)
@@ -250,6 +275,10 @@ INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, d
 
 INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(1, '2026-09-07 00:29:08.487', '2026-09-07 00:29:15.227', false, NULL, NULL, 1, 'PP-U4UYPFOF08NZ', 1, 1.000, 40, 4800.00);
 INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(2, '2026-09-07 00:29:29.899', '2026-09-07 00:29:29.904', false, NULL, NULL, 1, 'PP-5SVE39LY2XEI', 2, 1.500, 20, 5000.00);
+
+INSERT INTO public.aggregator_othermaterialtype (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name", unit_type) VALUES(1, '2026-09-07 00:30:00.000', '2026-09-07 00:30:00.002', false, NULL, NULL, 1, 'bag_outer_cover', 'kg');
+INSERT INTO public.aggregator_othermaterialtype (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name", unit_type) VALUES(2, '2026-09-07 00:30:00.100', '2026-09-07 00:30:00.102', false, NULL, NULL, 1, 'packet_outer_cover', 'kg');
+INSERT INTO public.aggregator_othermaterialtype (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name", unit_type) VALUES(3, '2026-09-07 00:30:00.200', '2026-09-07 00:30:00.202', false, NULL, NULL, 1, 'leaflets', 'count');
 -- -------------------------------------------------------------------------
 -- Sequence sync
 -- -------------------------------------------------------------------------
@@ -270,5 +299,6 @@ SELECT setval(pg_get_serial_sequence('public.aggregator_city', 'id'),           
 SELECT setval(pg_get_serial_sequence('public.aggregator_crop', 'id'),             (SELECT MAX(id) FROM public.aggregator_crop));
 SELECT setval(pg_get_serial_sequence('public.aggregator_product', 'id'),          (SELECT MAX(id) FROM public.aggregator_product));
 SELECT setval(pg_get_serial_sequence('public.aggregator_productpackaging', 'id'), (SELECT MAX(id) FROM public.aggregator_productpackaging));
+SELECT setval(pg_get_serial_sequence('public.aggregator_othermaterialtype', 'id'),    (SELECT MAX(id) FROM public.aggregator_othermaterialtype));
 
 COMMIT;
