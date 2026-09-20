@@ -29,6 +29,11 @@ class SidebarItems {
       icon: Icons.storefront_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.ORDERS,
+      label: AppStrings.ORDERS,
+      icon: Icons.receipt_long_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.PRODUCTS,
       label: AppStrings.PRODUCTS,
       icon: Icons.inventory_2_outlined,

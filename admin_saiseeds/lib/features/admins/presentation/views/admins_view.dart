@@ -10,8 +10,8 @@ import '../../../../core/widgets/feedback/confirmation_dialog.dart';
 import '../../data/admins_repository.dart';
 import '../../data/models/admin_model.dart';
 import '../bloc/admins_cubit.dart';
-import '../widgets/admin_detail_dialog.dart';
 import '../widgets/admin_form_dialog.dart';
+import '../widgets/admin_record_dialog.dart';
 import '../widgets/admins_table.dart';
 
 class AdminsView extends StatelessWidget {
@@ -110,9 +110,8 @@ class _AdminsContentState extends State<_AdminsContent> {
             currentSortOrder: state.sortOrder,
             currentFilters: state.filters,
             onFetchData: _onFetchData,
-            onView: (admin) => AdminDetailDialog.show(context, admin),
-            onEdit: (admin) =>
-                AdminFormDialog.show(context, cubit: cubit, admin: admin),
+            onView: (admin) =>
+                AdminRecordDialog.show(context, admin, cubit: cubit),
             onDelete: _onDelete,
             emptyTitle: state.isEmptySource
                 ? AppStrings.ADMINS_EMPTY_STATE_TITLE

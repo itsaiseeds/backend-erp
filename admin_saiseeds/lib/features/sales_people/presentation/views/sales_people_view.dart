@@ -11,8 +11,8 @@ import '../../data/models/sales_person_model.dart';
 import '../../data/sales_people_repository.dart';
 import '../bloc/sales_people_cubit.dart';
 import '../widgets/sales_people_table.dart';
-import '../widgets/sales_person_detail_dialog.dart';
 import '../widgets/sales_person_form_dialog.dart';
+import '../widgets/sales_person_record_dialog.dart';
 
 class SalesPeopleView extends StatelessWidget {
   const SalesPeopleView({super.key});
@@ -111,12 +111,8 @@ class _SalesPeopleContentState extends State<_SalesPeopleContent> {
             currentSortOrder: state.sortOrder,
             currentFilters: state.filters,
             onFetchData: _onFetchData,
-            onView: (person) => SalesPersonDetailDialog.show(context, person),
-            onEdit: (person) => SalesPersonFormDialog.show(
-              context,
-              cubit: cubit,
-              salesPerson: person,
-            ),
+            onView: (person) =>
+                SalesPersonRecordDialog.show(context, person, cubit: cubit),
             onDelete: _onDelete,
             emptyTitle: state.isEmptySource
                 ? AppStrings.SALES_PEOPLE_EMPTY_STATE_TITLE

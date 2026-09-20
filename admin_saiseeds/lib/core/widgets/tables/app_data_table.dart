@@ -54,6 +54,7 @@ class AppDataTable<T> extends StatefulWidget {
 
   final List<String> sortByOptions;
   final List<String> filterByOptions;
+  final Set<String> lockedFilters;
   final String? currentSortBy;
   final String? currentSortOrder;
   final Map<String, String> currentFilters;
@@ -113,6 +114,7 @@ class AppDataTable<T> extends StatefulWidget {
     this.onFetchData,
     this.sortByOptions = const [],
     this.filterByOptions = const [],
+    this.lockedFilters = const {},
     this.currentSortBy,
     this.currentSortOrder,
     this.currentFilters = const {},
@@ -173,6 +175,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
   bool _isAtEnd = false;
   bool _isHoveringScroll = false;
   bool _hasResized = false;
+  double _appliedScaleFactor = 1.0;
 
   Set<String> get selectedIds => _selection.keys.toSet();
 
@@ -406,6 +409,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     if (index == -1) return;
 
     setState(() {
+      _bakeScaledWidths();
       _hasResized = true;
       final double current =
           _columnWidthOverrides[columnId] ?? _allColumns[index].width;
@@ -415,6 +419,16 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
         minWidth: ColumnResizeHandle.minWidthFor(columnId),
       );
     });
+  }
+
+  void _bakeScaledWidths() {
+    if (_hasResized || _appliedScaleFactor == 1.0) return;
+
+    for (final AppDataColumn col in _allColumns) {
+      _columnWidthOverrides[col.id] =
+          _effectiveWidth(col) * _appliedScaleFactor;
+    }
+    _appliedScaleFactor = 1.0;
   }
 
   double _effectiveWidth(AppDataColumn col) =>
@@ -459,6 +473,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
                   hintText: widget.searchHintText,
                   sortByOptions: widget.sortByOptions,
                   filterByOptions: widget.filterByOptions,
+                  lockedFilters: widget.lockedFilters,
                   filterValueOptions: widget.filterValueOptions,
                   getFilterValueLabel: widget.getFilterValueLabel,
                   isDateRangeFilter: widget.isDateRangeFilter,
@@ -628,6 +643,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     final double scaleFactor = needsFilling
         ? (maxWidth - dividersWidth) / preferredContentWidth
         : 1.0;
+    _appliedScaleFactor = scaleFactor;
     final double renderedWidth =
         (preferredContentWidth * scaleFactor) + dividersWidth;
 

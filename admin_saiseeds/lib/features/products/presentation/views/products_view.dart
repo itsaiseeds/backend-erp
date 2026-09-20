@@ -12,8 +12,8 @@ import '../../data/crops_repository.dart';
 import '../../data/models/product_model.dart';
 import '../../data/products_repository.dart';
 import '../bloc/products_cubit.dart';
-import '../widgets/product_detail_dialog.dart';
 import '../widgets/product_form_dialog.dart';
+import '../widgets/product_record_dialog.dart';
 import '../widgets/products_table.dart';
 
 class ProductsView extends StatelessWidget {
@@ -116,9 +116,8 @@ class _ProductsContentState extends State<_ProductsContent> {
             currentSortOrder: state.sortOrder,
             currentFilters: state.filters,
             onFetchData: _onFetchData,
-            onView: (product) => ProductDetailDialog.show(context, product),
-            onEdit: (product) =>
-                ProductFormDialog.show(context, cubit: cubit, product: product),
+            onView: (product) =>
+                ProductRecordDialog.show(context, product, cubit: cubit),
             onDelete: _onDelete,
             emptyTitle: state.isEmptySource
                 ? AppStrings.PRODUCTS_EMPTY_STATE_TITLE

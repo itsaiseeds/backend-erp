@@ -46,12 +46,8 @@ class _ImageViewerDialogState extends State<ImageViewerDialog> {
     final double clamped = next.clamp(_minScale, _maxScale);
     setState(() {
       _scale = clamped;
-      _controller.value = Matrix4.identity()..scaleByDouble(
-        clamped,
-        clamped,
-        clamped,
-        1,
-      );
+      _controller.value = Matrix4.identity()
+        ..scaleByDouble(clamped, clamped, clamped, 1);
     });
   }
 
@@ -102,8 +98,7 @@ class _ImageViewerDialogState extends State<ImageViewerDialog> {
                 minScale: _minScale,
                 maxScale: _maxScale,
                 onInteractionEnd: (_) {
-                  final double current =
-                      _controller.value.getMaxScaleOnAxis();
+                  final double current = _controller.value.getMaxScaleOnAxis();
                   if (current != _scale) setState(() => _scale = current);
                 },
                 child: Center(

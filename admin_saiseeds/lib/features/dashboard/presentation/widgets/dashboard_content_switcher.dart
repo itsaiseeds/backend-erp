@@ -6,6 +6,7 @@ import '../views/dashboard_overview_view.dart';
 import '../../../products/presentation/views/products_view.dart';
 import '../../../product_packagings/presentation/views/product_packagings_view.dart';
 import '../../../clients/presentation/views/clients_view.dart';
+import '../../../orders/presentation/views/orders_view.dart';
 import '../../../sales_people/presentation/views/sales_people_view.dart';
 
 class DashboardContentSwitcher {
@@ -19,6 +20,8 @@ class DashboardContentSwitcher {
         return const AdminsView();
       case TabIds.CLIENTS:
         return const ClientsView();
+      case TabIds.ORDERS:
+        return const OrdersView();
       case TabIds.SALES_PEOPLE:
         return const SalesPeopleView();
       case TabIds.PRODUCTS:

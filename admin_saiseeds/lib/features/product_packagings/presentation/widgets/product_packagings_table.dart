@@ -3,7 +3,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/widgets/buttons/icon_action_button.dart';
+import '../../../../core/widgets/buttons/outlined_action_button.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
 import '../../../../core/widgets/tables/app_data_table.dart';
 import '../../data/models/product_packaging_model.dart';
@@ -25,7 +25,6 @@ class ProductPackagingsTable extends StatefulWidget {
   final String? currentSortBy;
   final String? currentSortOrder;
   final Map<String, String> currentFilters;
-  final void Function(ProductPackagingModel packaging)? onEdit;
   final void Function(ProductPackagingModel packaging)? onDelete;
   final void Function(ProductPackagingModel packaging)? onView;
   final List<Widget> searchBarActions;
@@ -43,7 +42,6 @@ class ProductPackagingsTable extends StatefulWidget {
     this.currentSortBy,
     this.currentSortOrder,
     this.currentFilters = const {},
-    this.onEdit,
     this.onDelete,
     this.onView,
     this.searchBarActions = const [],
@@ -184,18 +182,10 @@ class ProductPackagingsTableState extends State<ProductPackagingsTable> {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconActionButton(
-              icon: Icons.edit_outlined,
-              tooltip: AppStrings.EDIT,
-              onPressed: widget.onEdit == null
-                  ? null
-                  : () => widget.onEdit!(packaging),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            IconActionButton(
+            OutlinedActionButton(
+              label: AppStrings.DELETE,
               icon: Icons.delete_outline_rounded,
-              tooltip: AppStrings.DELETE,
-              type: IconActionType.error,
+              tone: OutlinedActionTone.error,
               onPressed: widget.onDelete == null
                   ? null
                   : () => widget.onDelete!(packaging),

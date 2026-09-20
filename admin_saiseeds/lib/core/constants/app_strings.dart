@@ -104,10 +104,14 @@ class AppStrings {
   static const String RETRY = 'Retry';
   static const String CANCEL = 'Cancel';
   static const String CONFIRM = 'Confirm';
+  static const String OK = 'OK';
   static const String SAVE = 'Save';
   static const String EDIT = 'Edit';
   static const String DELETE = 'Delete';
   static const String SEARCH = 'Search...';
+  static const String NO_RESULTS_FOUND = 'No results found';
+  static const String REQUIRED_MARKER = ' *';
+  static const String TYPE_TO_SEARCH = 'Type to search...';
   static const String NO_DATA_FOUND = 'No data found.';
   static const String SOMETHING_WENT_WRONG =
       'Something went wrong. Please try again.';
@@ -157,6 +161,8 @@ class AppStrings {
   static const String CLIENT_STATUS_PENDING = 'Pending';
   static const String CLIENTS_VIEW_PENDING = 'Pending requests';
   static const String CLIENTS_VIEW_VERIFIED = 'Verified clients';
+  static const String CLIENT_STATUS_OPTION_VERIFIED = 'Accepted clients';
+  static const String CLIENT_STATUS_OPTION_PENDING = 'Pending clients';
   static const String CLIENTS_TABLE_SEARCH_HINT = 'Search clients...';
   static const String CLIENTS_EMPTY_STATE_TITLE = 'No clients yet';
   static const String CLIENTS_EMPTY_STATE_BODY =
@@ -196,6 +202,7 @@ class AppStrings {
   static const String CLIENT_PRIMARY_BADGE = 'Primary';
   static const String FILTER_OPERATOR_EQUALS = '=';
   static const String DATE_RANGE_HINT = 'Select dates';
+  static const String DATE_PICK_HINT = 'Select a date';
   static const String DATE_RANGE_HELP = 'Select date range';
   static const String DATE_RANGE_APPLY = 'Apply';
   static const String DATE_RANGE_ARROW = '→';
@@ -209,11 +216,11 @@ class AppStrings {
   static const String DATE_RANGE_LAST_90 = 'Last 90 days';
   static const String DATE_RANGE_LAST_6M = 'Last 6 months';
   static const String DATE_RANGE_LAST_YEAR = 'Last 1 year';
-  static const String SMALL_SCREEN_TITLE = 'Best viewed on a larger screen';
+  static const String SMALL_SCREEN_TITLE = 'Best experienced on desktop';
   static const String SMALL_SCREEN_BODY =
-      'The Saiseeds admin portal is built for tablets and desktops. Open this '
-      'page on a wider screen for the full experience.';
-  static const String SMALL_SCREEN_HINT = 'Minimum width: 768px';
+      'The Saiseeds admin portal is designed for desktop screens. Open this '
+      'page on a desktop or widen your window for the full experience.';
+  static const String SMALL_SCREEN_HINT = 'Minimum width: 1200px';
   static const String CLIENT_STEP_DETAILS = 'Details';
   static const String CLIENT_STEP_ADDRESSES = 'Addresses';
   static const String CLIENT_STEP_CONTACTS = 'Contacts';
@@ -222,6 +229,10 @@ class AppStrings {
   static const String CLIENT_ADD_ADDRESS = 'Add address';
   static const String CLIENT_ADD_CONTACT = 'Add contact';
   static const String CLIENT_ADD_TRANSPORT = 'Add transport agency';
+  static const String CLIENT_RAIL_ADDRESSES_HINT = 'Manage client addresses.';
+  static const String CLIENT_RAIL_CONTACTS_HINT = 'Manage client contacts.';
+  static const String CLIENT_RAIL_TRANSPORT_HINT =
+      'Manage client transport agencies.';
   static const String CLIENT_ADDRESS_LABEL = 'Label';
   static const String CLIENT_ADDRESS_LINE_1 = 'Address line 1';
   static const String CLIENT_ADDRESS_LINE_2 = 'Address line 2';
@@ -235,8 +246,10 @@ class AppStrings {
   static const String CLIENT_REMOVE_ENTRY = 'Remove';
   static const String STEP_BACK = 'Back';
   static const String STEP_NEXT = 'Next';
-  static const String VALIDATION_ONE_PRIMARY = 'Exactly one entry must be primary.';
-  static const String VALIDATION_AT_LEAST_ONE = 'At least one entry is required.';
+  static const String VALIDATION_ONE_PRIMARY =
+      'Exactly one entry must be primary.';
+  static const String VALIDATION_AT_LEAST_ONE =
+      'At least one entry is required.';
   static const String VALIDATION_CITY_REQUIRED = 'City is required.';
   static const String CLIENT_CREATED_BY_LABEL = 'Added by';
   static const String CLIENT_COMPANY_NAME_HINT = 'Registered business name';
@@ -353,7 +366,31 @@ class AppStrings {
       'Scan this code in an authenticator app to enable sign-in.';
   static const String DETAIL_FIELD_CREATED_BY = 'Created By';
   static const String DETAIL_FIELD_CREATED_AT = 'Created At';
+  static const String SALES_PERSON_EDIT_HINT =
+      'Update the sales person account details.';
+  static const String VIEW_MODE_TOAST_TITLE = 'View mode';
+  static const String VIEW_MODE_TOAST_BODY =
+      'Select the edit action in the header to change these details.';
+  static const String VIEW_MODE_LOCKED_TOAST_BODY =
+      'This field is read-only and cannot be edited.';
   static const String TOTP_MANUAL_ENTRY = 'Setup key';
+  static const String TOTP_SEND_WHATSAPP = 'WhatsApp';
+  static const String TOTP_DOWNLOAD_QR = 'Download QR';
+  static const String TOTP_NO_PHONE = 'No phone number on record.';
+  static const String TOTP_DOWNLOAD_FAILED = 'Could not prepare the QR image.';
+  static const String TOTP_QR_FILE_SUFFIX = '-authenticator-qr.png';
+  static const String TOTP_QR_FALLBACK_NAME = 'saiseeds';
+  static const String TOTP_WHATSAPP_GREETING = 'Hello';
+  static const String TOTP_WHATSAPP_INTRO =
+      'Welcome to Saiseeds. Your account is ready.';
+  static const String TOTP_WHATSAPP_STEPS =
+      'To sign in, open any authenticator app (Google Authenticator, Authy) '
+      'and scan the QR code attached to this message.';
+  static const String TOTP_WHATSAPP_CLOSING =
+      'Keep this code private. It is what signs you in.';
+  static const String TOTP_WHATSAPP_QR_TITLE = 'Saiseeds sign-in QR';
+  static const String TOTP_QR_ATTACH_HINT =
+      'Attach the downloaded QR image to the chat.';
   static const String TOTP_UNAVAILABLE =
       'No authenticator setup code is available for this account.';
 
@@ -518,4 +555,130 @@ class AppStrings {
   static const String PRODUCTS_UNAVAILABLE =
       'Product list is unavailable. Refresh the page and try again.';
   static const String SELECTED_PRODUCT_SUMMARY_TITLE = 'Selected product';
+  static const String SELECTED_PRODUCT_SUMMARY_HINT =
+      'Read-only details of the product this packaging belongs to.';
+  static const String SELECTED_PRODUCT_NONE =
+      'Pick a product to see its details here.';
+  static const String ORDERS = 'Order Management';
+  static const String ORDERS_EMPTY_STATE_TITLE = 'No orders found';
+  static const String ORDERS_EMPTY_STATE_BODY =
+      'Orders booked by your sales team will appear here.';
+  static const String ORDERS_LOAD_FAILED_TITLE = 'Could not load orders';
+  static const String ORDERS_TABLE_SEARCH_HINT = 'Search by client';
+
+  static const String ORDER_STATUS_BOOKED = 'Booked';
+  static const String ORDER_STATUS_UNDER_REVIEW = 'Under review';
+  static const String ORDER_STATUS_CONFIRMED = 'Confirmed';
+  static const String ORDER_STATUS_DISPATCHED = 'Dispatched';
+  static const String ORDER_STATUS_DELIVERED = 'Delivered';
+  static const String ORDER_STATUS_ON_HOLD = 'On hold';
+  static const String ORDER_STATUS_REJECTED = 'Rejected';
+
+  static const String COLUMN_ORDER_CLIENT = 'Client';
+  static const String COLUMN_ORDER_STATUS = 'Status';
+  static const String COLUMN_ORDER_AMOUNT = 'Amount';
+  static const String COLUMN_ORDER_ID = 'Order ID';
+  static const String COLUMN_ORDER_ADDRESS = 'Delivery Address';
+  static const String COLUMN_ORDER_DISPATCH = 'Dispatch';
+  static const String COLUMN_ORDER_VERIFIED_BY = 'Verified By';
+  static const String COLUMN_ORDER_CLIENT_ONBOARDED_BY = 'Client Added By';
+  static const String COLUMN_ORDER_PLACED = 'Placed';
+  static const String COLUMN_ORDER_EXPECTED = 'Expected';
+  static const String COLUMN_ORDER_SALES_PERSON = 'Sales Person';
+  static const String COLUMN_ORDER_ACTIONS = 'Order Actions';
+
+  static const String ORDER_VERIFY = 'Verify';
+  static const String ORDER_UNVERIFY = 'Unverify';
+  static const String ORDER_HOLD = 'Hold';
+  static const String ORDER_REJECT = 'Reject';
+
+  static const String ORDER_VERIFY_TITLE = 'Verify this order?';
+  static const String ORDER_VERIFY_BODY =
+      'The order is approved against the current stock count and its bags are reserved.';
+  static const String ORDER_VERIFY_DONE = 'Order verified';
+
+  static const String ORDER_UNVERIFY_TITLE = 'Withdraw approval?';
+  static const String ORDER_UNVERIFY_BODY =
+      'The order returns to Under review and the bags it reserved are released.';
+  static const String ORDER_UNVERIFY_DONE = 'Approval withdrawn';
+
+  static const String ORDER_HOLD_TITLE = 'Put this order on hold?';
+  static const String ORDER_HOLD_BODY =
+      'The order is paused and any bags it reserved are released. It can be resumed by verifying it again.';
+  static const String ORDER_HOLD_DONE = 'Order on hold';
+
+  static const String ORDER_REJECT_TITLE = 'Reject this order?';
+  static const String ORDER_REJECT_BODY =
+      'Rejection is permanent. No action moves an order out of Rejected, and any reserved bags are released.';
+  static const String ORDER_REJECT_DONE = 'Order rejected';
+
+  static const String ORDER_VERIFY_BLOCKED =
+      'Only a booked, under-review or held order can be verified.';
+  static const String ORDER_UNVERIFY_BLOCKED =
+      'Only a confirmed order can be unverified.';
+  static const String ORDER_HOLD_BLOCKED =
+      'A dispatched, delivered or rejected order cannot be held.';
+  static const String ORDER_REJECT_BLOCKED =
+      'A dispatched or delivered order cannot be rejected.';
+  static const String ORDER_EDIT_BLOCKED =
+      'A dispatched or delivered order can no longer be edited.';
+
+  static const String ORDER_DETAILS_TITLE = 'Order details';
+  static const String ORDER_UPDATED_TITLE = 'Order updated';
+  static const String ORDER_EDIT_LOCKED_TITLE = 'Order locked';
+  static const String ORDER_EDIT_LOCKED_BODY =
+      'A dispatched order can no longer be edited.';
+  static const String ORDER_QUANTITY_LABEL = 'Quantity';
+  static const String ORDER_ADD_ITEM = 'Add item';
+  static const String ORDER_PICK_PRODUCTS_TITLE = 'Add products';
+  static const String ORDER_PICK_PRODUCTS_SUBTITLE =
+      'Choose the bags to add to this order.';
+  static const String ORDER_PICK_SEARCH_HINT = 'Search products...';
+  static const String ORDER_PICK_EMPTY = 'No packagings match your search.';
+  static const String ORDER_PICK_ADD = 'ADD';
+  static const String ORDER_PICK_CONFIRM = 'Add these products';
+  static const String ORDER_PICK_SELECTED_NONE = 'Nothing selected yet';
+  static const String ORDER_PICK_ON_ORDER = 'On this order';
+  static const String TABLE_ROW_ACTIONS = 'Options';
+  static const String TABLE_ROW_ACTIONS_TOOLTIP = 'Order options';
+  static const String ORDER_PICK_ALREADY_TITLE = 'Already on this order';
+  static const String ORDER_PICK_ALREADY_BODY =
+      'Close this and raise the quantity on the existing line instead.';
+  static const String ORDER_PICK_SELECTED_ONE = 'bag selected';
+  static const String ORDER_PICK_SELECTED_MANY = 'bags selected';
+  static const String ORDER_REMOVE_ITEM = 'Remove item';
+  static const String ORDER_NEW_ITEM = 'New item';
+  static const String ORDER_NEGOTIATED_PRICE_LABEL = 'Negotiated price';
+  static const String ORDER_PICK_DELIVERY_DATE = 'Pick a delivery date';
+  static const String ORDER_STEP_PREFIX = 'Step';
+  static const String LABEL_SEPARATOR = ':';
+  static const String ORDER_STEP_SUMMARY_CAPTION = 'Order overview';
+  static const String ORDER_STEP_ITEMS_CAPTION = 'Bags on this order';
+  static const String ORDER_STEP_DELIVERY_CAPTION = 'Where it is going';
+  static const String ORDER_STEP_SUMMARY = 'Summary';
+  static const String ORDER_STEP_ITEMS = 'Items';
+  static const String ORDER_STEP_DELIVERY = 'Delivery';
+
+  static const String ORDER_PUBLIC_ID_LABEL = 'Order ID';
+  static const String ORDER_PLACED_BY_LABEL = 'Booked by';
+  static const String ORDER_CLIENT_ONBOARDED_BY_LABEL = 'Client onboarded by';
+  static const String ORDER_VERIFIED_BY_LABEL = 'Verified by';
+  static const String ORDER_AWAITING_VERIFICATION = 'Awaiting verification';
+  static const String ORDER_TOTAL_AMOUNT_LABEL = 'Total amount';
+  static const String ORDER_TOTAL_PACKETS_LABEL = 'Total packets';
+  static const String ORDER_ITEM_COUNT_LABEL = 'Items';
+  static const String ORDER_BAG_COUNT_LABEL = 'Bags';
+  static const String ORDER_DELIVERY_ADDRESS_LABEL = 'Delivery address';
+  static const String ORDER_CITY_LABEL = 'City';
+  static const String ORDER_DISPATCH_MODE_LABEL = 'Dispatch';
+  static const String ORDER_TRANSPORT_AGENCY_LABEL = 'Transport agency';
+  static const String ORDER_EXPECTED_DELIVERY_LABEL = 'Expected delivery';
+  static const String ORDER_PLACED_ON_LABEL = 'Booked on';
+  static const String ORDER_DISPATCH_AGENCY = 'Transport agency';
+  static const String ORDER_DISPATCH_PRIVATE = 'Private dispatch';
+  static const String ORDER_QUANTITY_PREFIX = 'Qty';
+  static const String ORDER_PER_BAG = 'per bag';
+  static const String ORDER_LIST_PRICE_LABEL = 'List price';
+  static const String ORDER_NO_ITEMS = 'This order has no lines.';
+  static const String TIMEZONE_IST = 'IST';
 }

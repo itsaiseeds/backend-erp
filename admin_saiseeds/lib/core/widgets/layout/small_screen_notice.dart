@@ -12,7 +12,7 @@ class SmallScreenGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!ResponsiveHelper.isMobile(context)) return child;
+    if (ResponsiveHelper.isDesktop(context)) return child;
     return const SmallScreenNotice();
   }
 }

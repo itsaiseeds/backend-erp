@@ -74,13 +74,11 @@ class AppSidebar extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Expanded(
             child: ClipRect(
-              child: ListView.separated(
+              child: ListView.builder(
                 padding: EdgeInsets.symmetric(
                   horizontal: isCollapsed ? AppSpacing.sm : AppSpacing.smd,
                 ),
                 itemCount: items.length,
-                separatorBuilder: (context, index) =>
-                    const SidebarDivider(indent: AppSizes.sidebarDividerIndent),
                 itemBuilder: (context, index) {
                   final item = items[index];
                   return SidebarItem(
@@ -468,7 +466,7 @@ class _SidebarItemState extends State<SidebarItem> {
           duration: _fillDuration,
           curve: Curves.easeOutCubic,
           height: AppSizes.sidebarItemHeight,
-          margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          margin: const EdgeInsets.only(bottom: AppSpacing.xs),
           decoration: BoxDecoration(
             color: fill,
             borderRadius: const BorderRadius.all(Radius.circular(AppRadius.md)),

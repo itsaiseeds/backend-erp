@@ -19,6 +19,7 @@ class AppRadius {
   static const double xs = 4.0;
   static const double sm = 6.0;
   static const double md = 8.0;
+  static const double dialog = 10.0;
   static const double lg = 12.0;
   static const double xl = 16.0;
   static const double full = 999.0;
@@ -97,8 +98,6 @@ class AppSizes {
   static const double tableRowHeight = 44.0;
   static const double tableCompactRowHeight = 38.0;
   static const double tableSearchBarHeight = 52.0;
-  static const double clientSwitcherHeight = 44.0;
-  static const double clientSwitcherWidth = 420.0;
   static const double tableControlHeight = 36.0;
   static const double tableSortOrderWidth = 38.0;
   static const double tableSelectColumnWidth = 56.0;
@@ -123,6 +122,8 @@ class AppSizes {
   static const double tablePinIconSize = 12.0;
   static const double tableFilterMenuWidth = 280.0;
   static const double tableFilterMenuMaxHeight = 300.0;
+  static const double searchMenuMaxHeight = 260.0;
+  static const double searchOptionHeight = 44.0;
   static const double tableFilterValueMinWidth = 60.0;
   static const double tableFilterValueMaxWidth = 160.0;
   static const double tableSearchFieldMinWidth = 160.0;
@@ -135,10 +136,13 @@ class AppSizes {
   static const double tableColumnWidthMedium = 180.0;
   static const double tableColumnWidthWide = 260.0;
 
-  static const double formDialogWidth = 560.0;
+  static const double confirmDialogWidth = 420.0;
+  static const double dialogHeaderIconBox = 36.0;
+  static const double formDialogWidth = 900.0;
   static const double stepDotSize = 28.0;
   static const double productImagePreview = 200.0;
   static const double dateRangePopoverWidth = 640.0;
+  static const double singleDatePopoverWidth = 320.0;
   static const double dateRangePresetsWidth = 140.0;
   static const double dateRangeCellSize = 32.0;
   static const double smallScreenNoticeWidth = 360.0;
@@ -146,17 +150,50 @@ class AppSizes {
   static const double smallScreenIconBox = 72.0;
   static const double smallScreenIcon = 34.0;
   static const double tableActionButtonHeight = 30.0;
-  static const double detailDialogWidth = 620.0;
+  static const double detailDialogWidth = 900.0;
   static const double imageViewerButton = 40.0;
-  static const double detailDialogFixedHeight = 560.0;
-  static const double dialogMaxHeight = 720.0;
+  static const double dialogMaxHeight = 940.0;
   static const double formDialogFixedHeight = 620.0;
   static const double dialogIconTile = 40.0;
   static const double dialogCloseTile = 32.0;
   static const double addButtonTile = 40.0;
+  static const double orderMetricDividerHeight = 32.0;
   static const double qrCodeSize = 200.0;
   static const double qrFrameInset = 12.0;
   static const double toggleTileHeight = 56.0;
   static const double searchableMenuMaxHeight = 280.0;
   static const double detailFieldMinWidth = 220.0;
+
+  static const double recordDialogWidthFactor = 0.86;
+  static const double recordDialogHeightFactor = 0.86;
+  static const double recordDialogMinWidth = 640.0;
+  static const double recordDialogTwoColumnWidth = 860.0;
+  static const double recordDialogThreeColumnWidth = 1180.0;
+  static const double recordDialogMinHeight = 420.0;
+  static const double recordDialogHeightTrim = 50.0;
+  static const double recordDialogRoomyBump = 100.0;
+
+  static const double pickerCardImage = 132.0;
+  static const double pickerCardStepperOverlap = 17.0;
+  static const double pickerCardStepperWidth = 78.0;
+  static const double pickerCardTagInset = 14.0;
+  static const double pickerStepperHeight = 34.0;
+  static const double pickerGridMinTileWidth = 220.0;
+  static const double pickerCardExtent = 238.0;
+
+  static const double orderStepperHeight = 32.0;
+  static const double orderStepperCountWidth = 28.0;
+  static const double orderPriceFieldWidth = 130.0;
+
+  static const double rowActionsMenuWidth = 220.0;
+  static const double rowActionsItemHeight = 40.0;
+  static const double recordDialogAsideWidth = 280.0;
+  static const double recordDialogAsideMinViewport = 1024.0;
+
+  static const double entryRailWidth = 220.0;
+  static const double entryRailIndicator = 4.0;
+  static const double entryRailIndicatorHeight = 18.0;
+  static const double entryRailIndicatorRadius = 2.0;
+  static const double entryRailItemVertical = 14.0;
+  static const double entryRailAddHeight = 44.0;
 }

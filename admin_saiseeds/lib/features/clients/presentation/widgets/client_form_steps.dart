@@ -33,113 +33,6 @@ extension ClientFormStepX on ClientFormStep {
   }
 }
 
-class ClientStepIndicator extends StatelessWidget {
-  final ClientFormStep current;
-  final ValueChanged<ClientFormStep>? onStepTapped;
-
-  const ClientStepIndicator({
-    super.key,
-    required this.current,
-    this.onStepTapped,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final int currentIndex = ClientFormStep.values.indexOf(current);
-
-    return Row(
-      children: [
-        for (final step in ClientFormStep.values) ...[
-          if (step.index > 0)
-            Expanded(
-              child: Container(
-                height: AppSizes.borderThin,
-                margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                color: step.index <= currentIndex
-                    ? AppColors.PRIMARY
-                    : AppColors.BORDER,
-              ),
-            ),
-          _StepDot(
-            index: step.index,
-            label: step.label,
-            isActive: step.index == currentIndex,
-            isComplete: step.index < currentIndex,
-            onTap: onStepTapped == null ? null : () => onStepTapped!(step),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _StepDot extends StatelessWidget {
-  final int index;
-  final String label;
-  final bool isActive;
-  final bool isComplete;
-  final VoidCallback? onTap;
-
-  const _StepDot({
-    required this.index,
-    required this.label,
-    required this.isActive,
-    required this.isComplete,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isHighlighted = isActive || isComplete;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
-            width: AppSizes.stepDotSize,
-            height: AppSizes.stepDotSize,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isHighlighted ? AppColors.PRIMARY : AppColors.SURFACE,
-              border: Border.all(
-                color: isHighlighted ? AppColors.PRIMARY : AppColors.BORDER,
-              ),
-            ),
-            child: isComplete
-                ? const Icon(
-                    Icons.check_rounded,
-                    size: AppSizes.iconSm,
-                    color: AppColors.TEXT_ON_PRIMARY,
-                  )
-                : Text(
-                    '${index + 1}',
-                    style: AppTypography.labelMedium.copyWith(
-                      color: isHighlighted
-                          ? AppColors.TEXT_ON_PRIMARY
-                          : AppColors.TEXT_SECONDARY,
-                    ),
-                  ),
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            label,
-            style: AppTypography.bodySmall.copyWith(
-              color: isHighlighted
-                  ? AppColors.TEXT_PRIMARY
-                  : AppColors.TEXT_SECONDARY,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class EntryCard extends StatefulWidget {
   final String title;
   final String summary;
@@ -147,6 +40,7 @@ class EntryCard extends StatefulWidget {
   final VoidCallback? onRemove;
   final bool initiallyExpanded;
   final bool isPrimary;
+  final bool isBare;
 
   const EntryCard({
     super.key,
@@ -156,6 +50,7 @@ class EntryCard extends StatefulWidget {
     this.onRemove,
     this.initiallyExpanded = true,
     this.isPrimary = false,
+    this.isBare = false,
   });
 
   @override
@@ -171,6 +66,8 @@ class _EntryCardState extends State<EntryCard> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isBare) return widget.child;
+
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       decoration: BoxDecoration(
@@ -227,7 +124,7 @@ class _EntryCardState extends State<EntryCard> {
                     const SizedBox(width: AppSpacing.sm),
                     const AppBadge(
                       label: AppStrings.CLIENT_PRIMARY_BADGE,
-                      variant: AppBadgeVariant.info,
+                      variant: AppBadgeVariant.success,
                     ),
                   ],
                   if (widget.onRemove != null) ...[
@@ -275,6 +172,7 @@ class AddressStepCard extends StatefulWidget {
   final VoidCallback onMakePrimary;
   final bool enabled;
   final bool initiallyExpanded;
+  final bool isBare;
 
   const AddressStepCard({
     super.key,
@@ -286,6 +184,7 @@ class AddressStepCard extends StatefulWidget {
     required this.onMakePrimary,
     this.enabled = true,
     this.initiallyExpanded = true,
+    this.isBare = false,
   });
 
   @override
@@ -338,6 +237,7 @@ class _AddressStepCardState extends State<AddressStepCard> {
       summary: _summary(address),
       isPrimary: address.isPrimary,
       initiallyExpanded: widget.initiallyExpanded,
+      isBare: widget.isBare,
       onRemove: widget.canRemove && widget.enabled ? widget.onRemove : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -429,6 +329,7 @@ class ContactStepCard extends StatefulWidget {
   final VoidCallback onMakePrimary;
   final bool enabled;
   final bool initiallyExpanded;
+  final bool isBare;
 
   const ContactStepCard({
     super.key,
@@ -440,6 +341,7 @@ class ContactStepCard extends StatefulWidget {
     required this.onMakePrimary,
     this.enabled = true,
     this.initiallyExpanded = true,
+    this.isBare = false,
   });
 
   @override
@@ -488,6 +390,7 @@ class _ContactStepCardState extends State<ContactStepCard> {
       ].where((part) => part.trim().isNotEmpty).join(' · '),
       isPrimary: widget.contact.isPrimary,
       initiallyExpanded: widget.initiallyExpanded,
+      isBare: widget.isBare,
       onRemove: widget.canRemove && widget.enabled ? widget.onRemove : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -542,6 +445,7 @@ class TransportStepCard extends StatefulWidget {
   final VoidCallback onMakePrimary;
   final bool enabled;
   final bool initiallyExpanded;
+  final bool isBare;
 
   const TransportStepCard({
     super.key,
@@ -553,6 +457,7 @@ class TransportStepCard extends StatefulWidget {
     required this.onMakePrimary,
     this.enabled = true,
     this.initiallyExpanded = true,
+    this.isBare = false,
   });
 
   @override
@@ -581,6 +486,7 @@ class _TransportStepCardState extends State<TransportStepCard> {
       summary: widget.agency.name,
       isPrimary: widget.agency.isPrimary,
       initiallyExpanded: widget.initiallyExpanded,
+      isBare: widget.isBare,
       onRemove: widget.canRemove && widget.enabled ? widget.onRemove : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

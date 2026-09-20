@@ -38,15 +38,7 @@ void main() {
       },
     );
 
-    for (final double width in <double>[
-      1920,
-      1600,
-      1440,
-      1280,
-      1024,
-      900,
-      768,
-    ]) {
+    for (final double width in <double>[1920, 1600, 1440, 1280, 1200]) {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = Size(width, 1000);
       addTearDown(tester.view.reset);

@@ -4,11 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/models/city_model.dart';
 import '../../../../core/services/metadata_service.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/utils/validators/form_validators.dart';
 import '../../../../core/widgets/dialogs/app_form_dialog.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
+import '../../../../core/widgets/layout/form_field_grid.dart';
 import '../../../../core/widgets/inputs/city_picker_field.dart';
 import '../../data/models/sales_person_model.dart';
 import '../bloc/sales_people_cubit.dart';
@@ -134,10 +134,8 @@ class _SalesPersonFormDialogState extends State<SalesPersonFormDialog> {
       onSubmit: _isSubmitting ? null : _submit,
       content: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: FormFieldGrid(
+          fields: [
             AppTextField(
               controller: _nameController,
               label: AppStrings.FIELD_NAME,
@@ -145,7 +143,6 @@ class _SalesPersonFormDialogState extends State<SalesPersonFormDialog> {
               enabled: !_isSubmitting,
               validator: FormValidators.requiredField,
             ),
-            const SizedBox(height: AppSpacing.md),
             AppTextField(
               controller: _emailController,
               label: AppStrings.FIELD_EMAIL_OPTIONAL,
@@ -154,7 +151,6 @@ class _SalesPersonFormDialogState extends State<SalesPersonFormDialog> {
               enabled: !_isSubmitting,
               validator: FormValidators.optionalEmail,
             ),
-            const SizedBox(height: AppSpacing.md),
             AppTextField(
               controller: _phoneController,
               label: AppStrings.PHONE_NUMBER,
@@ -169,7 +165,6 @@ class _SalesPersonFormDialogState extends State<SalesPersonFormDialog> {
               ],
               validator: FormValidators.phoneNumber,
             ),
-            const SizedBox(height: AppSpacing.md),
             CityPickerField(
               value: _selectedCity,
               enabled: !_isSubmitting,

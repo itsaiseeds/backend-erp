@@ -12,6 +12,8 @@ void main() {
       TabIds.DASHBOARD,
       TabIds.ADMINS,
       TabIds.SALES_PEOPLE,
+      TabIds.CLIENTS,
+      TabIds.ORDERS,
       TabIds.PRODUCTS,
       TabIds.PRODUCT_PACKAGINGS,
     ]);
@@ -24,6 +26,8 @@ void main() {
     expect(ids, [
       TabIds.DASHBOARD,
       TabIds.SALES_PEOPLE,
+      TabIds.CLIENTS,
+      TabIds.ORDERS,
       TabIds.PRODUCTS,
       TabIds.PRODUCT_PACKAGINGS,
     ]);
