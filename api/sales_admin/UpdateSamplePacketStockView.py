@@ -1,4 +1,5 @@
-"""Loose-stock count endpoint: ``POST``/``PATCH`` ``/api/sales-admin/update-loose-stock``.
+"""Sample-packet (loose) stock count endpoint:
+``POST``/``PATCH`` ``/api/sales-admin/update-sample-packet-stock``.
 
 Loose stock is stock **in a packet but not in a bag**. It is identified by
 ``(product, packet_weight)`` and nothing else -- a product packed as both
@@ -23,7 +24,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
@@ -146,6 +147,26 @@ class UpdateLooseStockView(AdminApiView):
         ),
         request=UpdateLooseStockSerializer,
         responses={200: LooseStockPayloadSerializer(many=True)},
+        examples=[
+            OpenApiExample(
+                "Whole-day loose count",
+                value={
+                    "counts": [
+                        {
+                            "product": "P-A1B2C3D4E0F1",
+                            "packet_weight": "1.000",
+                            "packets": 12,
+                        },
+                        {
+                            "product": "P-A1B2C3D4E0F1",
+                            "packet_weight": "0.500",
+                            "packets": 0,
+                        },
+                    ]
+                },
+                request_only=True,
+            ),
+        ],
     )
     def post(self, request):
         serializer = UpdateLooseStockSerializer(data=request.data)
@@ -168,6 +189,21 @@ class UpdateLooseStockView(AdminApiView):
         ),
         request=UpdateLooseStockSerializer,
         responses={200: LooseStockPayloadSerializer(many=True)},
+        examples=[
+            OpenApiExample(
+                "Partial loose count",
+                value={
+                    "counts": [
+                        {
+                            "product": "P-A1B2C3D4E0F1",
+                            "packet_weight": "1.000",
+                            "packets": 12,
+                        }
+                    ]
+                },
+                request_only=True,
+            ),
+        ],
     )
     def patch(self, request):
         serializer = UpdateLooseStockSerializer(data=request.data)

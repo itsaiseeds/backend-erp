@@ -7,6 +7,7 @@ plain ``APIView``.
 from django.urls import path
 
 from .AdminsView import AdminsView
+from .BagStockView import BagStockView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .CropsView import CropsView
 from .DeleteOtherMaterialRecipeView import DeleteOtherMaterialRecipeView
@@ -20,7 +21,6 @@ from .HoldOrderView import HoldOrderView
 from .InwardOtherMaterialsView import InwardOtherMaterialsView
 from .InwardRawMaterialsView import InwardRawMaterialsView
 from .LogoutView import LogoutView
-from .LooseStockView import LooseStockView
 from .OtherMaterialRecipesView import OtherMaterialRecipesView
 from .OtherMaterialStockView import OtherMaterialStockView
 from .OtherMaterialTypesView import OtherMaterialTypesView
@@ -31,21 +31,22 @@ from .RawMaterialStockView import RawMaterialStockView
 from .RejectOrderView import RejectOrderView
 from .RevertDispatchView import RevertDispatchView
 from .SalesPeopleView import SalesPeopleView
+from .SamplePacketStockView import LooseStockView
 from .StockView import StockView
 from .UnverifyOrderView import UnverifyOrderView
 from .UpdateAdminView import UpdateAdminView
+from .UpdateBagStockView import UpdateTodaysInventoryView
 from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
 from .UpdateInwardOtherMaterialView import UpdateInwardOtherMaterialView
 from .UpdateInwardRawMaterialView import UpdateInwardRawMaterialView
-from .UpdateLooseStockView import UpdateLooseStockView
 from .UpdateOrderView import UpdateOrderView
 from .UpdateOtherMaterialTypeView import UpdateOtherMaterialTypeView
 from .UpdatePartyView import UpdatePartyView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateSalesPersonView import UpdateSalesPersonView
-from .UpdateTodaysInventoryView import UpdateTodaysInventoryView
+from .UpdateSamplePacketStockView import UpdateLooseStockView
 from .UploadLRNumberView import UploadLRNumberView
 from .VerifyClientView import VerifyClientView
 from .VerifyOrderView import VerifyOrderView
@@ -64,16 +65,21 @@ urlpatterns = [
         name="check-todays-inventory",
     ),
     path(
-        "update-todays-inventory",
+        "update-bag-stock",
         UpdateTodaysInventoryView.as_view(),
-        name="update-todays-inventory",
+        name="update-bag-stock",
     ),
     path(
-        "update-loose-stock",
+        "update-sample-packet-stock",
         UpdateLooseStockView.as_view(),
-        name="update-loose-stock",
+        name="update-sample-packet-stock",
     ),
-    path("loose-stock", LooseStockView.as_view(), name="loose-stock"),
+    path(
+        "bag-stock",
+        BagStockView.as_view(),
+        name="bag-stock",
+    ),
+    path("sample-packet-stock", LooseStockView.as_view(), name="sample-packet-stock"),
     path("get-stock/<str:public_id>", StockView.as_view(), name="get-stock"),
     path("products", ProductsView.as_view(), name="products"),
     path("products/<str:public_id>", UpdateProductView.as_view(), name="update-product"),
