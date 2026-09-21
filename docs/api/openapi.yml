@@ -669,12 +669,27 @@ paths:
               schema:
                 description: Too many requests from this IP; retry later.
           description: ''
+  /api/sales-admin/bag-stock:
+    get:
+      operationId: api_sales_admin_bag_stock_retrieve
+      description: Read the current bag-stock position for every counted packaging.
+      summary: Read the bag-stock position
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BagStockPosition'
+          description: ''
   /api/sales-admin/check-todays-inventory:
     get:
       operationId: api_sales_admin_check_todays_inventory_retrieve
       description: '``is_complete`` covers sealed bags only -- the loose count is
-        optional and never blocks verification. ``loose_snapshot_date`` is when loose
-        stock was last counted, or null if never.'
+        optional and never blocks order verification.'
       summary: Check whether today's stock count is complete
       tags:
       - api
@@ -1314,22 +1329,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InwardRawMaterialPayload'
-          description: ''
-  /api/sales-admin/loose-stock:
-    get:
-      operationId: api_sales_admin_loose_stock_retrieve
-      description: Read the current loose-stock position for every counted pool.
-      summary: Read the loose-stock position
-      tags:
-      - api
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LooseStockPosition'
           description: ''
   /api/sales-admin/order/{public_id}:
     get:
@@ -2091,6 +2090,23 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/sample-packet-stock:
+    get:
+      operationId: api_sales_admin_sample_packet_stock_retrieve
+      description: Read the current sample-packet (loose) position for every counted
+        pool.
+      summary: Read the sample-packet (loose) stock position
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LooseStockPosition'
+          description: ''
   /api/sales-admin/unverify-order/{public_id}:
     post:
       operationId: api_sales_admin_unverify_order_create
@@ -2113,6 +2129,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/update-bag-stock:
+    post:
+      operationId: api_sales_admin_update_bag_stock_create
+      description: 'Sealed-bag counts only: every active packaging receives a snapshot
+        row for today, and packagings absent from ``counts`` are recorded as zero
+        bags. Loose packets are not accepted here -- record them at ``/api/sales-admin/update-sample-packet-stock``.'
+      summary: Replace today's entire stock count
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+            examples:
+              Whole-dayBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                    PP-A1B2C3D4E0F2: 0
+                summary: Whole-day bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
+          description: ''
+    patch:
+      operationId: api_sales_admin_update_bag_stock_partial_update
+      description: 'Sealed-bag counts only: only the packagings named in ``counts``
+        are written; the rest of today''s rows are left as they are. Loose packets
+        are not accepted here -- record them at ``/api/sales-admin/update-sample-packet-stock``.'
+      summary: Partially update today's stock count
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+            examples:
+              PartialBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                summary: Partial bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
           description: ''
   /api/sales-admin/update-client/:
     post:
@@ -2142,9 +2233,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientPayload'
           description: ''
-  /api/sales-admin/update-loose-stock:
+  /api/sales-admin/update-sample-packet-stock:
     post:
-      operationId: api_sales_admin_update_loose_stock_create
+      operationId: api_sales_admin_update_sample_packet_stock_create
       description: Every (product, packet_weight) pair the business packs receives
         a loose row for today. Pairs absent from ``counts`` are recorded as zero packets.
         Does not touch the sealed-bag snapshot.
@@ -2156,6 +2247,17 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateLooseStockRequest'
+            examples:
+              Whole-dayLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '0.500'
+                    packets: 0
+                summary: Whole-day loose count
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/UpdateLooseStockRequest'
@@ -2175,7 +2277,7 @@ paths:
                   $ref: '#/components/schemas/LooseStockPayload'
           description: ''
     patch:
-      operationId: api_sales_admin_update_loose_stock_partial_update
+      operationId: api_sales_admin_update_sample_packet_stock_partial_update
       description: Only the pairs named in ``counts`` are written; every other loose
         row is left as it is.
       summary: Partially update the loose-stock count
@@ -2186,6 +2288,14 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+            examples:
+              PartialLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                summary: Partial loose count
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
@@ -2202,67 +2312,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/LooseStockPayload'
-          description: ''
-  /api/sales-admin/update-todays-inventory:
-    post:
-      operationId: api_sales_admin_update_todays_inventory_create
-      description: Every active packaging receives a snapshot row for today. Packagings
-        absent from ``counts`` are recorded as zero bags. Loose stock is counted separately
-        and is not affected.
-      summary: Replace today's entire stock count
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
-        required: true
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SnapshotPayload'
-          description: ''
-    patch:
-      operationId: api_sales_admin_update_todays_inventory_partial_update
-      description: Only the packagings named in ``counts`` are written; the rest of
-        today's rows are left as they are.
-      summary: Partially update today's stock count
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SnapshotPayload'
           description: ''
   /api/sales-admin/upload-lr-number/{public_id}:
     post:
@@ -2754,6 +2803,41 @@ components:
       required:
       - product_packaging_public_id
       - quantity
+    BagStockLine:
+      type: object
+      description: Output shape for one packaging's bag position.
+      properties:
+        packaging:
+          $ref: '#/components/schemas/PackagingRef'
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        consumed:
+          type: integer
+        available:
+          type: integer
+      required:
+      - available
+      - consumed
+      - on_hand
+      - packaging
+      - reserved
+    BagStockPosition:
+      type: object
+      description: Output shape for the whole bag position.
+      properties:
+        snapshot_date:
+          type: string
+          format: date
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/BagStockLine'
+      required:
+      - lines
+      - snapshot_date
     CatalogueItem:
       type: object
       description: Output shape for one catalogue row -- a bag (schema only).
@@ -3004,26 +3088,12 @@ components:
       properties:
         is_complete:
           type: boolean
-        snapshot_date:
-          type: string
-          format: date
-        loose_snapshot_date:
-          type: string
-          format: date
-          nullable: true
-        missing_packagings:
-          type: array
-          items:
-            $ref: '#/components/schemas/MissingPackaging'
         stock_admins:
           type: array
           items:
             $ref: '#/components/schemas/StockAdmin'
       required:
       - is_complete
-      - loose_snapshot_date
-      - missing_packagings
-      - snapshot_date
       - stock_admins
     City:
       type: object
@@ -4218,19 +4288,6 @@ components:
       required:
       - name
       - public_id
-    MissingPackaging:
-      type: object
-      description: Output shape for one packaging that has not been counted today.
-      properties:
-        public_id:
-          type: string
-        product:
-          type: object
-          additionalProperties:
-            type: string
-      required:
-      - product
-      - public_id
     OrderCardPackaging:
       type: object
       description: |-
@@ -4924,15 +4981,19 @@ components:
           type: integer
     PatchedUpdateTodaysInventoryRequest:
       type: object
-      description: 'Request validation: a map of packaging ``public_id`` → today''s
-        bag count.'
+      description: |-
+        Request validation: a map of packaging ``public_id`` → today's bag count.
+
+        Bags only -- loose packets are never accepted here; they are recorded at
+        ``/api/sales-admin/update-sample-packet-stock``.
       properties:
         counts:
           type: object
           additionalProperties:
             type: integer
             minimum: 0
-          description: Map of product-packaging public_id to its bag count.
+          description: Map of product-packaging public_id to its sealed-bag count;
+            loose packets are recorded at ``update-sample-packet-stock``, not here.
     ProductLooseStockPayload:
       type: object
       description: Output shape for a product's loose position, one line per packet
@@ -5443,15 +5504,19 @@ components:
         * `REJECTED` - REJECTED
     UpdateTodaysInventoryRequest:
       type: object
-      description: 'Request validation: a map of packaging ``public_id`` → today''s
-        bag count.'
+      description: |-
+        Request validation: a map of packaging ``public_id`` → today's bag count.
+
+        Bags only -- loose packets are never accepted here; they are recorded at
+        ``/api/sales-admin/update-sample-packet-stock``.
       properties:
         counts:
           type: object
           additionalProperties:
             type: integer
             minimum: 0
-          description: Map of product-packaging public_id to its bag count.
+          description: Map of product-packaging public_id to its sealed-bag count;
+            loose packets are recorded at ``update-sample-packet-stock``, not here.
       required:
       - counts
     UploadLRNumberRequest:

@@ -8,7 +8,7 @@ from common.models import (
     TimeStampedModel,
 )
 
-from .InventorySnapshot import default_snapshot_date
+from .BagStockSnapshot import default_snapshot_date
 
 
 class LooseStockSnapshot(

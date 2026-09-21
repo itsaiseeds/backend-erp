@@ -1,12 +1,12 @@
-"""Daily stock-count endpoint: ``POST``/``PATCH`` ``/api/sales-admin/update-todays-inventory``.
+"""Daily bag-stock count endpoint: ``POST``/``PATCH`` ``/api/sales-admin/update-bag-stock``.
 
 Only an application Admin holding ``Admin.can_update_stock_count`` may write a
 count (also enforced by ``InventoryOperations._assert_can_update_stock_count``).
 
 This is the **sealed-bag** count only. Loose stock -- stock in a packet but not
 in a bag -- is counted separately and optionally at
-``/api/sales-admin/update-loose-stock``, on its own independent lifecycle:
-writing a bag count here never touches a loose row.
+``/api/sales-admin/update-sample-packet-stock``, on its own independent
+lifecycle: writing a bag count here never touches a loose row.
 
 ``POST`` replaces **today's entire** count: every active packaging receives a
 row for today, and packagings absent from the payload are recorded as zero.
@@ -19,7 +19,7 @@ count purges every older bag row (see ``InventoryOperations``).
 
 from __future__ import annotations
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
@@ -29,12 +29,19 @@ from api.admin import AdminApiView
 
 
 class UpdateTodaysInventorySerializer(serializers.Serializer):
-    """Request validation: a map of packaging ``public_id`` → today's bag count."""
+    """Request validation: a map of packaging ``public_id`` → today's bag count.
+
+    Bags only -- loose packets are never accepted here; they are recorded at
+    ``/api/sales-admin/update-sample-packet-stock``.
+    """
 
     counts = serializers.DictField(
         child=serializers.IntegerField(min_value=0),
         error_messages={"required": "Stock counts are required."},
-        help_text="Map of product-packaging public_id to its bag count.",
+        help_text=(
+            "Map of product-packaging public_id to its sealed-bag count; loose "
+            "packets are recorded at ``update-sample-packet-stock``, not here."
+        ),
     )
 
 
@@ -95,12 +102,25 @@ class UpdateTodaysInventoryView(AdminApiView):
     @extend_schema(
         summary="Replace today's entire stock count",
         description=(
-            "Every active packaging receives a snapshot row for today. Packagings "
-            "absent from ``counts`` are recorded as zero bags. Loose stock is "
-            "counted separately and is not affected."
+            "Sealed-bag counts only: every active packaging receives a snapshot "
+            "row for today, and packagings absent from ``counts`` are recorded as "
+            "zero bags. Loose packets are not accepted here -- record them at "
+            "``/api/sales-admin/update-sample-packet-stock``."
         ),
         request=UpdateTodaysInventorySerializer,
         responses={200: SnapshotPayloadSerializer(many=True)},
+        examples=[
+            OpenApiExample(
+                "Whole-day bag count",
+                value={
+                    "counts": {
+                        "PP-A1B2C3D4E0F1": 12,
+                        "PP-A1B2C3D4E0F2": 0,
+                    }
+                },
+                request_only=True,
+            ),
+        ],
     )
     def post(self, request):
         serializer = UpdateTodaysInventorySerializer(data=request.data)
@@ -122,11 +142,20 @@ class UpdateTodaysInventoryView(AdminApiView):
     @extend_schema(
         summary="Partially update today's stock count",
         description=(
-            "Only the packagings named in ``counts`` are written; the rest of "
-            "today's rows are left as they are."
+            "Sealed-bag counts only: only the packagings named in ``counts`` are "
+            "written; the rest of today's rows are left as they are. Loose "
+            "packets are not accepted here -- record them at "
+            "``/api/sales-admin/update-sample-packet-stock``."
         ),
         request=UpdateTodaysInventorySerializer,
         responses={200: SnapshotPayloadSerializer(many=True)},
+        examples=[
+            OpenApiExample(
+                "Partial bag count",
+                value={"counts": {"PP-A1B2C3D4E0F1": 12}},
+                request_only=True,
+            ),
+        ],
     )
     def patch(self, request):
         serializer = UpdateTodaysInventorySerializer(data=request.data)

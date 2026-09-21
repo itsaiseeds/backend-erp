@@ -1,4 +1,5 @@
-"""Loose-stock position endpoint: ``GET`` ``/api/sales-admin/loose-stock``.
+"""Sample-packet (loose) stock position endpoint:
+``GET`` ``/api/sales-admin/sample-packet-stock``.
 
 Only an application Admin may view it (``admin_required``). Returns every
 counted loose pool -- one line per ``(product, packet_weight)`` -- with the
@@ -18,7 +19,7 @@ from rest_framework.response import Response
 
 from aggregator import InventoryOperations
 from api.admin import AdminApiView
-from api.sales_admin.UpdateLooseStockView import LooseStockProductRefSerializer
+from api.sales_admin.UpdateSamplePacketStockView import LooseStockProductRefSerializer
 
 
 class LooseStockLineSerializer(serializers.Serializer):
@@ -56,12 +57,12 @@ def loose_line_payload(entry: dict) -> dict:
 
 
 class LooseStockView(AdminApiView):
-    """Read the current loose-stock position for every counted pool."""
+    """Read the current sample-packet (loose) position for every counted pool."""
 
     admin_required = True
 
     @extend_schema(
-        summary="Read the loose-stock position",
+        summary="Read the sample-packet (loose) stock position",
         responses={200: LooseStockPositionSerializer},
     )
     def get(self, request):

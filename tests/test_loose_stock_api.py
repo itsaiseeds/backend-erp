@@ -1,9 +1,9 @@
 """API-level tests for the loose-stock endpoints.
 
 Covers:
-    POST  /api/sales-admin/update-loose-stock
-    PATCH /api/sales-admin/update-loose-stock
-    GET   /api/sales-admin/loose-stock
+    POST  /api/sales-admin/update-sample-packet-stock
+    PATCH /api/sales-admin/update-sample-packet-stock
+    GET   /api/sales-admin/sample-packet-stock
 
 Loose stock is keyed by (product, packet_weight), so the payload is a list of
 lines rather than a map keyed by one public id.
@@ -22,8 +22,8 @@ from aggregator.models import LooseStockSnapshot, ProductPackaging, Stage, Stage
 from authentication.models import Admin, User
 from tests.common import WebApiTestCase
 
-UPDATE_URL = "/api/sales-admin/update-loose-stock"
-POSITION_URL = "/api/sales-admin/loose-stock"
+UPDATE_URL = "/api/sales-admin/update-sample-packet-stock"
+POSITION_URL = "/api/sales-admin/sample-packet-stock"
 
 SUPERUSER_PHONE = "9999999999"
 
@@ -167,8 +167,9 @@ class LooseStockApiTest(WebApiTestCase):
     # -- validation ------------------------------------------------------------
 
     def test_invalid_loose_count_payloads_are_rejected(self):
-        """Every rejected line leaves the whole payload unwritten -- the write is
-        all-or-nothing, so a bad line must not half-apply the good ones.
+        """Every rejected line leaves the whole payload unwritten on both verbs --
+        the write is all-or-nothing, so a bad line must not half-apply the good
+        ones, and a sealed-bag map is never a loose count.
 
         Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_invalid_loose_count_payloads_are_rejected
         """
@@ -182,14 +183,17 @@ class LooseStockApiTest(WebApiTestCase):
             # The same pool named twice would let the last line silently win.
             ("duplicate pool in one payload", [self._line("1.000", 12), self._line("1.000", 3)]),
             ("negative packets", [self._line("1.000", -1)]),
+            # A sealed-bag map (packaging id -> bags) is not a list of loose lines.
+            ("bag-shaped map instead of loose lines", {"PP-PACKAGING": 10}),
         ]
-        for label, counts in cases:
-            with self.subTest(case=label):
-                resp = self._stock_admin_request(
-                    "patch", UPDATE_URL, data={"counts": counts}, format="json"
-                )
-                self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
-                self.assertEqual(LooseStockSnapshot.objects.count(), 0)
+        for verb in ("post", "patch"):
+            for label, counts in cases:
+                with self.subTest(case=label, verb=verb.upper()):
+                    resp = self._stock_admin_request(
+                        verb, UPDATE_URL, data={"counts": counts}, format="json"
+                    )
+                    self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+                    self.assertEqual(LooseStockSnapshot.objects.count(), 0)
 
     # -- reading ---------------------------------------------------------------
 
