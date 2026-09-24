@@ -27,11 +27,16 @@ from aggregator.InventoryOperations import (
     snapshot_count_payload,
 )
 from aggregator.models import InventorySnapshot, LooseStockSnapshot
+from api.export_serializers import ExportSnapshotDaySerializer
 from api.export_views import (
     EXPORT_QUERY_PARAMETERS,
     AdminDateRangeExportView,
     DateWindow,
-    ExportResponseSerializer,
+    export_response_serializer,
+)
+
+ExportInventorySnapshotsResponseSerializer = export_response_serializer(
+    "ExportInventorySnapshotsResponseSerializer", ExportSnapshotDaySerializer
 )
 
 
@@ -62,7 +67,7 @@ class ExportInventorySnapshotsView(AdminDateRangeExportView):
         operation_id="sales_admin_export_inventory_snapshots",
         summary="Export bag and loose stock counts for a date range, grouped by date",
         parameters=EXPORT_QUERY_PARAMETERS,
-        responses={200: ExportResponseSerializer},
+        responses={200: ExportInventorySnapshotsResponseSerializer},
     )
     def get(self, request: Request, *args, **kwargs):
         return super().get(request, *args, **kwargs)

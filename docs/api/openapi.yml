@@ -1007,7 +1007,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExportResponse'
+                $ref: '#/components/schemas/ExportCustomOrdersResponse'
           description: ''
   /api/sales-admin/export/dispatch-receipts:
     get:
@@ -1039,7 +1039,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExportResponse'
+                $ref: '#/components/schemas/ExportDispatchReceiptsResponse'
           description: ''
   /api/sales-admin/export/inventory-snapshots:
     get:
@@ -1072,7 +1072,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExportResponse'
+                $ref: '#/components/schemas/ExportInventorySnapshotsResponse'
           description: ''
   /api/sales-admin/export/inward-entries:
     get:
@@ -1104,7 +1104,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExportResponse'
+                $ref: '#/components/schemas/ExportInwardEntriesResponse'
           description: ''
   /api/sales-admin/export/orders:
     get:
@@ -1136,7 +1136,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExportResponse'
+                $ref: '#/components/schemas/ExportOrdersResponse'
           description: ''
   /api/sales-admin/get-clients/:
     get:
@@ -3206,8 +3206,7 @@ components:
           type: string
           description: The packaging's public id.
         product:
-          type: object
-          additionalProperties: {}
+          $ref: '#/components/schemas/ProductRef'
         packet_weight:
           type: string
         packets:
@@ -4133,9 +4132,140 @@ components:
       - result
       - stdout
       - success
-    ExportResponse:
+    ExportBagSnapshot:
       type: object
-      description: Output envelope shared by every export (schema only).
+      description: '``InventoryOperations.snapshot_count_payload``: counted figures
+        only.'
+      properties:
+        public_id:
+          type: string
+        snapshot_date:
+          type: string
+          format: date
+        packaging:
+          $ref: '#/components/schemas/PackagingRef'
+        bags:
+          type: integer
+        total_packets:
+          type: integer
+        total_weight:
+          type: string
+          description: Kilograms.
+      required:
+      - bags
+      - packaging
+      - public_id
+      - snapshot_date
+      - total_packets
+      - total_weight
+    ExportCity:
+      type: object
+      description: '``ClientOperations.order_city_payload``: the order''s delivery
+        city.'
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    ExportClient:
+      type: object
+      description: '``ClientOperations.client_summary_payload``.'
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+        gst_number:
+          type: string
+      required:
+      - company_name
+      - gst_number
+      - public_id
+    ExportCustomOrder:
+      type: object
+      description: One row of ``export/custom-orders`` (``custom_order_export_payload``).
+      properties:
+        public_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        client:
+          $ref: '#/components/schemas/ExportClient'
+        city:
+          allOf:
+          - $ref: '#/components/schemas/ExportCity'
+          nullable: true
+          description: order -> delivery address -> city.
+        delivery_address:
+          type: string
+        status:
+          type: string
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportCustomOrderItem'
+      required:
+      - actual_delivery_date
+      - city
+      - client
+      - created_at
+      - delivery_address
+      - expected_delivery_date
+      - items
+      - public_id
+      - special_comments
+      - status
+      - total_amount
+      - total_packets
+      - verified_at
+    ExportCustomOrderItem:
+      type: object
+      description: One loose-packet line of a custom order.
+      properties:
+        product:
+          $ref: '#/components/schemas/ProductRef'
+        packet_weight:
+          type: string
+          description: Weight of one packet, in kg.
+        negotiated_selling_price:
+          type: string
+          description: Per packet.
+        packets:
+          type: integer
+        line_total:
+          type: string
+      required:
+      - line_total
+      - negotiated_selling_price
+      - packet_weight
+      - packets
+      - product
+    ExportCustomOrdersResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
       properties:
         start_date:
           type: string
@@ -4148,13 +4278,342 @@ components:
         results:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/ExportCustomOrder'
       required:
       - count
       - end_date
       - results
       - start_date
+    ExportDispatchReceipt:
+      type: object
+      description: 'One row of ``export/dispatch-receipts``: a full challan plus the
+        order''s own facts.'
+      properties:
+        order_public_id:
+          type: string
+        our_details:
+          $ref: '#/components/schemas/ChallanParty'
+        receiver_details:
+          $ref: '#/components/schemas/ChallanReceiver'
+        hsn_code:
+          type: string
+        financial_year:
+          type: string
+          description: Indian FY, e.g. "2026-2027".
+        dispatch:
+          $ref: '#/components/schemas/ChallanDispatch'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChallanLine'
+        item_count:
+          type: integer
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        order_created_at:
+          type: string
+          format: date-time
+        city:
+          allOf:
+          - $ref: '#/components/schemas/ExportCity'
+          nullable: true
+          description: order -> delivery address -> city.
+      required:
+      - city
+      - dispatch
+      - financial_year
+      - hsn_code
+      - item_count
+      - items
+      - order_created_at
+      - order_public_id
+      - our_details
+      - receiver_details
+      - total_amount
+      - total_packets
+    ExportDispatchReceiptsResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportDispatchReceipt'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
+    ExportInventorySnapshotsResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportSnapshotDay'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
+    ExportInwardDay:
+      type: object
+      description: 'One row of ``export/inward-entries``: every entry booked on one
+        IST day.'
+      properties:
+        date:
+          type: string
+          format: date
+        raw_materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportInwardRawMaterial'
+        other_materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportInwardOtherMaterial'
+      required:
+      - date
+      - other_materials
+      - raw_materials
+    ExportInwardEntriesResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportInwardDay'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
+    ExportInwardOtherMaterial:
+      type: object
+      description: Output shape for one inward-other-material lot.
+      properties:
+        public_id:
+          type: string
+        recipe:
+          $ref: '#/components/schemas/InwardOtherMaterialRecipeRef'
+        party:
+          $ref: '#/components/schemas/InwardOtherMaterialPartyRef'
+        quantity:
+          type: string
+          description: Amount received, in the recipe's unit.
+        effective_date:
+          type: string
+          format: date
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - effective_date
+      - party
+      - public_id
+      - quantity
+      - recipe
+    ExportInwardRawMaterial:
+      type: object
+      description: Output shape for one raw-material lot.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/InwardRawMaterialProductRef'
+        party:
+          $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        quantity_kg:
+          type: string
+          description: Kilograms received.
+        status:
+          type: string
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+        effective_date:
+          type: string
+          format: date
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - effective_date
+      - lab_sampling_date
+      - party
+      - product
+      - public_id
+      - quantity_kg
+      - status
+    ExportLooseSnapshot:
+      type: object
+      description: '``InventoryOperations.loose_stock_count_payload``: counted figures
+        only.'
+      properties:
+        public_id:
+          type: string
+        snapshot_date:
+          type: string
+          format: date
+        product:
+          $ref: '#/components/schemas/ProductRef'
+        packet_weight:
+          type: string
+          description: Weight of one packet, in kg.
+        packets:
+          type: integer
+        total_weight:
+          type: string
+          description: Kilograms.
+      required:
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - snapshot_date
+      - total_weight
+    ExportOrder:
+      type: object
+      description: One row of ``export/orders`` (``OrderOperations.order_export_payload``).
+      properties:
+        public_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        client:
+          $ref: '#/components/schemas/ExportClient'
+        city:
+          allOf:
+          - $ref: '#/components/schemas/ExportCity'
+          nullable: true
+          description: order -> delivery address -> city.
+        delivery_address:
+          type: string
+        status:
+          type: string
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+        transport_agency:
+          allOf:
+          - $ref: '#/components/schemas/TransportAgencyRef'
+          nullable: true
+        dispatch_mode:
+          $ref: '#/components/schemas/DispatchModeEnum'
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemPayload'
+      required:
+      - actual_delivery_date
+      - city
+      - client
+      - created_at
+      - delivery_address
+      - dispatch_mode
+      - expected_delivery_date
+      - items
+      - public_id
+      - special_comments
+      - status
+      - total_amount
+      - total_packets
+      - transport_agency
+      - verified_at
+    ExportOrdersResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportOrder'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
+    ExportSnapshotDay:
+      type: object
+      description: 'One row of ``export/inventory-snapshots``: both counts for one
+        date.'
+      properties:
+        snapshot_date:
+          type: string
+          format: date
+        bag_snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportBagSnapshot'
+        loose_snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportLooseSnapshot'
+      required:
+      - bag_snapshots
+      - loose_snapshots
+      - snapshot_date
     FilterCatalogueEntry:
       type: object
       description: Schema for one ``available_filters`` entry.
@@ -4921,9 +5380,9 @@ components:
         public_id:
           type: string
         product:
-          type: object
-          additionalProperties: {}
-          description: 'The bag''s product: {public_id, name}.'
+          allOf:
+          - $ref: '#/components/schemas/ProductRef'
+          description: The bag's product.
         packet_weight:
           type: string
         packets:
@@ -5343,7 +5802,7 @@ components:
       - stage
     ProductRef:
       type: object
-      description: Output shape for the ``product`` reference on a packaging.
+      description: Output shape for a ``{public_id, name}`` product reference.
       properties:
         public_id:
           type: string

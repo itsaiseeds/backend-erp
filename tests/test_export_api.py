@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import serializers, status
 
 from aggregator import InventoryOperations as inv
 from aggregator.ClientOperations import create_client_with_details
@@ -32,6 +32,13 @@ from aggregator.models import (
     State,
 )
 from aggregator.OrderOperations import create_order
+from api.sales_admin.ExportCustomOrdersView import ExportCustomOrdersResponseSerializer
+from api.sales_admin.ExportDispatchReceiptsView import ExportDispatchReceiptsResponseSerializer
+from api.sales_admin.ExportInventorySnapshotsView import (
+    ExportInventorySnapshotsResponseSerializer,
+)
+from api.sales_admin.ExportInwardEntriesView import ExportInwardEntriesResponseSerializer
+from api.sales_admin.ExportOrdersView import ExportOrdersResponseSerializer
 from authentication.models import Admin, SalesPerson
 from tests.common import WebApiTestCase
 
@@ -56,6 +63,30 @@ def _keys(value) -> set[str]:
     if isinstance(value, list):
         return {k for v in value for k in _keys(v)}
     return set()
+
+
+def _documented_keys_mismatches(serializer, data, path="") -> list[str]:
+    """Where ``data`` and the documenting ``serializer`` disagree on keys, recursively.
+
+    The export schemas are hand-written serializers, so this keeps the OpenAPI doc
+    honest: every key a response carries is documented, and every documented key
+    is really there, at every level of nesting.
+    """
+    if isinstance(serializer, serializers.ListSerializer):
+        problems = []
+        for index, item in enumerate(data):
+            problems += _documented_keys_mismatches(serializer.child, item, f"{path}[{index}]")
+        return problems
+    if not isinstance(serializer, serializers.Serializer) or data is None:
+        return []
+    fields = serializer.fields
+    problems = [f"{path}: undocumented {sorted(set(data) - set(fields))}"] if set(data) - set(fields) else []
+    if set(fields) - set(data):
+        problems.append(f"{path}: missing {sorted(set(fields) - set(data))}")
+    for name, field in fields.items():
+        if name in data:
+            problems += _documented_keys_mismatches(field, data[name], f"{path}.{name}")
+    return problems
 
 
 def _ist(day, at=time.min) -> datetime:
@@ -243,6 +274,7 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["items"][0]["quantity"], 2)
         self.assertEqual(row["total_amount"], "2000.00")
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
+        self.assertEqual(_documented_keys_mismatches(ExportOrdersResponseSerializer(), resp.data), [])
 
     # -- custom orders --------------------------------------------------------
 
@@ -272,6 +304,7 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["items"][0]["product"]["public_id"], self.product.public_id)
         self.assertEqual(row["items"][0]["packets"], 5)
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
+        self.assertEqual(_documented_keys_mismatches(ExportCustomOrdersResponseSerializer(), resp.data), [])
 
     # -- dispatch receipts ----------------------------------------------------
 
@@ -298,6 +331,7 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["receiver_details"]["company_name"], "Acme Seeds")
         self.assertEqual(row["items"][0]["lot_number"], "LOT-1")
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
+        self.assertEqual(_documented_keys_mismatches(ExportDispatchReceiptsResponseSerializer(), resp.data), [])
 
     # -- inward entries -------------------------------------------------------
 
@@ -342,6 +376,7 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual([r["public_id"] for r in days[1]["raw_materials"]], [raw_new.public_id])
         self.assertEqual([r["public_id"] for r in days[1]["other_materials"]], [other_new.public_id])
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
+        self.assertEqual(_documented_keys_mismatches(ExportInwardEntriesResponseSerializer(), resp.data), [])
 
     # -- inventory snapshots --------------------------------------------------
 
@@ -380,3 +415,4 @@ class ExportApiTest(WebApiTestCase):
             _keys(days) & {"packets_available", "reserved", "consumed", "available"}
         )
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
+        self.assertEqual(_documented_keys_mismatches(ExportInventorySnapshotsResponseSerializer(), resp.data), [])

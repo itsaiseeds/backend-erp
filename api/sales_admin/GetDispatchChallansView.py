@@ -45,6 +45,7 @@ from rest_framework.request import Request
 from aggregator.DispatchOperations import dispatch_challan_payload
 from aggregator.models import DispatchEntryItem, Order
 from aggregator.models.Order import DISPATCH_REQUIRED_STATUS_CODES
+from api.order_serializers import ProductRefSerializer
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
@@ -160,7 +161,7 @@ class ChallanLineSerializer(serializers.Serializer):
     """Output shape for one challan line: a bag, its lot and its money."""
 
     public_id = serializers.CharField(help_text="The packaging's public id.")
-    product = serializers.DictField()
+    product = ProductRefSerializer()
     packet_weight = serializers.CharField()
     packets = serializers.IntegerField()
     total_weight = serializers.CharField()

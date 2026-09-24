@@ -14,11 +14,16 @@ from rest_framework.request import Request
 
 from aggregator.models import Order, OrderItem
 from aggregator.OrderOperations import order_export_payload
+from api.export_serializers import ExportOrderSerializer
 from api.export_views import (
     EXPORT_QUERY_PARAMETERS,
     AdminDateRangeExportView,
     DateWindow,
-    ExportResponseSerializer,
+    export_response_serializer,
+)
+
+ExportOrdersResponseSerializer = export_response_serializer(
+    "ExportOrdersResponseSerializer", ExportOrderSerializer
 )
 
 
@@ -43,7 +48,7 @@ class ExportOrdersView(AdminDateRangeExportView):
         operation_id="sales_admin_export_orders",
         summary="Export orders (with items) booked in a date range",
         parameters=EXPORT_QUERY_PARAMETERS,
-        responses={200: ExportResponseSerializer},
+        responses={200: ExportOrdersResponseSerializer},
     )
     def get(self, request: Request, *args, **kwargs):
         return super().get(request, *args, **kwargs)

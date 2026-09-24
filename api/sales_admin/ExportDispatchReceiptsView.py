@@ -22,14 +22,19 @@ from rest_framework.request import Request
 
 from aggregator.ClientOperations import order_city_payload
 from aggregator.DispatchOperations import dispatch_challan_payload
+from api.export_serializers import ExportDispatchReceiptSerializer
 from api.export_views import (
     EXPORT_QUERY_PARAMETERS,
     AdminDateRangeExportView,
     DateWindow,
-    ExportResponseSerializer,
+    export_response_serializer,
 )
 
 from .GetDispatchChallansView import challan_queryset
+
+ExportDispatchReceiptsResponseSerializer = export_response_serializer(
+    "ExportDispatchReceiptsResponseSerializer", ExportDispatchReceiptSerializer
+)
 
 
 class ExportDispatchReceiptsView(AdminDateRangeExportView):
@@ -54,7 +59,7 @@ class ExportDispatchReceiptsView(AdminDateRangeExportView):
         operation_id="sales_admin_export_dispatch_receipts",
         summary="Export dispatch receipts (challans) of orders booked in a date range",
         parameters=EXPORT_QUERY_PARAMETERS,
-        responses={200: ExportResponseSerializer},
+        responses={200: ExportDispatchReceiptsResponseSerializer},
     )
     def get(self, request: Request, *args, **kwargs):
         return super().get(request, *args, **kwargs)

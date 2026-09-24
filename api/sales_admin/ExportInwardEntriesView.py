@@ -24,11 +24,16 @@ from aggregator.InwardOperations import (
     inward_raw_material_payload,
 )
 from aggregator.models import InwardOtherMaterial, InwardRawMaterial
+from api.export_serializers import ExportInwardDaySerializer
 from api.export_views import (
     EXPORT_QUERY_PARAMETERS,
     AdminDateRangeExportView,
     DateWindow,
-    ExportResponseSerializer,
+    export_response_serializer,
+)
+
+ExportInwardEntriesResponseSerializer = export_response_serializer(
+    "ExportInwardEntriesResponseSerializer", ExportInwardDaySerializer
 )
 
 
@@ -71,7 +76,7 @@ class ExportInwardEntriesView(AdminDateRangeExportView):
         operation_id="sales_admin_export_inward_entries",
         summary="Export inward entries booked in a date range, grouped by day",
         parameters=EXPORT_QUERY_PARAMETERS,
-        responses={200: ExportResponseSerializer},
+        responses={200: ExportInwardEntriesResponseSerializer},
     )
     def get(self, request: Request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
