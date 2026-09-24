@@ -82,6 +82,33 @@ def challan_orders() -> QuerySet:
     return Order.objects.filter(CHALLAN_Q)
 
 
+def challan_queryset() -> QuerySet:
+    """:func:`challan_orders` with every join ``dispatch_challan_payload`` walks.
+
+    The payload reads the receiver off the ``DispatchEntry`` snapshot, so it is
+    the entry's own address and cities that are selected here, not the order's
+    or the client's. Shared by the challan list and the dispatch-receipt export.
+    """
+    return challan_orders().select_related(
+        "dispatch_details",
+        "dispatch_entry",
+        "dispatch_entry__client",
+        "dispatch_entry__client_address__pincode",
+        "dispatch_entry__client_address__city",
+        "dispatch_entry__client_address__state",
+        "dispatch_entry__client_address__country",
+        "dispatch_entry__from_city",
+        "dispatch_entry__to_city",
+    ).prefetch_related(
+        Prefetch(
+            "dispatch_entry__items",
+            queryset=DispatchEntryItem.objects.select_related(
+                "product_packaging__product"
+            ),
+        ),
+    )
+
+
 class ChallanPartySerializer(serializers.Serializer):
     """Output shape for our own consignor block (schema only)."""
 
@@ -249,30 +276,7 @@ class GetDispatchChallansView(AdminPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        """Every join ``dispatch_challan_payload`` walks, declared once.
-
-        The payload reads the receiver off the ``DispatchEntry`` snapshot, so it
-        is the entry's own address and cities that are selected here, not the
-        order's or the client's.
-        """
-        return challan_orders().select_related(
-            "dispatch_details",
-            "dispatch_entry",
-            "dispatch_entry__client",
-            "dispatch_entry__client_address__pincode",
-            "dispatch_entry__client_address__city",
-            "dispatch_entry__client_address__state",
-            "dispatch_entry__client_address__country",
-            "dispatch_entry__from_city",
-            "dispatch_entry__to_city",
-        ).prefetch_related(
-            Prefetch(
-                "dispatch_entry__items",
-                queryset=DispatchEntryItem.objects.select_related(
-                    "product_packaging__product"
-                ),
-            ),
-        )
+        return challan_queryset()
 
     def serialize_page(self, page_items: list[Order], request: Request) -> list[dict]:
         return [dispatch_challan_payload(order) for order in page_items]

@@ -99,7 +99,8 @@ backend-erp/
   DB) and paste it into Neon; `migrate` is never part of the workflow.
 
 ### Seed Data (DML)
-- `sql/dml.sql` seeds content types (28) + permissions (112) + reconciliation
+- `sql/dml.sql` seeds content types (41) + permissions (164 CRUD + the custom
+  `authentication.execute_python_code`) + reconciliation
   users (superuser `9999999999` with TOTP, no-TOTP user `8888888888`).
 - Always use `ON CONFLICT DO NOTHING` for idempotency
 - Always reset sequences with `SELECT setval('table_id_seq', N);`
@@ -225,12 +226,11 @@ bag holds N packets. (This inverts an earlier model where a "packet" held
   deals only in loose packets — it never breaks open a bag. Moving stock between
   the pools is a physical act recorded by **re-uploading both counts**
   (`bags - 1`, `packets + N`) — never by a synthetic movement row.
-- **The two pools run on independent date lifecycles.** Each purge is scoped to
-  its own table: `_purge_older_than` touches only `InventorySnapshot`,
-  `_purge_loose_older_than` only `LooseStockSnapshot`. A bag count for a new day
-  must never delete a loose count that is still accurate. Within each table only
-  the latest `snapshot_date` is retained (a queryset delete, which bypasses
-  `SoftDeletedModel`'s instance-level soft delete by design).
+- **The two pools run on independent date lifecycles.** Every day's count is
+  kept as history in both tables (nothing is purged; the date-range export
+  reads it). Every stock read selects **one** `snapshot_date` — today, an
+  explicit date, or the table's own latest date — never "all rows", so older
+  days never leak into a figure. Keep it that way when adding a read.
 - **The bag count is compulsory; the loose count is not.**
   `is_stock_count_complete` covers bags only, so a missing or stale loose count
   never blocks verification. Because a loose count may be days old and still be
@@ -240,7 +240,7 @@ bag holds N packets. (This inverts an earlier model where a "packet" held
 - Reserved and consumed quantities are **derived from order status** (`Order`
   for bags, `CustomOrder` for loose packets), never stored. That is what makes
   verification and dispatch reversible, and what lets outstanding reservations
-  survive the purge. Do not add counter columns.
+  carry across days. Do not add counter columns.
 
 ### Order verification & custom orders
 - `OrderOperations.verify_order` has **three** gates: (1) the actor is an admin

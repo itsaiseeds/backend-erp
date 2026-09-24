@@ -232,6 +232,8 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(162, 'Can change dispatch entry item', 46, 'change_dispatchentryitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(163, 'Can delete dispatch entry item', 46, 'delete_dispatchentryitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(164, 'Can view dispatch entry item', 46, 'view_dispatchentryitem');
+-- Custom permission (authentication.User.Meta.permissions): gates POST /api/execute-code/.
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(165, 'Can execute Python code on the server', 1, 'execute_python_code');
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)

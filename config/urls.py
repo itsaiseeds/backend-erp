@@ -7,6 +7,7 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from api.execute_code import execute_code_page
 from api.permissions import IsSuperUser
 from config.views import flutter_catch_all
 
@@ -25,6 +26,8 @@ urlpatterns = [
         SpectacularSwaggerView.as_view(permission_classes=[IsSuperUser], url_name="schema"),
         name="swagger-ui",
     ),
+    # Browser UI for POST /api/execute-code/ (same session as the sales-admin app).
+    path("execute-code/", execute_code_page, name="execute-code-page"),
     re_path(r"^sales-admin(?:/(?P<path>.*))?$", flutter_catch_all),
 ]
 

@@ -171,6 +171,9 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = "user"
         verbose_name_plural = "users"
+        permissions = [
+            ("execute_python_code", "Can execute Python code on the server"),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.phone_number})"

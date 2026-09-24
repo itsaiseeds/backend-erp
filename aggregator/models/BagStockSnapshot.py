@@ -36,10 +36,9 @@ class InventorySnapshot(
     (``packets + N``). Both tables stay pure records of what was counted -- they
     carry no synthetic movements.
 
-    Only the latest ``snapshot_date`` is retained; recording a count for a newer
-    date hard-deletes every earlier row (see
-    ``aggregator.InventoryOperations.record_stock_counts``). That purge is
-    scoped to this table and never touches loose stock.
+    Every day's count is kept as history. Reads always select one
+    ``snapshot_date`` (today, or the latest counted date -- see
+    ``aggregator.InventoryOperations``), so older days never affect a figure.
 
     Exposed to the frontend by its ``public_id`` (``INV-…``); the primary key is
     never sent out.

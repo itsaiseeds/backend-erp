@@ -34,6 +34,8 @@ from .models import (
 if TYPE_CHECKING:
     from authentication.models import User
 
+    from .models import CustomOrder, Order
+
 # The three client link tables share the same shape: a ``client`` FK, a target
 # FK, an ``is_primary`` flag and soft-delete columns. The declarative helpers
 # below are generic over whichever one they are handed.
@@ -432,6 +434,25 @@ def update_client_core(client: Client, **fields: str) -> Client:
 def _primary_link(links: list[LinkT]) -> LinkT | None:
     """The primary link among already-loaded ``links`` (no extra query)."""
     return next((link for link in links if link.is_primary), None)
+
+
+def client_summary_payload(client: Client) -> dict:
+    """Who an order is for, in business terms: public id, name and GST."""
+    return {
+        "public_id": client.public_id,
+        "company_name": client.company_name,
+        "gst_number": client.gst_number,
+    }
+
+
+def order_city_payload(order: Order | CustomOrder) -> dict | None:
+    """The city an order (or custom order) goes to: order -> delivery address -> city.
+
+    Deliberately the order's own delivery address, never one of the client's
+    addresses -- a client may ship different orders to different cities.
+    """
+    city = order.delivery_address.city if order.delivery_address_id else None
+    return {"id": city.id, "name": city.name} if city else None
 
 
 def client_payload(client: Client) -> dict:

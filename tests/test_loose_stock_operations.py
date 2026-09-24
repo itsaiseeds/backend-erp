@@ -5,9 +5,8 @@ Loose stock is stock in a packet but not in a bag, keyed by
 exists for: a product packed as both 1kg x 20 and 1kg x 30 has ONE pool of
 loose 1kg packets, not two.
 
-Also covers the independent date lifecycle -- the loose count is optional, is
-never purged by a bag count, and is read at the latest *loose* date rather than
-today.
+Also covers the independent date lifecycle -- the loose count is optional, keeps
+its history, and is read at the latest *loose* date rather than today.
 
 Run: bash scripts/run.sh test-unit
 """
@@ -21,7 +20,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 
 from aggregator import InventoryOperations as inv
-from aggregator.models import InventorySnapshot, LooseStockSnapshot, Stage, StageIds
+from aggregator.models import LooseStockSnapshot, Stage, StageIds
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, User
 from tests.common import DMLTestCase
@@ -166,36 +165,17 @@ class LooseStockTest(DMLTestCase):
         assert rows.count() == 1
         assert rows.first().packets == 9
 
-    def test_newer_loose_count_purges_older_loose_days(self):
-        """tests/test_loose_stock_operations.py::LooseStockTest::test_newer_loose_count_purges_older_loose_days"""
+    def test_older_loose_days_are_kept_but_reads_use_only_the_latest(self):
+        """tests/test_loose_stock_operations.py::LooseStockTest::test_older_loose_days_are_kept_but_reads_use_only_the_latest"""
         yesterday = self.today - datetime.timedelta(days=1)
         self._record(50, snapshot_date=yesterday)
         self._record(12)
-        assert LooseStockSnapshot.all_objects.filter(snapshot_date=yesterday).count() == 0
-        assert inv.on_hand_loose_packets(self.product, self.w1) == 12
-
-    # -- the two lifecycles are independent ------------------------------------
-
-    def test_a_new_days_bag_count_does_not_purge_loose_stock(self):
-        """tests/test_loose_stock_operations.py::LooseStockTest::test_a_new_days_bag_count_does_not_purge_loose_stock"""
-        yesterday = self.today - datetime.timedelta(days=1)
-        self._record(12, snapshot_date=yesterday)
-        # A bag count for today must not touch yesterday's still-valid loose count.
-        inv.record_stock_count(
-            product_packaging=self.pack_20, bags=400, actor=self.stock_admin
-        )
         assert LooseStockSnapshot.objects.filter(snapshot_date=yesterday).count() == 1
         assert inv.on_hand_loose_packets(self.product, self.w1) == 12
+        assert inv.available_loose_packets(self.product, self.w1) == 12
+        assert [e["packets_on_hand"] for e in inv.loose_stock_position()] == [12]
 
-    def test_a_loose_count_does_not_purge_bag_snapshots(self):
-        """tests/test_loose_stock_operations.py::LooseStockTest::test_a_loose_count_does_not_purge_bag_snapshots"""
-        yesterday = self.today - datetime.timedelta(days=1)
-        inv.record_stock_count(
-            product_packaging=self.pack_20, bags=400, actor=self.stock_admin,
-            snapshot_date=yesterday,
-        )
-        self._record(12)
-        assert InventorySnapshot.objects.filter(snapshot_date=yesterday).count() == 1
+    # -- the two lifecycles are independent ------------------------------------
 
     def test_loose_reads_use_the_latest_loose_date_not_today(self):
         """tests/test_loose_stock_operations.py::LooseStockTest::test_loose_reads_use_the_latest_loose_date_not_today"""

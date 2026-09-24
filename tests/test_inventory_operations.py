@@ -1,4 +1,4 @@
-"""InventoryOperations tests: the daily count, its purge, and the two pools.
+"""InventoryOperations tests: the daily count, its history, and the two pools.
 
 Run: bash scripts/run.sh test-unit
 """
@@ -150,19 +150,26 @@ class InventoryOperationsTest(DMLTestCase):
         # Opening bags is recorded by re-uploading the count.
         assert rows.first().bags == 360
 
-    def test_newer_count_hard_deletes_older_days_only(self):
-        """tests/test_inventory_operations.py::InventoryOperationsTest::test_newer_count_hard_deletes_older_days_only"""
+    def test_older_days_are_kept_but_reads_use_only_the_latest(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_older_days_are_kept_but_reads_use_only_the_latest"""
         yesterday = self.today - datetime.timedelta(days=1)
         self._count_everything(bags=100, snapshot_date=yesterday)
-        assert InventorySnapshot.objects.filter(snapshot_date=yesterday).exists()
-
         self._count_everything(bags=400, snapshot_date=self.today)
 
-        # Rows for days < x are physically gone, not merely soft-deleted.
-        assert not InventorySnapshot.all_objects.filter(snapshot_date=yesterday).exists()
-        # Rows for x itself survive.
-        assert InventorySnapshot.objects.filter(snapshot_date=self.today).exists()
+        # History is kept...
+        assert InventorySnapshot.objects.filter(snapshot_date=yesterday).exists()
+        # ...but every read sees today's count alone.
         assert inv.latest_snapshot_date() == self.today
+        assert inv.on_hand_bags(self.pack) == 400
+        assert inv.available_bags(self.pack) == 400
+        assert {e["packets_on_hand"] for e in inv.stock_position()} == {400}
+        assert inv.snapshot_for().count() == ProductPackaging.objects.count()
+
+    def test_yesterdays_count_does_not_complete_today(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_yesterdays_count_does_not_complete_today"""
+        yesterday = self.today - datetime.timedelta(days=1)
+        self._count_everything(snapshot_date=yesterday)
+        assert inv.is_stock_count_complete() is False
 
     # -- completeness gate -----------------------------------------------------
 

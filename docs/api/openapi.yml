@@ -513,6 +513,35 @@ paths:
                 items:
                   $ref: '#/components/schemas/AndroidStateRef'
           description: ''
+  /api/execute-code/:
+    post:
+      operationId: execute_code
+      description: Execute Python on the server (``execute_python_code`` permission
+        only).
+      summary: Execute Python code on the server (permission-gated)
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteCodeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExecuteCodeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExecuteCodeRequestRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecuteCodeResponse'
+          description: ''
   /api/sales-admin/admins:
     get:
       operationId: api_sales_admin_admins_list
@@ -947,6 +976,167 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/export/custom-orders:
+    get:
+      operationId: sales_admin_export_custom_orders
+      description: Export the custom orders booked in a date window, with their items.
+      summary: Export custom orders (with items) booked in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+          description: ''
+  /api/sales-admin/export/dispatch-receipts:
+    get:
+      operationId: sales_admin_export_dispatch_receipts
+      description: Export the complete challans of orders booked in a date window.
+      summary: Export dispatch receipts (challans) of orders booked in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+          description: ''
+  /api/sales-admin/export/inventory-snapshots:
+    get:
+      operationId: sales_admin_export_inventory_snapshots
+      description: Export the bag and loose stock counts for a date window, grouped
+        by date.
+      summary: Export bag and loose stock counts for a date range, grouped by date
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+          description: ''
+  /api/sales-admin/export/inward-entries:
+    get:
+      operationId: sales_admin_export_inward_entries
+      description: Export the inward entries booked in a date window, grouped by day.
+      summary: Export inward entries booked in a date range, grouped by day
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+          description: ''
+  /api/sales-admin/export/orders:
+    get:
+      operationId: sales_admin_export_orders
+      description: Export the orders booked in a date window, with their items.
+      summary: Export orders (with items) booked in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
           description: ''
   /api/sales-admin/get-clients/:
     get:
@@ -3913,6 +4103,58 @@ components:
       - from_city_id
       - items
       - vehicle_number
+    ExecuteCodeRequestRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+      required:
+      - code
+    ExecuteCodeResponse:
+      type: object
+      description: Output shape of a run (schema only).
+      properties:
+        success:
+          type: boolean
+        stdout:
+          type: string
+        result:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        duration_ms:
+          type: integer
+      required:
+      - duration_ms
+      - error
+      - result
+      - stdout
+      - success
+    ExportResponse:
+      type: object
+      description: Output envelope shared by every export (schema only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
     FilterCatalogueEntry:
       type: object
       description: Schema for one ``available_filters`` entry.

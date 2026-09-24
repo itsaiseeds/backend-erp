@@ -19,7 +19,7 @@ from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from .permissions import IsAdminUser, IsSalesPerson, IsSuperUser
+from .permissions import HasDjangoPermission, IsAdminUser, IsSalesPerson, IsSuperUser
 
 
 def fire_and_forget(func: Callable[[], object]) -> None:
@@ -43,6 +43,8 @@ class BaseApiView(APIView):
     * ``admin_required``   - additionally require an ``Admin`` profile.
     * ``superuser_required`` - additionally require a Django superuser.
     * ``salesperson_required`` - additionally require a ``SalesPerson`` profile.
+    * ``required_permission`` - additionally require this Django permission
+      (``"<app_label>.<codename>"``), regardless of role; ``None`` for none.
 
     The concrete client bases (:class:`~api.admin.AdminApiView` for the
     session-only web app and :class:`~android.api.base.AndroidBaseView` for
@@ -60,6 +62,7 @@ class BaseApiView(APIView):
     admin_required = False
     superuser_required = False
     salesperson_required = False
+    required_permission: str | None = None
 
     def get_permissions(self):
         permissions = []
@@ -71,4 +74,6 @@ class BaseApiView(APIView):
             permissions.append(IsSuperUser())
         if self.salesperson_required:
             permissions.append(IsSalesPerson())
+        if self.required_permission is not None:
+            permissions.append(HasDjangoPermission())
         return permissions

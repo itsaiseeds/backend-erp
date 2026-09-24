@@ -12,6 +12,11 @@ from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .CropsView import CropsView
 from .DeleteOtherMaterialRecipeView import DeleteOtherMaterialRecipeView
 from .DispatchOrderView import DispatchOrderView
+from .ExportCustomOrdersView import ExportCustomOrdersView
+from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
+from .ExportInventorySnapshotsView import ExportInventorySnapshotsView
+from .ExportInwardEntriesView import ExportInwardEntriesView
+from .ExportOrdersView import ExportOrdersView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetDispatchChallansView import GetDispatchChallansView
@@ -191,5 +196,27 @@ urlpatterns = [
         "other-material-stock",
         OtherMaterialStockView.as_view(),
         name="other-material-stock",
+    ),
+    # -- Date-range exports (api/export_views.py) -------------------------------
+    path("export/orders", ExportOrdersView.as_view(), name="export-orders"),
+    path(
+        "export/custom-orders",
+        ExportCustomOrdersView.as_view(),
+        name="export-custom-orders",
+    ),
+    path(
+        "export/dispatch-receipts",
+        ExportDispatchReceiptsView.as_view(),
+        name="export-dispatch-receipts",
+    ),
+    path(
+        "export/inward-entries",
+        ExportInwardEntriesView.as_view(),
+        name="export-inward-entries",
+    ),
+    path(
+        "export/inventory-snapshots",
+        ExportInventorySnapshotsView.as_view(),
+        name="export-inventory-snapshots",
     ),
 ]
