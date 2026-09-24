@@ -1,0 +1,464 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Execute Code</title>
+<link rel="stylesheet" href="{% static 'api/vendor/codemirror/codemirror.min.css' %}">
+<link rel="stylesheet" href="{% static 'api/vendor/codemirror/addon/hint/show-hint.min.css' %}">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2127; --muted: #626b77;
+    --border: #d8dce2; --accent: #2457c5; --accent-text: #ffffff;
+    --ok: #1f7a3d; --ok-bg: #e5f4ea; --err: #b3261e; --err-bg: #fbe9e7;
+    --warn-bg: #fff4d6; --warn-text: #6b4e00; --code-bg: #f1f3f6;
+    --selection: #cfdcf7; --chip: #e7ebf1;
+    --tok-keyword: #a626a4; --tok-def: #4078f2; --tok-builtin: #0184bc;
+    --tok-string: #50a14f; --tok-number: #986801; --tok-comment: #8a919c;
+    --tok-model: #c18401; --tok-property: #e45649;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171b; --panel: #1c2026; --text: #e6e9ee; --muted: #9aa3ae;
+      --border: #2f353d; --accent: #6b95ff; --accent-text: #0d1117;
+      --ok: #6fd08f; --ok-bg: #16301f; --err: #ff8a80; --err-bg: #3a1a18;
+      --warn-bg: #3a2f10; --warn-text: #f3d27a; --code-bg: #12151a;
+      --selection: #2b3a55; --chip: #262b33;
+      --tok-keyword: #c678dd; --tok-def: #61afef; --tok-builtin: #56b6c2;
+      --tok-string: #98c379; --tok-number: #d19a66; --tok-comment: #7f8894;
+      --tok-model: #e5c07b; --tok-property: #e06c75;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .warn {
+    background: var(--warn-bg); color: var(--warn-text); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 16px;
+  }
+  code, pre, .CodeMirror, .CodeMirror-hints {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px;
+  }
+  /* Output panels only -- CodeMirror renders every editor line as a <pre> too. */
+  .out pre {
+    line-height: 1.5; background: var(--code-bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 0 0 8px 8px; border-top: 0;
+    padding: 10px 12px; margin: 0; white-space: pre-wrap; word-break: break-word;
+    max-height: 360px; overflow: auto;
+  }
+
+  /* -- editor ------------------------------------------------------------ */
+  .CodeMirror {
+    height: 340px; line-height: 1.55; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--code-bg); color: var(--text); resize: vertical; overflow: hidden;
+  }
+  .CodeMirror-focused { border-color: var(--accent); box-shadow: 0 0 0 3px var(--selection); }
+  .CodeMirror-lines { padding: 10px 0; }
+  .CodeMirror pre.CodeMirror-line, .CodeMirror pre.CodeMirror-line-like { padding: 0 12px; }
+  .CodeMirror-gutters { background: var(--code-bg); border-right: 1px solid var(--border); }
+  .CodeMirror-linenumber { color: var(--muted); opacity: .7; padding: 0 8px 0 12px; }
+  .CodeMirror-cursor { border-left: 2px solid var(--accent); }
+  .CodeMirror-selected, .CodeMirror-focused .CodeMirror-selected { background: var(--selection); }
+  .CodeMirror-matchingbracket { color: var(--accent) !important; text-decoration: underline; }
+  .cm-s-default .cm-keyword { color: var(--tok-keyword); }
+  .cm-s-default .cm-def { color: var(--tok-def); }
+  .cm-s-default .cm-builtin { color: var(--tok-builtin); }
+  .cm-s-default .cm-string { color: var(--tok-string); }
+  .cm-s-default .cm-number { color: var(--tok-number); }
+  .cm-s-default .cm-comment { color: var(--tok-comment); font-style: italic; }
+  .cm-s-default .cm-property { color: var(--tok-property); }
+  .cm-s-default .cm-variable, .cm-s-default .cm-variable-2, .cm-s-default .cm-operator { color: var(--text); }
+  .cm-s-default .cm-meta { color: var(--tok-builtin); }
+  /* Same specificity as the .cm-variable rule above, and later, so it wins. */
+  .cm-s-default .cm-model { color: var(--tok-model); font-weight: 600; }
+
+  /* -- autocomplete dropdown --------------------------------------------- */
+  .CodeMirror-hints {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .25); max-height: 260px; padding: 2px; z-index: 20;
+  }
+  .CodeMirror-hint {
+    color: var(--text); padding: 2px 8px; border-radius: 4px;
+    display: flex; justify-content: space-between; gap: 16px;
+  }
+  li.CodeMirror-hint-active { background: var(--accent); color: var(--accent-text); }
+  .hint-kind { color: var(--muted); font-size: 11px; }
+  li.CodeMirror-hint-active .hint-kind { color: inherit; opacity: .8; }
+
+  /* -- controls and output ----------------------------------------------- */
+  .bar { display: flex; align-items: center; gap: 16px; margin: 12px 0 20px; flex-wrap: wrap; }
+  #run {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+    padding: 8px 18px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  #run:hover { filter: brightness(1.08); }
+  #run:disabled { opacity: .6; cursor: progress; }
+  #run svg { width: 12px; height: 12px; fill: currentColor; }
+  .keys { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+  kbd {
+    font: 11px ui-monospace, Consolas, monospace; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 5px;
+  }
+  .status { margin-left: auto; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+  .status.ok { color: var(--ok); background: var(--ok-bg); }
+  .status.err { color: var(--err); background: var(--err-bg); }
+  .out { margin-bottom: 16px; }
+  .out h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    margin: 0; padding: 6px 12px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px 8px 0 0;
+  }
+  #error-box h2 { color: var(--err); }
+  #error-out { color: var(--err); }
+
+  /* -- models in scope --------------------------------------------------- */
+  details.scope {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; margin-bottom: 20px;
+  }
+  details.scope summary { cursor: pointer; font-weight: 600; }
+  .scope-note { color: var(--muted); margin: 8px 0; }
+  .scope-group { margin: 8px 0; }
+  .scope-group h3 { font-size: 12px; color: var(--muted); margin: 0 0 4px; font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: var(--chip); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 2px 8px; font: 12px ui-monospace, Consolas, monospace;
+    font-weight: 400; cursor: pointer;
+  }
+  .chip:hover { border-color: var(--accent); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Execute code</h1>
+  <p class="sub">Signed in as {{ request.user.name }} ({{ request.user.phone_number }})</p>
+
+  <div class="warn">
+    Runs on the live server in one transaction. It <strong>commits</strong> if the code
+    finishes and rolls back if it raises.
+  </div>
+
+  <textarea id="code"></textarea>
+
+  <div class="bar">
+    <button id="run" type="button">
+      <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z"/></svg><span id="run-label">Run</span>
+    </button>
+    <span class="keys">
+      <span><kbd>Ctrl</kbd> <kbd>Enter</kbd> run</span>
+      <span><kbd>Ctrl</kbd> <kbd>Space</kbd> complete</span>
+      <span><kbd>Ctrl</kbd> <kbd>/</kbd> comment</span>
+    </span>
+    <span id="status" class="status" hidden></span>
+  </div>
+
+  <section id="result-box" class="out" hidden>
+    <h2>Result</h2>
+    <pre id="result-out"></pre>
+  </section>
+  <section id="stdout-box" class="out" hidden>
+    <h2>Output</h2>
+    <pre id="stdout-out"></pre>
+  </section>
+  <section id="error-box" class="out" hidden>
+    <h2>Error</h2>
+    <pre id="error-out"></pre>
+  </section>
+
+  <details class="scope">
+    <summary id="scope-title">In scope</summary>
+    <p class="scope-note">Every model and enum is available by name, no import needed. Click one to insert it.</p>
+    <div id="scope-groups"></div>
+  </details>
+</main>
+
+{{ catalogue|json_script:"catalogue" }}
+<script src="{% static 'api/vendor/codemirror/codemirror.min.js' %}"></script>
+<script src="{% static 'api/vendor/codemirror/mode/python/python.min.js' %}"></script>
+<script src="{% static 'api/vendor/codemirror/addon/hint/show-hint.min.js' %}"></script>
+<script src="{% static 'api/vendor/codemirror/addon/edit/matchbrackets.min.js' %}"></script>
+<script src="{% static 'api/vendor/codemirror/addon/edit/closebrackets.min.js' %}"></script>
+<script src="{% static 'api/vendor/codemirror/addon/comment/comment.min.js' %}"></script>
+<script>
+  const API_URL = "{{ api_url|escapejs }}";
+  const CSRF_TOKEN = "{{ csrf_token }}";
+  const DRAFT_KEY = "execute-code-draft";
+  const CATALOGUE = JSON.parse(document.getElementById("catalogue").textContent);
+  const MODELS = CATALOGUE.models;
+  const MODEL_NAMES = Object.keys(MODELS);
+  const ENUMS = CATALOGUE.enums;
+  const ENUM_NAMES = Object.keys(ENUMS);
+
+  const KEYWORDS = [
+    "and", "as", "assert", "break", "class", "continue", "def", "del", "elif", "else",
+    "except", "False", "finally", "for", "from", "if", "import", "in", "is", "lambda",
+    "None", "not", "or", "pass", "raise", "return", "True", "try", "while", "with", "yield",
+  ];
+  const BUILTINS = [
+    "abs", "all", "any", "bool", "dict", "enumerate", "filter", "float", "getattr",
+    "hasattr", "int", "isinstance", "len", "list", "map", "max", "min", "next", "range",
+    "repr", "reversed", "round", "set", "setattr", "sorted", "str", "sum", "tuple",
+    "type", "zip", "Exception", "ValueError", "KeyError",
+  ];
+  // Calls whose keyword arguments are field names / lookups of the model.
+  const FIELD_CALLS = [
+    "filter", "exclude", "get", "get_or_create", "update_or_create", "create", "update",
+    "order_by", "values", "values_list", "only", "defer", "select_related",
+    "prefetch_related", "latest", "earliest",
+  ];
+
+  // -- editor -------------------------------------------------------------
+
+  const textarea = document.getElementById("code");
+  try { textarea.value = localStorage.getItem(DRAFT_KEY) || ""; } catch (e) {}
+
+  const editor = CodeMirror.fromTextArea(textarea, {
+    mode: { name: "python", version: 3, extra_builtins: CATALOGUE.helpers },
+    lineNumbers: true,
+    lineWrapping: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    autofocus: true,
+    extraKeys: {
+      "Ctrl-Enter": execute,
+      "Cmd-Enter": execute,
+      "Ctrl-Space": (cm) => cm.showHint({ completeSingle: false }),
+      "Ctrl-/": "toggleComment",
+      "Cmd-/": "toggleComment",
+      Tab: (cm) => cm.somethingSelected()
+        ? cm.indentSelection("add")
+        : cm.replaceSelection("    ", "end"),
+      "Shift-Tab": (cm) => cm.indentSelection("subtract"),
+    },
+    hintOptions: { hint: complete, completeSingle: false },
+  });
+
+  // Model names get their own colour on top of the Python mode's highlighting.
+  editor.addOverlay({
+    token(stream) {
+      if (stream.match(/^[A-Za-z_]\w*/)) {
+        const name = stream.current();
+        return MODELS[name] || ENUMS[name] ? "model" : null;
+      }
+      stream.next();
+      return null;
+    },
+  });
+
+  editor.on("change", () => {
+    try { localStorage.setItem(DRAFT_KEY, editor.getValue()); } catch (e) {}
+  });
+
+  // Open the completion list as you type, but never inside strings or comments.
+  editor.on("inputRead", (cm, change) => {
+    if (cm.state.completionActive || change.origin !== "+input") return;
+    if (!/^[\w.]$/.test(change.text.join(""))) return;
+    const type = cm.getTokenAt(cm.getCursor()).type || "";
+    if (/string|comment/.test(type)) return;
+    cm.showHint({ completeSingle: false });
+  });
+
+  // -- autocomplete --------------------------------------------------------
+
+  function option(text, kind) {
+    return {
+      text,
+      render(element) {
+        const label = document.createElement("span");
+        label.textContent = text;
+        const tag = document.createElement("span");
+        tag.className = "hint-kind";
+        tag.textContent = kind;
+        element.append(label, tag);
+      },
+    };
+  }
+
+  function wordsInDocument(exclude) {
+    const words = new Set(editor.getValue().match(/[A-Za-z_]\w{2,}/g) || []);
+    words.delete(exclude);
+    return [...words];
+  }
+
+  function complete(cm) {
+    const cursor = cm.getCursor();
+    const line = cm.getLine(cursor.line).slice(0, cursor.ch);
+    const word = /\w*$/.exec(line)[0];
+    const before = line.slice(0, line.length - word.length);
+    const queryset = () => CATALOGUE.queryset_methods.map((name) => option(name, "method"));
+    let options;
+    let match;
+
+    if ((match = /(\w+)\.(\w+)\.$/.exec(before)) && MODELS[match[1]]
+        && MODELS[match[1]].managers.includes(match[2])) {
+      // Order.objects.|
+      options = queryset();
+    } else if ((match = /(\w+)\.$/.exec(before)) && ENUMS[match[1]]) {
+      // StatusIds.|
+      options = ENUMS[match[1]].map((name) => option(name, "member"));
+    } else if ((match = /(\w+)\.$/.exec(before)) && MODELS[match[1]]) {
+      // Order.|
+      const model = MODELS[match[1]];
+      options = [
+        ...model.managers.map((name) => option(name, "manager")),
+        option("DoesNotExist", "exception"),
+        ...model.fields.map((name) => option(name, "field")),
+      ];
+    } else if (/\)\.$/.test(before)) {
+      // Order.objects.filter(...).|  -- a chained queryset
+      options = queryset();
+    } else if (/\.$/.test(before)) {
+      return null;  // attribute of something we can't know about
+    } else {
+      options = [
+        ...fieldArguments(before),
+        ...MODEL_NAMES.map((name) => option(name, MODELS[name].app)),
+        ...ENUM_NAMES.map((name) => option(name, "enum")),
+        ...CATALOGUE.helpers.map((name) => option(name, "helper")),
+        ...KEYWORDS.map((name) => option(name, "keyword")),
+        ...BUILTINS.map((name) => option(name, "builtin")),
+        ...wordsInDocument(word).map((name) => option(name, "name")),
+      ];
+    }
+    return {
+      list: rank(options, word),
+      from: CodeMirror.Pos(cursor.line, cursor.ch - word.length),
+      to: cursor,
+    };
+  }
+
+  // Inside Order.objects.filter(| the model's field names are the useful ones.
+  function fieldArguments(before) {
+    const pattern = new RegExp(
+      String.raw`(\w+)\.\w+\.(?:${FIELD_CALLS.join("|")})\([^()]*$`
+    );
+    const match = pattern.exec(before);
+    const model = match && MODELS[match[1]];
+    return model ? model.fields.map((name) => option(name, "field")) : [];
+  }
+
+  // Prefix matches first, then substring matches; duplicates keep their first kind.
+  function rank(options, word) {
+    const needle = word.toLowerCase();
+    const seen = new Set();
+    const prefix = [];
+    const inside = [];
+    for (const item of options) {
+      if (seen.has(item.text)) continue;
+      const text = item.text.toLowerCase();
+      if (needle && text === needle) continue;
+      if (text.startsWith(needle)) prefix.push(item);
+      else if (needle && text.includes(needle)) inside.push(item);
+      else continue;
+      seen.add(item.text);
+    }
+    return [...prefix, ...inside].slice(0, 80);
+  }
+
+  // -- models in scope ------------------------------------------------------
+
+  // One group of clickable names; ``describe`` gives each chip's hover text.
+  function renderGroup(title, names, describe) {
+    const group = document.createElement("div");
+    group.className = "scope-group";
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    const chips = document.createElement("div");
+    chips.className = "chips";
+    for (const name of names) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.textContent = name;
+      chip.title = describe(name);
+      chip.addEventListener("click", () => {
+        editor.replaceSelection(name, "end");
+        editor.focus();
+      });
+      chips.append(chip);
+    }
+    group.append(heading, chips);
+    document.getElementById("scope-groups").append(group);
+  }
+
+  function renderScope() {
+    const byApp = {};
+    for (const name of MODEL_NAMES) (byApp[MODELS[name].app] ||= []).push(name);
+    document.getElementById("scope-title").textContent =
+      "In scope: " + MODEL_NAMES.length + " models, " + ENUM_NAMES.length + " enums + " +
+      CATALOGUE.helpers.join(", ");
+    for (const app of Object.keys(byApp).sort()) {
+      renderGroup(app, byApp[app], (name) => MODELS[name].fields.join(", "));
+    }
+    renderGroup("enums", ENUM_NAMES, (name) => ENUMS[name].join(", "));
+  }
+  renderScope();
+
+  // -- running --------------------------------------------------------------
+
+  const run = document.getElementById("run");
+  const runLabel = document.getElementById("run-label");
+  const statusEl = document.getElementById("status");
+  run.addEventListener("click", execute);
+
+  function show(name, text) {
+    const box = document.getElementById(name + "-box");
+    box.hidden = text === null || text === undefined || text === "";
+    document.getElementById(name + "-out").textContent = box.hidden ? "" : text;
+  }
+
+  function setStatus(ok, text) {
+    statusEl.hidden = false;
+    statusEl.className = "status " + (ok ? "ok" : "err");
+    statusEl.textContent = text;
+  }
+
+  async function execute() {
+    const source = editor.getValue();
+    if (!source.trim() || run.disabled) return;
+    run.disabled = true;
+    runLabel.textContent = "Running…";
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF_TOKEN },
+        body: JSON.stringify({ code: source }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setStatus(false, "HTTP " + response.status);
+        show("result", null);
+        show("stdout", null);
+        show("error", data.detail || JSON.stringify(data, null, 2));
+        return;
+      }
+      setStatus(data.success, (data.success ? "Committed" : "Failed, rolled back") +
+        " · " + data.duration_ms + " ms");
+      show("result", data.result);
+      show("stdout", data.stdout);
+      show("error", data.error);
+    } catch (err) {
+      setStatus(false, "Request failed");
+      show("error", String(err));
+    } finally {
+      run.disabled = false;
+      runLabel.textContent = "Run";
+    }
+  }
+</script>
+</body>
+</html>

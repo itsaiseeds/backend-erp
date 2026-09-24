@@ -69,6 +69,27 @@ def django_db_setup(django_db_setup, django_db_blocker):  # noqa: PT004
     yield
 
 
+@pytest.fixture(scope="session", autouse=True)
+def plain_static_storage():
+    """Serve ``{% static %}`` without the ``collectstatic`` manifest.
+
+    Production uses WhiteNoise's ``CompressedManifestStaticFilesStorage``, which
+    resolves every static path through the manifest ``collectstatic`` writes at
+    deploy time. Tests never run ``collectstatic`` (CI builds the image and runs
+    pytest straight away), so any template using ``{% static %}`` -- such as the
+    ``/execute-code/`` page -- would fail with "Missing staticfiles manifest
+    entry". The plain storage maps paths directly, which is all a test needs.
+    """
+    from django.conf import settings
+
+    storages = {
+        **settings.STORAGES,
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+    with override_settings(STORAGES=storages):
+        yield
+
+
 @pytest.fixture(autouse=True)
 def isolated_media_root(tmp_path):
     """Point ``MEDIA_ROOT`` at a per-test temp directory.

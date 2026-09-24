@@ -13,8 +13,8 @@ row for today, and packagings absent from the payload are recorded as zero.
 ``PATCH`` updates only the packagings named in the payload and leaves the rest
 of today's rows untouched.
 
-Either way, only the latest ``snapshot_date`` is retained -- recording today's
-count purges every older bag row (see ``InventoryOperations``).
+Either way, earlier days' rows are kept as history; reads only ever look at
+one ``snapshot_date`` (see ``InventoryOperations``).
 """
 
 from __future__ import annotations

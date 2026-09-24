@@ -5,8 +5,8 @@ counted sealed-bag line -- one per active packaging -- with the reserved,
 consumed and available bag figures derived from order status.
 
 ``snapshot_date`` is the date the bag count was last taken, and is ``null``
-when no bag count has ever been recorded. It is the most recent bag snapshot:
-recording today's bag count purges older rows, so that date is the truth.
+when no bag count has ever been recorded. It is the most recent bag snapshot;
+older days are kept as history but never read here.
 """
 
 from __future__ import annotations

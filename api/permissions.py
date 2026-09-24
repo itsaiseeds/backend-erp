@@ -46,3 +46,21 @@ class IsSalesPerson(IsAuthenticated):
         if not super().has_permission(request, view):
             return False
         return request.user.is_salesperson
+
+
+class HasDjangoPermission(BasePermission):
+    """Allow only users holding the Django permission the view names.
+
+    The view declares it as ``required_permission`` (``"<app_label>.<codename>"``).
+    Role does not matter: any user granted the permission passes, and a
+    superuser passes implicitly, as ``User.has_perm`` always allows them.
+    """
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        permission = getattr(view, "required_permission", None)
+        if permission is None:
+            return False
+        return user.has_perm(permission)

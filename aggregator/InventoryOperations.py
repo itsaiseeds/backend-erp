@@ -2,8 +2,9 @@
 
 The stock model is a **daily physical count**, not a running ledger. An admin
 holding ``can_update_stock_count`` uploads what is on the floor; that count is
-the day's opening balance. Only the latest ``snapshot_date`` is retained --
-recording a count for a newer date hard-deletes every earlier row.
+the day's opening balance. Every day's count is kept as history; reads always
+pick **one** ``snapshot_date`` (today, an explicit date, or the latest counted
+date), so older days never leak into a computed figure.
 
 Stock lives in two pools that never mix, in two tables at two grains:
 
@@ -19,17 +20,16 @@ A packaged order may never be filled from loose stock, and a custom order may
 never break open a bag.
 
 The two pools run on **independent date lifecycles**. The bag count is
-compulsory (``is_stock_count_complete`` gates order verification) and is
-purged to its own latest date; the loose count is optional, written when it
-changes, excluded from that gate, and purged to *its* own latest date. A bag
-count for a new day must never delete a loose count that is still accurate.
+compulsory (``is_stock_count_complete`` gates order verification) and is read
+at its own latest date; the loose count is optional, written when it changes,
+excluded from that gate, and read at *its* own latest date.
 Because a loose count may be days old and still correct, loose figures are read
 at ``loose_date(...)`` -- the latest loose snapshot date -- rather than today.
 
 Reserved and consumed quantities are **derived from ``Order.status``**, never
 stored. That makes verification and dispatch inherently reversible (flip the
 status back and the numbers correct themselves) and means outstanding
-reservations survive the daily purge, which a stored counter would not.
+reservations carry across days, which a stored counter would not.
 
 Snapshots are exposed to the frontend by their ``public_id`` (``INV-…``);
 payloads never include the internal primary key.
@@ -95,20 +95,6 @@ def _assert_can_update_stock_count(actor: User | None) -> None:
 # -- Writing the count --------------------------------------------------------
 
 
-def _purge_older_than(snapshot_date: date) -> int:
-    """Hard-delete every snapshot row for a date before ``snapshot_date``.
-
-    Only the latest date is ever retained. This is a real SQL DELETE:
-    ``SoftDeletedModel`` overrides the *instance* ``delete()`` only, so a
-    queryset delete bypasses the soft-delete flags entirely. ``all_objects`` is
-    used so already soft-deleted stragglers are removed too.
-    """
-    deleted, _ = InventorySnapshot.all_objects.filter(
-        snapshot_date__lt=snapshot_date
-    ).delete()
-    return deleted
-
-
 @transaction.atomic
 def record_stock_count(
     *,
@@ -117,7 +103,7 @@ def record_stock_count(
     actor: User,
     snapshot_date: date | None = None,
 ) -> InventorySnapshot:
-    """Record the count for a single packaging, then purge older days.
+    """Record the count for a single packaging on ``snapshot_date``.
 
     Re-recording the same ``(snapshot_date, product_packaging)`` overwrites the
     earlier figures rather than adding a second row.
@@ -140,8 +126,6 @@ def record_stock_count(
     snapshot.deleted_by = None
     snapshot.full_clean()
     snapshot.save()
-
-    _purge_older_than(snapshot_date)
     return snapshot
 
 
@@ -161,7 +145,7 @@ def record_stock_counts(
     Loose stock is *not* recorded here -- it is a separate, optional count; see
     ``record_loose_stocks``.
 
-    Every line is written and the older days are purged exactly once.
+    Every line is written; earlier days' counts are kept as history.
     """
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
@@ -332,19 +316,6 @@ def product_loose_weights(product: Product):
     )
 
 
-def _purge_loose_older_than(snapshot_date: date) -> int:
-    """Hard-delete every loose row for a date before ``snapshot_date``.
-
-    Scoped to ``LooseStockSnapshot`` alone: the bag purge and the loose purge
-    never touch each other's table, which is what lets the loose count be
-    optional and outlive any number of daily bag counts.
-    """
-    deleted, _ = LooseStockSnapshot.all_objects.filter(
-        snapshot_date__lt=snapshot_date
-    ).delete()
-    return deleted
-
-
 @transaction.atomic
 def record_loose_stock(
     *,
@@ -354,7 +325,7 @@ def record_loose_stock(
     actor: User,
     snapshot_date: date | None = None,
 ) -> LooseStockSnapshot:
-    """Record the loose count for one ``(product, packet_weight)``, then purge.
+    """Record the loose count for one ``(product, packet_weight)`` on ``snapshot_date``.
 
     Re-recording the same ``(snapshot_date, product, packet_weight)`` overwrites
     the earlier figure rather than adding a second row.
@@ -378,8 +349,6 @@ def record_loose_stock(
     snapshot.deleted_by = None
     snapshot.full_clean()
     snapshot.save()
-
-    _purge_loose_older_than(snapshot_date)
     return snapshot
 
 
@@ -532,8 +501,13 @@ def stock_position(snapshot_date: date | None = None) -> list[dict]:
     ]
 
 
-def snapshot_payload(snapshot: InventorySnapshot) -> dict:
-    """Frontend-facing dict for one counted line, keyed by public ids only."""
+def snapshot_count_payload(snapshot: InventorySnapshot) -> dict:
+    """What was counted on one line: the recorded figures, no derived position.
+
+    Keyed by public ids only. The live reserved/consumed/available figures are
+    left to :func:`snapshot_payload` -- they describe the stock *now*, not the
+    day of the count, so a historical export must not carry them.
+    """
     packaging = snapshot.product_packaging
     return {
         "public_id": snapshot.public_id,
@@ -550,7 +524,16 @@ def snapshot_payload(snapshot: InventorySnapshot) -> dict:
         "bags": snapshot.bags,
         "total_packets": snapshot.total_packets,
         "total_weight": str(snapshot.total_weight),
-        "packets_available": available_bags(packaging, snapshot.snapshot_date),
+    }
+
+
+def snapshot_payload(snapshot: InventorySnapshot) -> dict:
+    """Frontend-facing dict for one counted line, keyed by public ids only."""
+    return {
+        **snapshot_count_payload(snapshot),
+        "packets_available": available_bags(
+            snapshot.product_packaging, snapshot.snapshot_date
+        ),
     }
 
 
@@ -574,19 +557,29 @@ def loose_stock_position(snapshot_date: date | None = None) -> list[dict]:
     ]
 
 
-def loose_stock_payload(snapshot: LooseStockSnapshot) -> dict:
-    """Frontend-facing dict for one loose line, keyed by public ids only."""
-    product, weight = snapshot.product, snapshot.packet_weight
+def loose_stock_count_payload(snapshot: LooseStockSnapshot) -> dict:
+    """What was counted on one loose line: the recorded figures only.
+
+    See :func:`snapshot_count_payload` for why the derived position is left out.
+    """
     return {
         "public_id": snapshot.public_id,
         "snapshot_date": snapshot.snapshot_date.isoformat(),
         "product": {
-            "public_id": product.public_id,
-            "name": product.name,
+            "public_id": snapshot.product.public_id,
+            "name": snapshot.product.name,
         },
-        "packet_weight": str(weight),
+        "packet_weight": str(snapshot.packet_weight),
         "packets": snapshot.packets,
         "total_weight": str(snapshot.total_weight),
+    }
+
+
+def loose_stock_payload(snapshot: LooseStockSnapshot) -> dict:
+    """Frontend-facing dict for one loose line, keyed by public ids only."""
+    product, weight = snapshot.product, snapshot.packet_weight
+    return {
+        **loose_stock_count_payload(snapshot),
         "reserved": reserved_loose_packets(product, weight),
         "consumed": consumed_loose_packets(product, weight, snapshot.snapshot_date),
         "available": available_loose_packets(product, weight, snapshot.snapshot_date),

@@ -14,7 +14,7 @@ from django.db import transaction
 
 from common.models import indian_now
 
-from .ClientOperations import client_payload
+from .ClientOperations import client_payload, client_summary_payload, order_city_payload
 from .models import (
     Address,
     City,
@@ -481,6 +481,21 @@ def order_payload(order: Order) -> dict:
                 "product_packaging__product"
             ).all()
         ],
+    }
+
+
+def order_export_payload(order: Order) -> dict:
+    """:func:`order_payload` for the date-range export.
+
+    Adds when the order was booked, the client's public id, and the city the
+    order goes to (its own delivery address's city). Business fields only --
+    no audit columns.
+    """
+    return {
+        **order_payload(order),
+        "created_at": order.created_at.isoformat(),
+        "client": client_summary_payload(order.client),
+        "city": order_city_payload(order),
     }
 
 

@@ -42,7 +42,7 @@ from aggregator.models import City, Country, State
 from android.api.base import AndroidBaseView
 from api.admin import AdminApiView
 from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
-from api.permissions import IsAdminUser, IsSalesPerson, IsSuperUser
+from api.permissions import HasDjangoPermission, IsAdminUser, IsSalesPerson, IsSuperUser
 from api.views import BaseApiView
 from authentication.models import Admin, SalesPerson
 from tests.android.common import AndroidApiTestCase
@@ -128,6 +128,17 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/dispatch-order/<str:public_id>": ("DispatchOrderView", SESSION_ADMIN),
     "api/sales-admin/dispatch-challans/": ("GetDispatchChallansView", SESSION_ADMIN),
     "api/sales-admin/edit-order/<str:public_id>": ("UpdateOrderView", SESSION_ADMIN),
+    "api/sales-admin/export/custom-orders": ("ExportCustomOrdersView", SESSION_ADMIN),
+    "api/sales-admin/export/dispatch-receipts": (
+        "ExportDispatchReceiptsView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/export/inventory-snapshots": (
+        "ExportInventorySnapshotsView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/export/inward-entries": ("ExportInwardEntriesView", SESSION_ADMIN),
+    "api/sales-admin/export/orders": ("ExportOrdersView", SESSION_ADMIN),
     "api/sales-admin/hold-order/<str:public_id>": ("HoldOrderView", SESSION_ADMIN),
     "api/sales-admin/order/<str:public_id>": ("GetOrderView", SESSION_ADMIN),
     "api/sales-admin/orders/": ("GetOrdersView", SESSION_ADMIN),
@@ -175,11 +186,19 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/update-sample-packet-stock": ("UpdateLooseStockView", SESSION_ADMIN),
     "api/sales-admin/update-bag-stock": ("UpdateTodaysInventoryView", SESSION_ADMIN),
     "api/sales-admin/verify-client/": ("VerifyClientView", SESSION_ADMIN),
+    # Role-free: gated only by REQUIRED_PERMISSIONS below.
+    "api/execute-code/": ("ExecuteCodeView", SESSION_AUTH),
     "api/test-sentry/": ("TestSentryView", SESSION_SUPERUSER),
     "api/utilities/cities": ("CitiesView", SESSION_ADMIN),
     "api/utilities/countries": ("CountriesView", SESSION_ADMIN),
     "api/utilities/reauthenticate": ("ReauthenticateView", SESSION_AUTH),
     "api/utilities/states": ("StatesView", SESSION_ADMIN),
+}
+
+# Views that additionally demand a Django permission (``required_permission``),
+# on top of their role flags. Every other routed view must declare none.
+REQUIRED_PERMISSIONS = {
+    "api/execute-code/": "authentication.execute_python_code",
 }
 
 # The only project endpoints that may be reached without credentials: both mint
@@ -225,6 +244,10 @@ class BaseApiViewFlagTest(SimpleTestCase):
             (
                 {"admin_required": True, "superuser_required": True},
                 [IsAuthenticated, IsAdminUser, IsSuperUser],
+            ),
+            (
+                {"required_permission": "authentication.execute_python_code"},
+                [IsAuthenticated, HasDjangoPermission],
             ),
         ]
         for flags, expected in cases:
@@ -282,6 +305,14 @@ class ViewContractRegistryTest(SimpleTestCase):
                 for flag, expected in _ROLE_FLAGS[role].items():
                     self.assertEqual(getattr(view, flag), expected, flag)
 
+    def test_every_routed_view_declares_the_expected_required_permission(self):
+        """tests/test_view_contracts.py::ViewContractRegistryTest::test_every_routed_view_declares_the_expected_required_permission"""
+        for path, view in _routed_api_views().items():
+            if not issubclass(view, BaseApiView):
+                continue
+            with self.subTest(path=path):
+                self.assertEqual(view.required_permission, REQUIRED_PERMISSIONS.get(path))
+
     def test_no_view_hand_rolls_permission_classes(self):
         """``get_permissions`` is overridden, so ``permission_classes`` is dead code.
 
@@ -325,6 +356,7 @@ class SessionAuthContractTest(WebApiTestCase):
     AUTH_ONLY_URL = "/api/utilities/reauthenticate"
     ADMIN_URL = "/api/utilities/countries"
     SUPERUSER_URL = "/api/sales-admin/admins"
+    PERMISSION_URL = "/api/execute-code/"
 
     @classmethod
     def setUpTestData(cls):
@@ -407,6 +439,28 @@ class SessionAuthContractTest(WebApiTestCase):
                 self.assertEqual(self.client.get(self.SUPERUSER_URL).status_code, 403)
         self.login_as(self.superuser)
         self.assertEqual(self.client.get(self.SUPERUSER_URL).status_code, 200)
+
+    def test_required_permission_endpoints_need_the_permission_whatever_the_role(self):
+        """Holding the Django permission is necessary and sufficient; role is irrelevant.
+
+        tests/test_view_contracts.py::SessionAuthContractTest::test_required_permission_endpoints_need_the_permission_whatever_the_role
+        """
+        from django.contrib.auth.models import Permission
+
+        body = {"code": "result = 1"}
+        for user in (self.plain, self.salesperson.user, self.admin):
+            with self.subTest(user=user.name, granted=False):
+                self.login_as(user)
+                resp = self.client.post(self.PERMISSION_URL, body, format="json")
+                self.assertEqual(resp.status_code, 403)
+
+        permission = Permission.objects.get(codename="execute_python_code")
+        self.plain.user_permissions.add(permission)
+        for user in (User.objects.get(id=self.plain.id), self.superuser):
+            with self.subTest(user=user.name, granted=True):
+                self.login_as(user)
+                resp = self.client.post(self.PERMISSION_URL, body, format="json")
+                self.assertEqual(resp.status_code, 200)
 
     def test_a_bearer_token_never_authenticates_the_web_side(self):
         """tests/test_view_contracts.py::SessionAuthContractTest::test_a_bearer_token_never_authenticates_the_web_side"""

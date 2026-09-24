@@ -11,8 +11,8 @@ count (also enforced by ``InventoryOperations._assert_can_update_stock_count``).
 
 Unlike the daily bag count this is **optional**: nothing requires it to be
 written daily, or at all, and a missing loose count never blocks order
-verification. Recording a count purges older *loose* rows only -- the bag
-snapshot is on its own independent lifecycle and is never touched here.
+verification. Earlier loose days are kept as history -- and the bag snapshot
+is on its own independent lifecycle and is never touched here.
 
 ``POST`` replaces the whole loose count for today: every ``(product,
 packet_weight)`` pair the business packs receives a row, and pairs absent from

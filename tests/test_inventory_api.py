@@ -243,10 +243,11 @@ class InventoryApiTest(WebApiTestCase):
                     )
                     self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
 
-    def test_post_update_inventory_replaces_previous_day(self):
-        """Recording today's count hard-deletes older-day rows.
+    def test_post_update_inventory_keeps_previous_day(self):
+        """Recording today's count keeps older days as history, while the
+        bag-stock position reports today's count alone.
 
-        Run: tests/test_inventory_api.py::InventoryApiTest::test_post_update_inventory_replaces_previous_day
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_post_update_inventory_keeps_previous_day
         """
         from aggregator.InventoryOperations import record_stock_counts
         from aggregator.models import InventorySnapshot
@@ -261,16 +262,22 @@ class InventoryApiTest(WebApiTestCase):
             InventorySnapshot.all_objects.filter(snapshot_date=yesterday).exists()
         )
 
-        # Now record today — yesterday's rows should be purged
+        # Now record today -- yesterday's rows stay as history.
         self._stock_admin_request(
             "post",
             UPDATE_URL,
             data={"counts": {self.pack1.public_id: 10, self.pack2.public_id: 8}},
             format="json",
         )
-        self.assertFalse(
-            InventorySnapshot.all_objects.filter(snapshot_date=yesterday).exists()
+        self.assertTrue(
+            InventorySnapshot.objects.filter(snapshot_date=yesterday).exists()
         )
+
+        resp = self._stock_admin_request("get", BAG_STOCK_URL)
+        self.assertEqual(resp.data["snapshot_date"], datetime.date.today().isoformat())
+        on_hand = {line["packaging"]["public_id"]: line["on_hand"] for line in resp.data["lines"]}
+        self.assertEqual(on_hand[self.pack1.public_id], 10)
+        self.assertEqual(on_hand[self.pack2.public_id], 8)
 
     # ------------------------------------------------------------------
     # GET bag-stock
