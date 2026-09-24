@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from authentication.validators import validate_phone_number
 from common.models import (
@@ -113,8 +114,12 @@ class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
 
     @property
     def dispatch_date(self):
-        """The date printed on the challan: the day the goods left."""
-        return self.dispatched_at.date()
+        """The date printed on the challan: the IST day the goods left.
+
+        Converted to local time first: a timestamp read back from the database
+        is UTC, whose date is still yesterday between midnight and 05:30 IST.
+        """
+        return timezone.localtime(self.dispatched_at).date()
 
     @property
     def is_private(self):
