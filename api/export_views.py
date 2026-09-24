@@ -71,13 +71,24 @@ class ExportDateRangeQuerySerializer(serializers.Serializer):
         return attrs
 
 
-class ExportResponseSerializer(serializers.Serializer):
-    """Output envelope shared by every export (schema only)."""
+class _ExportEnvelopeSerializer(serializers.Serializer):
+    """Fields every export response carries around its ``results`` (schema only)."""
 
     start_date = serializers.DateField()
     end_date = serializers.DateField()
     count = serializers.IntegerField()
-    results = serializers.ListField(child=serializers.DictField())
+
+
+def export_response_serializer(
+    name: str, row: type[serializers.Serializer]
+) -> type[serializers.Serializer]:
+    """The response envelope for one export, with ``results`` typed as ``row``.
+
+    Each export gets its own named class (and so its own OpenAPI component), so
+    the doc shows every key of every row down to plain fields instead of a
+    generic ``additionalProp`` map.
+    """
+    return type(name, (_ExportEnvelopeSerializer,), {"results": row(many=True)})
 
 
 @dataclass(frozen=True)
