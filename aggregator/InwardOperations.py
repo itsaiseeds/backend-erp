@@ -17,6 +17,13 @@ A freshly recorded other-material lot is therefore in stock the day it arrives;
 a raw lot counts only while its status is ``in_use`` -- flipping stamps today,
 reverting clears the date and drops it back out of stock.
 
+Raw material is also **spent** by bag and loose-packet counts recorded in
+``InventoryOperations`` -- a lot's kilograms are packed into bags or sample
+packets there. ``assert_raw_lot_removable`` guards the two ways a lot can
+leave the ``in_use`` pool (reverting to ``lab_testing``, soft-deleting) so
+neither can strand bags or packets that no longer have raw material behind
+them.
+
 Everything here is derived or shape-only: nothing in this module writes rows.
 """
 
@@ -27,12 +34,14 @@ from typing import TYPE_CHECKING
 
 from django.db.models import Sum
 
+from . import InventoryOperations
 from .InventoryOperations import today
 from .models import (
     InwardOtherMaterial,
     InwardRawMaterial,
     InwardRawMaterialStatus,
     OtherMaterialType,
+    Product,
 )
 
 if TYPE_CHECKING:
@@ -67,6 +76,33 @@ def assert_raw_status_transition(current, requested) -> None:
         raise ValueError(
             f"'{current_label}' can only move to "
             f"{', '.join(InwardRawMaterialStatus(code).label for code in allowed)}."
+        )
+
+
+def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
+    """Raise unless ``entry`` may leave the in-use raw pool (revert or delete).
+
+    Only a lot that is currently ``in_use`` *and* whose ``effective_date`` has
+    come is counted in ``InventoryOperations.raw_available_kg`` at all --
+    removing anything else (still ``lab_testing``, or dated in the future) is
+    always safe. Removing a counted lot must not strand bags or sample packets
+    that were packed from its kilograms with no raw material behind them.
+
+    Raises ``ValueError`` with a message an API renders as a 400, the same
+    convention as ``assert_raw_status_transition``.
+    """
+    is_counted = (
+        entry.status == InwardRawMaterialStatus.IN_USE
+        and entry.effective_date is not None
+        and entry.effective_date <= InventoryOperations.today()
+    )
+    if not is_counted:
+        return
+    remaining = InventoryOperations.raw_available_kg(entry.product) - entry.quantity_kg
+    if remaining < 0:
+        raise ValueError(
+            f"{-remaining} kg of this lot is already packed into bags or "
+            "sample packets and cannot be removed."
         )
 
 
@@ -161,10 +197,14 @@ def raw_incoming_stock(
 ) -> list[dict]:
     """Per-product incoming raw-material position as of ``as_of`` (default today).
 
-    Only lots with ``status=in_use`` and ``effective_date <= as_of`` count. The
-    list is ready for display: each entry carries the product's public id / name
-    and the summed ``quantity_kg`` (a Decimal; serializers turn it into a str).
-    ``product_public_ids`` narrows the report to those products.
+    Only lots with ``status=in_use`` and ``effective_date <= as_of`` count
+    toward ``incoming_kg``. ``packed_kg`` is what has since been packed into
+    bags or sample packets (``InventoryOperations.raw_bagged_kg`` +
+    ``raw_loose_kg``, read as of now -- a count has no "as of" of its own) and
+    ``available_kg`` is what is left to pack. The list is ready for display:
+    each entry carries the product's public id / name and Decimal kilogram
+    figures (serializers turn them into strings). ``product_public_ids``
+    narrows the report to those products.
     """
     as_of = as_of or today()
     query = InwardRawMaterial.objects.filter(
@@ -174,21 +214,30 @@ def raw_incoming_stock(
     )
     if product_public_ids:
         query = query.filter(product__public_id__in=product_public_ids)
-    rows = (
+    rows = list(
         query.values("product_id", "product__public_id", "product__name")
         .annotate(incoming_kg=Sum("quantity_kg"))
         .filter(incoming_kg__gt=0)
         .order_by("product__name")
     )
-    return [
-        {
-            "product_id": row["product_id"],
-            "public_id": row["product__public_id"],
-            "name": row["product__name"],
-            "incoming_kg": row["incoming_kg"],
-        }
-        for row in rows
-    ]
+    products = Product.objects.in_bulk(row["product_id"] for row in rows)
+    lines = []
+    for row in rows:
+        product = products[row["product_id"]]
+        packed_kg = InventoryOperations.raw_bagged_kg(
+            product
+        ) + InventoryOperations.raw_loose_kg(product)
+        lines.append(
+            {
+                "product_id": row["product_id"],
+                "public_id": row["product__public_id"],
+                "name": row["product__name"],
+                "incoming_kg": row["incoming_kg"],
+                "packed_kg": packed_kg,
+                "available_kg": row["incoming_kg"] - packed_kg,
+            }
+        )
+    return lines
 
 
 def other_material_on_hand(

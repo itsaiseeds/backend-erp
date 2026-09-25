@@ -1044,25 +1044,33 @@ paths:
   /api/sales-admin/export/inventory-snapshots:
     get:
       operationId: sales_admin_export_inventory_snapshots
-      description: Export the bag and loose stock counts for a date window, grouped
-        by date.
-      summary: Export bag and loose stock counts for a date range, grouped by date
+      description: Export bag and loose stock counts, interleaved and paginated.
+      summary: Export bag and loose stock counts, interleaved and paginated
       parameters:
       - in: query
         name: end_date
         schema:
           type: string
           format: date
-        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
-          start_date.
-        required: true
+        description: Last day of the window (inclusive, IST). Optional -- give together
+          with start_date, or omit both for the full history.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
       - in: query
         name: start_date
         schema:
           type: string
           format: date
-        description: First day of the window (inclusive, IST).
-        required: true
+        description: First day of the window (inclusive, IST). Optional -- give together
+          with end_date, or omit both for the full history.
       tags:
       - api
       security:
@@ -1072,7 +1080,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExportInventorySnapshotsResponse'
+                $ref: '#/components/schemas/ExportInventorySnapshotsPage'
           description: ''
   /api/sales-admin/export/inward-entries:
     get:
@@ -4134,9 +4142,12 @@ components:
       - success
     ExportBagSnapshot:
       type: object
-      description: '``InventoryOperations.snapshot_count_payload``: counted figures
-        only.'
+      description: |-
+        ``InventoryOperations.snapshot_count_payload``: counted figures only,
+        plus the ``kind`` discriminator.
       properties:
+        kind:
+          $ref: '#/components/schemas/ExportBagSnapshotKindEnum'
         public_id:
           type: string
         snapshot_date:
@@ -4153,11 +4164,17 @@ components:
           description: Kilograms.
       required:
       - bags
+      - kind
       - packaging
       - public_id
       - snapshot_date
       - total_packets
       - total_weight
+    ExportBagSnapshotKindEnum:
+      enum:
+      - bag
+      type: string
+      description: '* `bag` - bag'
     ExportCity:
       type: object
       description: '``ClientOperations.order_city_payload``: the order''s delivery
@@ -4355,28 +4372,35 @@ components:
       - end_date
       - results
       - start_date
-    ExportInventorySnapshotsResponse:
+    ExportInventorySnapshotRow:
+      oneOf:
+      - $ref: '#/components/schemas/ExportBagSnapshot'
+      - $ref: '#/components/schemas/ExportLooseSnapshot'
+    ExportInventorySnapshotsPage:
       type: object
-      description: Fields every export response carries around its ``results`` (schema
-        only).
+      description: Output shape for the paginated envelope (schema only).
       properties:
-        start_date:
-          type: string
-          format: date
-        end_date:
-          type: string
-          format: date
-        count:
+        total_count:
           type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
         results:
           type: array
           items:
-            $ref: '#/components/schemas/ExportSnapshotDay'
+            $ref: '#/components/schemas/ExportInventorySnapshotRow'
+          readOnly: true
       required:
-      - count
-      - end_date
+      - next_page_number
+      - previous_page_number
       - results
-      - start_date
+      - total_count
+      - total_pages
     ExportInwardDay:
       type: object
       description: 'One row of ``export/inward-entries``: every entry booked on one
@@ -4483,9 +4507,12 @@ components:
       - status
     ExportLooseSnapshot:
       type: object
-      description: '``InventoryOperations.loose_stock_count_payload``: counted figures
-        only.'
+      description: |-
+        ``InventoryOperations.loose_stock_count_payload``: counted figures only,
+        plus the ``kind`` discriminator.
       properties:
+        kind:
+          $ref: '#/components/schemas/ExportLooseSnapshotKindEnum'
         public_id:
           type: string
         snapshot_date:
@@ -4502,12 +4529,18 @@ components:
           type: string
           description: Kilograms.
       required:
+      - kind
       - packet_weight
       - packets
       - product
       - public_id
       - snapshot_date
       - total_weight
+    ExportLooseSnapshotKindEnum:
+      enum:
+      - loose
+      type: string
+      description: '* `loose` - loose'
     ExportOrder:
       type: object
       description: One row of ``export/orders`` (``OrderOperations.order_export_payload``).
@@ -4594,26 +4627,6 @@ components:
       - end_date
       - results
       - start_date
-    ExportSnapshotDay:
-      type: object
-      description: 'One row of ``export/inventory-snapshots``: both counts for one
-        date.'
-      properties:
-        snapshot_date:
-          type: string
-          format: date
-        bag_snapshots:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExportBagSnapshot'
-        loose_snapshots:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExportLooseSnapshot'
-      required:
-      - bag_snapshots
-      - loose_snapshots
-      - snapshot_date
     FilterCatalogueEntry:
       type: object
       description: Schema for one ``available_filters`` entry.
@@ -5839,9 +5852,17 @@ components:
         incoming_kg:
           type: string
           description: Sum of in-use KG with a reached effective date.
+        packed_kg:
+          type: string
+          description: KG already packed into bags or sample packets.
+        available_kg:
+          type: string
+          description: 'KG left to pack: incoming_kg minus packed_kg.'
       required:
+      - available_kg
       - incoming_kg
       - name
+      - packed_kg
       - product
     ReauthenticateResponse:
       type: object

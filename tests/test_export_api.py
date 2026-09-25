@@ -35,12 +35,12 @@ from aggregator.OrderOperations import create_order
 from api.sales_admin.ExportCustomOrdersView import ExportCustomOrdersResponseSerializer
 from api.sales_admin.ExportDispatchReceiptsView import ExportDispatchReceiptsResponseSerializer
 from api.sales_admin.ExportInventorySnapshotsView import (
-    ExportInventorySnapshotsResponseSerializer,
+    ExportInventorySnapshotsPageSerializer,
 )
 from api.sales_admin.ExportInwardEntriesView import ExportInwardEntriesResponseSerializer
 from api.sales_admin.ExportOrdersView import ExportOrdersResponseSerializer
 from authentication.models import Admin, SalesPerson
-from tests.common import WebApiTestCase
+from tests.common import WebApiTestCase, book_raw_material_for_every_product
 
 User = get_user_model()
 
@@ -160,6 +160,14 @@ class ExportApiTest(WebApiTestCase):
             created_by=cls.superuser,
         )
         cls.party = Party.objects.create(name="ABC Traders", city_id=1, created_by=cls.admin_user)
+        # _dispatch and the direct record_* calls below count every
+        # packaging, including the dml.sql seed rows, and every count is now
+        # checked against raw material. Booked (backdated) well outside any
+        # test's export window, so it never shows up as one of "today"'s
+        # inward entries.
+        book_raw_material_for_every_product(
+            actor=cls.superuser, booked_on=_ist(inv.today() - timedelta(days=365))
+        )
         cls.today = inv.today()
 
     def setUp(self):
@@ -380,10 +388,11 @@ class ExportApiTest(WebApiTestCase):
 
     # -- inventory snapshots --------------------------------------------------
 
-    def test_snapshot_export_returns_every_counted_day_grouped_by_date(self):
-        """History is kept, so several days come back -- counted figures only.
+    def test_snapshot_export_interleaves_bag_and_loose_rows_ordered_by_date(self):
+        """Bag and loose rows are one flat list, ordered by date then kind --
+        counted figures only, not the live position.
 
-        tests/test_export_api.py::ExportApiTest::test_snapshot_export_returns_every_counted_day_grouped_by_date
+        tests/test_export_api.py::ExportApiTest::test_snapshot_export_interleaves_bag_and_loose_rows_ordered_by_date
         """
         yesterday = self.today - timedelta(days=1)
         weight = Decimal("1.000")
@@ -402,17 +411,71 @@ class ExportApiTest(WebApiTestCase):
         resp = self._export(SNAPSHOTS_URL, yesterday, self.today)
 
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
-        days = resp.data["results"]
+        rows = resp.data["results"]
+        self.assertEqual(resp.data["total_count"], 4)
+        self.assertEqual(resp.data["total_pages"], 1)
+        self.assertIsNone(resp.data["next_page_number"])
+        self.assertIsNone(resp.data["previous_page_number"])
         self.assertEqual(
-            [day["snapshot_date"] for day in days], [yesterday.isoformat(), self.today.isoformat()]
+            [(r["snapshot_date"], r["kind"]) for r in rows],
+            [
+                (yesterday.isoformat(), "bag"),
+                (yesterday.isoformat(), "loose"),
+                (self.today.isoformat(), "bag"),
+                (self.today.isoformat(), "loose"),
+            ],
         )
-        self.assertEqual([b["bags"] for b in days[0]["bag_snapshots"]], [100])
-        self.assertEqual([b["bags"] for b in days[1]["bag_snapshots"]], [90])
-        self.assertEqual([loose["packets"] for loose in days[0]["loose_snapshots"]], [30])
-        self.assertEqual([loose["packets"] for loose in days[1]["loose_snapshots"]], [25])
+        self.assertEqual([r["bags"] for r in rows if r["kind"] == "bag"], [100, 90])
+        self.assertEqual([r["packets"] for r in rows if r["kind"] == "loose"], [30, 25])
         # Counted figures only: the live position describes today, not the count day.
         self.assertFalse(
-            _keys(days) & {"packets_available", "reserved", "consumed", "available"}
+            _keys(rows) & {"packets_available", "reserved", "consumed", "available"}
         )
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportInventorySnapshotsResponseSerializer(), resp.data), [])
+        self.assertEqual(
+            _documented_keys_mismatches(ExportInventorySnapshotsPageSerializer(), resp.data), []
+        )
+
+    def test_snapshot_export_window_is_optional(self):
+        """Omitting start_date/end_date pages through the whole history.
+
+        tests/test_export_api.py::ExportApiTest::test_snapshot_export_window_is_optional
+        """
+        inv.record_stock_count(
+            product_packaging=self.bag, bags=5, actor=self.admin_user, snapshot_date=self.today
+        )
+
+        resp = self.client.get(SNAPSHOTS_URL)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual(resp.data["total_count"], 1)
+        self.assertEqual(resp.data["results"][0]["kind"], "bag")
+
+    def test_snapshot_export_rejects_a_half_given_window(self):
+        """tests/test_export_api.py::ExportApiTest::test_snapshot_export_rejects_a_half_given_window"""
+        resp = self.client.get(SNAPSHOTS_URL, {"start_date": self.today.isoformat()})
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.data)
+
+    def test_snapshot_export_paginates(self):
+        """tests/test_export_api.py::ExportApiTest::test_snapshot_export_paginates"""
+        yesterday = self.today - timedelta(days=1)
+        inv.record_stock_count(
+            product_packaging=self.bag, bags=1, actor=self.admin_user, snapshot_date=yesterday
+        )
+        inv.record_stock_count(
+            product_packaging=self.bag, bags=2, actor=self.admin_user, snapshot_date=self.today
+        )
+
+        first = self.client.get(SNAPSHOTS_URL, {"page_size": 1})
+        self.assertEqual(first.status_code, status.HTTP_200_OK, first.data)
+        self.assertEqual(first.data["total_count"], 2)
+        self.assertEqual(first.data["total_pages"], 2)
+        self.assertEqual(len(first.data["results"]), 1)
+        self.assertEqual(first.data["results"][0]["snapshot_date"], yesterday.isoformat())
+        self.assertIsNone(first.data["previous_page_number"])
+        self.assertEqual(first.data["next_page_number"], 2)
+
+        second = self.client.get(SNAPSHOTS_URL, {"page_size": 1, "page": 2})
+        self.assertEqual(second.data["results"][0]["snapshot_date"], self.today.isoformat())
+        self.assertEqual(second.data["previous_page_number"], 1)
+        self.assertIsNone(second.data["next_page_number"])

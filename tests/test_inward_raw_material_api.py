@@ -10,8 +10,8 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
-from aggregator import InwardOperations
-from aggregator.models import InwardRawMaterial, Party, Product
+from aggregator import InventoryOperations, InwardOperations
+from aggregator.models import InwardRawMaterial, Party, Product, ProductPackaging
 from authentication.models import Admin
 from tests.common import WebApiTestCase
 
@@ -161,6 +161,50 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(reflipped.status_code, status.HTTP_200_OK, reflipped.content)
         self.assertEqual(reflipped.data["status"], "in_use")
         self.assertEqual(reflipped.data["effective_date"], InwardOperations.today().isoformat())
+
+    def test_reverting_a_lot_with_packed_stock_is_rejected(self):
+        """A lot cannot revert out of in_use once its kilograms are packed
+        into a bag count -- that would strand bags with no raw material.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_reverting_a_lot_with_packed_stock_is_rejected
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot(quantity_kg="40")  # SAI-33's bag is 1kg x 40 = 40kg
+        url = self._url(created.data)
+        self.client.patch(url, {"status": "in_use"}, format="json")
+
+        pack = ProductPackaging.objects.get(product=self.product)
+        InventoryOperations.record_stock_count(
+            product_packaging=pack, bags=1, actor=self.seed_admin
+        )
+
+        reverted = self.client.patch(url, {"status": "lab_testing"}, format="json")
+        self.assertEqual(reverted.status_code, status.HTTP_400_BAD_REQUEST, reverted.content)
+
+        in_db = InwardRawMaterial.all_objects.get(public_id=created.data["public_id"])
+        self.assertEqual(in_db.status, "in_use")
+
+    def test_deleting_a_lot_with_packed_stock_is_rejected(self):
+        """A lot cannot be deleted once its kilograms are packed into a bag
+        count -- for the same reason a revert is refused.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_deleting_a_lot_with_packed_stock_is_rejected
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot(quantity_kg="40")
+        url = self._url(created.data)
+        self.client.patch(url, {"status": "in_use"}, format="json")
+
+        pack = ProductPackaging.objects.get(product=self.product)
+        InventoryOperations.record_stock_count(
+            product_packaging=pack, bags=1, actor=self.seed_admin
+        )
+
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
+        self.assertTrue(
+            InwardRawMaterial.objects.filter(public_id=created.data["public_id"]).exists()
+        )
 
     def test_the_stamped_date_is_not_an_input_field_while_in_use(self):
         """effective_date is never writable; only a revert clears it.

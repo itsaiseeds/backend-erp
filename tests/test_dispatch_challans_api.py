@@ -33,7 +33,7 @@ from aggregator.models import (
 from aggregator.OrderOperations import create_order, mark_delivered
 from authentication.models import Admin, SalesPerson
 from common.models import indian_now
-from tests.common import WebApiTestCase
+from tests.common import WebApiTestCase, book_raw_material_for_every_product
 
 User = get_user_model()
 
@@ -116,6 +116,9 @@ class DispatchChallansApiTest(WebApiTestCase):
             selling_price=Decimal("1000.00"),
             created_by=cls.superuser,
         )
+        # _dispatched_order counts every packaging, including the dml.sql seed
+        # rows, and every count is now checked against raw material.
+        book_raw_material_for_every_product(actor=cls.superuser)
 
     def setUp(self):
         super().setUp()

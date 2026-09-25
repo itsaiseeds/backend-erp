@@ -8,6 +8,11 @@ A lot counts toward the total only once it is **dated and usable** -- both an
 ``status='in_use'`` (a ``lab_testing`` lot is held back until the lab signs
 off). Soft-deleted lots never count.
 
+``incoming_kg`` is everything that has come in. ``packed_kg`` is what has
+since been packed into bags or sample packets via ``update-bag-stock`` /
+``update-sample-packet-stock``, and ``available_kg`` is what is left to pack
+(``incoming_kg - packed_kg``) -- see ``InventoryOperations.raw_available_kg``.
+
 Optional ``?product=<P-...,...>`` narrows the report to those products.
 """
 
@@ -29,6 +34,12 @@ class RawMaterialStockLineSerializer(serializers.Serializer):
     product = serializers.CharField(help_text="Product public id.")
     name = serializers.CharField(help_text="Product name.")
     incoming_kg = serializers.CharField(help_text="Sum of in-use KG with a reached effective date.")
+    packed_kg = serializers.CharField(
+        help_text="KG already packed into bags or sample packets."
+    )
+    available_kg = serializers.CharField(
+        help_text="KG left to pack: incoming_kg minus packed_kg."
+    )
 
 
 class RawMaterialStockSerializer(serializers.Serializer):
@@ -58,6 +69,8 @@ class RawMaterialStockView(AdminApiView):
                 "product": line["public_id"],
                 "name": line["name"],
                 "incoming_kg": str(line["incoming_kg"]),
+                "packed_kg": str(line["packed_kg"]),
+                "available_kg": str(line["available_kg"]),
             }
             for line in InwardOperations.raw_incoming_stock(
                 as_of, product_public_ids=product_public_ids

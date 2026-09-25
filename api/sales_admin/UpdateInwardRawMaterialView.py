@@ -14,6 +14,10 @@ Two jobs live here:
   immutable once a lot exists; a wrong amount is removed with ``DELETE``
   (soft) and re-booked. ``DELETE`` is the only corrective verb.
 
+Both a revert to ``lab_testing`` and a ``DELETE`` are refused (400) when the
+lot's kilograms are already packed into a bag or sample-packet count --
+see ``InwardOperations.assert_raw_lot_removable``.
+
 Soft-deleted lots are never found (404).
 """
 
@@ -25,6 +29,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from aggregator.InwardOperations import (
+    assert_raw_lot_removable,
     assert_raw_status_transition,
     inward_raw_material_payload,
     today,
@@ -77,6 +82,13 @@ class UpdateInwardRawMaterialSerializer(serializers.Serializer):
             self.instance.status == InwardRawMaterialStatus.IN_USE
             and requested_status != InwardRawMaterialStatus.IN_USE
         ):
+            # Reverting out of in_use removes this lot's kilograms from the
+            # raw pool -- refuse it if bags or sample packets are already
+            # packed from them.
+            try:
+                assert_raw_lot_removable(self.instance)
+            except ValueError as exc:
+                raise serializers.ValidationError({"status": str(exc)}) from None
             attrs["effective_date"] = None
         return attrs
 
@@ -111,5 +123,9 @@ class UpdateInwardRawMaterialView(AdminApiView):
     )
     def delete(self, request, public_id: str):
         entry = get_object_or_404(InwardRawMaterial.objects.all(), public_id=public_id)
+        try:
+            assert_raw_lot_removable(entry)
+        except ValueError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from None
         entry.mark_deleted(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
