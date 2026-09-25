@@ -15,6 +15,10 @@ of today's rows untouched.
 
 Either way, earlier days' rows are kept as history; reads only ever look at
 one ``snapshot_date`` (see ``InventoryOperations``).
+
+A bag is packed from raw material: the write is refused (400) when the
+product's in-use raw kilograms cannot cover the counted bags. See
+``InventoryOperations.raw_available_kg``.
 """
 
 from __future__ import annotations
@@ -131,9 +135,12 @@ class UpdateTodaysInventoryView(AdminApiView):
             packaging: provided.get(packaging, 0)
             for packaging in ProductPackaging.objects.all()
         }  # noqa: C420 -- provided.get() varies per key, not a constant fill
-        snapshots = InventoryOperations.record_stock_counts(
-            counts=full_counts, actor=request.user
-        )
+        try:
+            snapshots = InventoryOperations.record_stock_counts(
+                counts=full_counts, actor=request.user
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"counts": str(exc)}) from None
         return Response(
             [InventoryOperations.snapshot_payload(s) for s in snapshots],
             status=status.HTTP_200_OK,
@@ -161,9 +168,12 @@ class UpdateTodaysInventoryView(AdminApiView):
         serializer = UpdateTodaysInventorySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         counts = self._resolve_counts(serializer)
-        snapshots = InventoryOperations.record_stock_counts(
-            counts=counts, actor=request.user
-        )
+        try:
+            snapshots = InventoryOperations.record_stock_counts(
+                counts=counts, actor=request.user
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"counts": str(exc)}) from None
         return Response(
             [InventoryOperations.snapshot_payload(s) for s in snapshots],
             status=status.HTTP_200_OK,

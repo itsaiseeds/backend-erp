@@ -18,6 +18,10 @@ is on its own independent lifecycle and is never touched here.
 packet_weight)`` pair the business packs receives a row, and pairs absent from
 the payload are recorded as zero. ``PATCH`` writes only the lines named in the
 payload and leaves the rest alone.
+
+A loose packet is packed from raw material, the same as a bag: the write is
+refused (400) when the product's in-use raw kilograms cannot cover the
+counted packets. See ``InventoryOperations.raw_available_kg``.
 """
 
 from __future__ import annotations
@@ -176,9 +180,12 @@ class UpdateLooseStockView(AdminApiView):
         full_counts = {
             pair: provided.get(pair, 0) for pair in packable_pairs().values()
         }
-        snapshots = InventoryOperations.record_loose_stocks(
-            counts=full_counts, actor=request.user
-        )
+        try:
+            snapshots = InventoryOperations.record_loose_stocks(
+                counts=full_counts, actor=request.user
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"counts": str(exc)}) from None
         return self._respond(snapshots)
 
     @extend_schema(
@@ -209,7 +216,10 @@ class UpdateLooseStockView(AdminApiView):
         serializer = UpdateLooseStockSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         counts = self._resolve_counts(serializer)
-        snapshots = InventoryOperations.record_loose_stocks(
-            counts=counts, actor=request.user
-        )
+        try:
+            snapshots = InventoryOperations.record_loose_stocks(
+                counts=counts, actor=request.user
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"counts": str(exc)}) from None
         return self._respond(snapshots)

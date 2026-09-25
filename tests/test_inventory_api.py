@@ -18,7 +18,7 @@ from rest_framework import status
 
 from aggregator.models import ProductPackaging, Stage, StageIds
 from authentication.models import Admin, SalesPerson, User
-from tests.common import WebApiTestCase
+from tests.common import WebApiTestCase, book_raw_material_for_every_product
 
 CHECK_URL = "/api/sales-admin/check-todays-inventory"
 UPDATE_URL = "/api/sales-admin/update-bag-stock"
@@ -114,6 +114,10 @@ class InventoryApiTest(WebApiTestCase):
             selling_price=Decimal("1387.50"),
             created_by=cls.stock_admin_user,
         )
+        # Bag counts are checked against raw material -- book far more than
+        # any test writes, for every product (one test counts every
+        # packaging, including the dml.sql seed rows).
+        book_raw_material_for_every_product(actor=cls.stock_admin_user)
 
     # ------------------------------------------------------------------
     # helpers
@@ -242,6 +246,25 @@ class InventoryApiTest(WebApiTestCase):
                         verb, UPDATE_URL, data={"counts": counts}, format="json"
                     )
                     self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+
+    def test_bag_count_exceeding_raw_material_is_rejected(self):
+        """A bag count that would spend more raw material than the product has
+        in use is rejected with a 400, and nothing is written.
+
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_bag_count_exceeding_raw_material_is_rejected
+        """
+        # pack1 is 0.5kg x 50 packets = 25kg/bag; 50000 bags needs 1,250,000kg,
+        # over the 1,000,000kg setUpTestData booked for self.product.
+        resp = self._stock_admin_request(
+            "patch", UPDATE_URL,
+            data={"counts": {self.pack1.public_id: 50000}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+        self.assertIn("raw material", resp.data["detail"].lower())
+
+        empty = self._stock_admin_request("get", BAG_STOCK_URL)
+        self.assertEqual(empty.data["lines"], [])
 
     def test_post_update_inventory_keeps_previous_day(self):
         """Recording today's count keeps older days as history, while the

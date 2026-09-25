@@ -17,6 +17,8 @@ from aggregator.models import (
     City,
     Country,
     InventorySnapshot,
+    InwardRawMaterial,
+    Party,
     Pincode,
     ProductPackaging,
     Stage,
@@ -34,7 +36,7 @@ from aggregator.OrderOperations import (
 )
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, SalesPerson, User
-from tests.common import DMLTestCase
+from tests.common import DMLTestCase, book_raw_material, book_raw_material_for_every_product
 
 
 class InventoryOperationsTest(DMLTestCase):
@@ -84,6 +86,9 @@ class InventoryOperationsTest(DMLTestCase):
         cls.pack = add_packaging(
             cls.product, packet_weight=Decimal("1.000"), packets=40, actor=cls.su
         )
+        # _count_everything counts every packaging, including the dml.sql
+        # seed rows, and every count is now checked against raw material.
+        book_raw_material_for_every_product(actor=cls.su)
         cls.today = datetime.date.today()
         cls.weight = Decimal("1.000")
 
@@ -297,6 +302,142 @@ class InventoryOperationsTest(DMLTestCase):
         # absent from the counted 400 and must not be subtracted again.
         assert inv.consumed_bags(self.pack) == 0
         assert inv.available_bags(self.pack) == 400
+
+    # -- raw material backing ---------------------------------------------------
+    #
+    # self.product is booked with a huge (1,000,000 kg) raw lot in
+    # setUpTestData so every test above can write counts freely. These tests
+    # care about the raw-material check itself, so they use a fresh product
+    # with a small, exact raw booking instead.
+
+    def _raw_pack(self, *, name, packet_weight=Decimal("1.000"), packets=1):
+        """A fresh product + single packaging, 1 bag == ``packet_weight`` kg."""
+        product = create_product(
+            name=name, crop="Jowar", stage=Stage.by_id(StageIds.BREEDER),
+            selling_price=Decimal("10.00"), actor=self.su,
+        )
+        pack = add_packaging(
+            product, packet_weight=packet_weight, packets=packets, actor=self.su
+        )
+        return product, pack
+
+    def test_bag_count_within_raw_material_is_allowed(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_bag_count_within_raw_material_is_allowed"""
+        product, pack = self._raw_pack(name="Raw OK")
+        book_raw_material(product, Decimal("10.000"), actor=self.su)
+
+        inv.record_stock_count(product_packaging=pack, bags=10, actor=self.stock_admin)
+        assert inv.on_hand_bags(pack) == 10
+        assert inv.raw_available_kg(product) == Decimal("0.000")
+
+    def test_bag_count_exceeding_raw_material_is_rejected_and_rolled_back(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_bag_count_exceeding_raw_material_is_rejected_and_rolled_back"""
+        product, pack = self._raw_pack(name="Raw Short")
+        book_raw_material(product, Decimal("10.000"), actor=self.su)
+
+        with self.assertRaises(ValueError):
+            inv.record_stock_count(product_packaging=pack, bags=11, actor=self.stock_admin)
+        # The rejected write left no row behind.
+        assert inv.on_hand_bags(pack) == 0
+        assert inv.raw_available_kg(product) == Decimal("10.000")
+
+    def test_lab_testing_lot_provides_no_raw_material(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_lab_testing_lot_provides_no_raw_material"""
+        product, pack = self._raw_pack(name="Raw Lab Testing")
+        party, _ = Party.objects.get_or_create(
+            name="Raw Ops Test Party", city=self.city, defaults={"created_by": self.su}
+        )
+        InwardRawMaterial.objects.create(
+            product=product, party=party, quantity_kg=Decimal("10.000"),
+            created_by=self.su,
+        )  # default status=lab_testing, effective_date=None
+
+        assert inv.raw_available_kg(product) == Decimal("0.000")
+        with self.assertRaises(ValueError):
+            inv.record_stock_count(product_packaging=pack, bags=1, actor=self.stock_admin)
+
+    def test_future_effective_date_provides_no_raw_material(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_future_effective_date_provides_no_raw_material"""
+        product, pack = self._raw_pack(name="Raw Future")
+        book_raw_material(
+            product, Decimal("10.000"), actor=self.su,
+            effective_date=self.today + datetime.timedelta(days=1),
+        )
+
+        assert inv.raw_available_kg(product) == Decimal("0.000")
+        with self.assertRaises(ValueError):
+            inv.record_stock_count(product_packaging=pack, bags=1, actor=self.stock_admin)
+
+    def test_lowering_a_bag_count_releases_raw_material(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_lowering_a_bag_count_releases_raw_material"""
+        product, pack = self._raw_pack(name="Raw Release")
+        book_raw_material(product, Decimal("10.000"), actor=self.su)
+
+        inv.record_stock_count(product_packaging=pack, bags=10, actor=self.stock_admin)
+        assert inv.raw_available_kg(product) == Decimal("0.000")
+
+        inv.record_stock_count(product_packaging=pack, bags=4, actor=self.stock_admin)
+        assert inv.raw_available_kg(product) == Decimal("6.000")
+
+    def test_mixed_increase_and_decrease_is_judged_net_per_product(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_mixed_increase_and_decrease_is_judged_net_per_product"""
+        product, pack_a = self._raw_pack(name="Raw Mixed", packets=1)
+        pack_b = add_packaging(
+            product, packet_weight=Decimal("1.000"), packets=2, actor=self.su
+        )
+        book_raw_material(product, Decimal("10.000"), actor=self.su)
+        inv.record_stock_count(product_packaging=pack_a, bags=8, actor=self.stock_admin)
+        assert inv.raw_available_kg(product) == Decimal("2.000")
+
+        # Raising pack_a to 10kg while adding pack_b at 1 (2kg) would be 12kg,
+        # over the 10kg available -- rejected and rolled back in full.
+        with self.assertRaises(ValueError):
+            inv.record_stock_counts(
+                counts={pack_a: 10, pack_b: 1}, actor=self.stock_admin,
+            )
+        assert inv.on_hand_bags(pack_a) == 8
+        assert inv.on_hand_bags(pack_b) == 0
+
+        # Lowering pack_a to 6 (6kg) while raising pack_b to 2 (4kg) nets to
+        # exactly 10kg -- the whole upload is judged together, not line by line.
+        inv.record_stock_counts(counts={pack_a: 6, pack_b: 2}, actor=self.stock_admin)
+        assert inv.on_hand_bags(pack_a) == 6
+        assert inv.on_hand_bags(pack_b) == 2
+        assert inv.raw_available_kg(product) == Decimal("0.000")
+
+    def test_bags_dispatched_before_the_count_stay_spent(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_bags_dispatched_before_the_count_stay_spent"""
+        self._count_everything(bags=400)
+        before = inv.raw_available_kg(self.product)
+
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        attach_dispatch_details(
+            order, dispatched_by=self.stock_admin,
+            dispatch_date=self.today - datetime.timedelta(days=3),
+            from_city=self.city, to_city=self.city2, lr_number="LR900",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+
+        # The 5 bags left before today's count, so on_hand/consumed already
+        # forgot them -- but they were still packed from raw material, and
+        # raw availability must not quietly get it back.
+        assert inv.consumed_bags(self.pack) == 0
+        assert inv.on_hand_bags(self.pack) == 400
+        assert inv.raw_available_kg(self.product) == before - 5 * self.pack.total_weight
+
+    def test_reserved_bags_do_not_change_raw_material(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_reserved_bags_do_not_change_raw_material"""
+        self._count_everything(bags=400)
+        before = inv.raw_available_kg(self.product)
+
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)  # reserves 5 bags; none dispatched
+
+        assert inv.reserved_bags(self.pack) == 5
+        assert inv.raw_available_kg(self.product) == before
 
     def test_uncounted_packaging_has_no_stock(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_uncounted_packaging_has_no_stock"""

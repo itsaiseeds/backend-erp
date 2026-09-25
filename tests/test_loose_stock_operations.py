@@ -23,7 +23,7 @@ from aggregator import InventoryOperations as inv
 from aggregator.models import LooseStockSnapshot, Stage, StageIds
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, User
-from tests.common import DMLTestCase
+from tests.common import DMLTestCase, book_raw_material, book_raw_material_for_every_product
 
 
 class LooseStockTest(DMLTestCase):
@@ -66,6 +66,9 @@ class LooseStockTest(DMLTestCase):
         cls.pack_half = add_packaging(
             cls.product, packet_weight=Decimal("0.500"), packets=40, actor=cls.su
         )
+        # Bag/loose counts are now checked against raw material, and one test
+        # counts every packaging including the dml.sql seed rows.
+        book_raw_material_for_every_product(actor=cls.su)
         cls.today = datetime.date.today()
         cls.w1 = Decimal("1.000")
         cls.whalf = Decimal("0.500")
@@ -204,6 +207,82 @@ class LooseStockTest(DMLTestCase):
         )
         assert LooseStockSnapshot.objects.count() == 0
         assert inv.is_stock_count_complete() is True
+
+    # -- raw material backing ---------------------------------------------------
+    #
+    # self.product is booked with a huge (1,000,000 kg) raw lot in
+    # setUpTestData so every test above can write counts freely. These tests
+    # care about the raw-material check itself, so they use a fresh product
+    # with a small, exact raw booking instead.
+
+    def _raw_pack(self, *, name, packet_weight=Decimal("1.000"), packets=1):
+        """A fresh product + single packaging, 1 bag == ``packet_weight`` kg,
+        so the loose pool at that weight exists too (``product_loose_weights``
+        only lists weights a product is actually packed in)."""
+        product = create_product(
+            name=name, crop="Maize", stage=Stage.by_id(StageIds.BREEDER),
+            selling_price=Decimal("10.00"), actor=self.su,
+        )
+        pack = add_packaging(
+            product, packet_weight=packet_weight, packets=packets, actor=self.su
+        )
+        return product, pack
+
+    def test_loose_count_within_raw_material_is_allowed(self):
+        """tests/test_loose_stock_operations.py::LooseStockTest::test_loose_count_within_raw_material_is_allowed"""
+        product, _pack = self._raw_pack(name="Raw Loose OK")
+        book_raw_material(product, Decimal("10.000"), actor=self.su)
+
+        inv.record_loose_stock(
+            product=product, packet_weight=self.w1, packets=10, actor=self.stock_admin
+        )
+        assert inv.on_hand_loose_packets(product, self.w1) == 10
+        assert inv.raw_available_kg(product) == Decimal("0.000")
+
+    def test_loose_count_exceeding_raw_material_is_rejected_and_rolled_back(self):
+        """tests/test_loose_stock_operations.py::LooseStockTest::test_loose_count_exceeding_raw_material_is_rejected_and_rolled_back"""
+        product, _pack = self._raw_pack(name="Raw Loose Short")
+        book_raw_material(product, Decimal("10.000"), actor=self.su)
+
+        with self.assertRaises(ValueError):
+            inv.record_loose_stock(
+                product=product, packet_weight=self.w1, packets=11, actor=self.stock_admin
+            )
+        assert inv.on_hand_loose_packets(product, self.w1) == 0
+        assert inv.raw_available_kg(product) == Decimal("10.000")
+
+    def test_lowering_a_loose_count_releases_raw_material(self):
+        """tests/test_loose_stock_operations.py::LooseStockTest::test_lowering_a_loose_count_releases_raw_material"""
+        product, _pack = self._raw_pack(name="Raw Loose Release")
+        book_raw_material(product, Decimal("10.000"), actor=self.su)
+
+        inv.record_loose_stock(
+            product=product, packet_weight=self.w1, packets=10, actor=self.stock_admin
+        )
+        assert inv.raw_available_kg(product) == Decimal("0.000")
+
+        inv.record_loose_stock(
+            product=product, packet_weight=self.w1, packets=4, actor=self.stock_admin
+        )
+        assert inv.raw_available_kg(product) == Decimal("6.000")
+
+    def test_bags_and_loose_packets_share_one_products_raw_material(self):
+        """tests/test_loose_stock_operations.py::LooseStockTest::test_bags_and_loose_packets_share_one_products_raw_material"""
+        product, pack = self._raw_pack(name="Raw Shared")
+        book_raw_material(product, Decimal("10.000"), actor=self.su)
+
+        inv.record_stock_count(product_packaging=pack, bags=6, actor=self.stock_admin)
+        assert inv.raw_available_kg(product) == Decimal("4.000")
+
+        # The loose pool draws from whatever the bag count left behind.
+        with self.assertRaises(ValueError):
+            inv.record_loose_stock(
+                product=product, packet_weight=self.w1, packets=5, actor=self.stock_admin
+            )
+        inv.record_loose_stock(
+            product=product, packet_weight=self.w1, packets=4, actor=self.stock_admin
+        )
+        assert inv.raw_available_kg(product) == Decimal("0.000")
 
     # -- payload shapes --------------------------------------------------------
 

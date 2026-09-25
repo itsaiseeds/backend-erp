@@ -125,11 +125,18 @@ class ExportInwardDaySerializer(serializers.Serializer):
 
 
 # -- inventory snapshots -----------------------------------------------------
+#
+# Unlike the other exports, ``export/inventory-snapshots`` is paginated: bag
+# and loose rows are interleaved into one flat list ordered by snapshot_date,
+# each carrying a ``kind`` discriminator instead of being grouped into a
+# per-date bucket. See ``api.sales_admin.ExportInventorySnapshotsView``.
 
 
 class ExportBagSnapshotSerializer(serializers.Serializer):
-    """``InventoryOperations.snapshot_count_payload``: counted figures only."""
+    """``InventoryOperations.snapshot_count_payload``: counted figures only,
+    plus the ``kind`` discriminator."""
 
+    kind = serializers.ChoiceField(choices=["bag"])
     public_id = serializers.CharField()
     snapshot_date = serializers.DateField()
     packaging = PackagingRefSerializer()
@@ -139,19 +146,13 @@ class ExportBagSnapshotSerializer(serializers.Serializer):
 
 
 class ExportLooseSnapshotSerializer(serializers.Serializer):
-    """``InventoryOperations.loose_stock_count_payload``: counted figures only."""
+    """``InventoryOperations.loose_stock_count_payload``: counted figures only,
+    plus the ``kind`` discriminator."""
 
+    kind = serializers.ChoiceField(choices=["loose"])
     public_id = serializers.CharField()
     snapshot_date = serializers.DateField()
     product = ProductRefSerializer()
     packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
     packets = serializers.IntegerField()
     total_weight = serializers.CharField(help_text="Kilograms.")
-
-
-class ExportSnapshotDaySerializer(serializers.Serializer):
-    """One row of ``export/inventory-snapshots``: both counts for one date."""
-
-    snapshot_date = serializers.DateField()
-    bag_snapshots = ExportBagSnapshotSerializer(many=True)
-    loose_snapshots = ExportLooseSnapshotSerializer(many=True)

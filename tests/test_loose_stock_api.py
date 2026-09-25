@@ -20,7 +20,7 @@ from rest_framework import status
 
 from aggregator.models import LooseStockSnapshot, ProductPackaging, Stage, StageIds
 from authentication.models import Admin, User
-from tests.common import WebApiTestCase
+from tests.common import WebApiTestCase, book_raw_material
 
 UPDATE_URL = "/api/sales-admin/update-sample-packet-stock"
 POSITION_URL = "/api/sales-admin/sample-packet-stock"
@@ -73,6 +73,11 @@ class LooseStockApiTest(WebApiTestCase):
         cls.pack_half = ProductPackaging.objects.create(
             product=cls.product, packet_weight=Decimal("0.500"), packets=40,
             selling_price=Decimal("800.00"), created_by=cls.stock_admin_user,
+        )
+        # Loose counts are checked against raw material -- book far more than
+        # any test writes so the check never gets in the way here.
+        book_raw_material(
+            cls.product, Decimal("1000000.000"), actor=cls.stock_admin_user
         )
 
     # -- helpers ---------------------------------------------------------------
@@ -194,6 +199,23 @@ class LooseStockApiTest(WebApiTestCase):
                     )
                     self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
                     self.assertEqual(LooseStockSnapshot.objects.count(), 0)
+
+    def test_loose_count_exceeding_raw_material_is_rejected(self):
+        """A loose count that would spend more raw material than the product
+        has in use is rejected with a 400, and nothing is written.
+
+        Run: tests/test_loose_stock_api.py::LooseStockApiTest::test_loose_count_exceeding_raw_material_is_rejected
+        """
+        # 1kg packets; 2,000,000 of them needs 2,000,000kg, over the
+        # 1,000,000kg setUpTestData booked for self.product.
+        resp = self._stock_admin_request(
+            "patch", UPDATE_URL,
+            data={"counts": [self._line("1.000", 2_000_000)]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+        self.assertIn("raw material", resp.data["detail"].lower())
+        self.assertEqual(LooseStockSnapshot.objects.count(), 0)
 
     # -- reading ---------------------------------------------------------------
 

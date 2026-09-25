@@ -180,6 +180,8 @@ class InwardStockApiTest(WebApiTestCase):
             "product": self.product1.public_id,
             "name": "SAI-33",
             "incoming_kg": "100.000",
+            "packed_kg": "0.000",
+            "available_kg": "100.000",
         })
 
     def test_raw_stock_sums_multiple_lots_and_supports_product_filtering(self):
@@ -245,6 +247,8 @@ class InwardStockApiTest(WebApiTestCase):
             "product": self.product1.public_id,
             "name": "SAI-33",
             "incoming_kg": "25.000",
+            "packed_kg": "0.000",
+            "available_kg": "25.000",
         }])
 
     def test_a_reverted_lot_stops_counting_against_the_stock_read(self):
@@ -274,6 +278,8 @@ class InwardStockApiTest(WebApiTestCase):
             "product": self.product1.public_id,
             "name": "SAI-33",
             "incoming_kg": "25.000",
+            "packed_kg": "0.000",
+            "available_kg": "25.000",
         }])
 
         reverted = self.client.patch(url, {"status": "lab_testing"}, format="json")
