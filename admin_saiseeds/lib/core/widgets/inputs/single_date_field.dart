@@ -81,6 +81,22 @@ class _SingleDateFieldState extends State<SingleDateField> {
     _overlayEntry?.markNeedsBuild();
   }
 
+  bool _opensUpward(BuildContext overlayContext) {
+    final RenderObject? box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return false;
+
+    final double fieldBottom = box.localToGlobal(Offset.zero).dy + box.size.height;
+    final double available =
+        MediaQuery.sizeOf(overlayContext).height - fieldBottom;
+
+    if (available >= AppSizes.singleDatePopoverHeight + AppSpacing.xs) {
+      return false;
+    }
+
+    final double aboveField = box.localToGlobal(Offset.zero).dy;
+    return aboveField > available;
+  }
+
   Widget _buildOverlay(BuildContext overlayContext) {
     return Stack(
       children: [
@@ -95,7 +111,16 @@ class _SingleDateFieldState extends State<SingleDateField> {
           child: CompositedTransformFollower(
             link: _layerLink,
             showWhenUnlinked: false,
-            offset: const Offset(0, AppSizes.inputHeight + AppSpacing.xs),
+            targetAnchor: _opensUpward(overlayContext)
+                ? Alignment.topLeft
+                : Alignment.bottomLeft,
+            followerAnchor: _opensUpward(overlayContext)
+                ? Alignment.bottomLeft
+                : Alignment.topLeft,
+            offset: Offset(
+              0,
+              _opensUpward(overlayContext) ? -AppSpacing.xs : AppSpacing.xs,
+            ),
             child: Material(
               color: AppColors.TRANSPARENT,
               child: Container(

@@ -1,6 +1,7 @@
 import '../../../core/constants/app_strings.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/endpoints/inventory_endpoints.dart';
 import '../../../core/network/endpoints/orders_endpoints.dart';
 import 'models/order_model.dart';
 import 'models/paginated_orders_model.dart';
@@ -49,6 +50,15 @@ class OrdersRepository {
 
   Future<void> rejectOrder(String publicId) =>
       _apiClient.post(OrdersEndpoints.reject(publicId));
+
+  Future<bool> fetchTodaysStockComplete() async {
+    final dynamic response = await _apiClient.get(
+      InventoryEndpoints.checkTodaysInventory,
+    );
+
+    if (response is! Map) return false;
+    return response['is_complete'] == true;
+  }
 
   Future<void> updateOrder({
     required String publicId,

@@ -45,6 +45,7 @@ class OrdersTable extends StatefulWidget {
   final void Function(OrderModel order)? onHold;
   final void Function(OrderModel order)? onReject;
   final List<Widget> searchBarActions;
+  final Widget? searchBarTrailing;
 
   const OrdersTable({
     super.key,
@@ -66,6 +67,7 @@ class OrdersTable extends StatefulWidget {
     this.onHold,
     this.onReject,
     this.searchBarActions = const [],
+    this.searchBarTrailing,
   });
 
   @override
@@ -199,6 +201,7 @@ class OrdersTableState extends State<OrdersTable> {
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
       searchBarActions: widget.searchBarActions,
+      searchBarTrailing: widget.searchBarTrailing,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _columns,
       configKey: OrdersTable.CONFIG_KEY,

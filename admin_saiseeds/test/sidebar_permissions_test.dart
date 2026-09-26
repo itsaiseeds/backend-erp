@@ -16,6 +16,12 @@ void main() {
       TabIds.ORDERS,
       TabIds.PRODUCTS,
       TabIds.PRODUCT_PACKAGINGS,
+      TabIds.PARTIES,
+      TabIds.BAG_STOCK,
+      TabIds.PACKET_STOCK,
+      TabIds.INWARD_RAW_MATERIALS,
+      TabIds.OTHER_RAW_MATERIALS,
+      TabIds.OTHER_MATERIAL_INWARD,
     ]);
   });
 
@@ -30,6 +36,12 @@ void main() {
       TabIds.ORDERS,
       TabIds.PRODUCTS,
       TabIds.PRODUCT_PACKAGINGS,
+      TabIds.PARTIES,
+      TabIds.BAG_STOCK,
+      TabIds.PACKET_STOCK,
+      TabIds.INWARD_RAW_MATERIALS,
+      TabIds.OTHER_RAW_MATERIALS,
+      TabIds.OTHER_MATERIAL_INWARD,
     ]);
   });
 

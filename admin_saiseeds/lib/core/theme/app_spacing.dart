@@ -143,6 +143,7 @@ class AppSizes {
   static const double productImagePreview = 200.0;
   static const double dateRangePopoverWidth = 640.0;
   static const double singleDatePopoverWidth = 320.0;
+  static const double singleDatePopoverHeight = 294.0;
   static const double dateRangePresetsWidth = 140.0;
   static const double dateRangeCellSize = 32.0;
   static const double smallScreenNoticeWidth = 360.0;

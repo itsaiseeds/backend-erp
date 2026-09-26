@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import '../../../../core/bloc/safe_cubit.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -25,6 +27,7 @@ class OrdersState extends Equatable {
   final Map<String, String> filters;
   final bool isMutating;
   final String? errorMessage;
+  final bool isTodaysStockComplete;
 
   const OrdersState({
     this.status = OrdersStatus.initial,
@@ -38,6 +41,7 @@ class OrdersState extends Equatable {
     this.sortBy,
     this.sortOrder,
     this.filters = const {},
+    this.isTodaysStockComplete = false,
     this.isMutating = false,
     this.errorMessage,
   });
@@ -54,6 +58,7 @@ class OrdersState extends Equatable {
     String? sortBy,
     String? sortOrder,
     Map<String, String>? filters,
+    bool? isTodaysStockComplete,
     bool? isMutating,
     String? errorMessage,
     bool clearError = false,
@@ -70,6 +75,8 @@ class OrdersState extends Equatable {
       sortBy: sortBy ?? this.sortBy,
       sortOrder: sortOrder ?? this.sortOrder,
       filters: filters ?? this.filters,
+      isTodaysStockComplete:
+          isTodaysStockComplete ?? this.isTodaysStockComplete,
       isMutating: isMutating ?? this.isMutating,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
@@ -90,6 +97,7 @@ class OrdersState extends Equatable {
     sortBy,
     sortOrder,
     filters,
+    isTodaysStockComplete,
     isMutating,
     errorMessage,
   ];
@@ -106,6 +114,17 @@ class OrdersCubit extends SafeCubit<OrdersState> {
   static const int PAGE_SIZE = 10;
 
   Future<void> loadOrders() => _fetch(page: state.currentPage);
+
+  /// The stock flag rides along with every list load, so verifying an order
+  /// (which needs today's count) leaves the chip telling the truth.
+  Future<void> loadTodaysStockStatus() async {
+    try {
+      final bool isComplete = await _repository.fetchTodaysStockComplete();
+      emit(state.copyWith(isTodaysStockComplete: isComplete));
+    } catch (_) {
+      emit(state.copyWith(isTodaysStockComplete: false));
+    }
+  }
 
   Future<void> refresh() => _fetch(page: 1);
 
@@ -237,6 +256,7 @@ class OrdersCubit extends SafeCubit<OrdersState> {
 
   Future<void> _fetch({required int page}) async {
     emit(state.copyWith(status: OrdersStatus.loading, clearError: true));
+    unawaited(loadTodaysStockStatus());
 
     try {
       final PaginatedOrdersModel result = await _repository.fetchOrders(

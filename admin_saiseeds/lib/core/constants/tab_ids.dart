@@ -8,5 +8,11 @@ class TabIds {
   static const String ORDERS = 'orders';
   static const String PRODUCTS = 'products';
   static const String PRODUCT_PACKAGINGS = 'product-packagings';
+  static const String PARTIES = 'parties';
+  static const String BAG_STOCK = 'bag-stock';
+  static const String PACKET_STOCK = 'packet-stock';
+  static const String INWARD_RAW_MATERIALS = 'inward-raw-materials';
+  static const String OTHER_RAW_MATERIALS = 'other-raw-materials';
+  static const String OTHER_MATERIAL_INWARD = 'other-material-inward';
   static const String PROFILE = 'profile';
 }

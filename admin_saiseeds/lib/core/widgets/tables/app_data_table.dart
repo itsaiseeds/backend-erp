@@ -67,6 +67,10 @@ class AppDataTable<T> extends StatefulWidget {
   final String Function(String sort)? getHumanReadableSortName;
   final String searchHintText;
   final List<Widget> searchBarActions;
+
+  /// Sits beside the search bar at its full height, free of the square
+  /// constraint `searchBarActions` imposes on icon buttons.
+  final Widget? searchBarTrailing;
   final double searchBarHeight;
 
   final List<AppDataColumn> columns;
@@ -127,6 +131,7 @@ class AppDataTable<T> extends StatefulWidget {
     this.getHumanReadableSortName,
     this.searchHintText = AppStrings.SEARCH,
     this.searchBarActions = const [],
+    this.searchBarTrailing,
     this.searchBarHeight = AppSizes.tableSearchBarHeight,
     this.initialPinnedColumns = const [],
     this.initialHiddenColumns = const [],
@@ -490,6 +495,16 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
                   minHeight: widget.searchBarHeight,
                 ),
               ),
+              if (widget.searchBarTrailing != null) ...[
+                const SizedBox(width: AppSpacing.smd),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    height: widget.searchBarHeight,
+                    child: widget.searchBarTrailing,
+                  ),
+                ),
+              ],
               for (final action in widget.searchBarActions) ...[
                 const SizedBox(width: AppSpacing.smd),
                 Align(

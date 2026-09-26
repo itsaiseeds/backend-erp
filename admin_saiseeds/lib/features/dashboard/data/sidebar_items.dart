@@ -43,6 +43,36 @@ class SidebarItems {
       label: AppStrings.PRODUCT_PACKAGINGS,
       icon: Icons.inventory_outlined,
     ),
+    SidebarItemModel(
+      id: TabIds.PARTIES,
+      label: AppStrings.PARTIES,
+      icon: Icons.handshake_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.BAG_STOCK,
+      label: AppStrings.BAG_STOCK,
+      icon: Icons.warehouse_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.PACKET_STOCK,
+      label: AppStrings.PACKET_STOCK,
+      icon: Icons.category_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.INWARD_RAW_MATERIALS,
+      label: AppStrings.INWARD_RAW_MATERIALS,
+      icon: Icons.local_shipping_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.OTHER_RAW_MATERIALS,
+      label: AppStrings.OTHER_RAW_MATERIALS,
+      icon: Icons.layers_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.OTHER_MATERIAL_INWARD,
+      label: AppStrings.OTHER_MATERIAL_INWARD,
+      icon: Icons.inventory_2_outlined,
+    ),
   ];
 
   static const String DEFAULT_ITEM_ID = TabIds.DASHBOARD;

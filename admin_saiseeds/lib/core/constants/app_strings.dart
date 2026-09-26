@@ -639,6 +639,32 @@ class AppStrings {
   static const String ORDER_PICK_CONFIRM = 'Add these products';
   static const String ORDER_PICK_SELECTED_NONE = 'Nothing selected yet';
   static const String ORDER_PICK_ON_ORDER = 'On this order';
+  static const String STOCK_UPDATED = 'Stock Updated';
+  static const String STOCK_NOT_UPDATED = 'Stock not updated';
+  static const String PARTIES = 'Party Management';
+  static const String PARTY_DETAIL_TITLE = 'Party details';
+  static const String PARTY_DETAIL_SUBTITLE =
+      'Name and city on record for this party.';
+  static const String ADD_PARTY = 'Add party';
+  static const String ADD_PARTY_SUBTITLE = 'Register a party in the directory.';
+  static const String EDIT_PARTY_SUBTITLE = 'Update the party details.';
+  static const String PARTY_CREATED_TITLE = 'Party created';
+  static const String PARTY_UPDATED_TITLE = 'Party updated';
+  static const String PARTY_DELETED_TITLE = 'Party deleted';
+  static const String DELETE_PARTY_TITLE = 'Delete party';
+  static const String DELETE_PARTY_BODY =
+      'This permanently removes the party. This cannot be undone.';
+  static const String COLUMN_PARTY_NAME = 'Party Name';
+  static const String COLUMN_PARTY_CONTACT = 'Contact Number';
+  static const String FIELD_PARTY_NAME_HINT = 'Party name';
+  static const String FIELD_PARTY_CONTACT_HINT = '10-digit mobile number';
+  static const String PARTIES_TABLE_SEARCH_HINT = 'Search parties...';
+  static const String PARTIES_EMPTY_STATE_TITLE = 'No parties yet';
+  static const String PARTIES_EMPTY_STATE_BODY =
+      'Add a party to start building the directory.';
+  static const String PARTIES_LOAD_FAILED_TITLE = 'Could not load parties';
+  static const String VALIDATION_PARTY_NAME_REQUIRED =
+      'Party name is required.';
   static const String TABLE_ROW_ACTIONS = 'Options';
   static const String TABLE_ROW_ACTIONS_TOOLTIP = 'Order options';
   static const String ORDER_PICK_ALREADY_TITLE = 'Already on this order';
@@ -681,4 +707,140 @@ class AppStrings {
   static const String ORDER_LIST_PRICE_LABEL = 'List price';
   static const String ORDER_NO_ITEMS = 'This order has no lines.';
   static const String TIMEZONE_IST = 'IST';
+
+  static const String INWARD_RAW_MATERIALS = 'Inward Raw Material';
+  static const String OTHER_RAW_MATERIALS = 'Other Material Recipes';
+  static const String OTHER_MATERIAL_INWARD = 'Other Material Inward';
+
+  static const String COLUMN_RECIPE = 'Recipe';
+
+  static const String FIELD_RECIPE = 'Recipe';
+  static const String FIELD_RECIPE_HINT = 'Search a recipe';
+
+  static const String OTHER_INWARD_DETAIL_TITLE = 'Other material lot';
+  static const String OTHER_INWARD_DETAIL_SUBTITLE =
+      'Recipe, party and quantity received for this lot.';
+  static const String ADD_OTHER_INWARD = 'Add lot';
+  static const String ADD_OTHER_INWARD_SUBTITLE =
+      'Record an inward other-material lot.';
+  static const String OTHER_INWARD_CREATED_TITLE = 'Lot recorded';
+  static const String OTHER_INWARD_DELETED_TITLE = 'Lot deleted';
+  static const String DELETE_OTHER_INWARD_TITLE = 'Delete lot';
+  static const String DELETE_OTHER_INWARD_BODY =
+      'This permanently removes the other-material lot. This cannot be undone.';
+  static const String OTHER_INWARD_TABLE_SEARCH_HINT =
+      'Search other material...';
+  static const String OTHER_INWARD_EMPTY_STATE_TITLE =
+      'No other material lots yet';
+  static const String OTHER_INWARD_EMPTY_STATE_BODY =
+      'Record an inward lot to start tracking other material.';
+  static const String OTHER_INWARD_LOAD_FAILED_TITLE =
+      'Could not load other material lots';
+  static const String VALIDATION_RECIPE_REQUIRED = 'Recipe is required.';
+
+  static const String COLUMN_PARTY = 'Party';
+  static const String COLUMN_QUANTITY_KG = 'Quantity (kg)';
+  static const String COLUMN_LAB_SAMPLING_DATE = 'Lab Sampling Date';
+  static const String COLUMN_EFFECTIVE_DATE = 'Effective Date';
+  static const String COLUMN_MATERIAL_TYPE = 'Material Type';
+  static const String COLUMN_QUANTITY = 'Quantity';
+  static const String COLUMN_UNIT_TYPE = 'Unit';
+
+  static const String STATUS_LAB_TESTING = 'Lab Testing';
+  static const String STATUS_IN_USE = 'In Use';
+
+  static const String FIELD_PARTY = 'Party';
+  static const String FIELD_PARTY_HINT = 'Search a party';
+  static const String FIELD_QUANTITY_KG = 'Quantity (kg)';
+  static const String FIELD_QUANTITY_KG_HINT = 'Weight received in kg';
+  static const String FIELD_LAB_SAMPLING_DATE = 'Lab sampling date';
+  static const String FIELD_MATERIAL_TYPE = 'Material type';
+  static const String FIELD_MATERIAL_TYPE_HINT = 'Search a material type';
+  static const String FIELD_RECIPE_QUANTITY = 'Quantity';
+  static const String FIELD_RECIPE_QUANTITY_HINT = 'Amount per packet';
+
+  static const String INWARD_DETAIL_TITLE = 'Raw material lot';
+  static const String INWARD_DETAIL_SUBTITLE =
+      'Product, party and lab sampling details for this lot.';
+  static const String ADD_INWARD = 'Add lot';
+  static const String ADD_INWARD_SUBTITLE = 'Record an inward raw-material lot.';
+  static const String EDIT_INWARD_SUBTITLE =
+      'Update the sampling date or mark the lot in use.';
+  static const String INWARD_CREATED_TITLE = 'Lot recorded';
+  static const String INWARD_UPDATED_TITLE = 'Lot updated';
+  static const String INWARD_DELETED_TITLE = 'Lot deleted';
+  static const String DELETE_INWARD_TITLE = 'Delete lot';
+  static const String DELETE_INWARD_BODY =
+      'This permanently removes the raw-material lot. This cannot be undone.';
+  static const String INWARD_TABLE_SEARCH_HINT = 'Search raw material...';
+  static const String INWARD_EMPTY_STATE_TITLE = 'No raw material lots yet';
+  static const String INWARD_EMPTY_STATE_BODY =
+      'Record an inward lot to start tracking raw material.';
+  static const String INWARD_LOAD_FAILED_TITLE =
+      'Could not load raw material lots';
+  static const String INWARD_MARK_IN_USE = 'Mark in use';
+  static const String INWARD_STATUS_LOCKED_NOTE =
+      'A lot already in use cannot change status.';
+
+  static const String RECIPE_DETAIL_TITLE = 'Material recipe';
+  static const String RECIPE_DETAIL_SUBTITLE =
+      'Material consumed per packet of this product.';
+  static const String ADD_RECIPE = 'Add recipe';
+  static const String ADD_RECIPE_SUBTITLE =
+      'Define the material a packet consumes.';
+  static const String EDIT_RECIPE_SUBTITLE = 'Update the recipe details.';
+  static const String RECIPE_CREATED_TITLE = 'Recipe created';
+  static const String RECIPE_UPDATED_TITLE = 'Recipe updated';
+  static const String RECIPE_DELETED_TITLE = 'Recipe deleted';
+  static const String DELETE_RECIPE_TITLE = 'Delete recipe';
+  static const String DELETE_RECIPE_BODY =
+      'This permanently removes the recipe. This cannot be undone.';
+  static const String RECIPE_TABLE_SEARCH_HINT = 'Search recipes...';
+  static const String RECIPE_EMPTY_STATE_TITLE = 'No recipes yet';
+  static const String RECIPE_EMPTY_STATE_BODY =
+      'Add a recipe to define what a packet consumes.';
+  static const String RECIPE_LOAD_FAILED_TITLE = 'Could not load recipes';
+
+  static const String VALIDATION_PARTY_REQUIRED = 'Party is required.';
+  static const String VALIDATION_MATERIAL_TYPE_REQUIRED =
+      'Material type is required.';
+  static const String VALIDATION_LAB_DATE_REQUIRED =
+      'Lab sampling date is required.';
+
+  static const String BAG_STOCK = 'Bag Stock Management';
+  static const String PACKET_STOCK = 'Packet Stock Management';
+
+  static const String STOCK_UPDATE_ACTION = 'Update Stock';
+  static const String STOCK_CONFIRM_TITLE = 'Update today\'s stock';
+  static const String STOCK_CONFIRM_BODY =
+      'Please update stock of all products together. Counts you leave blank '
+      'keep the value already recorded for today.';
+  static const String STOCK_CONFIRM_ACTION = 'Confirm';
+  static const String STOCK_NOTHING_ENTERED_TITLE = 'Nothing to update';
+  static const String STOCK_NOTHING_ENTERED_BODY =
+      'Enter at least one count before updating.';
+  static const String STOCK_COUNT_HINT = '0';
+
+  static const String COLUMN_STOCK_ON_HAND = 'On Hand';
+  static const String COLUMN_STOCK_RESERVED = 'Reserved';
+  static const String COLUMN_STOCK_CONSUMED = 'Consumed';
+  static const String COLUMN_STOCK_AVAILABLE = 'Available';
+  static const String COLUMN_STOCK_COUNTED = 'Counted';
+  static const String COLUMN_PACKETS_PER_BAG = 'Packets / Bag';
+
+  static const String BAG_STOCK_TABLE_SEARCH_HINT = 'Search bag stock...';
+  static const String BAG_STOCK_EMPTY_STATE_TITLE = 'No bag stock yet';
+  static const String BAG_STOCK_EMPTY_STATE_BODY =
+      'Add a product packaging to start counting sealed bags.';
+  static const String BAG_STOCK_LOAD_FAILED_TITLE = 'Could not load bag stock';
+  static const String BAG_STOCK_UPDATED_TITLE = 'Bag stock updated';
+
+  static const String PACKET_STOCK_TABLE_SEARCH_HINT =
+      'Search packet stock...';
+  static const String PACKET_STOCK_EMPTY_STATE_TITLE = 'No packet stock yet';
+  static const String PACKET_STOCK_EMPTY_STATE_BODY =
+      'Add a product to start counting loose sample packets.';
+  static const String PACKET_STOCK_LOAD_FAILED_TITLE =
+      'Could not load packet stock';
+  static const String PACKET_STOCK_UPDATED_TITLE = 'Packet stock updated';
 }

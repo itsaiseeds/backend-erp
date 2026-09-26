@@ -6,6 +6,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/widgets/feedback/confirmation_dialog.dart';
+import '../../../../core/widgets/feedback/stock_status_chip.dart';
 import '../../data/models/order_model.dart';
 import '../../data/orders_repository.dart';
 import '../../../product_packagings/data/product_packagings_repository.dart';
@@ -183,6 +184,9 @@ class _OrdersContentState extends State<_OrdersContent> {
             onUnverify: _onUnverify,
             onHold: _onHold,
             onReject: _onReject,
+            searchBarTrailing: StockStatusChip(
+              isComplete: state.isTodaysStockComplete,
+            ),
             searchBarActions: [
               IconActionButton(
                 expand: true,

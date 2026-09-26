@@ -57,6 +57,15 @@ class FormValidators {
     return null;
   }
 
+  static String? optionalPhoneNumber(String? value) {
+    final String raw = (value ?? '').trim();
+    if (raw.isEmpty) return null;
+    if (raw.length != PHONE_NUMBER_LENGTH || !_digitsOnly.hasMatch(raw)) {
+      return AppStrings.VALIDATION_PHONE_INVALID;
+    }
+    return null;
+  }
+
   static String? optionalEmail(String? value) {
     final String raw = (value ?? '').trim();
     if (raw.isEmpty) return null;
