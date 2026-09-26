@@ -5,7 +5,7 @@ product, computed from ``InwardRawMaterial`` lots on the fly.
 
 A lot counts toward the total only once it is **dated and usable** -- both an
 ``effective_date`` that has come ("tomorrow is not incoming yet") and
-``status='in_use'`` (a ``lab_testing`` lot is held back until the lab signs
+``status='In Use'`` (a ``Lab Testing`` lot is held back until the lab signs
 off). Soft-deleted lots never count.
 
 ``incoming_kg`` is everything that has come in. ``packed_kg`` is what has

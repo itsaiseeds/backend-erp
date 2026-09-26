@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from aggregator.InwardOperations import party_payload
 from aggregator.models import City, Party
 from api.paginated_views import AdminPaginatedDateRangeListView
+from authentication.validators import validate_phone_number
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
     QuerysetFilter,
@@ -57,6 +58,16 @@ class CreatePartySerializer(serializers.Serializer):
         queryset=City.objects.all(),
         error_messages={"required": "City is required."},
     )
+    contact_number = serializers.CharField(
+        max_length=10,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[validate_phone_number],
+    )
+
+    def validate_contact_number(self, value):
+        return value or None
 
     def validate(self, attrs):
         name = attrs["name"].strip()
@@ -151,7 +162,10 @@ class PartiesView(AdminPaginatedDateRangeListView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         party = Party.objects.create(
-            name=data["name"], city=data["city"], created_by=request.user
+            name=data["name"],
+            city=data["city"],
+            contact_number=data.get("contact_number"),
+            created_by=request.user,
         )
         return Response(
             party_payload(party), status=status.HTTP_201_CREATED

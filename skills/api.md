@@ -114,7 +114,7 @@ Both compose the private mixin in `common/views/paginated_date_range.py`.
 | `sort_options` | `()` | Tuple of `SortOption`. Client sends `?sort=<-?name,...>` (comma list, `-` = descending). A `pk` tie-breaker is always appended. |
 | `default_sort` | `()` | ORM ordering (str or sequence) used when `?sort` is absent. |
 
-`page`, `page_size`, `sort`, `start_date_time`, `end_date_time` are **reserved** â€”
+`page`, `page_size`, `all`, `sort`, `start_date_time`, `end_date_time` are **reserved** â€”
 no filter param may reuse those names (raises at request time if it does).
 
 ### Filters
@@ -174,6 +174,9 @@ Inverted bounds â†’ **400**.
 ### Query contract
 
 - `?page` (default 1), `?page_size` (default 10, max 30).
+- `?all=true` (default `false`; bare `?all` also means true) â€” paging off: every
+  row matching the filters in one page of the same envelope (`total_pages: 1`,
+  both page numbers `null`); `page` / `page_size` ignored. Bad value â†’ **400**.
 - `?<filter>=<csv>` / `?<name>_after=&<name>_before=` per declared filter, AND-ed.
 - `?sort=<-?name,...>` per `sort_options`; unknown key â†’ **400**.
 - `?start_date_time=` / `?end_date_time=` (ISO 8601) â€” the built-in window; see
@@ -248,6 +251,21 @@ class GetClientsView(AndroidPaginatedDateRangeListView):
 
 See `android/api/v1/GetClientsView.py` for the real thing.
 
+## Swagger groups
+
+Swagger groups endpoints by feature area (`Admin Â· Inward`, `Admin Â· Stock
+count`, `Android Â· Orders`, ...), not by URL. The grouping is **documentation
+only** -- routes never change for it. `common/openapi_tags.py` holds the ordered
+tag list (`OPENAPI_TAGS`, fed to `SPECTACULAR_SETTINGS["TAGS"]`) and the
+path-to-tag table (`ROUTE_TAGS`, first match wins), applied by
+`common.openapi.GroupedAutoSchema`. Exports carry two tags: their domain group
+plus `Admin Â· Exports`.
+
+**A new endpoint must be added to `ROUTE_TAGS`** -- `tests/test_openapi_tags.py`
+fails for any operation left in the default `api` / `android` tag. An explicit
+`@extend_schema(tags=[...])` still overrides the table, but prefer the table so
+the grouping stays in one place.
+
 ## Reading clients
 
 | Endpoint | Scope | Payload |
@@ -319,14 +337,14 @@ stored blank and filled in later by `POST upload-lr-number/<public_id>`. A
 private dispatch requires `vehicle_number` and `driver_number`. Fields belonging
 to the other kind are refused rather than ignored.
 
-`dispatch-order` also takes `items` — **one lot number per line**, keyed by
+`dispatch-order` also takes `items` ï¿½ **one lot number per line**, keyed by
 `product_packaging_public_id` (the id `GET order/<public_id>` hands back for each
 line), which must name every line of the order exactly once. That is what writes
-the order's **challan**: a `DispatchEntry` (`DE-…`, one per order) plus a
-`DispatchEntryItem` per line. The entry **snapshots** the receiver — the client's
-address and primary contact as they stood at dispatch — so a challan reprinted
+the order's **challan**: a `DispatchEntry` (`DE-ï¿½`, one per order) plus a
+`DispatchEntryItem` per line. The entry **snapshots** the receiver ï¿½ the client's
+address and primary contact as they stood at dispatch ï¿½ so a challan reprinted
 next year still says what went out with the goods. Re-dispatching an order
-rewrites the same entry in place rather than making a second one, so `DE-…` names
+rewrites the same entry in place rather than making a second one, so `DE-ï¿½` names
 that order's challan for as long as the order lives.
 
 ## Dispatch challans
@@ -339,18 +357,18 @@ through `DispatchEntry.lr_number` rather than storing a second copy.
 
 `GET /api/sales-admin/dispatch-challans/` lists dispatched orders whose challan
 is complete, each row being the printable challan itself: our consignor block
-(`aggregator/CompanyDetails.py` — placeholder values until the real registration
+(`aggregator/CompanyDetails.py` ï¿½ placeholder values until the real registration
 details land), the snapshotted consignee, a hard-coded HSN code, the Indian
-financial year (April–March, so `2026-2027`), the journey and every lot-numbered
+financial year (Aprilï¿½March, so `2026-2027`), the journey and every lot-numbered
 line. What "complete" means depends on who carried the goods: an **agency**
 dispatch appears only once its LR is recorded, while a **private** one appears
-straight away — there is no note to wait for. Either way the order must still
+straight away ï¿½ there is no note to wait for. Either way the order must still
 **be** dispatched (DISPATCHED or DELIVERED): `revert-dispatch` rewinds the status
 but leaves the dispatch rows attached, so the status is what takes a reverted
 order off the list.
 
 Unlike `orders/`, its **date window is required**, and it filters on
-`dispatch_entry.dispatched_at` — a challan belongs to the period the goods left
+`dispatch_entry.dispatched_at` ï¿½ a challan belongs to the period the goods left
 in, not the period the order was booked in. Filter by `?client=` / `?city_id=`
 (destination), sort by `dispatch_date` (default, newest first) or `created_at`.
 

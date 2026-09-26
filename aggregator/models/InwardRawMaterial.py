@@ -17,8 +17,8 @@ class InwardRawMaterialStatus(models.TextChoices):
     the user flips the status to ``IN_USE`` when the material is usable.
     """
 
-    LAB_TESTING = "lab_testing", "lab testing"
-    IN_USE = "in_use", "in use"
+    LAB_TESTING = "Lab Testing", "Lab Testing"
+    IN_USE = "In Use", "In Use"
 
 
 class InwardRawMaterial(

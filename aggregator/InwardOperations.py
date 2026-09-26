@@ -5,22 +5,22 @@ of raw material (``InwardRawMaterial``, kilograms) or of a packing material
 (``InwardOtherMaterial``, in its material type's unit) for a product's recipe.
 An entry is booked the day it arrives (``created_at``); an other-material entry
 is stamped with ``effective_date`` = that same day, while a raw lot stamps one
-on the day the user flips it to ``in_use``. Dates never backfill into
+on the day the user flips it to ``In Use``. Dates never backfill into
 middleware the way the snapshot dates do -- a lot counts toward stock only once
 its effective date has come, so nothing surprises the books mid-day.
 
 Read-time derivation (no stored counters, no cron): the raw-material stock of a
-product is the sum of its ``quantity_kg`` over lots with ``status=in_use`` and
+product is the sum of its ``quantity_kg`` over lots with ``status=In Use`` and
 ``effective_date <= today``; the on-hand of a material type is the sum of its
 ``InwardOtherMaterial.quantity`` over entries with ``effective_date <= today``.
 A freshly recorded other-material lot is therefore in stock the day it arrives;
-a raw lot counts only while its status is ``in_use`` -- flipping stamps today,
+a raw lot counts only while its status is ``In Use`` -- flipping stamps today,
 reverting clears the date and drops it back out of stock.
 
 Raw material is also **spent** by bag and loose-packet counts recorded in
 ``InventoryOperations`` -- a lot's kilograms are packed into bags or sample
 packets there. ``assert_raw_lot_removable`` guards the two ways a lot can
-leave the ``in_use`` pool (reverting to ``lab_testing``, soft-deleting) so
+leave the ``In Use`` pool (reverting to ``Lab Testing``, soft-deleting) so
 neither can strand bags or packets that no longer have raw material behind
 them.
 
@@ -50,8 +50,8 @@ if TYPE_CHECKING:
 
 # Two-way status transitions for an ``InwardRawMaterial`` lot. Editing this dict
 # is the **only** change needed to change the flips: every guard below re-reads
-# it on each call. Flipping to ``in_use`` stamps ``effective_date`` with today;
-# reverting to ``lab_testing`` clears it (see ``UpdateInwardRawMaterialView``).
+# it on each call. Flipping to ``In Use`` stamps ``effective_date`` with today;
+# reverting to ``Lab Testing`` clears it (see ``UpdateInwardRawMaterialView``).
 ALLOWED_RAW_STATUS_TRANSITIONS = {
     InwardRawMaterialStatus.LAB_TESTING: (InwardRawMaterialStatus.IN_USE,),
     InwardRawMaterialStatus.IN_USE: (InwardRawMaterialStatus.LAB_TESTING,),
@@ -82,9 +82,9 @@ def assert_raw_status_transition(current, requested) -> None:
 def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
     """Raise unless ``entry`` may leave the in-use raw pool (revert or delete).
 
-    Only a lot that is currently ``in_use`` *and* whose ``effective_date`` has
+    Only a lot that is currently ``In Use`` *and* whose ``effective_date`` has
     come is counted in ``InventoryOperations.raw_available_kg`` at all --
-    removing anything else (still ``lab_testing``, or dated in the future) is
+    removing anything else (still ``Lab Testing``, or dated in the future) is
     always safe. Removing a counted lot must not strand bags or sample packets
     that were packed from its kilograms with no raw material behind them.
 
@@ -157,7 +157,7 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
         },
         "party": {"id": entry.party_id, "name": entry.party.name},
         "quantity_kg": str(entry.quantity_kg),
-        "status": entry.get_status_display().title(),
+        "status": entry.status,
         "lab_sampling_date": (
             entry.lab_sampling_date.isoformat()
             if entry.lab_sampling_date is not None
@@ -198,7 +198,7 @@ def raw_incoming_stock(
 ) -> list[dict]:
     """Per-product incoming raw-material position as of ``as_of`` (default today).
 
-    Only lots with ``status=in_use`` and ``effective_date <= as_of`` count
+    Only lots with ``status=In Use`` and ``effective_date <= as_of`` count
     toward ``incoming_kg``. ``packed_kg`` is what has since been packed into
     bags or sample packets (``InventoryOperations.raw_bagged_kg`` +
     ``raw_loose_kg``, read as of now -- a count has no "as of" of its own) and

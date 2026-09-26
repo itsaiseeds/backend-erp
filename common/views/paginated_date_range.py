@@ -27,9 +27,11 @@ single ``sort``::
 * ``sort`` is a comma-separated list of declared sort names, each optionally
   ``-``-prefixed for descending; absent, :attr:`default_sort` is used. A ``pk``
   tie-breaker is always appended so pagination is stable.
+* ``all=true`` turns paging off -- every row matching the filters comes back in
+  one page of the usual envelope.
 
-``page``, ``page_size``, ``start_date_time``, ``end_date_time`` and ``sort`` are
-reserved -- no filter param may reuse those names.
+``page``, ``page_size``, ``all``, ``start_date_time``, ``end_date_time`` and
+``sort`` are reserved -- no filter param may reuse those names.
 
 Every ``available_filters`` entry carries a ``label`` (a human-readable field
 name, so the client titles the widget without mapping param names itself) and a
@@ -82,11 +84,42 @@ class StandardPageNumberPagination(PageNumberPagination):
           "previous_page_number": <int or null on the first page>,
           "results": [...],
         }
+
+    ``?all=true`` switches paging off: every matching row comes back as a single
+    page (``page`` / ``page_size`` are ignored) in the same envelope, so
+    ``total_pages`` is ``1`` and both page numbers are ``null``.
     """
 
     page_size = 10
     page_size_query_param = "page_size"
-    max_page_size = 30
+    max_page_size = 100
+    all_query_param = "all"
+
+    def wants_all(self, request: Request) -> bool:
+        """Whether the request asked for ``?all``; a bad value is a ``400``.
+
+        A bare ``?all`` counts as ``true``; otherwise the usual boolean spellings
+        (``true``/``false``, ``1``/``0``, ...) are accepted.
+        """
+        raw = request.query_params.get(self.all_query_param)
+        if raw is None:
+            return False
+        if not raw.strip():
+            return True
+        try:
+            return serializers.BooleanField().to_internal_value(raw.strip())
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({self.all_query_param: exc.detail}) from None
+
+    def paginate_queryset(self, queryset, request: Request, view=None) -> list | None:
+        if not self.wants_all(request):
+            return super().paginate_queryset(queryset, request, view=view)
+        rows = list(queryset)
+        # One page holding every row; ``max(.., 1)`` keeps an empty result valid.
+        paginator = self.django_paginator_class(rows, max(len(rows), 1))
+        self.page = paginator.page(1)
+        self.request = request
+        return list(self.page)
 
     def get_paginated_response(self, data) -> Response:
         page = self.page
@@ -132,7 +165,7 @@ DATE_RANGE_PARAMS = ("start_date_time", "end_date_time")
 
 # Query params the mixin owns; a filter or sort option may not reuse these names.
 RESERVED_QUERY_PARAMS = frozenset(
-    {"page", "page_size", "sort", *DATE_RANGE_PARAMS}
+    {"page", "page_size", "all", "sort", *DATE_RANGE_PARAMS}
 )
 
 
@@ -577,6 +610,31 @@ class SortCatalogueEntrySerializer(serializers.Serializer):
     description = serializers.CharField()
 
 
+def pagination_query_parameters() -> list[OpenApiParameter]:
+    """The drf-spectacular params :class:`StandardPageNumberPagination` reads
+    (``page``, ``page_size``, ``all``) -- for any view that paginates with it."""
+    return [
+        OpenApiParameter("page", OpenApiTypes.INT, description="1-based page number."),
+        OpenApiParameter(
+            "page_size",
+            OpenApiTypes.INT,
+            description=(
+                f"Rows per page (default {StandardPageNumberPagination.page_size}, "
+                f"max {StandardPageNumberPagination.max_page_size})."
+            ),
+        ),
+        OpenApiParameter(
+            "all",
+            OpenApiTypes.BOOL,
+            default=False,
+            description=(
+                "When true, ignore page / page_size and return every row matching "
+                "the filters as a single page (total_pages 1, page numbers null)."
+            ),
+        ),
+    ]
+
+
 def list_query_parameters(
     *,
     queryset_filters: Sequence[ListFilter] = (),
@@ -589,12 +647,7 @@ def list_query_parameters(
     query string stays in lockstep with what the view actually accepts.
     ``date_window`` is ``"required"`` (default), ``"optional"`` or ``"none"``.
     """
-    params = [
-        OpenApiParameter("page", OpenApiTypes.INT, description="1-based page number."),
-        OpenApiParameter(
-            "page_size", OpenApiTypes.INT, description="Rows per page (default 10, max 30)."
-        ),
-    ]
+    params = pagination_query_parameters()
     if date_window != "none":
         required = date_window == "required"
         for name in DATE_RANGE_PARAMS:

@@ -49,7 +49,10 @@ from api.export_serializers import (
     ExportBagSnapshotSerializer,
     ExportLooseSnapshotSerializer,
 )
-from common.views.paginated_date_range import StandardPageNumberPagination
+from common.views.paginated_date_range import (
+    StandardPageNumberPagination,
+    pagination_query_parameters,
+)
 
 
 class _OptionalDateWindowSerializer(serializers.Serializer):
@@ -108,14 +111,7 @@ class ExportInventorySnapshotsView(AdminApiView):
         operation_id="sales_admin_export_inventory_snapshots",
         summary="Export bag and loose stock counts, interleaved and paginated",
         parameters=[
-            OpenApiParameter(
-                "page", OpenApiTypes.INT, description="1-based page number."
-            ),
-            OpenApiParameter(
-                "page_size",
-                OpenApiTypes.INT,
-                description="Rows per page (default 10, max 30).",
-            ),
+            *pagination_query_parameters(),
             OpenApiParameter(
                 "start_date",
                 OpenApiTypes.DATE,

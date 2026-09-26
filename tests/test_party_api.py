@@ -164,23 +164,41 @@ class PartyApiTest(WebApiTestCase):
             status.HTTP_200_OK,
         )
 
-    def test_contact_number_is_optional_and_not_settable_on_create(self):
-        """``contact_number`` defaults to null and isn't accepted by POST.
+    def test_contact_number_is_optional_and_stored_on_create(self):
+        """POST stores a valid ``contact_number``, defaults it to null, and 400s bad ones.
 
-        tests/test_party_api.py::PartyApiTest::test_contact_number_is_optional_and_not_settable_on_create
+        tests/test_party_api.py::PartyApiTest::test_contact_number_is_optional_and_stored_on_create
         """
         self.login_as(self.seed_admin)
-        self.assertIsNone(self.party.contact_number)
 
         response = self.client.post(
             PARTIES_URL,
-            {"name": "No Phone Traders", "city": self.surat.id, "contact_number": "9876543210"},
+            {"name": "DEF Traders", "city": self.surat.id, "contact_number": "1234567890"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
-        self.assertIsNone(response.data["contact_number"])
+        self.assertEqual(response.data["contact_number"], "1234567890")
         created = Party.all_objects.get(pk=response.data["id"])
-        self.assertIsNone(created.contact_number)
+        self.assertEqual(created.contact_number, "1234567890")
+
+        for label, body in (
+            ("omitted", {"name": "No Phone Traders", "city": self.surat.id}),
+            ("blank", {"name": "Blank Phone Traders", "city": self.surat.id, "contact_number": ""}),
+        ):
+            with self.subTest(case=label):
+                response = self.client.post(PARTIES_URL, body, format="json")
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+                self.assertIsNone(response.data["contact_number"])
+                self.assertIsNone(Party.all_objects.get(pk=response.data["id"]).contact_number)
+
+        for label, bad_value in (("too short", "12345"), ("with country code", "+919876543210")):
+            with self.subTest(case=label):
+                response = self.client.post(
+                    PARTIES_URL,
+                    {"name": "Bad Phone Traders", "city": self.surat.id, "contact_number": bad_value},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_admin_update_party_contact_number(self):
         """PATCH can set, change, and clear ``contact_number``; bad values 400.
@@ -208,13 +226,14 @@ class PartyApiTest(WebApiTestCase):
                 )
                 self.assertEqual(bad_response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # Clearing it back out (blank) is allowed.
+        # Clearing it back out (blank) is allowed and stores NULL.
         clear_response = self.client.patch(
             self._url(self.party), {"contact_number": ""}, format="json"
         )
         self.assertEqual(clear_response.status_code, status.HTTP_200_OK, clear_response.content)
+        self.assertIsNone(clear_response.data["contact_number"])
         self.party.refresh_from_db()
-        self.assertEqual(self.party.contact_number, "")
+        self.assertIsNone(self.party.contact_number)
 
         # Other fields are unaffected when contact_number isn't sent.
         self.assertEqual(
@@ -224,7 +243,7 @@ class PartyApiTest(WebApiTestCase):
             status.HTTP_200_OK,
         )
         self.party.refresh_from_db()
-        self.assertEqual(self.party.contact_number, "")
+        self.assertIsNone(self.party.contact_number)
 
     # -- filtering --------------------------------------------------------------
 
