@@ -157,7 +157,7 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
         },
         "party": {"id": entry.party_id, "name": entry.party.name},
         "quantity_kg": str(entry.quantity_kg),
-        "status": entry.status,
+        "status": entry.get_status_display().title(),
         "lab_sampling_date": (
             entry.lab_sampling_date.isoformat()
             if entry.lab_sampling_date is not None
