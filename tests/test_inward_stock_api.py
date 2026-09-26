@@ -222,7 +222,7 @@ class InwardStockApiTest(WebApiTestCase):
         created = self.client.post(
             "/api/sales-admin/inward-raw-materials",
             {
-                "product": self.product1.id,
+                "product": self.product1.public_id,
                 "party": self.party.id,
                 "quantity_kg": "25",
                 "lab_sampling_date": self.today.isoformat(),
@@ -260,7 +260,7 @@ class InwardStockApiTest(WebApiTestCase):
         created = self.client.post(
             "/api/sales-admin/inward-raw-materials",
             {
-                "product": self.product1.id,
+                "product": self.product1.public_id,
                 "party": self.party.id,
                 "quantity_kg": "25",
             },
