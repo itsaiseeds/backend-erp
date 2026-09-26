@@ -87,7 +87,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(lot["product"], {"public_id": "P-I34V7RI1JPUH", "name": "SAI-33"})
         self.assertEqual(lot["party"], {"id": self.party.id, "name": "ABC Traders"})
         self.assertEqual(lot["quantity_kg"], "150.500")
-        self.assertEqual(lot["status"], "lab_testing")
+        self.assertEqual(lot["status"], "Lab Testing")
         self.assertIsNone(lot["lab_sampling_date"])
         self.assertIsNone(lot["effective_date"])  # never in stock by accident
 
@@ -140,7 +140,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         # No date is ever typed -- the flip stamps today.
         flipped = self.client.patch(url, {"status": "in_use"}, format="json")
         self.assertEqual(flipped.status_code, status.HTTP_200_OK, flipped.content)
-        self.assertEqual(flipped.data["status"], "in_use")
+        self.assertEqual(flipped.data["status"], "In Use")
         self.assertEqual(flipped.data["effective_date"], InwardOperations.today().isoformat())
 
         in_db = InwardRawMaterial.all_objects.get(public_id=created.data["public_id"])
@@ -149,7 +149,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         # Reverting is allowed and clears the date, dropping the lot out of stock.
         reverted = self.client.patch(url, {"status": "lab_testing"}, format="json")
         self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)
-        self.assertEqual(reverted.data["status"], "lab_testing")
+        self.assertEqual(reverted.data["status"], "Lab Testing")
         self.assertIsNone(reverted.data["effective_date"])
 
         in_db.refresh_from_db()
@@ -159,7 +159,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         # And the lot can be flipped into stock again later, re-stamped fresh.
         reflipped = self.client.patch(url, {"status": "in_use"}, format="json")
         self.assertEqual(reflipped.status_code, status.HTTP_200_OK, reflipped.content)
-        self.assertEqual(reflipped.data["status"], "in_use")
+        self.assertEqual(reflipped.data["status"], "In Use")
         self.assertEqual(reflipped.data["effective_date"], InwardOperations.today().isoformat())
 
     def test_reverting_a_lot_with_packed_stock_is_rejected(self):
