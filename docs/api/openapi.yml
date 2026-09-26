@@ -3764,7 +3764,8 @@ components:
         that flip and is deliberately absent here.
       properties:
         product:
-          type: integer
+          type: string
+          minLength: 1
         party:
           type: integer
         quantity_kg:

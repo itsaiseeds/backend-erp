@@ -64,7 +64,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
     def _create_lot(self, **overrides):
         """POST a lot and return the response (defaults: SAI-33 / ABC Traders / 150.5 kg)."""
         body = {
-            "product": self.product.id,
+            "product": self.product.public_id,
             "party": self.party.id,
             "quantity_kg": "150.5",
             **overrides,
@@ -112,10 +112,13 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         cases = [
             ("missing product", {"party": self.party.id, "quantity_kg": "10"}),
-            ("missing party", {"product": self.product.id, "quantity_kg": "10"}),
-            ("missing quantity", {"product": self.product.id, "party": self.party.id}),
+            ("missing party", {"product": self.product.public_id, "quantity_kg": "10"}),
+            (
+                "missing quantity",
+                {"product": self.product.public_id, "party": self.party.id},
+            ),
             ("negative quantity", {"quantity_kg": "-1"}),
-            ("unknown product", {"product": 999999, "quantity_kg": "10"}),
+            ("unknown product", {"product": "P-UNKNOWN0000", "quantity_kg": "10"}),
             ("unknown party", {"party": 999999, "quantity_kg": "10"}),
         ]
         for label, body in cases:
@@ -267,6 +270,34 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(listing.status_code, status.HTTP_200_OK)
         self.assertEqual(listing.data["total_count"], 1)
         self.assertEqual(listing.data["results"][0]["public_id"], created.data["public_id"])
+
+    def test_product_is_addressed_by_public_id_not_pk(self):
+        """Create and the ``?product=`` filter both take the product's public id.
+
+        A ``product`` field sent as the internal pk (an int) is rejected: the
+        product is only ever known to the frontend by its ``public_id``.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_product_is_addressed_by_public_id_not_pk
+        """
+        self.login_as(self.seed_admin)
+
+        by_pk = self.client.post(
+            LOTS_URL,
+            {"product": self.product.id, "party": self.party.id, "quantity_kg": "10"},
+            format="json",
+        )
+        self.assertEqual(by_pk.status_code, status.HTTP_400_BAD_REQUEST, by_pk.content)
+
+        created = self._create_lot()
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+
+        filtered = self.client.get(LOTS_URL, {"product": self.product.public_id})
+        self.assertEqual(filtered.status_code, status.HTTP_200_OK, filtered.content)
+        self.assertEqual(filtered.data["total_count"], 1)
+
+        empty = self.client.get(LOTS_URL, {"product": "P-DOES-NOT-EXIST"})
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data["total_count"], 0)
 
     # -- deletion -------------------------------------------------------------
 
