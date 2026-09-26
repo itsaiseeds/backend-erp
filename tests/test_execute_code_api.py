@@ -64,7 +64,7 @@ class ExecuteCodeApiTest(WebApiTestCase):
         )
 
         self.assertTrue(data["success"], data["error"])
-        self.assertEqual(data["result"], "(3, 'BREEDER', 'in_use')")
+        self.assertEqual(data["result"], "(3, 'BREEDER', 'In Use')")
 
     def test_a_successful_write_is_committed(self):
         """tests/test_execute_code_api.py::ExecuteCodeApiTest::test_a_successful_write_is_committed"""

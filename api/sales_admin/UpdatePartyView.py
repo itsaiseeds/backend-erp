@@ -2,8 +2,8 @@
 
 Only an application Admin may update or delete a party. Soft-deleted parties are
 never found (404). ``name`` + ``city`` are validated for uniqueness, excluding
-the party being edited. ``contact_number`` is optional and may be cleared with
-a blank string.
+the party being edited. ``contact_number`` is optional; a blank or null value
+clears it (stored as NULL).
 """
 
 from __future__ import annotations
@@ -42,6 +42,9 @@ class UpdatePartySerializer(serializers.Serializer):
 
     def validate_name(self, value):
         return value.strip()
+
+    def validate_contact_number(self, value):
+        return value or None
 
     def validate(self, attrs):
         name = attrs.get("name", self.instance.name if self.instance is not None else None)

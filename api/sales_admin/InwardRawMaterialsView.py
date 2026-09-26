@@ -4,7 +4,7 @@ Only an application Admin may view or create lots (``admin_required``). A lot
 records raw-material replenishment: how many kilograms of a ``Product`` came in
 from a ``Party``, when it was sampled for the lab, and its ``status``. The
 entry's date is its ``created_at``; ``effective_date`` is **not** accepted here
--- flipping ``status`` to ``in_use`` with ``PATCH`` stamps it with today (see
+-- flipping ``status`` to ``In Use`` with ``PATCH`` stamps it with today (see
 ``UpdateInwardRawMaterialView``), so a freshly booked lot never counts toward
 stock by accident.
 
@@ -62,8 +62,8 @@ class InwardRawMaterialPayloadSerializer(serializers.Serializer):
 class CreateInwardRawMaterialSerializer(serializers.Serializer):
     """Request validation for booking a new raw-material lot.
 
-    ``status`` is not accepted: every lot starts ``lab_testing`` and is moved to
-    ``in_use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
+    ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
+    ``In Use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
     that flip and is deliberately absent here.
     """
 
@@ -116,7 +116,7 @@ _QUERYSET_FILTERS = (
         "status",
         label="Status",
         parse=parse_str,
-        description="Lot status (lab_testing / in_use).",
+        description="Lot status (Lab Testing / In Use).",
         options=[
             {"value": s.value, "label": s.label}
             for s in InwardRawMaterialStatus

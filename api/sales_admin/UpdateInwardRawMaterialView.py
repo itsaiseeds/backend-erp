@@ -5,16 +5,16 @@ Path: ``/api/sales-admin/inward-raw-material/<public_id>``.
 Two jobs live here:
 
 * **Record the lifecycle.** ``PATCH`` fills in ``lab_sampling_date`` and moves
-  a lot between ``lab_testing`` and ``in_use`` (both ways; see
-  ``InwardOperations.ALLOWED_RAW_STATUS_TRANSITIONS``). Flipping to ``in_use``
-  stamps ``effective_date`` with today; reverting to ``lab_testing`` clears the
+  a lot between ``Lab Testing`` and ``In Use`` (both ways; see
+  ``InwardOperations.ALLOWED_RAW_STATUS_TRANSITIONS``). Flipping to ``In Use``
+  stamps ``effective_date`` with today; reverting to ``Lab Testing`` clears the
   date. Together the stamp + status are what start and stop the lot counting
   toward ``raw-material-stock``.
 * **Correct a booking.** ``product`` / ``party`` / ``quantity_kg`` are
   immutable once a lot exists; a wrong amount is removed with ``DELETE``
   (soft) and re-booked. ``DELETE`` is the only corrective verb.
 
-Both a revert to ``lab_testing`` and a ``DELETE`` are refused (400) when the
+Both a revert to ``Lab Testing`` and a ``DELETE`` are refused (400) when the
 lot's kilograms are already packed into a bag or sample-packet count --
 see ``InwardOperations.assert_raw_lot_removable``.
 
@@ -44,8 +44,8 @@ class UpdateInwardRawMaterialSerializer(serializers.Serializer):
     """Request validation for updating a raw-material lot (all fields optional).
 
     Only ``lab_sampling_date`` and ``status`` are accepted: flipping to
-    ``in_use`` stamps the effective date with today, reverting to
-    ``lab_testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
+    ``In Use`` stamps the effective date with today, reverting to
+    ``Lab Testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
     are immutable. Any unknown key is ignored.
     """
 
@@ -68,9 +68,9 @@ class UpdateInwardRawMaterialSerializer(serializers.Serializer):
             except ValueError as exc:
                 raise serializers.ValidationError({"status": str(exc)}) from None
 
-        # Flipping into ``in_use`` stamps the effective date with today -- the
-        # user never types it, and stamped + in_use is what stock reads count.
-        # Reverting to ``lab_testing`` clears the date so the lot drops back
+        # Flipping into ``In Use`` stamps the effective date with today -- the
+        # user never types it, and stamped + In Use is what stock reads count.
+        # Reverting to ``Lab Testing`` clears the date so the lot drops back
         # out of stock. Both keys are undeclared (never user input): the view
         # below applies them from validated_data like any declared field.
         if (
@@ -82,7 +82,7 @@ class UpdateInwardRawMaterialSerializer(serializers.Serializer):
             self.instance.status == InwardRawMaterialStatus.IN_USE
             and requested_status != InwardRawMaterialStatus.IN_USE
         ):
-            # Reverting out of in_use removes this lot's kilograms from the
+            # Reverting out of In Use removes this lot's kilograms from the
             # raw pool -- refuse it if bags or sample packets are already
             # packed from them.
             try:

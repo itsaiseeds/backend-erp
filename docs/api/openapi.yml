@@ -1548,7 +1548,7 @@ paths:
         name: status
         schema:
           type: string
-        description: Lot status (lab_testing / in_use). Comma-separated (any match);
+        description: Lot status (Lab Testing / In Use). Comma-separated (any match);
           AND-ed with the other filters.
       tags:
       - Admin · Inward
@@ -3842,8 +3842,8 @@ components:
       description: |-
         Request validation for booking a new raw-material lot.
 
-        ``status`` is not accepted: every lot starts ``lab_testing`` and is moved to
-        ``in_use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
+        ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
+        ``In Use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
         that flip and is deliberately absent here.
       properties:
         product:
@@ -3925,6 +3925,10 @@ components:
           maxLength: 255
         city:
           type: integer
+        contact_number:
+          type: string
+          nullable: true
+          maxLength: 10
       required:
       - city
       - name
@@ -5629,8 +5633,8 @@ components:
         Request validation for updating a raw-material lot (all fields optional).
 
         Only ``lab_sampling_date`` and ``status`` are accepted: flipping to
-        ``in_use`` stamps the effective date with today, reverting to
-        ``lab_testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
+        ``In Use`` stamps the effective date with today, reverting to
+        ``Lab Testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
         are immutable. Any unknown key is ignored.
       properties:
         lab_sampling_date:
@@ -6282,12 +6286,12 @@ components:
       - transport_agencies
     UpdateInwardRawMaterialStatusEnum:
       enum:
-      - lab_testing
-      - in_use
+      - Lab Testing
+      - In Use
       type: string
       description: |-
-        * `lab_testing` - lab testing
-        * `in_use` - in use
+        * `Lab Testing` - Lab Testing
+        * `In Use` - In Use
     UpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'
