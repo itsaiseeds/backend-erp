@@ -299,7 +299,7 @@ class ListQueryParametersTest(SimpleTestCase):
     def test_bare_view_documents_page_and_the_required_window(self):
         params = list_query_parameters()
 
-        self.assertEqual([p.name for p in params], ["page", "page_size", *DATE_RANGE_PARAMS])
+        self.assertEqual([p.name for p in params], ["page", "page_size", "all", *DATE_RANGE_PARAMS])
         window = {p.name: p for p in params if p.name in DATE_RANGE_PARAMS}
         self.assertTrue(all(p.required for p in window.values()))
 
@@ -309,7 +309,7 @@ class ListQueryParametersTest(SimpleTestCase):
         self.assertFalse(params["start_date_time"].required)
 
     def test_none_window_drops_the_bounds(self):
-        self.assertEqual(self._names(date_window="none"), ["page", "page_size"])
+        self.assertEqual(self._names(date_window="none"), ["page", "page_size", "all"])
 
     def test_filters_and_sort_are_documented(self):
         names = self._names(
@@ -318,7 +318,7 @@ class ListQueryParametersTest(SimpleTestCase):
             date_window="none",
         )
 
-        self.assertEqual(names, ["page", "page_size", "city_id", "status__in", "sort"])
+        self.assertEqual(names, ["page", "page_size", "all", "city_id", "status__in", "sort"])
 
     def test_a_range_filter_contributes_its_two_bound_params(self):
         names = self._names(
@@ -327,7 +327,7 @@ class ListQueryParametersTest(SimpleTestCase):
         )
 
         self.assertEqual(
-            names, ["page", "page_size", "created_after", "created_before"]
+            names, ["page", "page_size", "all", "created_after", "created_before"]
         )
 
 
@@ -535,3 +535,38 @@ class MixinRequestHandlingTest(SimpleTestCase):
         response, _ = view(self.factory.get("/", {"start_date_time": "2026-01-01T00:00Z"}))
 
         self.assertEqual(response.status_code, 400)
+
+    def test_all_returns_every_row_as_a_single_page(self):
+        response, _ = self._view(enforce=False)(self.factory.get("/", {"all": "true"}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_count"], 25)
+        self.assertEqual(response.data["total_pages"], 1)
+        self.assertEqual(len(response.data["results"]), 25)
+        self.assertIsNone(response.data["next_page_number"])
+        self.assertIsNone(response.data["previous_page_number"])
+
+    def test_all_ignores_page_and_page_size(self):
+        response, _ = self._view(enforce=False)(
+            self.factory.get("/", {"all": "true", "page": "3", "page_size": "2"})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 25)
+
+    def test_a_bare_all_means_true(self):
+        response, _ = self._view(enforce=False)(self.factory.get("/?all"))
+
+        self.assertEqual(len(response.data["results"]), 25)
+
+    def test_all_false_keeps_paging(self):
+        response, _ = self._view(enforce=False)(self.factory.get("/", {"all": "false"}))
+
+        self.assertEqual(len(response.data["results"]), 10)
+        self.assertEqual(response.data["total_pages"], 3)
+
+    def test_an_unparseable_all_is_a_400(self):
+        response, _ = self._view(enforce=False)(self.factory.get("/", {"all": "nope"}))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["detail"], "Must be a valid boolean.")
