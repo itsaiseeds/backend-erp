@@ -80,7 +80,7 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
     def _create_lot(self, **overrides):
         """POST a lot and return the response (recipe / party / 4 units default)."""
         body = {
-            "recipe": self.recipe.id,
+            "recipe": self.recipe.public_id,
             "party": self.party.id,
             "quantity": "4",
             **overrides,
@@ -113,6 +113,16 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
         self.assertEqual(created.effective_date, InwardOperations.today())
         self.assertEqual(created.recipe_id, self.recipe.id)
         self.assertEqual(created.created_by_id, self.seed_admin.id)
+
+    def test_recipe_is_addressed_by_public_id_not_pk(self):
+        """A ``recipe`` sent as the internal pk (an int) is rejected: a recipe
+        is only ever known to the frontend by its ``public_id``.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_recipe_is_addressed_by_public_id_not_pk
+        """
+        self.login_as(self.seed_admin)
+        response = self._create_lot(recipe=self.recipe.id)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
 
     def test_quantity_bounds_are_checked_and_effective_date_is_not_accepted_on_post(self):
         """Bounds are checked at booking; a posted effective_date is dropped.
@@ -188,6 +198,22 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
         self.assertEqual(listing.status_code, status.HTTP_200_OK)
         self.assertEqual(listing.data["total_count"], 1)
         self.assertEqual(listing.data["results"][0]["public_id"], created.data["public_id"])
+
+    def test_product_filter_takes_a_public_id(self):
+        """``?product=`` (via the recipe's product) takes the product's public id.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_product_filter_takes_a_public_id
+        """
+        self.login_as(self.seed_admin)
+        self._create_lot()
+
+        response = self.client.get(LOTS_URL, {"product": self.product.public_id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["total_count"], 1)
+
+        empty = self.client.get(LOTS_URL, {"product": "P-DOES-NOT-EXIST"})
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data["total_count"], 0)
 
     # -- deletion -------------------------------------------------------------
 

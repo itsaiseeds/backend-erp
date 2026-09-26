@@ -63,7 +63,7 @@ class OtherMaterialRecipeApiTest(WebApiTestCase):
         return self.client.post(
             RECIPES_URL,
             {
-                "product": (product or self.product).id,
+                "product": (product or self.product).public_id,
                 "material_type": (material_type or self.packet_cover).id,
                 "packet_weight": packet_weight,
                 "quantity": quantity,
@@ -96,6 +96,25 @@ class OtherMaterialRecipeApiTest(WebApiTestCase):
         created = OtherMaterialRecipe.all_objects.get(public_id=recipe["public_id"])
         self.assertEqual(created.created_by_id, self.seed_admin.id)
         self.assertEqual(created.quantity, Decimal("3.000"))
+
+    def test_product_is_addressed_by_public_id_not_pk(self):
+        """A ``product`` sent as the internal pk (an int) is rejected: the
+        product is only ever known to the frontend by its ``public_id``.
+
+        tests/test_other_material_recipe_api.py::OtherMaterialRecipeApiTest::test_product_is_addressed_by_public_id_not_pk
+        """
+        self.login_as(self.seed_admin)
+        response = self.client.post(
+            RECIPES_URL,
+            {
+                "product": self.product.id,
+                "material_type": self.packet_cover.id,
+                "packet_weight": "2.5",
+                "quantity": "3",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
 
     def test_a_recipe_is_unique_per_product_type_and_packet_weight(self):
         """Same keys 400; changing a variant dimension creates a fresh row.
@@ -156,7 +175,7 @@ class OtherMaterialRecipeApiTest(WebApiTestCase):
                     self.client.post(
                         RECIPES_URL,
                         {
-                            "product": self.product.id,
+                            "product": self.product.public_id,
                             "material_type": self.packet_cover.id,
                             **body,
                         },
@@ -195,6 +214,20 @@ class OtherMaterialRecipeApiTest(WebApiTestCase):
         self.assertEqual(listing.status_code, status.HTTP_200_OK)
         self.assertEqual(listing.data["total_count"], 1)
         self.assertEqual(listing.data["results"][0]["public_id"], created.data["public_id"])
+
+    def test_product_filter_takes_a_public_id(self):
+        """``?product=`` narrows by the product's public id.
+
+        tests/test_other_material_recipe_api.py::OtherMaterialRecipeApiTest::test_product_filter_takes_a_public_id
+        """
+        self.login_as(self.seed_admin)
+        self._create_recipe()
+        self._create_recipe(product=self.other_product)
+
+        response = self.client.get(RECIPES_URL, {"product": self.product.public_id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["total_count"], 1)
+        self.assertEqual(response.data["results"][0]["product"]["public_id"], self.product.public_id)
 
     # -- deletion -------------------------------------------------------------
 
