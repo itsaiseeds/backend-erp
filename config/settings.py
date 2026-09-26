@@ -15,6 +15,8 @@ from pathlib import Path
 
 from corsheaders.defaults import default_headers
 
+from common.openapi_tags import OPENAPI_TAGS
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -282,7 +284,7 @@ REST_FRAMEWORK = {
         #     else []
         # ),
     ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_SCHEMA_CLASS": "common.openapi.GroupedAutoSchema",
     # Per-scope throttle rates. ``verify_otp`` (web) and ``android_login``
     # (Android) each cap a single IP's login attempts per hour so an attacker
     # cannot cheaply burn through every account's lockout budget from one origin.
@@ -398,8 +400,9 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
-    # Group endpoints by the namespace they are mounted under.
-    "TAGS": [],
+    # Swagger groups (feature areas), in display order; each endpoint's group
+    # comes from ``common.openapi_tags.ROUTE_TAGS`` via ``GroupedAutoSchema``.
+    "TAGS": OPENAPI_TAGS,
 }
 
 # CORS
