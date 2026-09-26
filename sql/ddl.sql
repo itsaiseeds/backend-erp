@@ -1101,6 +1101,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_party (
 	created_by_id int8 NULL,
 	"name" varchar(255) NOT NULL,
 	city_id int8 NOT NULL,
+	contact_number varchar(10) NULL,
 	CONSTRAINT aggregator_party_pkey PRIMARY KEY (id),
 	CONSTRAINT uniq_party_name_city UNIQUE (name, city_id)
 );
