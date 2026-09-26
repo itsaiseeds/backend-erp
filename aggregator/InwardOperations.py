@@ -115,6 +115,7 @@ def party_payload(party: Party) -> dict:
         "id": party.id,
         "name": party.name,
         "city": {"id": party.city_id, "name": party.city.name},
+        "contact_number": party.contact_number,
     }
 
 

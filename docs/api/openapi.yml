@@ -1827,8 +1827,8 @@ paths:
         name: city_id
         schema:
           type: string
-        description: City id(s) of the party's city. Comma-separated (any match);
-          AND-ed with the other filters.
+        description: City id(s) of the party's city (see options). Comma-separated
+          (any match); AND-ed with the other filters.
       - in: query
         name: name
         schema:
@@ -5497,8 +5497,12 @@ components:
           type: string
         city:
           $ref: '#/components/schemas/PartyCityRef'
+        contact_number:
+          type: string
+          nullable: true
       required:
       - city
+      - contact_number
       - id
       - name
     PatchedUpdateAdminRequest:
@@ -5614,6 +5618,10 @@ components:
           maxLength: 255
         city:
           type: integer
+        contact_number:
+          type: string
+          nullable: true
+          maxLength: 10
     PatchedUpdateProductPackagingRequest:
       type: object
       description: Request validation for updating a ``ProductPackaging`` (all fields
