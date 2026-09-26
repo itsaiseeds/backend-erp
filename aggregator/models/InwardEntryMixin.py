@@ -9,7 +9,7 @@ class InwardEntryMixin(models.Model):
 
     ``effective_date`` is the day the entry starts counting toward stock. For
     other material it is stamped at booking (today); for raw material it is
-    stamped by the ``lab_testing -> in_use`` flip, and reverting a raw lot
+    stamped by the ``Lab Testing -> In Use`` flip, and reverting a raw lot
     clears the date again. A row counts toward stock only once that date has
     come.
     """

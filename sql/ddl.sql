@@ -1112,8 +1112,8 @@ CREATE INDEX IF NOT EXISTS aggregator_party_deleted_by_id_idx ON public.aggregat
 
 -- aggregator_inwardrawmaterial ------------------------------------------------
 -- Inward movement of raw material (product replenishment). The entry's date is
--- created_at; flipping status to 'in_use' stamps effective_date with today and,
--- once that date has come, the lot counts toward stock. status='lab_testing'
+-- created_at; flipping status to 'In Use' stamps effective_date with today and,
+-- once that date has come, the lot counts toward stock. status='Lab Testing'
 -- rows are held back until the lab signs off.
 CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	id bigserial NOT NULL,
@@ -1133,7 +1133,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	CONSTRAINT aggregator_inwardrawmaterial_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_inwardrawmaterial_public_id_key UNIQUE (public_id),
 	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0),
-	CONSTRAINT aggregator_inwardrawmaterial_status_check CHECK (status IN ('lab_testing', 'in_use'))
+	CONSTRAINT aggregator_inwardrawmaterial_status_check CHECK (status IN ('Lab Testing', 'In Use'))
 );
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_public_id_like ON public.aggregator_inwardrawmaterial USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_effective_date_idx ON public.aggregator_inwardrawmaterial USING btree (effective_date);

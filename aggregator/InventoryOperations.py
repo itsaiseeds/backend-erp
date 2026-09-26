@@ -33,7 +33,7 @@ reservations carry across days, which a stored counter would not.
 
 **Counts are backed by raw material.** Bags and loose packets are packed out
 of a product's inward raw kilograms (``InwardRawMaterial`` lots that are
-``in_use`` with a reached ``effective_date``). Writing a count is how packing
+``In Use`` with a reached ``effective_date``). Writing a count is how packing
 is recorded, so every count write is checked against that raw pool and rolls
 back when it would overdraw it. The packed kilograms are derived, never
 stored: whatever the latest count holds plus whatever was dispatched *before*
@@ -531,7 +531,7 @@ def available_loose_packets(
 # -- Raw material backing ------------------------------------------------
 #
 # Bags and loose packets are packed out of a product's inward raw kilograms --
-# ``InwardRawMaterial`` lots that are ``in_use`` with a reached
+# ``InwardRawMaterial`` lots that are ``In Use`` with a reached
 # ``effective_date`` (the same pool ``InwardOperations.raw_incoming_stock``
 # reports). Every count write below is checked against it: kilograms spent on
 # a bag or loose count can never exceed what has come in, and lowering a count

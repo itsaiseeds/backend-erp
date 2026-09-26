@@ -233,7 +233,7 @@ class InwardStockApiTest(WebApiTestCase):
         url = f"/api/sales-admin/inward-raw-material/{created.data['public_id']}"
         flipped = self.client.patch(
             url,
-            {"status": "in_use"},
+            {"status": "In Use"},
             format="json",
         )
         self.assertEqual(flipped.status_code, status.HTTP_200_OK, flipped.content)
@@ -269,7 +269,7 @@ class InwardStockApiTest(WebApiTestCase):
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
         url = f"/api/sales-admin/inward-raw-material/{created.data['public_id']}"
 
-        flipped = self.client.patch(url, {"status": "in_use"}, format="json")
+        flipped = self.client.patch(url, {"status": "In Use"}, format="json")
         self.assertEqual(flipped.status_code, status.HTTP_200_OK, flipped.content)
 
         counting = self.client.get(f"{RAW_STOCK_URL}?product={self.product1.public_id}")
@@ -282,7 +282,7 @@ class InwardStockApiTest(WebApiTestCase):
             "available_kg": "25.000",
         }])
 
-        reverted = self.client.patch(url, {"status": "lab_testing"}, format="json")
+        reverted = self.client.patch(url, {"status": "Lab Testing"}, format="json")
         self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)
         self.assertIsNone(reverted.data["effective_date"])
 
