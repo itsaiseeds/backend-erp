@@ -64,7 +64,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
     def _create_lot(self, **overrides):
         """POST a lot and return the response (defaults: SAI-33 / ABC Traders / 150.5 kg)."""
         body = {
-            "product": self.product.id,
+            "product": self.product.public_id,
             "party": self.party.id,
             "quantity_kg": "150.5",
             **overrides,
@@ -87,7 +87,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(lot["product"], {"public_id": "P-I34V7RI1JPUH", "name": "SAI-33"})
         self.assertEqual(lot["party"], {"id": self.party.id, "name": "ABC Traders"})
         self.assertEqual(lot["quantity_kg"], "150.500")
-        self.assertEqual(lot["status"], "lab_testing")
+        self.assertEqual(lot["status"], "Lab Testing")
         self.assertIsNone(lot["lab_sampling_date"])
         self.assertIsNone(lot["effective_date"])  # never in stock by accident
 
@@ -112,10 +112,13 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.login_as(self.seed_admin)
         cases = [
             ("missing product", {"party": self.party.id, "quantity_kg": "10"}),
-            ("missing party", {"product": self.product.id, "quantity_kg": "10"}),
-            ("missing quantity", {"product": self.product.id, "party": self.party.id}),
+            ("missing party", {"product": self.product.public_id, "quantity_kg": "10"}),
+            (
+                "missing quantity",
+                {"product": self.product.public_id, "party": self.party.id},
+            ),
             ("negative quantity", {"quantity_kg": "-1"}),
-            ("unknown product", {"product": 999999, "quantity_kg": "10"}),
+            ("unknown product", {"product": "P-UNKNOWN0000", "quantity_kg": "10"}),
             ("unknown party", {"party": 999999, "quantity_kg": "10"}),
         ]
         for label, body in cases:
@@ -140,7 +143,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         # No date is ever typed -- the flip stamps today.
         flipped = self.client.patch(url, {"status": "in_use"}, format="json")
         self.assertEqual(flipped.status_code, status.HTTP_200_OK, flipped.content)
-        self.assertEqual(flipped.data["status"], "in_use")
+        self.assertEqual(flipped.data["status"], "In Use")
         self.assertEqual(flipped.data["effective_date"], InwardOperations.today().isoformat())
 
         in_db = InwardRawMaterial.all_objects.get(public_id=created.data["public_id"])
@@ -149,7 +152,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         # Reverting is allowed and clears the date, dropping the lot out of stock.
         reverted = self.client.patch(url, {"status": "lab_testing"}, format="json")
         self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)
-        self.assertEqual(reverted.data["status"], "lab_testing")
+        self.assertEqual(reverted.data["status"], "Lab Testing")
         self.assertIsNone(reverted.data["effective_date"])
 
         in_db.refresh_from_db()
@@ -159,7 +162,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         # And the lot can be flipped into stock again later, re-stamped fresh.
         reflipped = self.client.patch(url, {"status": "in_use"}, format="json")
         self.assertEqual(reflipped.status_code, status.HTTP_200_OK, reflipped.content)
-        self.assertEqual(reflipped.data["status"], "in_use")
+        self.assertEqual(reflipped.data["status"], "In Use")
         self.assertEqual(reflipped.data["effective_date"], InwardOperations.today().isoformat())
 
     def test_reverting_a_lot_with_packed_stock_is_rejected(self):
@@ -267,6 +270,34 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(listing.status_code, status.HTTP_200_OK)
         self.assertEqual(listing.data["total_count"], 1)
         self.assertEqual(listing.data["results"][0]["public_id"], created.data["public_id"])
+
+    def test_product_is_addressed_by_public_id_not_pk(self):
+        """Create and the ``?product=`` filter both take the product's public id.
+
+        A ``product`` field sent as the internal pk (an int) is rejected: the
+        product is only ever known to the frontend by its ``public_id``.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_product_is_addressed_by_public_id_not_pk
+        """
+        self.login_as(self.seed_admin)
+
+        by_pk = self.client.post(
+            LOTS_URL,
+            {"product": self.product.id, "party": self.party.id, "quantity_kg": "10"},
+            format="json",
+        )
+        self.assertEqual(by_pk.status_code, status.HTTP_400_BAD_REQUEST, by_pk.content)
+
+        created = self._create_lot()
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+
+        filtered = self.client.get(LOTS_URL, {"product": self.product.public_id})
+        self.assertEqual(filtered.status_code, status.HTTP_200_OK, filtered.content)
+        self.assertEqual(filtered.data["total_count"], 1)
+
+        empty = self.client.get(LOTS_URL, {"product": "P-DOES-NOT-EXIST"})
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data["total_count"], 0)
 
     # -- deletion -------------------------------------------------------------
 

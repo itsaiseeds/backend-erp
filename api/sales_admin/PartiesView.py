@@ -40,6 +40,7 @@ class PartyPayloadSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
     city = PartyCityRefSerializer()
+    contact_number = serializers.CharField(allow_null=True)
 
 
 class CreatePartySerializer(serializers.Serializer):
@@ -79,12 +80,23 @@ class PartyListPageSerializer(serializers.Serializer):
     available_sorts = SortCatalogueEntrySerializer(many=True)
 
 
+def _party_cities(request: Request) -> list[dict]:
+    """Every distinct city at least one party is in."""
+    rows = (
+        Party.objects.values_list("city_id", "city__name")
+        .distinct()
+        .order_by("city__name")
+    )
+    return [{"value": city_id, "label": name} for city_id, name in rows]
+
+
 _QUERYSET_FILTERS = (
     QuerysetFilter(
         "city_id",
         label="City",
         lookup="city_id__in",
-        description="City id(s) of the party's city.",
+        description="City id(s) of the party's city (see options).",
+        options=_party_cities,
     ),
     QuerysetFilter(
         "name",

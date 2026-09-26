@@ -164,6 +164,101 @@ class PartyApiTest(WebApiTestCase):
             status.HTTP_200_OK,
         )
 
+    def test_contact_number_is_optional_and_not_settable_on_create(self):
+        """``contact_number`` defaults to null and isn't accepted by POST.
+
+        tests/test_party_api.py::PartyApiTest::test_contact_number_is_optional_and_not_settable_on_create
+        """
+        self.login_as(self.seed_admin)
+        self.assertIsNone(self.party.contact_number)
+
+        response = self.client.post(
+            PARTIES_URL,
+            {"name": "No Phone Traders", "city": self.surat.id, "contact_number": "9876543210"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        self.assertIsNone(response.data["contact_number"])
+        created = Party.all_objects.get(pk=response.data["id"])
+        self.assertIsNone(created.contact_number)
+
+    def test_admin_update_party_contact_number(self):
+        """PATCH can set, change, and clear ``contact_number``; bad values 400.
+
+        tests/test_party_api.py::PartyApiTest::test_admin_update_party_contact_number
+        """
+        self.login_as(self.seed_admin)
+
+        response = self.client.patch(
+            self._url(self.party), {"contact_number": "9876543210"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["contact_number"], "9876543210")
+        self.party.refresh_from_db()
+        self.assertEqual(self.party.contact_number, "9876543210")
+
+        for label, bad_value in (
+            ("too short", "12345"),
+            ("non-numeric", "98765abcde"),
+            ("with country code", "+919876543210"),
+        ):
+            with self.subTest(case=label):
+                bad_response = self.client.patch(
+                    self._url(self.party), {"contact_number": bad_value}, format="json"
+                )
+                self.assertEqual(bad_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Clearing it back out (blank) is allowed.
+        clear_response = self.client.patch(
+            self._url(self.party), {"contact_number": ""}, format="json"
+        )
+        self.assertEqual(clear_response.status_code, status.HTTP_200_OK, clear_response.content)
+        self.party.refresh_from_db()
+        self.assertEqual(self.party.contact_number, "")
+
+        # Other fields are unaffected when contact_number isn't sent.
+        self.assertEqual(
+            self.client.patch(
+                self._url(self.party), {"name": "ABC Traders"}, format="json"
+            ).status_code,
+            status.HTTP_200_OK,
+        )
+        self.party.refresh_from_db()
+        self.assertEqual(self.party.contact_number, "")
+
+    # -- filtering --------------------------------------------------------------
+
+    def test_city_filter_options_list_only_cities_parties_are_in(self):
+        """The ``city_id`` filter's catalogue options cover only in-use cities,
+        and the filter itself narrows the list.
+
+        tests/test_party_api.py::PartyApiTest::test_city_filter_options_list_only_cities_parties_are_in
+        """
+        self.login_as(self.seed_admin)
+
+        # Only Surat is in use so far (the seeded party).
+        entry = next(
+            f for f in self.client.get(PARTIES_URL).data["available_filters"]
+            if f["filter"] == "city_id"
+        )
+        self.assertEqual(entry["options"], [{"value": self.surat.id, "label": "Surat"}])
+
+        self._create_party("Delta Traders", city=self.ahmedabad)
+
+        entry = next(
+            f for f in self.client.get(PARTIES_URL).data["available_filters"]
+            if f["filter"] == "city_id"
+        )
+        self.assertEqual(
+            sorted(o["label"] for o in entry["options"]), ["Ahmedabad", "Surat"]
+        )
+
+        response = self.client.get(PARTIES_URL, {"city_id": self.ahmedabad.id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [item["name"] for item in response.data["results"]], ["Delta Traders"]
+        )
+
     # -- deletion -------------------------------------------------------------
 
     def test_delete_soft_deletes_and_removes_the_party_from_the_api(self):
