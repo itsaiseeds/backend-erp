@@ -251,6 +251,21 @@ class GetClientsView(AndroidPaginatedDateRangeListView):
 
 See `android/api/v1/GetClientsView.py` for the real thing.
 
+## Swagger groups
+
+Swagger groups endpoints by feature area (`Admin · Inward`, `Admin · Stock
+count`, `Android · Orders`, ...), not by URL. The grouping is **documentation
+only** -- routes never change for it. `common/openapi_tags.py` holds the ordered
+tag list (`OPENAPI_TAGS`, fed to `SPECTACULAR_SETTINGS["TAGS"]`) and the
+path-to-tag table (`ROUTE_TAGS`, first match wins), applied by
+`common.openapi.GroupedAutoSchema`. Exports carry two tags: their domain group
+plus `Admin · Exports`.
+
+**A new endpoint must be added to `ROUTE_TAGS`** -- `tests/test_openapi_tags.py`
+fails for any operation left in the default `api` / `android` tag. An explicit
+`@extend_schema(tags=[...])` still overrides the table, but prefer the table so
+the grouping stays in one place.
+
 ## Reading clients
 
 | Endpoint | Scope | Payload |

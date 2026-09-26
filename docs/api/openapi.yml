@@ -11,7 +11,7 @@ paths:
       description: Validate a TOTP code, then issue a bearer token for that sales
         person.
       tags:
-      - android
+      - Android · Auth
       requestBody:
         content:
           application/json:
@@ -59,7 +59,7 @@ paths:
         ``TOKEN_TTL_HOURS``.
       summary: Revoke the caller's bearer token
       tags:
-      - android
+      - Android · Auth
       security:
       - bearerAuth: []
       responses:
@@ -81,7 +81,7 @@ paths:
       description: Confirm the caller's bearer token is still valid.
       summary: Check whether the caller's bearer token is still valid
       tags:
-      - android
+      - Android · Auth
       security:
       - bearerAuth: []
       responses:
@@ -110,7 +110,7 @@ paths:
         description: The client's public id, e.g. C-E79QA0E2OIHF.
         required: true
       tags:
-      - android
+      - Android · Clients
       security:
       - bearerAuth: []
       responses:
@@ -126,7 +126,7 @@ paths:
       description: Create a client owned by the calling sales person.
       summary: Create a client
       tags:
-      - android
+      - Android · Clients
       requestBody:
         content:
           application/json:
@@ -154,7 +154,7 @@ paths:
       description: Book an order of sealed bags for one of the caller's clients.
       summary: Book an order from multi-selected catalogue bags
       tags:
-      - android
+      - Android · Orders
       requestBody:
         content:
           application/json:
@@ -244,7 +244,7 @@ paths:
         description: Client verification status. Comma-separated (any match); AND-ed
           with the other filters.
       tags:
-      - android
+      - Android · Clients
       security:
       - bearerAuth: []
       responses:
@@ -309,7 +309,7 @@ paths:
         description: Order lifecycle status. Comma-separated (any match); AND-ed with
           the other filters.
       tags:
-      - android
+      - Android · Orders
       security:
       - bearerAuth: []
       responses:
@@ -386,7 +386,7 @@ paths:
         description: Seed stage of the product. Comma-separated (any match); AND-ed
           with the other filters.
       tags:
-      - android
+      - Android · Catalogue
       security:
       - bearerAuth: []
       responses:
@@ -402,7 +402,7 @@ paths:
       description: Replace the three lists of a client the calling sales person created.
       summary: Update a client's addresses, contacts and transport agencies
       tags:
-      - android
+      - Android · Clients
       requestBody:
         content:
           application/json:
@@ -430,7 +430,7 @@ paths:
       description: List Indian states, each with its cities, grouped by state.
       summary: List Indian states grouped with their cities
       tags:
-      - android
+      - Android · Utilities
       security:
       - bearerAuth: []
       responses:
@@ -455,7 +455,7 @@ paths:
         description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
         required: true
       tags:
-      - android
+      - Android · Clients
       security:
       - bearerAuth: []
       responses:
@@ -480,7 +480,7 @@ paths:
         description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
         required: true
       tags:
-      - android
+      - Android · Clients
       security:
       - bearerAuth: []
       responses:
@@ -498,7 +498,7 @@ paths:
       description: List the countries available for a client address.
       summary: List countries
       tags:
-      - android
+      - Android · Utilities
       security:
       - bearerAuth: []
       responses:
@@ -522,7 +522,7 @@ paths:
           type: integer
         description: Only return states in this country.
       tags:
-      - android
+      - Android · Utilities
       security:
       - bearerAuth: []
       responses:
@@ -541,7 +541,7 @@ paths:
         only).
       summary: Execute Python code on the server (permission-gated)
       tags:
-      - api
+      - Developer tools
       requestBody:
         content:
           application/json:
@@ -569,7 +569,7 @@ paths:
       description: List (GET) or create (POST) application admins (superuser only).
       summary: List application admins
       tags:
-      - api
+      - Admin · Users
       security:
       - sessionAuth: []
       responses:
@@ -586,7 +586,7 @@ paths:
       description: List (GET) or create (POST) application admins (superuser only).
       summary: Create an application admin (and a fallback sales person)
       tags:
-      - api
+      - Admin · Users
       requestBody:
         content:
           application/json:
@@ -620,7 +620,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Users
       requestBody:
         content:
           application/json:
@@ -652,7 +652,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Users
       security:
       - sessionAuth: []
       responses:
@@ -664,7 +664,7 @@ paths:
       description: Revoke the caller's session cookie.
       summary: Revoke the caller's session
       tags:
-      - api
+      - Admin · Auth
       security:
       - sessionAuth: []
       responses:
@@ -685,7 +685,7 @@ paths:
       operationId: api_sales_admin_auth_otp_verify_create
       description: Validate a TOTP code, then (re)open a session for that user.
       tags:
-      - api
+      - Admin · Auth
       requestBody:
         content:
           application/json:
@@ -725,7 +725,7 @@ paths:
       description: Read the current bag-stock position for every counted packaging.
       summary: Read the bag-stock position
       tags:
-      - api
+      - Admin · Stock levels
       security:
       - sessionAuth: []
       responses:
@@ -742,7 +742,7 @@ paths:
         optional and never blocks order verification.'
       summary: Check whether today's stock count is complete
       tags:
-      - api
+      - Admin · Stock count
       security:
       - sessionAuth: []
       responses:
@@ -765,7 +765,7 @@ paths:
         description: The client's public id, e.g. C-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Clients
       security:
       - sessionAuth: []
       responses:
@@ -781,7 +781,7 @@ paths:
       description: List (GET) or create (POST) crops (app admin only).
       summary: List crops
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -798,7 +798,7 @@ paths:
       description: List (GET) or create (POST) crops (app admin only).
       summary: Create a crop
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -832,7 +832,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -864,7 +864,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -926,7 +926,7 @@ paths:
         description: ISO 8601. Start date time of the window.
         required: true
       tags:
-      - api
+      - Admin · Dispatch
       security:
       - sessionAuth: []
       responses:
@@ -949,7 +949,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Dispatch
       requestBody:
         content:
           application/json:
@@ -984,7 +984,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Orders
       requestBody:
         content:
           application/json:
@@ -1027,7 +1027,8 @@ paths:
         description: First day of the window (inclusive, IST).
         required: true
       tags:
-      - api
+      - Admin · Orders
+      - Admin · Exports
       security:
       - sessionAuth: []
       responses:
@@ -1059,7 +1060,8 @@ paths:
         description: First day of the window (inclusive, IST).
         required: true
       tags:
-      - api
+      - Admin · Dispatch
+      - Admin · Exports
       security:
       - sessionAuth: []
       responses:
@@ -1107,7 +1109,8 @@ paths:
         description: First day of the window (inclusive, IST). Optional -- give together
           with end_date, or omit both for the full history.
       tags:
-      - api
+      - Admin · Stock count
+      - Admin · Exports
       security:
       - sessionAuth: []
       responses:
@@ -1139,7 +1142,8 @@ paths:
         description: First day of the window (inclusive, IST).
         required: true
       tags:
-      - api
+      - Admin · Inward
+      - Admin · Exports
       security:
       - sessionAuth: []
       responses:
@@ -1171,7 +1175,8 @@ paths:
         description: First day of the window (inclusive, IST).
         required: true
       tags:
-      - api
+      - Admin · Orders
+      - Admin · Exports
       security:
       - sessionAuth: []
       responses:
@@ -1261,7 +1266,7 @@ paths:
         description: User id(s) of the sales admin who verified the client (see options).
           Comma-separated (any match); AND-ed with the other filters.
       tags:
-      - api
+      - Admin · Clients
       security:
       - sessionAuth: []
       responses:
@@ -1284,7 +1289,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Stock levels
       security:
       - sessionAuth: []
       responses:
@@ -1307,7 +1312,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Orders
       security:
       - sessionAuth: []
       responses:
@@ -1329,7 +1334,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Inward
       security:
       - sessionAuth: []
       responses:
@@ -1350,7 +1355,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Inward
       security:
       - sessionAuth: []
       responses:
@@ -1406,7 +1411,7 @@ paths:
         description: Comma-separated sort keys (created_at, party, effective_date);
           prefix a key with '-' for descending. Defaults to the view's natural order.
       tags:
-      - api
+      - Admin · Inward
       security:
       - sessionAuth: []
       responses:
@@ -1422,7 +1427,7 @@ paths:
         only).
       summary: Create an inward other-material lot
       tags:
-      - api
+      - Admin · Inward
       requestBody:
         content:
           application/json:
@@ -1457,7 +1462,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Inward
       requestBody:
         content:
           application/json:
@@ -1490,7 +1495,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Inward
       security:
       - sessionAuth: []
       responses:
@@ -1546,7 +1551,7 @@ paths:
         description: Lot status (lab_testing / in_use). Comma-separated (any match);
           AND-ed with the other filters.
       tags:
-      - api
+      - Admin · Inward
       security:
       - sessionAuth: []
       responses:
@@ -1562,7 +1567,7 @@ paths:
         only).
       summary: Create an inward raw-material lot
       tags:
-      - api
+      - Admin · Inward
       requestBody:
         content:
           application/json:
@@ -1597,7 +1602,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Orders
       security:
       - sessionAuth: []
       responses:
@@ -1669,7 +1674,7 @@ paths:
         description: Order lifecycle status. Comma-separated (any match); AND-ed with
           the other filters.
       tags:
-      - api
+      - Admin · Orders
       security:
       - sessionAuth: []
       responses:
@@ -1691,7 +1696,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -1739,7 +1744,7 @@ paths:
         description: Comma-separated sort keys (product, packet_weight, created_at);
           prefix a key with '-' for descending. Defaults to the view's natural order.
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -1754,7 +1759,7 @@ paths:
       description: List (GET) or create (POST) other material recipes (app admin only).
       summary: Create an other material recipe
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -1782,7 +1787,7 @@ paths:
       description: Read the other-material on-hand position (app admin only).
       summary: Other-material on-hand stock, per material type
       tags:
-      - api
+      - Admin · Stock levels
       security:
       - sessionAuth: []
       responses:
@@ -1798,7 +1803,7 @@ paths:
       description: List (GET) or create (POST) other material types (app admin only).
       summary: List other material types
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -1815,7 +1820,7 @@ paths:
       description: List (GET) or create (POST) other material types (app admin only).
       summary: Create an other material type
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -1849,7 +1854,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -1881,7 +1886,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -1929,7 +1934,7 @@ paths:
         description: Comma-separated sort keys (name, created_at); prefix a key with
           '-' for descending. Defaults to the view's natural order.
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -1944,7 +1949,7 @@ paths:
       description: List (GET) or create (POST) parties (app admin only).
       summary: Create a party
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -1978,7 +1983,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -2010,7 +2015,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -2022,7 +2027,7 @@ paths:
       description: List (GET) or create (POST) product packagings (app admin only).
       summary: List product packagings
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -2039,7 +2044,7 @@ paths:
       description: List (GET) or create (POST) product packagings (app admin only).
       summary: Create a product packaging
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -2073,7 +2078,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -2105,7 +2110,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -2117,7 +2122,7 @@ paths:
       description: List (GET) or create (POST) products (app admin only).
       summary: List products
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -2134,7 +2139,7 @@ paths:
       description: List (GET) or create (POST) products (app admin only).
       summary: Create a product
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -2168,7 +2173,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Master data
       requestBody:
         content:
           application/json:
@@ -2200,7 +2205,7 @@ paths:
           type: string
         required: true
       tags:
-      - api
+      - Admin · Master data
       security:
       - sessionAuth: []
       responses:
@@ -2212,7 +2217,7 @@ paths:
       description: Read the incoming raw-material position (app admin only).
       summary: Raw-material incoming stock, per product
       tags:
-      - api
+      - Admin · Stock levels
       security:
       - sessionAuth: []
       responses:
@@ -2235,7 +2240,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Orders
       security:
       - sessionAuth: []
       responses:
@@ -2258,7 +2263,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Dispatch
       security:
       - sessionAuth: []
       responses:
@@ -2274,7 +2279,7 @@ paths:
       description: List (GET) or create (POST) sales people (app admin only).
       summary: List sales people
       tags:
-      - api
+      - Admin · Users
       security:
       - sessionAuth: []
       responses:
@@ -2291,7 +2296,7 @@ paths:
       description: List (GET) or create (POST) sales people (app admin only).
       summary: Create a sales person
       tags:
-      - api
+      - Admin · Users
       requestBody:
         content:
           application/json:
@@ -2326,7 +2331,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Users
       requestBody:
         content:
           application/json:
@@ -2359,7 +2364,7 @@ paths:
           type: integer
         required: true
       tags:
-      - api
+      - Admin · Users
       security:
       - sessionAuth: []
       responses:
@@ -2372,7 +2377,7 @@ paths:
         pool.
       summary: Read the sample-packet (loose) stock position
       tags:
-      - api
+      - Admin · Stock levels
       security:
       - sessionAuth: []
       responses:
@@ -2395,7 +2400,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Orders
       security:
       - sessionAuth: []
       responses:
@@ -2413,7 +2418,7 @@ paths:
         bags. Loose packets are not accepted here -- record them at ``/api/sales-admin/update-sample-packet-stock``.'
       summary: Replace today's entire stock count
       tags:
-      - api
+      - Admin · Stock count
       requestBody:
         content:
           application/json:
@@ -2451,7 +2456,7 @@ paths:
         are not accepted here -- record them at ``/api/sales-admin/update-sample-packet-stock``.'
       summary: Partially update today's stock count
       tags:
-      - api
+      - Admin · Stock count
       requestBody:
         content:
           application/json:
@@ -2486,7 +2491,7 @@ paths:
       description: Update any client's core details and lists (app admin only).
       summary: Update a client
       tags:
-      - api
+      - Admin · Clients
       requestBody:
         content:
           application/json:
@@ -2516,7 +2521,7 @@ paths:
         Does not touch the sealed-bag snapshot.
       summary: Replace the whole loose-stock count
       tags:
-      - api
+      - Admin · Stock count
       requestBody:
         content:
           application/json:
@@ -2557,7 +2562,7 @@ paths:
         row is left as it is.
       summary: Partially update the loose-stock count
       tags:
-      - api
+      - Admin · Stock count
       requestBody:
         content:
           application/json:
@@ -2602,7 +2607,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Dispatch
       requestBody:
         content:
           application/json:
@@ -2630,7 +2635,7 @@ paths:
       description: Approve a pending client (app admin only).
       summary: Verify a client
       tags:
-      - api
+      - Admin · Clients
       requestBody:
         content:
           application/json:
@@ -2665,7 +2670,7 @@ paths:
         description: The order's public id, e.g. ORD-E79QA0E2OIHF.
         required: true
       tags:
-      - api
+      - Admin · Orders
       security:
       - sessionAuth: []
       responses:
@@ -2684,7 +2689,7 @@ paths:
         Only a Django superuser may call it, to stop the endpoint from being
         exploited as a free exception spammer.
       tags:
-      - api
+      - Developer tools
       security:
       - sessionAuth: []
       responses:
@@ -2698,7 +2703,7 @@ paths:
         Only a Django superuser may call it, to stop the endpoint from being
         exploited as a free exception spammer.
       tags:
-      - api
+      - Developer tools
       security:
       - sessionAuth: []
       responses:
@@ -2710,7 +2715,7 @@ paths:
       description: List Indian states, each with its cities, grouped by state.
       summary: List Indian states grouped with their cities
       tags:
-      - api
+      - Admin · Utilities
       security:
       - sessionAuth: []
       responses:
@@ -2728,7 +2733,7 @@ paths:
       description: List all countries, ordered by name.
       summary: List all countries
       tags:
-      - api
+      - Admin · Utilities
       security:
       - sessionAuth: []
       responses:
@@ -2746,7 +2751,7 @@ paths:
       description: Confirm the caller's session cookie is still valid.
       summary: Check whether the caller's session is still valid
       tags:
-      - api
+      - Admin · Auth
       security:
       - sessionAuth: []
       responses:
@@ -2774,7 +2779,7 @@ paths:
           type: integer
         description: Filter states by country id
       tags:
-      - api
+      - Admin · Utilities
       security:
       - sessionAuth: []
       responses:
@@ -6421,3 +6426,38 @@ components:
       in: header
       name: sessionid
       description: Django session cookie for the sales admin website.
+tags:
+- name: Admin · Auth
+  description: Sales-admin website sign-in and session.
+- name: Admin · Users
+  description: Admin and sales-person accounts.
+- name: Admin · Clients
+  description: Client records and verification.
+- name: Admin · Orders
+  description: 'Order review: verify, hold, reject, edit.'
+- name: Admin · Dispatch
+  description: Dispatching orders, challans and LR numbers.
+- name: Admin · Inward
+  description: 'Inward movement: raw and other material received into stock.'
+- name: Admin · Stock count
+  description: Daily bag and sample-packet stock counts.
+- name: Admin · Stock levels
+  description: Read-only current stock positions (bags, packets, materials).
+- name: Admin · Master data
+  description: Crops, products, packagings, material types, recipes and parties.
+- name: Admin · Exports
+  description: Report exports; each also appears under its own domain group.
+- name: Admin · Utilities
+  description: Geography look-ups for the admin website.
+- name: Android · Auth
+  description: Sales-person app sign-in and session.
+- name: Android · Clients
+  description: The sales person's clients, addresses, transport.
+- name: Android · Orders
+  description: Placing and listing the sales person's orders.
+- name: Android · Catalogue
+  description: Products the sales person can sell.
+- name: Android · Utilities
+  description: Geography look-ups for the app.
+- name: Developer tools
+  description: Internal debugging endpoints.
