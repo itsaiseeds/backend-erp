@@ -3744,7 +3744,8 @@ components:
         party:
           type: integer
         recipe:
-          type: integer
+          type: string
+          minLength: 1
         quantity:
           type: string
           format: decimal
@@ -3914,7 +3915,8 @@ components:
       description: Request validation for creating a new ``OtherMaterialRecipe``.
       properties:
         product:
-          type: integer
+          type: string
+          minLength: 1
         material_type:
           type: integer
         packet_weight:

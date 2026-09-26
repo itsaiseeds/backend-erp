@@ -33,6 +33,7 @@ from common.views.paginated_date_range import (
     SortCatalogueEntrySerializer,
     SortOption,
     list_query_parameters,
+    parse_str,
 )
 
 
@@ -79,7 +80,8 @@ class CreateInwardOtherMaterialSerializer(serializers.Serializer):
         queryset=Party.objects.all(),
         error_messages={"required": "Party is required."},
     )
-    recipe = serializers.PrimaryKeyRelatedField(
+    recipe = serializers.SlugRelatedField(
+        slug_field="public_id",
         queryset=OtherMaterialRecipe.objects.all(),
         error_messages={"required": "Recipe is required."},
     )
@@ -128,6 +130,7 @@ _QUERYSET_FILTERS = (
         "product",
         label="Product",
         lookup="recipe__product__public_id__in",
+        parse=parse_str,
         description="Product public id(s) (see the recipe).",
     ),
 )
