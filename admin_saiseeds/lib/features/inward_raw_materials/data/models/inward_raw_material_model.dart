@@ -85,7 +85,23 @@ class InwardRawMaterialModel {
 
   int? get partyId => party?.id;
 
-  bool get isInUse => status == InwardStatus.IN_USE;
+  String get _statusKey =>
+      status.trim().toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_');
+
+  bool get isInUse => _statusKey == InwardStatus.IN_USE;
+
+  String get statusLabel {
+    final String raw = status.trim();
+    if (raw.isEmpty) return '';
+    if (raw.contains('_')) {
+      return raw
+          .split('_')
+          .where((word) => word.isNotEmpty)
+          .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
+          .join(' ');
+    }
+    return raw;
+  }
 
   num? get quantityValue => num.tryParse(quantityKg);
 

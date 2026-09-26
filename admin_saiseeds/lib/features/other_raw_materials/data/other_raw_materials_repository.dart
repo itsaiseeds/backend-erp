@@ -63,24 +63,6 @@ class OtherRawMaterialsRepository {
     );
   }
 
-  Future<void> updateRecipe({
-    required String publicId,
-    required String productPublicId,
-    required int materialTypeId,
-    required String packetWeight,
-    required String quantity,
-  }) async {
-    await _apiClient.patch(
-      RawMaterialsEndpoints.recipeDetail(publicId),
-      body: _body(
-        productPublicId: productPublicId,
-        materialTypeId: materialTypeId,
-        packetWeight: packetWeight,
-        quantity: quantity,
-      ),
-    );
-  }
-
   Future<void> deleteRecipe(String publicId) async {
     await _apiClient.delete(RawMaterialsEndpoints.recipeDetail(publicId));
   }

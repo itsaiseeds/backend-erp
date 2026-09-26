@@ -135,9 +135,9 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
           : AppStrings.INWARD_DETAIL_SUBTITLE,
       mode: _mode,
       badge: AppBadge(
-        label: _lot.isInUse
-            ? AppStrings.STATUS_IN_USE
-            : AppStrings.STATUS_LAB_TESTING,
+        label: _lot.statusLabel.isEmpty
+            ? AppStrings.STATUS_LAB_TESTING
+            : _lot.statusLabel,
         variant: _lot.isInUse
             ? AppBadgeVariant.success
             : AppBadgeVariant.warning,
@@ -179,6 +179,7 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
             isLocked: true,
           ),
           right: SingleDateField(
+            label: AppStrings.FIELD_LAB_SAMPLING_DATE,
             value: _labSamplingDate,
             enabled: _canEdit,
             onBlockedTap: _notifyViewMode,

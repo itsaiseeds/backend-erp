@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/services/packagings_service.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/widgets/feedback/confirmation_dialog.dart';
 import '../../../../core/widgets/feedback/stock_update_bar.dart';
+import '../../../product_packagings/data/product_packagings_repository.dart';
 import '../../data/bag_stock_repository.dart';
 import '../bloc/bag_stock_cubit.dart';
 import '../widgets/bag_stock_table.dart';
@@ -17,11 +19,13 @@ class BagStockView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ApiClient apiClient = context.read<ApiClient>();
+    PackagingsService.instance.repository = ProductPackagingsRepository(
+      apiClient: apiClient,
+    );
 
     return BlocProvider<BagStockCubit>(
       create: (context) =>
-          BagStockCubit(repository: BagStockRepository(apiClient: apiClient))
-            ..loadBagStock(),
+          BagStockCubit(repository: BagStockRepository(apiClient: apiClient)),
       child: const _BagStockContent(),
     );
   }
@@ -37,6 +41,24 @@ class _BagStockContent extends StatefulWidget {
 class _BagStockContentState extends State<_BagStockContent> {
   final GlobalKey<BagStockTableState> _tableKey =
       GlobalKey<BagStockTableState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _primeCache();
+  }
+
+  @override
+  void dispose() {
+    PackagingsService.instance.reset();
+    super.dispose();
+  }
+
+  Future<void> _primeCache() async {
+    await PackagingsService.instance.loadPackagings(forceRefresh: true);
+    if (!mounted) return;
+    await context.read<BagStockCubit>().loadBagStock();
+  }
 
   void _onFetchData({
     required int page,
@@ -56,7 +78,7 @@ class _BagStockContentState extends State<_BagStockContent> {
     );
   }
 
-  Future<void> _onRefresh() => context.read<BagStockCubit>().loadBagStock();
+  Future<void> _onRefresh() => _primeCache();
 
   Future<void> _onUpdateStock() async {
     final BagStockCubit cubit = context.read<BagStockCubit>();

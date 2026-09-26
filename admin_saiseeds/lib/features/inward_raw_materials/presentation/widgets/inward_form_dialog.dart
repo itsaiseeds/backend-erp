@@ -158,6 +158,7 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
             ),
             const SizedBox(height: AppSpacing.md),
             SingleDateField(
+              label: AppStrings.FIELD_LAB_SAMPLING_DATE,
               value: _labSamplingDate,
               enabled: !_isSubmitting,
               onChanged: (date) => setState(() {

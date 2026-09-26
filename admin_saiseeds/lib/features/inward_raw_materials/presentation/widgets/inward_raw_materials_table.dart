@@ -200,9 +200,9 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
         return _textCell(lot.quantityKg);
       case InwardRawMaterialsTable.COLUMN_STATUS:
         return AppBadge(
-          label: lot.isInUse
-              ? AppStrings.STATUS_IN_USE
-              : AppStrings.STATUS_LAB_TESTING,
+          label: lot.statusLabel.isEmpty
+              ? AppStrings.STATUS_LAB_TESTING
+              : lot.statusLabel,
           variant: lot.isInUse
               ? AppBadgeVariant.success
               : AppBadgeVariant.warning,

@@ -143,24 +143,6 @@ class OtherRawMaterialsCubit extends SafeCubit<OtherRawMaterialsState> {
     );
   }
 
-  Future<bool> updateRecipe({
-    required String publicId,
-    required String productPublicId,
-    required int materialTypeId,
-    required String packetWeight,
-    required String quantity,
-  }) {
-    return _mutate(
-      () => _repository.updateRecipe(
-        publicId: publicId,
-        productPublicId: productPublicId,
-        materialTypeId: materialTypeId,
-        packetWeight: packetWeight,
-        quantity: quantity,
-      ),
-    );
-  }
-
   Future<bool> deleteRecipe(String publicId) =>
       _mutate(() => _repository.deleteRecipe(publicId));
 

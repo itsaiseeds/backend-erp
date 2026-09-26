@@ -11,4 +11,8 @@ class InventoryEndpoints {
   static const String samplePacketStock = '$_base/sample-packet-stock';
   static const String updateSamplePacketStock =
       '$_base/update-sample-packet-stock';
+
+  static String getStock(String publicId) => '$_base/get-stock/$publicId';
+
+  static const String rawMaterialStock = '$_base/raw-material-stock';
 }

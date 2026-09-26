@@ -8,6 +8,7 @@ import 'date_range_field.dart';
 
 class SingleDateField extends StatefulWidget {
   final DateTime? value;
+  final String? label;
   final ValueChanged<DateTime?> onChanged;
   final bool enabled;
   final VoidCallback? onBlockedTap;
@@ -16,6 +17,7 @@ class SingleDateField extends StatefulWidget {
     super.key,
     required this.value,
     required this.onChanged,
+    this.label,
     this.enabled = true,
     this.onBlockedTap,
   });
@@ -186,6 +188,21 @@ class _SingleDateFieldState extends State<SingleDateField> {
     final DateTime? value = widget.value;
     final bool hasValue = value != null;
 
+    final String label = widget.label?.trim() ?? '';
+    if (label.isEmpty) return _buildAnchor(hasValue, value);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: AppTypography.label),
+        const SizedBox(height: AppSpacing.sm),
+        _buildAnchor(hasValue, value),
+      ],
+    );
+  }
+
+  Widget _buildAnchor(bool hasValue, DateTime? value) {
     return CompositedTransformTarget(
       link: _layerLink,
       child: MouseRegion(
@@ -217,7 +234,7 @@ class _SingleDateFieldState extends State<SingleDateField> {
                 Expanded(
                   child: Text(
                     hasValue
-                        ? _display.format(value)
+                        ? _display.format(value!)
                         : AppStrings.DATE_PICK_HINT,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

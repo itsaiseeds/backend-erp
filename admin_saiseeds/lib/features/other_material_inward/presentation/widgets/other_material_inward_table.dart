@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/services/recipes_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -188,7 +189,7 @@ class OtherMaterialInwardTableState extends State<OtherMaterialInwardTable> {
       case OtherMaterialInwardTable.COLUMN_PARTY:
         return _textCell(lot.partyName);
       case OtherMaterialInwardTable.COLUMN_QUANTITY:
-        return _textCell(lot.quantity, isStrong: true);
+        return _textCell(_quantityWithUnit(lot), isStrong: true);
       case OtherMaterialInwardTable.COLUMN_EFFECTIVE_DATE:
         return _textCell(DateFormatter.dayLabel(lot.effectiveDateTime));
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:
@@ -209,6 +210,20 @@ class OtherMaterialInwardTableState extends State<OtherMaterialInwardTable> {
       default:
         return _textCell(AppStrings.TABLE_VALUE_UNAVAILABLE);
     }
+  }
+
+  static String _quantityWithUnit(OtherMaterialInwardModel lot) {
+    final String quantity = lot.quantity.trim();
+    if (quantity.isEmpty) return quantity;
+
+    final String unit = RecipesService.instance
+            .recipeByPublicId(lot.recipePublicId)
+            ?.unitType
+            .trim() ??
+        '';
+    if (unit.isEmpty) return quantity;
+
+    return '$quantity $unit';
   }
 
   Widget _textCell(String value, {bool isStrong = false}) {

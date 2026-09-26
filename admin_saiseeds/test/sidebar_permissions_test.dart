@@ -22,6 +22,8 @@ void main() {
       TabIds.INWARD_RAW_MATERIALS,
       TabIds.OTHER_RAW_MATERIALS,
       TabIds.OTHER_MATERIAL_INWARD,
+      TabIds.PRODUCT_STOCK,
+      TabIds.RAW_MATERIAL_STOCK,
     ]);
   });
 
@@ -42,6 +44,8 @@ void main() {
       TabIds.INWARD_RAW_MATERIALS,
       TabIds.OTHER_RAW_MATERIALS,
       TabIds.OTHER_MATERIAL_INWARD,
+      TabIds.PRODUCT_STOCK,
+      TabIds.RAW_MATERIAL_STOCK,
     ]);
   });
 

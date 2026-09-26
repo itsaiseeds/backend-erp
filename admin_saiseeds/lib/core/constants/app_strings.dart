@@ -708,6 +708,35 @@ class AppStrings {
   static const String ORDER_NO_ITEMS = 'This order has no lines.';
   static const String TIMEZONE_IST = 'IST';
 
+  static const String PRODUCT_STOCK = 'Product Stock Management';
+  static const String RAW_MATERIAL_STOCK = 'Raw Material Stock Management';
+
+  static const String COLUMN_STOCK_TYPE = 'Type';
+  static const String COLUMN_INCOMING_KG = 'Incoming (kg)';
+  static const String COLUMN_PACKED_KG = 'Packed (kg)';
+  static const String COLUMN_AVAILABLE_KG = 'Available (kg)';
+
+  static const String STOCK_KIND_BAG = 'Bag';
+  static const String STOCK_KIND_LOOSE = 'Loose';
+
+  static const String PRODUCT_STOCK_TABLE_SEARCH_HINT =
+      'Search product stock...';
+  static const String PRODUCT_STOCK_EMPTY_STATE_TITLE = 'No stock positions';
+  static const String PRODUCT_STOCK_EMPTY_STATE_BODY =
+      'Add a product packaging to start tracking stock.';
+  static const String PRODUCT_STOCK_LOAD_FAILED_TITLE =
+      'Could not load product stock';
+
+  static const String RAW_MATERIAL_STOCK_TABLE_SEARCH_HINT =
+      'Search raw material stock...';
+  static const String RAW_MATERIAL_STOCK_EMPTY_STATE_TITLE =
+      'No raw material stock';
+  static const String RAW_MATERIAL_STOCK_EMPTY_STATE_BODY =
+      'Record an inward raw-material lot to start tracking stock.';
+  static const String RAW_MATERIAL_STOCK_LOAD_FAILED_TITLE =
+      'Could not load raw material stock';
+  static const String STOCK_AS_OF_PREFIX = 'As of';
+
   static const String INWARD_RAW_MATERIALS = 'Inward Raw Material';
   static const String OTHER_RAW_MATERIALS = 'Other Material Recipes';
   static const String OTHER_MATERIAL_INWARD = 'Other Material Inward';
@@ -788,7 +817,6 @@ class AppStrings {
   static const String ADD_RECIPE = 'Add recipe';
   static const String ADD_RECIPE_SUBTITLE =
       'Define the material a packet consumes.';
-  static const String EDIT_RECIPE_SUBTITLE = 'Update the recipe details.';
   static const String RECIPE_CREATED_TITLE = 'Recipe created';
   static const String RECIPE_UPDATED_TITLE = 'Recipe updated';
   static const String RECIPE_DELETED_TITLE = 'Recipe deleted';

@@ -73,6 +73,16 @@ class SidebarItems {
       label: AppStrings.OTHER_MATERIAL_INWARD,
       icon: Icons.inventory_2_outlined,
     ),
+    SidebarItemModel(
+      id: TabIds.PRODUCT_STOCK,
+      label: AppStrings.PRODUCT_STOCK,
+      icon: Icons.inventory_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.RAW_MATERIAL_STOCK,
+      label: AppStrings.RAW_MATERIAL_STOCK,
+      icon: Icons.grass_outlined,
+    ),
   ];
 
   static const String DEFAULT_ITEM_ID = TabIds.DASHBOARD;

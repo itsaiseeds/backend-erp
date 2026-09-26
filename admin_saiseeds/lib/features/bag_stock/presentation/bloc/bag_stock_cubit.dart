@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import '../../../../core/bloc/safe_cubit.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/services/packagings_service.dart';
 import '../../../../core/utils/list_query.dart';
 import '../../data/bag_stock_repository.dart';
 import '../../data/models/bag_stock_line_model.dart';
@@ -121,7 +122,7 @@ class BagStockCubit extends SafeCubit<BagStockState> {
           state.copyWith(
             status: BagStockStatus.loaded,
             snapshotDate: snapshot.snapshotDate,
-            allLines: snapshot.lines,
+            allLines: _withUncountedPackagings(snapshot.lines),
             draftCounts: const {},
             clearError: true,
           ),
@@ -201,6 +202,31 @@ class BagStockCubit extends SafeCubit<BagStockState> {
       emit(state.copyWith(isSubmitting: false, errorMessage: _messageOf(error)));
       return false;
     }
+  }
+
+  List<BagStockLineModel> _withUncountedPackagings(
+    List<BagStockLineModel> lines,
+  ) {
+    final PackagingsService service = PackagingsService.instance;
+    if (!service.isLoaded) return lines;
+
+    final Map<String, BagStockLineModel> counted = {
+      for (final BagStockLineModel line in lines)
+        if (line.packagingPublicId.isNotEmpty) line.packagingPublicId: line,
+    };
+
+    return service.packagings.map((packaging) {
+      final BagStockLineModel? line = counted.remove(packaging.publicId);
+      if (line == null) return BagStockLineModel(packaging: packaging);
+
+      return BagStockLineModel(
+        packaging: packaging,
+        onHand: line.onHand,
+        reserved: line.reserved,
+        consumed: line.consumed,
+        available: line.available,
+      );
+    }).toList()..addAll(counted.values);
   }
 
   BagStockState _projected(BagStockState source, {required int page}) {
