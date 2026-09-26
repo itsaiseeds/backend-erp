@@ -23,6 +23,7 @@ from django.db import transaction
 
 from common.models import indian_now
 
+from .ClientOperations import client_summary_payload, order_city_payload
 from .models import (
     Address,
     City,
@@ -165,15 +166,26 @@ def attach_dispatch_details(
     dispatch_date,
     from_city: City,
     to_city: City,
-    lr_number: str,
+    driver_name: str,
+    driver_number: str,
+    vehicle_number: str,
+    lr_number: str = "",
 ) -> DispatchDetails:
-    """Record a third-party dispatch and link it to the custom order."""
+    """Record a third-party dispatch and link it to the custom order.
+
+    Writes the same ``DispatchDetails`` table as the packaged-order path, so it
+    carries the same mandatory driver and vehicle details; ``lr_number`` is the
+    one field the transporter may issue later.
+    """
     dispatch = DispatchDetails(
         client=order.client,
         dispatched_by=dispatched_by,
         dispatch_date=dispatch_date,
         from_city=from_city,
         to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
         lr_number=lr_number,
     )
     dispatch.full_clean()
@@ -194,8 +206,9 @@ def attach_private_dispatch_details(
     dispatch_date,
     from_city: City,
     to_city: City,
-    vehicle_number: str,
+    driver_name: str,
     driver_number: str,
+    vehicle_number: str,
 ) -> PrivateDispatchDetails:
     """Record an own-vehicle dispatch and link it to the custom order."""
     dispatch = PrivateDispatchDetails(
@@ -204,8 +217,9 @@ def attach_private_dispatch_details(
         dispatch_date=dispatch_date,
         from_city=from_city,
         to_city=to_city,
-        vehicle_number=vehicle_number,
+        driver_name=driver_name,
         driver_number=driver_number,
+        vehicle_number=vehicle_number,
     )
     dispatch.full_clean()
     dispatch.save()
@@ -269,4 +283,19 @@ def custom_order_payload(order: CustomOrder) -> dict:
             }
             for item in order.items.select_related("product").all()
         ],
+    }
+
+
+def custom_order_export_payload(order: CustomOrder) -> dict:
+    """:func:`custom_order_payload` for the date-range export.
+
+    Adds when the order was booked, the client's public id, and the city the
+    order goes to (its own delivery address's city). Business fields only --
+    no audit columns.
+    """
+    return {
+        **custom_order_payload(order),
+        "created_at": order.created_at.isoformat(),
+        "client": client_summary_payload(order.client),
+        "city": order_city_payload(order),
     }

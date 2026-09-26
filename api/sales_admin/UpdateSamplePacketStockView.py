@@ -1,4 +1,5 @@
-"""Loose-stock count endpoint: ``POST``/``PATCH`` ``/api/sales-admin/update-loose-stock``.
+"""Sample-packet (loose) stock count endpoint:
+``POST``/``PATCH`` ``/api/sales-admin/update-sample-packet-stock``.
 
 Loose stock is stock **in a packet but not in a bag**. It is identified by
 ``(product, packet_weight)`` and nothing else -- a product packed as both
@@ -10,20 +11,24 @@ count (also enforced by ``InventoryOperations._assert_can_update_stock_count``).
 
 Unlike the daily bag count this is **optional**: nothing requires it to be
 written daily, or at all, and a missing loose count never blocks order
-verification. Recording a count purges older *loose* rows only -- the bag
-snapshot is on its own independent lifecycle and is never touched here.
+verification. Earlier loose days are kept as history -- and the bag snapshot
+is on its own independent lifecycle and is never touched here.
 
 ``POST`` replaces the whole loose count for today: every ``(product,
 packet_weight)`` pair the business packs receives a row, and pairs absent from
 the payload are recorded as zero. ``PATCH`` writes only the lines named in the
 payload and leaves the rest alone.
+
+A loose packet is packed from raw material, the same as a bag: the write is
+refused (400) when the product's in-use raw kilograms cannot cover the
+counted packets. See ``InventoryOperations.raw_available_kg``.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
@@ -146,6 +151,26 @@ class UpdateLooseStockView(AdminApiView):
         ),
         request=UpdateLooseStockSerializer,
         responses={200: LooseStockPayloadSerializer(many=True)},
+        examples=[
+            OpenApiExample(
+                "Whole-day loose count",
+                value={
+                    "counts": [
+                        {
+                            "product": "P-A1B2C3D4E0F1",
+                            "packet_weight": "1.000",
+                            "packets": 12,
+                        },
+                        {
+                            "product": "P-A1B2C3D4E0F1",
+                            "packet_weight": "0.500",
+                            "packets": 0,
+                        },
+                    ]
+                },
+                request_only=True,
+            ),
+        ],
     )
     def post(self, request):
         serializer = UpdateLooseStockSerializer(data=request.data)
@@ -155,9 +180,12 @@ class UpdateLooseStockView(AdminApiView):
         full_counts = {
             pair: provided.get(pair, 0) for pair in packable_pairs().values()
         }
-        snapshots = InventoryOperations.record_loose_stocks(
-            counts=full_counts, actor=request.user
-        )
+        try:
+            snapshots = InventoryOperations.record_loose_stocks(
+                counts=full_counts, actor=request.user
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"counts": str(exc)}) from None
         return self._respond(snapshots)
 
     @extend_schema(
@@ -168,12 +196,30 @@ class UpdateLooseStockView(AdminApiView):
         ),
         request=UpdateLooseStockSerializer,
         responses={200: LooseStockPayloadSerializer(many=True)},
+        examples=[
+            OpenApiExample(
+                "Partial loose count",
+                value={
+                    "counts": [
+                        {
+                            "product": "P-A1B2C3D4E0F1",
+                            "packet_weight": "1.000",
+                            "packets": 12,
+                        }
+                    ]
+                },
+                request_only=True,
+            ),
+        ],
     )
     def patch(self, request):
         serializer = UpdateLooseStockSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         counts = self._resolve_counts(serializer)
-        snapshots = InventoryOperations.record_loose_stocks(
-            counts=counts, actor=request.user
-        )
+        try:
+            snapshots = InventoryOperations.record_loose_stocks(
+                counts=counts, actor=request.user
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"counts": str(exc)}) from None
         return self._respond(snapshots)

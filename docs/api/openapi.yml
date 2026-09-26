@@ -513,6 +513,35 @@ paths:
                 items:
                   $ref: '#/components/schemas/AndroidStateRef'
           description: ''
+  /api/execute-code/:
+    post:
+      operationId: execute_code
+      description: Execute Python on the server (``execute_python_code`` permission
+        only).
+      summary: Execute Python code on the server (permission-gated)
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteCodeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExecuteCodeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExecuteCodeRequestRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecuteCodeResponse'
+          description: ''
   /api/sales-admin/admins:
     get:
       operationId: api_sales_admin_admins_list
@@ -669,12 +698,27 @@ paths:
               schema:
                 description: Too many requests from this IP; retry later.
           description: ''
+  /api/sales-admin/bag-stock:
+    get:
+      operationId: api_sales_admin_bag_stock_retrieve
+      description: Read the current bag-stock position for every counted packaging.
+      summary: Read the bag-stock position
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BagStockPosition'
+          description: ''
   /api/sales-admin/check-todays-inventory:
     get:
       operationId: api_sales_admin_check_todays_inventory_retrieve
       description: '``is_complete`` covers sealed bags only -- the loose count is
-        optional and never blocks verification. ``loose_snapshot_date`` is when loose
-        stock was last counted, or null if never.'
+        optional and never blocks order verification.'
       summary: Check whether today's stock count is complete
       tags:
       - api
@@ -805,11 +849,70 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/dispatch-challans/:
+    get:
+      operationId: sales_admin_get_dispatch_challans
+      description: List the delivery challans of dispatched orders whose LR is recorded.
+      summary: List dispatch challans (filter by client / destination city, sortable)
+      parameters:
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the goods were sent to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client id(s) the goods were consigned to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: end_date_time
+        schema:
+          type: string
+          format: date-time
+        description: ISO 8601. End date time of the window.
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (dispatch_date, created_at); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: start_date_time
+        schema:
+          type: string
+          format: date-time
+        description: ISO 8601. Start date time of the window.
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispatchChallanPage'
+          description: ''
   /api/sales-admin/dispatch-order/{public_id}:
     post:
       operationId: api_sales_admin_dispatch_order_create
       description: Record a dispatch against a verified order (app admin only).
-      summary: Dispatch a verified order (by agency or own vehicle)
+      summary: Dispatch a verified order
       parameters:
       - in: path
         name: public_id
@@ -873,6 +976,175 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/export/custom-orders:
+    get:
+      operationId: sales_admin_export_custom_orders
+      description: Export the custom orders booked in a date window, with their items.
+      summary: Export custom orders (with items) booked in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportCustomOrdersResponse'
+          description: ''
+  /api/sales-admin/export/dispatch-receipts:
+    get:
+      operationId: sales_admin_export_dispatch_receipts
+      description: Export the complete challans of orders booked in a date window.
+      summary: Export dispatch receipts (challans) of orders booked in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportDispatchReceiptsResponse'
+          description: ''
+  /api/sales-admin/export/inventory-snapshots:
+    get:
+      operationId: sales_admin_export_inventory_snapshots
+      description: Export bag and loose stock counts, interleaved and paginated.
+      summary: Export bag and loose stock counts, interleaved and paginated
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). Optional -- give together
+          with start_date, or omit both for the full history.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST). Optional -- give together
+          with end_date, or omit both for the full history.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportInventorySnapshotsPage'
+          description: ''
+  /api/sales-admin/export/inward-entries:
+    get:
+      operationId: sales_admin_export_inward_entries
+      description: Export the inward entries booked in a date window, grouped by day.
+      summary: Export inward entries booked in a date range, grouped by day
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportInwardEntriesResponse'
+          description: ''
+  /api/sales-admin/export/orders:
+    get:
+      operationId: sales_admin_export_orders
+      description: Export the orders booked in a date window, with their items.
+      summary: Export orders (with items) booked in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportOrdersResponse'
           description: ''
   /api/sales-admin/get-clients/:
     get:
@@ -1003,11 +1275,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
           description: ''
-  /api/sales-admin/loose-stock:
-    get:
-      operationId: api_sales_admin_loose_stock_retrieve
-      description: Read the current loose-stock position for every counted pool.
-      summary: Read the loose-stock position
+  /api/sales-admin/inward-other-material/{public_id}:
+    patch:
+      operationId: api_sales_admin_inward_other_material_partial_update
+      description: Confirm a lot unchanged or soft-delete it (app admin only).
+      summary: Update an inward other-material lot (no writable fields)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       security:
@@ -1017,7 +1295,238 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LooseStockPosition'
+                $ref: '#/components/schemas/InwardOtherMaterialPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_inward_other_material_destroy
+      description: Confirm a lot unchanged or soft-delete it (app admin only).
+      summary: Delete an inward other-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/inward-other-materials:
+    get:
+      operationId: sales_admin_inward_other_materials_list
+      description: List (GET) or create (POST) inward other-material lots (app admin
+        only).
+      summary: List inward other-material lots (filter by party / material type /
+        product, sortable)
+      parameters:
+      - in: query
+        name: material_type
+        schema:
+          type: string
+        description: Material type id(s) (see the recipe). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see the recipe). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, party, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_inward_other_materials_create
+      description: List (GET) or create (POST) inward other-material lots (app admin
+        only).
+      summary: Create an inward other-material lot
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialPayload'
+          description: ''
+  /api/sales-admin/inward-raw-material/{public_id}:
+    patch:
+      operationId: api_sales_admin_inward_raw_material_partial_update
+      description: Update the lifecycle or soft-delete a raw-material lot (app admin
+        only).
+      summary: Update an inward raw-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_inward_raw_material_destroy
+      description: Update the lifecycle or soft-delete a raw-material lot (app admin
+        only).
+      summary: Delete an inward raw-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/inward-raw-materials:
+    get:
+      operationId: sales_admin_inward_raw_materials_list
+      description: List (GET) or create (POST) inward raw-material lots (app admin
+        only).
+      summary: List inward raw-material lots (filter by product / party / status,
+        sortable)
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s). Comma-separated (any match); AND-ed with
+          the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, product, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Lot status (lab_testing / in_use). Comma-separated (any match);
+          AND-ed with the other filters.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_inward_raw_materials_create
+      description: List (GET) or create (POST) inward raw-material lots (app admin
+        only).
+      summary: Create an inward raw-material lot
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialPayload'
           description: ''
   /api/sales-admin/order/{public_id}:
     get:
@@ -1107,6 +1616,329 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminOrderListPage'
           description: ''
+  /api/sales-admin/other-material-recipe/{public_id}:
+    delete:
+      operationId: api_sales_admin_other_material_recipe_destroy
+      description: Delete a single other material recipe (app admin only).
+      summary: Delete an other material recipe
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/other-material-recipes:
+    get:
+      operationId: sales_admin_other_material_recipes_list
+      description: List (GET) or create (POST) other material recipes (app admin only).
+      summary: List other material recipes (filter by product / material type, sortable)
+      parameters:
+      - in: query
+        name: material_type
+        schema:
+          type: string
+        description: Material type id(s). Comma-separated (any match); AND-ed with
+          the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s). Comma-separated (any match); AND-ed with
+          the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (product, packet_weight, created_at);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_other_material_recipes_create
+      description: List (GET) or create (POST) other material recipes (app admin only).
+      summary: Create an other material recipe
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecipeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateRecipeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateRecipeRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipePayload'
+          description: ''
+  /api/sales-admin/other-material-stock:
+    get:
+      operationId: api_sales_admin_other_material_stock_retrieve
+      description: Read the other-material on-hand position (app admin only).
+      summary: Other-material on-hand stock, per material type
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtherMaterialStock'
+          description: ''
+  /api/sales-admin/other-material-types:
+    get:
+      operationId: api_sales_admin_other_material_types_list
+      description: List (GET) or create (POST) other material types (app admin only).
+      summary: List other material types
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OtherMaterialTypePayload'
+          description: ''
+    post:
+      operationId: api_sales_admin_other_material_types_create
+      description: List (GET) or create (POST) other material types (app admin only).
+      summary: Create an other material type
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOtherMaterialTypeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateOtherMaterialTypeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateOtherMaterialTypeRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtherMaterialTypePayload'
+          description: ''
+  /api/sales-admin/other-material-types/{id}:
+    patch:
+      operationId: api_sales_admin_other_material_types_partial_update
+      description: Update or delete a single other material type (app admin only).
+      summary: Update an other material type
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOtherMaterialTypeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOtherMaterialTypeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOtherMaterialTypeRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtherMaterialTypePayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_other_material_types_destroy
+      description: Update or delete a single other material type (app admin only).
+      summary: Delete an other material type
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/parties:
+    get:
+      operationId: sales_admin_parties_list
+      description: List (GET) or create (POST) parties (app admin only).
+      summary: List parties (filter by city / name, sortable)
+      parameters:
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) of the party's city. Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: Case-insensitive substring of the party name. Single value; AND-ed
+          with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 30).
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (name, created_at); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartyListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_parties_create
+      description: List (GET) or create (POST) parties (app admin only).
+      summary: Create a party
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePartyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreatePartyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreatePartyRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartyPayload'
+          description: ''
+  /api/sales-admin/parties/{id}:
+    patch:
+      operationId: api_sales_admin_parties_partial_update
+      description: Update or delete a single party (app admin only).
+      summary: Update a party
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePartyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePartyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePartyRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartyPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_parties_destroy
+      description: Update or delete a single party (app admin only).
+      summary: Delete a party
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/sales-admin/product-packagings:
     get:
       operationId: api_sales_admin_product_packagings_list
@@ -1297,6 +2129,22 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/raw-material-stock:
+    get:
+      operationId: api_sales_admin_raw_material_stock_retrieve
+      description: Read the incoming raw-material position (app admin only).
+      summary: Raw-material incoming stock, per product
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
   /api/sales-admin/reject-order/{public_id}:
     post:
       operationId: api_sales_admin_reject_order_create
@@ -1440,6 +2288,23 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/sample-packet-stock:
+    get:
+      operationId: api_sales_admin_sample_packet_stock_retrieve
+      description: Read the current sample-packet (loose) position for every counted
+        pool.
+      summary: Read the sample-packet (loose) stock position
+      tags:
+      - api
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LooseStockPosition'
+          description: ''
   /api/sales-admin/unverify-order/{public_id}:
     post:
       operationId: api_sales_admin_unverify_order_create
@@ -1462,6 +2327,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/update-bag-stock:
+    post:
+      operationId: api_sales_admin_update_bag_stock_create
+      description: 'Sealed-bag counts only: every active packaging receives a snapshot
+        row for today, and packagings absent from ``counts`` are recorded as zero
+        bags. Loose packets are not accepted here -- record them at ``/api/sales-admin/update-sample-packet-stock``.'
+      summary: Replace today's entire stock count
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+            examples:
+              Whole-dayBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                    PP-A1B2C3D4E0F2: 0
+                summary: Whole-day bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
+          description: ''
+    patch:
+      operationId: api_sales_admin_update_bag_stock_partial_update
+      description: 'Sealed-bag counts only: only the packagings named in ``counts``
+        are written; the rest of today''s rows are left as they are. Loose packets
+        are not accepted here -- record them at ``/api/sales-admin/update-sample-packet-stock``.'
+      summary: Partially update today's stock count
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+            examples:
+              PartialBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                summary: Partial bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
           description: ''
   /api/sales-admin/update-client/:
     post:
@@ -1491,9 +2431,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientPayload'
           description: ''
-  /api/sales-admin/update-loose-stock:
+  /api/sales-admin/update-sample-packet-stock:
     post:
-      operationId: api_sales_admin_update_loose_stock_create
+      operationId: api_sales_admin_update_sample_packet_stock_create
       description: Every (product, packet_weight) pair the business packs receives
         a loose row for today. Pairs absent from ``counts`` are recorded as zero packets.
         Does not touch the sealed-bag snapshot.
@@ -1505,6 +2445,17 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateLooseStockRequest'
+            examples:
+              Whole-dayLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '0.500'
+                    packets: 0
+                summary: Whole-day loose count
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/UpdateLooseStockRequest'
@@ -1524,7 +2475,7 @@ paths:
                   $ref: '#/components/schemas/LooseStockPayload'
           description: ''
     patch:
-      operationId: api_sales_admin_update_loose_stock_partial_update
+      operationId: api_sales_admin_update_sample_packet_stock_partial_update
       description: Only the pairs named in ``counts`` are written; every other loose
         row is left as it is.
       summary: Partially update the loose-stock count
@@ -1535,6 +2486,14 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+            examples:
+              PartialLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                summary: Partial loose count
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
@@ -1552,26 +2511,32 @@ paths:
                 items:
                   $ref: '#/components/schemas/LooseStockPayload'
           description: ''
-  /api/sales-admin/update-todays-inventory:
+  /api/sales-admin/upload-lr-number/{public_id}:
     post:
-      operationId: api_sales_admin_update_todays_inventory_create
-      description: Every active packaging receives a snapshot row for today. Packagings
-        absent from ``counts`` are recorded as zero bags. Loose stock is counted separately
-        and is not affected.
-      summary: Replace today's entire stock count
+      operationId: api_sales_admin_upload_lr_number_create
+      description: Record the transporter's LR against a dispatched order (app admin
+        only).
+      summary: Record the LR number of an agency dispatch
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
       tags:
       - api
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+              $ref: '#/components/schemas/UploadLRNumberRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+              $ref: '#/components/schemas/UploadLRNumberRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+              $ref: '#/components/schemas/UploadLRNumberRequest'
         required: true
       security:
       - sessionAuth: []
@@ -1580,38 +2545,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SnapshotPayload'
-          description: ''
-    patch:
-      operationId: api_sales_admin_update_todays_inventory_partial_update
-      description: Only the packagings named in ``counts`` are written; the rest of
-        today's rows are left as they are.
-      summary: Partially update today's stock count
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SnapshotPayload'
+                $ref: '#/components/schemas/OrderDetailPayload'
           description: ''
   /api/sales-admin/verify-client/:
     post:
@@ -2067,6 +3001,41 @@ components:
       required:
       - product_packaging_public_id
       - quantity
+    BagStockLine:
+      type: object
+      description: Output shape for one packaging's bag position.
+      properties:
+        packaging:
+          $ref: '#/components/schemas/PackagingRef'
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        consumed:
+          type: integer
+        available:
+          type: integer
+      required:
+      - available
+      - consumed
+      - on_hand
+      - packaging
+      - reserved
+    BagStockPosition:
+      type: object
+      description: Output shape for the whole bag position.
+      properties:
+        snapshot_date:
+          type: string
+          format: date
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/BagStockLine'
+      required:
+      - lines
+      - snapshot_date
     CatalogueItem:
       type: object
       description: Output shape for one catalogue row -- a bag (schema only).
@@ -2172,32 +3141,156 @@ components:
       - code
       - name
       - sequence
+    ChallanAddress:
+      type: object
+      description: Output shape for the consignee's address, as snapshotted at dispatch.
+      properties:
+        line_1:
+          type: string
+        line_2:
+          type: string
+        pincode:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        city_id:
+          type: integer
+        state_id:
+          type: integer
+        country_id:
+          type: integer
+      required:
+      - city
+      - city_id
+      - country
+      - country_id
+      - line_1
+      - line_2
+      - pincode
+      - state
+      - state_id
+    ChallanDispatch:
+      type: object
+      description: Output shape for the journey block (schema only).
+      properties:
+        public_id:
+          type: string
+        lr_number:
+          type: string
+        dispatch_date:
+          type: string
+          format: date
+        is_private:
+          type: boolean
+        vehicle_number:
+          type: string
+        driver_name:
+          type: string
+        driver_number:
+          type: string
+        from_city:
+          type: string
+        to_city:
+          type: string
+      required:
+      - dispatch_date
+      - driver_name
+      - driver_number
+      - from_city
+      - is_private
+      - lr_number
+      - public_id
+      - to_city
+      - vehicle_number
+    ChallanLine:
+      type: object
+      description: 'Output shape for one challan line: a bag, its lot and its money.'
+      properties:
+        public_id:
+          type: string
+          description: The packaging's public id.
+        product:
+          $ref: '#/components/schemas/ProductRef'
+        packet_weight:
+          type: string
+        packets:
+          type: integer
+        total_weight:
+          type: string
+        selling_price:
+          type: string
+        lot_number:
+          type: string
+        quantity:
+          type: integer
+        negotiated_selling_price:
+          type: string
+        line_total:
+          type: string
+      required:
+      - line_total
+      - lot_number
+      - negotiated_selling_price
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - quantity
+      - selling_price
+      - total_weight
+    ChallanParty:
+      type: object
+      description: Output shape for our own consignor block (schema only).
+      properties:
+        company_name:
+          type: string
+        company_address:
+          type: string
+        gst_number:
+          type: string
+        state_name:
+          type: string
+      required:
+      - company_address
+      - company_name
+      - gst_number
+      - state_name
+    ChallanReceiver:
+      type: object
+      description: Output shape for the consignee block (schema only).
+      properties:
+        company_name:
+          type: string
+        gst_number:
+          type: string
+        address:
+          $ref: '#/components/schemas/ChallanAddress'
+        contact_person_name:
+          type: string
+        contact_person_number:
+          type: string
+      required:
+      - address
+      - company_name
+      - contact_person_name
+      - contact_person_number
+      - gst_number
     CheckTodaysInventoryPayload:
       type: object
       description: Output shape for the readiness report.
       properties:
         is_complete:
           type: boolean
-        snapshot_date:
-          type: string
-          format: date
-        loose_snapshot_date:
-          type: string
-          format: date
-          nullable: true
-        missing_packagings:
-          type: array
-          items:
-            $ref: '#/components/schemas/MissingPackaging'
         stock_admins:
           type: array
           items:
             $ref: '#/components/schemas/StockAdmin'
       required:
       - is_complete
-      - loose_snapshot_date
-      - missing_packagings
-      - snapshot_date
       - stock_admins
     City:
       type: object
@@ -2640,6 +3733,53 @@ components:
           maxLength: 255
       required:
       - name
+    CreateInwardOtherMaterialRequest:
+      type: object
+      description: |-
+        Request validation for booking a new other-material lot.
+
+        ``effective_date`` is absent on purpose: booking stamps it with today
+        (see ``InwardOtherMaterialsView.post``).
+      properties:
+        party:
+          type: integer
+        recipe:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Amount received, in the recipe's material unit.
+      required:
+      - party
+      - quantity
+      - recipe
+    CreateInwardRawMaterialRequest:
+      type: object
+      description: |-
+        Request validation for booking a new raw-material lot.
+
+        ``status`` is not accepted: every lot starts ``lab_testing`` and is moved to
+        ``in_use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
+        that flip and is deliberately absent here.
+      properties:
+        product:
+          type: integer
+        party:
+          type: integer
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms received from the party.
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - party
+      - product
+      - quantity_kg
     CreateMultiSelectBagOrderRequest:
       type: object
       description: |-
@@ -2678,6 +3818,32 @@ components:
       - client_address_id
       - client_public_id
       - items
+    CreateOtherMaterialTypeRequest:
+      type: object
+      description: Request validation for creating a new ``OtherMaterialType``.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        unit_type:
+          $ref: '#/components/schemas/UnitTypeEnum'
+      required:
+      - name
+      - unit_type
+    CreatePartyRequest:
+      type: object
+      description: Request validation for creating a new ``Party``.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        city:
+          type: integer
+      required:
+      - city
+      - name
     CreateProductPackagingRequest:
       type: object
       description: |-
@@ -2742,6 +3908,30 @@ components:
       - name
       - selling_price
       - stage
+    CreateRecipeRequest:
+      type: object
+      description: Request validation for creating a new ``OtherMaterialRecipe``.
+      properties:
+        product:
+          type: integer
+        material_type:
+          type: integer
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+          description: Weight of the covered packet, in kilograms (the product variant).
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Multiples of the material per pack, in the material type's
+            unit (2 leaflets, 2.000 kg cover, 5 litre).
+      required:
+      - material_type
+      - packet_weight
+      - product
+      - quantity
     CreateSalesPersonRequest:
       type: object
       description: Request validation for creating a new ``SalesPerson`` (city only).
@@ -2789,6 +3979,93 @@ components:
       required:
       - id
       - name
+    DispatchChallanItem:
+      type: object
+      description: Output shape for one challan (schema only).
+      properties:
+        order_public_id:
+          type: string
+        our_details:
+          $ref: '#/components/schemas/ChallanParty'
+        receiver_details:
+          $ref: '#/components/schemas/ChallanReceiver'
+        hsn_code:
+          type: string
+        financial_year:
+          type: string
+          description: Indian FY, e.g. "2026-2027".
+        dispatch:
+          $ref: '#/components/schemas/ChallanDispatch'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChallanLine'
+        item_count:
+          type: integer
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+      required:
+      - dispatch
+      - financial_year
+      - hsn_code
+      - item_count
+      - items
+      - order_public_id
+      - our_details
+      - receiver_details
+      - total_amount
+      - total_packets
+    DispatchChallanPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DispatchChallanItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    DispatchItemLotRequest:
+      type: object
+      description: The lot number for one line of the order being dispatched.
+      properties:
+        product_packaging_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        lot_number:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+      - lot_number
+      - product_packaging_public_id
     DispatchModeEnum:
       enum:
       - AGENCY
@@ -2802,34 +4079,554 @@ components:
       description: |-
         Request validation for recording a dispatch.
 
-        The kind of dispatch is read off the order in ``context["order"]`` -- it is
-        whether that order has a ``transport_agency`` -- so this serializer only
-        checks that the body matches the kind, never decides it.
+        Every field is required. There is no per-kind branching: an agency dispatch
+        and an own-vehicle one carry exactly the same details, and which table they
+        land in is the order's business, not the request's.
       properties:
-        dispatch_date:
-          type: string
-          format: date
         from_city_id:
           type: integer
-        to_city_id:
-          type: integer
-        lr_number:
-          type: string
-          description: 'Agency dispatches only, and optional even then: leave it out
-            while the transporter''s consignment note is still pending.'
-          maxLength: 64
-        vehicle_number:
+          description: Where the goods left from. An input until a warehouse can default
+            it.
+        driver_name:
           type: string
           minLength: 1
-          maxLength: 32
+          maxLength: 255
         driver_number:
           type: string
           minLength: 1
           maxLength: 10
+        vehicle_number:
+          type: string
+          minLength: 1
+          maxLength: 32
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DispatchItemLotRequest'
+          description: One lot number per line of the order; every line must appear.
       required:
-      - dispatch_date
+      - driver_name
+      - driver_number
       - from_city_id
-      - to_city_id
+      - items
+      - vehicle_number
+    ExecuteCodeRequestRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+      required:
+      - code
+    ExecuteCodeResponse:
+      type: object
+      description: Output shape of a run (schema only).
+      properties:
+        success:
+          type: boolean
+        stdout:
+          type: string
+        result:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        duration_ms:
+          type: integer
+      required:
+      - duration_ms
+      - error
+      - result
+      - stdout
+      - success
+    ExportBagSnapshot:
+      type: object
+      description: |-
+        ``InventoryOperations.snapshot_count_payload``: counted figures only,
+        plus the ``kind`` discriminator.
+      properties:
+        kind:
+          $ref: '#/components/schemas/ExportBagSnapshotKindEnum'
+        public_id:
+          type: string
+        snapshot_date:
+          type: string
+          format: date
+        packaging:
+          $ref: '#/components/schemas/PackagingRef'
+        bags:
+          type: integer
+        total_packets:
+          type: integer
+        total_weight:
+          type: string
+          description: Kilograms.
+      required:
+      - bags
+      - kind
+      - packaging
+      - public_id
+      - snapshot_date
+      - total_packets
+      - total_weight
+    ExportBagSnapshotKindEnum:
+      enum:
+      - bag
+      type: string
+      description: '* `bag` - bag'
+    ExportCity:
+      type: object
+      description: '``ClientOperations.order_city_payload``: the order''s delivery
+        city.'
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    ExportClient:
+      type: object
+      description: '``ClientOperations.client_summary_payload``.'
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+        gst_number:
+          type: string
+      required:
+      - company_name
+      - gst_number
+      - public_id
+    ExportCustomOrder:
+      type: object
+      description: One row of ``export/custom-orders`` (``custom_order_export_payload``).
+      properties:
+        public_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        client:
+          $ref: '#/components/schemas/ExportClient'
+        city:
+          allOf:
+          - $ref: '#/components/schemas/ExportCity'
+          nullable: true
+          description: order -> delivery address -> city.
+        delivery_address:
+          type: string
+        status:
+          type: string
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportCustomOrderItem'
+      required:
+      - actual_delivery_date
+      - city
+      - client
+      - created_at
+      - delivery_address
+      - expected_delivery_date
+      - items
+      - public_id
+      - special_comments
+      - status
+      - total_amount
+      - total_packets
+      - verified_at
+    ExportCustomOrderItem:
+      type: object
+      description: One loose-packet line of a custom order.
+      properties:
+        product:
+          $ref: '#/components/schemas/ProductRef'
+        packet_weight:
+          type: string
+          description: Weight of one packet, in kg.
+        negotiated_selling_price:
+          type: string
+          description: Per packet.
+        packets:
+          type: integer
+        line_total:
+          type: string
+      required:
+      - line_total
+      - negotiated_selling_price
+      - packet_weight
+      - packets
+      - product
+    ExportCustomOrdersResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportCustomOrder'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
+    ExportDispatchReceipt:
+      type: object
+      description: 'One row of ``export/dispatch-receipts``: a full challan plus the
+        order''s own facts.'
+      properties:
+        order_public_id:
+          type: string
+        our_details:
+          $ref: '#/components/schemas/ChallanParty'
+        receiver_details:
+          $ref: '#/components/schemas/ChallanReceiver'
+        hsn_code:
+          type: string
+        financial_year:
+          type: string
+          description: Indian FY, e.g. "2026-2027".
+        dispatch:
+          $ref: '#/components/schemas/ChallanDispatch'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChallanLine'
+        item_count:
+          type: integer
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        order_created_at:
+          type: string
+          format: date-time
+        city:
+          allOf:
+          - $ref: '#/components/schemas/ExportCity'
+          nullable: true
+          description: order -> delivery address -> city.
+      required:
+      - city
+      - dispatch
+      - financial_year
+      - hsn_code
+      - item_count
+      - items
+      - order_created_at
+      - order_public_id
+      - our_details
+      - receiver_details
+      - total_amount
+      - total_packets
+    ExportDispatchReceiptsResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportDispatchReceipt'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
+    ExportInventorySnapshotRow:
+      oneOf:
+      - $ref: '#/components/schemas/ExportBagSnapshot'
+      - $ref: '#/components/schemas/ExportLooseSnapshot'
+    ExportInventorySnapshotsPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportInventorySnapshotRow'
+          readOnly: true
+      required:
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    ExportInwardDay:
+      type: object
+      description: 'One row of ``export/inward-entries``: every entry booked on one
+        IST day.'
+      properties:
+        date:
+          type: string
+          format: date
+        raw_materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportInwardRawMaterial'
+        other_materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportInwardOtherMaterial'
+      required:
+      - date
+      - other_materials
+      - raw_materials
+    ExportInwardEntriesResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportInwardDay'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
+    ExportInwardOtherMaterial:
+      type: object
+      description: Output shape for one inward-other-material lot.
+      properties:
+        public_id:
+          type: string
+        recipe:
+          $ref: '#/components/schemas/InwardOtherMaterialRecipeRef'
+        party:
+          $ref: '#/components/schemas/InwardOtherMaterialPartyRef'
+        quantity:
+          type: string
+          description: Amount received, in the recipe's unit.
+        effective_date:
+          type: string
+          format: date
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - effective_date
+      - party
+      - public_id
+      - quantity
+      - recipe
+    ExportInwardRawMaterial:
+      type: object
+      description: Output shape for one raw-material lot.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/InwardRawMaterialProductRef'
+        party:
+          $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        quantity_kg:
+          type: string
+          description: Kilograms received.
+        status:
+          type: string
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+        effective_date:
+          type: string
+          format: date
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - effective_date
+      - lab_sampling_date
+      - party
+      - product
+      - public_id
+      - quantity_kg
+      - status
+    ExportLooseSnapshot:
+      type: object
+      description: |-
+        ``InventoryOperations.loose_stock_count_payload``: counted figures only,
+        plus the ``kind`` discriminator.
+      properties:
+        kind:
+          $ref: '#/components/schemas/ExportLooseSnapshotKindEnum'
+        public_id:
+          type: string
+        snapshot_date:
+          type: string
+          format: date
+        product:
+          $ref: '#/components/schemas/ProductRef'
+        packet_weight:
+          type: string
+          description: Weight of one packet, in kg.
+        packets:
+          type: integer
+        total_weight:
+          type: string
+          description: Kilograms.
+      required:
+      - kind
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - snapshot_date
+      - total_weight
+    ExportLooseSnapshotKindEnum:
+      enum:
+      - loose
+      type: string
+      description: '* `loose` - loose'
+    ExportOrder:
+      type: object
+      description: One row of ``export/orders`` (``OrderOperations.order_export_payload``).
+      properties:
+        public_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        client:
+          $ref: '#/components/schemas/ExportClient'
+        city:
+          allOf:
+          - $ref: '#/components/schemas/ExportCity'
+          nullable: true
+          description: order -> delivery address -> city.
+        delivery_address:
+          type: string
+        status:
+          type: string
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+        transport_agency:
+          allOf:
+          - $ref: '#/components/schemas/TransportAgencyRef'
+          nullable: true
+        dispatch_mode:
+          $ref: '#/components/schemas/DispatchModeEnum'
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemPayload'
+      required:
+      - actual_delivery_date
+      - city
+      - client
+      - created_at
+      - delivery_address
+      - dispatch_mode
+      - expected_delivery_date
+      - items
+      - public_id
+      - special_comments
+      - status
+      - total_amount
+      - total_packets
+      - transport_agency
+      - verified_at
+    ExportOrdersResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportOrder'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
     FilterCatalogueEntry:
       type: object
       description: Schema for one ``available_filters`` entry.
@@ -2873,6 +4670,187 @@ components:
       required:
       - label
       - value
+    InwardOtherMaterialListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InwardOtherMaterialPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    InwardOtherMaterialPartyRef:
+      type: object
+      description: Output shape for the ``party`` reference on a lot.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    InwardOtherMaterialPayload:
+      type: object
+      description: Output shape for one inward-other-material lot.
+      properties:
+        public_id:
+          type: string
+        recipe:
+          $ref: '#/components/schemas/InwardOtherMaterialRecipeRef'
+        party:
+          $ref: '#/components/schemas/InwardOtherMaterialPartyRef'
+        quantity:
+          type: string
+          description: Amount received, in the recipe's unit.
+        effective_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - effective_date
+      - party
+      - public_id
+      - quantity
+      - recipe
+    InwardOtherMaterialProductRef:
+      type: object
+      description: Output shape for the ``product`` reference inside a recipe ref.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
+    InwardOtherMaterialRecipeRef:
+      type: object
+      description: Output shape for the ``recipe`` reference on a lot.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/InwardOtherMaterialProductRef'
+        packet_weight:
+          type: string
+          description: Weight of the covered packet, in kg.
+      required:
+      - packet_weight
+      - product
+      - public_id
+    InwardRawMaterialListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InwardRawMaterialPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    InwardRawMaterialPartyRef:
+      type: object
+      description: Output shape for the ``party`` reference on a lot.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    InwardRawMaterialPayload:
+      type: object
+      description: Output shape for one raw-material lot.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/InwardRawMaterialProductRef'
+        party:
+          $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        quantity_kg:
+          type: string
+          description: Kilograms received.
+        status:
+          type: string
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+        effective_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - effective_date
+      - lab_sampling_date
+      - party
+      - product
+      - public_id
+      - quantity_kg
+      - status
+    InwardRawMaterialProductRef:
+      type: object
+      description: Output shape for the ``product`` reference on a lot.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
     LoginRequest:
       type: object
       properties:
@@ -3024,19 +5002,6 @@ components:
       required:
       - name
       - public_id
-    MissingPackaging:
-      type: object
-      description: Output shape for one packaging that has not been counted today.
-      properties:
-        public_id:
-          type: string
-        product:
-          type: object
-          additionalProperties:
-            type: string
-      required:
-      - product
-      - public_id
     OrderCardPackaging:
       type: object
       description: |-
@@ -3058,10 +5023,14 @@ components:
         selling_price:
           type: string
           description: The bag's own list price, not what this order was charged.
+        negotiated_selling_price:
+          type: string
+          description: The per-bag rate this order was actually charged for the line.
         quantity:
           type: integer
           description: Bags of this kind on the order.
       required:
+      - negotiated_selling_price
       - packet_weight
       - packets
       - product
@@ -3361,6 +5330,62 @@ components:
       - total_packets
       - transport_agency
       - verified_at
+    OtherMaterialStock:
+      type: object
+      description: Output shape for the whole other-material position.
+      properties:
+        as_of:
+          type: string
+          format: date
+          description: The day the numbers are as of.
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/OtherMaterialStockLine'
+      required:
+      - as_of
+      - lines
+    OtherMaterialStockLine:
+      type: object
+      description: Output shape for one material type's on-hand position.
+      properties:
+        material_type:
+          $ref: '#/components/schemas/OtherMaterialTypeRef'
+        on_hand:
+          type: string
+          description: Sum of units with a reached effective date.
+      required:
+      - material_type
+      - on_hand
+    OtherMaterialTypePayload:
+      type: object
+      description: Output shape for one material-type row.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+      required:
+      - id
+      - name
+      - unit_type
+    OtherMaterialTypeRef:
+      type: object
+      description: Output shape for the ``material_type`` reference on a line.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+          description: Count / kg / litre -- the unit of on_hand.
+      required:
+      - id
+      - name
+      - unit_type
     PackagingPayload:
       type: object
       description: Output shape for one bag (``ProductOperations.packaging_payload``).
@@ -3368,9 +5393,9 @@ components:
         public_id:
           type: string
         product:
-          type: object
-          additionalProperties: {}
-          description: 'The bag''s product: {public_id, name}.'
+          allOf:
+          - $ref: '#/components/schemas/ProductRef'
+          description: The bag's product.
         packet_weight:
           type: string
         packets:
@@ -3417,6 +5442,65 @@ components:
       - packets
       - product
       - public_id
+    PartyCityRef:
+      type: object
+      description: Output shape for the ``city`` reference on a party.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    PartyListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PartyPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    PartyPayload:
+      type: object
+      description: Output shape for one party row.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        city:
+          $ref: '#/components/schemas/PartyCityRef'
+      required:
+      - city
+      - id
+      - name
     PatchedUpdateAdminRequest:
       type: object
       description: |-
@@ -3450,6 +5534,22 @@ components:
           type: string
           minLength: 1
           maxLength: 255
+    PatchedUpdateInwardRawMaterialRequest:
+      type: object
+      description: |-
+        Request validation for updating a raw-material lot (all fields optional).
+
+        Only ``lab_sampling_date`` and ``status`` are accepted: flipping to
+        ``in_use`` stamps the effective date with today, reverting to
+        ``lab_testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
+        are immutable. Any unknown key is ignored.
+      properties:
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          $ref: '#/components/schemas/UpdateInwardRawMaterialStatusEnum'
     PatchedUpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'
@@ -3488,11 +5588,32 @@ components:
           description: A remark to add to the order. Appended as a new line -- it
             never replaces what is already there.
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/UpdateOrderStatusEnum'
         items:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemWriteRequest'
+    PatchedUpdateOtherMaterialTypeRequest:
+      type: object
+      description: Request validation for updating an ``OtherMaterialType`` (all fields
+        optional).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        unit_type:
+          $ref: '#/components/schemas/UnitTypeEnum'
+    PatchedUpdatePartyRequest:
+      type: object
+      description: Request validation for updating a ``Party`` (all fields optional).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        city:
+          type: integer
     PatchedUpdateProductPackagingRequest:
       type: object
       description: Request validation for updating a ``ProductPackaging`` (all fields
@@ -3574,15 +5695,19 @@ components:
           type: integer
     PatchedUpdateTodaysInventoryRequest:
       type: object
-      description: 'Request validation: a map of packaging ``public_id`` → today''s
-        bag count.'
+      description: |-
+        Request validation: a map of packaging ``public_id`` → today's bag count.
+
+        Bags only -- loose packets are never accepted here; they are recorded at
+        ``/api/sales-admin/update-sample-packet-stock``.
       properties:
         counts:
           type: object
           additionalProperties:
             type: integer
             minimum: 0
-          description: Map of product-packaging public_id to its bag count.
+          description: Map of product-packaging public_id to its sealed-bag count;
+            loose packets are recorded at ``update-sample-packet-stock``, not here.
     ProductLooseStockPayload:
       type: object
       description: Output shape for a product's loose position, one line per packet
@@ -3690,7 +5815,7 @@ components:
       - stage
     ProductRef:
       type: object
-      description: Output shape for the ``product`` reference on a packaging.
+      description: Output shape for a ``{public_id, name}`` product reference.
       properties:
         public_id:
           type: string
@@ -3699,6 +5824,46 @@ components:
       required:
       - name
       - public_id
+    RawMaterialStock:
+      type: object
+      description: Output shape for the whole incoming raw-material position.
+      properties:
+        as_of:
+          type: string
+          format: date
+          description: The day the numbers are as of.
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/RawMaterialStockLine'
+      required:
+      - as_of
+      - lines
+    RawMaterialStockLine:
+      type: object
+      description: Output shape for one product's incoming position.
+      properties:
+        product:
+          type: string
+          description: Product public id.
+        name:
+          type: string
+          description: Product name.
+        incoming_kg:
+          type: string
+          description: Sum of in-use KG with a reached effective date.
+        packed_kg:
+          type: string
+          description: KG already packed into bags or sample packets.
+        available_kg:
+          type: string
+          description: 'KG left to pack: incoming_kg minus packed_kg.'
+      required:
+      - available_kg
+      - incoming_kg
+      - name
+      - packed_kg
+      - product
     ReauthenticateResponse:
       type: object
       description: |-
@@ -3734,6 +5899,87 @@ components:
       - name
       - phone_number
       - role
+    RecipeListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipePayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    RecipeMaterialTypeRef:
+      type: object
+      description: Output shape for the ``material_type`` reference on a recipe.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+      required:
+      - id
+      - name
+      - unit_type
+    RecipePayload:
+      type: object
+      description: Output shape for one recipe row.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/RecipeProductRef'
+        material_type:
+          $ref: '#/components/schemas/RecipeMaterialTypeRef'
+        packet_weight:
+          type: string
+          description: Weight of the covered packet, in kg.
+        quantity:
+          type: string
+          description: Amount per pack, in the material type's unit.
+      required:
+      - material_type
+      - packet_weight
+      - product
+      - public_id
+      - quantity
+    RecipeProductRef:
+      type: object
+      description: Output shape for the ``product`` reference on a recipe.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
     SalesPersonPayload:
       type: object
       description: Swagger schema for one sales person row (city only).
@@ -3845,24 +6091,6 @@ components:
       - cities
       - id
       - name
-    StatusEnum:
-      enum:
-      - BOOKED
-      - UNDER_REVIEW
-      - CONFIRMED
-      - DISPATCHED
-      - DELIVERED
-      - ON_HOLD
-      - REJECTED
-      type: string
-      description: |-
-        * `BOOKED` - BOOKED
-        * `UNDER_REVIEW` - UNDER_REVIEW
-        * `CONFIRMED` - CONFIRMED
-        * `DISPATCHED` - DISPATCHED
-        * `DELIVERED` - DELIVERED
-        * `ON_HOLD` - ON_HOLD
-        * `REJECTED` - REJECTED
     StockAdmin:
       type: object
       description: Output shape for one admin authorised to record the daily count.
@@ -3924,6 +6152,16 @@ components:
       required:
       - id
       - name
+    UnitTypeEnum:
+      enum:
+      - count
+      - kg
+      - litre
+      type: string
+      description: |-
+        * `count` - count
+        * `kg` - kg
+        * `litre` - litre
     UpdateClientRequest:
       type: object
       description: Request validation for a sales person's client update.
@@ -3949,6 +6187,14 @@ components:
       - contacts
       - public_id
       - transport_agencies
+    UpdateInwardRawMaterialStatusEnum:
+      enum:
+      - lab_testing
+      - in_use
+      type: string
+      description: |-
+        * `lab_testing` - lab testing
+        * `in_use` - in use
     UpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'
@@ -3960,19 +6206,52 @@ components:
           description: Loose lines, one per (product, packet_weight) pair.
       required:
       - counts
+    UpdateOrderStatusEnum:
+      enum:
+      - BOOKED
+      - UNDER_REVIEW
+      - CONFIRMED
+      - DISPATCHED
+      - DELIVERED
+      - ON_HOLD
+      - REJECTED
+      type: string
+      description: |-
+        * `BOOKED` - BOOKED
+        * `UNDER_REVIEW` - UNDER_REVIEW
+        * `CONFIRMED` - CONFIRMED
+        * `DISPATCHED` - DISPATCHED
+        * `DELIVERED` - DELIVERED
+        * `ON_HOLD` - ON_HOLD
+        * `REJECTED` - REJECTED
     UpdateTodaysInventoryRequest:
       type: object
-      description: 'Request validation: a map of packaging ``public_id`` → today''s
-        bag count.'
+      description: |-
+        Request validation: a map of packaging ``public_id`` → today's bag count.
+
+        Bags only -- loose packets are never accepted here; they are recorded at
+        ``/api/sales-admin/update-sample-packet-stock``.
       properties:
         counts:
           type: object
           additionalProperties:
             type: integer
             minimum: 0
-          description: Map of product-packaging public_id to its bag count.
+          description: Map of product-packaging public_id to its sealed-bag count;
+            loose packets are recorded at ``update-sample-packet-stock``, not here.
       required:
       - counts
+    UploadLRNumberRequest:
+      type: object
+      description: Request validation for recording an LR number.
+      properties:
+        lr_number:
+          type: string
+          minLength: 1
+          description: The transporter's consignment note number.
+          maxLength: 64
+      required:
+      - lr_number
     UserRef:
       type: object
       description: Swagger schema for a compact ``{id, name}`` user reference.

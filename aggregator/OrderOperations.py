@@ -14,7 +14,7 @@ from django.db import transaction
 
 from common.models import indian_now
 
-from .ClientOperations import client_payload
+from .ClientOperations import client_payload, client_summary_payload, order_city_payload
 from .models import (
     Address,
     City,
@@ -117,12 +117,18 @@ def attach_dispatch_details(
     dispatch_date,
     from_city: City,
     to_city: City,
+    driver_name: str,
+    driver_number: str,
+    vehicle_number: str,
     lr_number: str = "",
 ) -> DispatchDetails:
     """Record a third-party dispatch and link it to the order (clears private).
 
-    ``lr_number`` is optional: the transporter often issues the consignment note
-    after collection, so a dispatch may be recorded while it is still pending.
+    The driver and the vehicle are required even though a transporter is
+    carrying the goods: they are what a delivery query is chased with.
+
+    ``lr_number`` is the exception -- the carrier usually issues the consignment
+    note after collection, so a dispatch is recorded while it is still pending.
     """
     dispatch = DispatchDetails(
         client=order.client,
@@ -130,6 +136,9 @@ def attach_dispatch_details(
         dispatch_date=dispatch_date,
         from_city=from_city,
         to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
         lr_number=lr_number,
     )
     dispatch.full_clean()
@@ -150,8 +159,9 @@ def attach_private_dispatch_details(
     dispatch_date,
     from_city: City,
     to_city: City,
-    vehicle_number: str,
+    driver_name: str,
     driver_number: str,
+    vehicle_number: str,
 ) -> PrivateDispatchDetails:
     """Record an own-vehicle dispatch and link it to the order (clears third-party)."""
     dispatch = PrivateDispatchDetails(
@@ -160,8 +170,9 @@ def attach_private_dispatch_details(
         dispatch_date=dispatch_date,
         from_city=from_city,
         to_city=to_city,
-        vehicle_number=vehicle_number,
+        driver_name=driver_name,
         driver_number=driver_number,
+        vehicle_number=vehicle_number,
     )
     dispatch.full_clean()
     dispatch.save()
@@ -247,12 +258,11 @@ def dispatch_order(
     order: Order,
     *,
     actor: User,
-    dispatch_date,
     from_city: City,
-    to_city: City,
-    lr_number: str = "",
-    vehicle_number: str = "",
-    driver_number: str = "",
+    driver_name: str,
+    driver_number: str,
+    vehicle_number: str,
+    lot_numbers: dict[str, str],
 ) -> Order:
     """Record a dispatch against a verified order and move it to DISPATCHED.
 
@@ -261,41 +271,72 @@ def dispatch_order(
     were there.
 
     **Which kind of dispatch this is comes from the order, not from the
-    arguments**: an order carrying a ``transport_agency`` goes by that carrier,
-    and one without it goes on our own vehicle. That is the same rule
+    arguments**: an order carrying a ``transport_agency`` goes by that carrier
+    and the details land on ``DispatchDetails``; one without goes on our own
+    vehicle and they land on ``PrivateDispatchDetails``. That is the same rule
     ``dispatch_mode`` reports on every order payload, so what was planned at
-    booking time is what gets recorded.
+    booking time is what gets recorded. Both kinds take the same details -- who
+    drove, on what number, in which vehicle -- so the caller supplies one shape
+    either way.
 
-    An agency dispatch therefore takes ``lr_number`` -- optionally, since the
-    consignment note is often issued after collection and is filled in later --
-    and a private one takes ``vehicle_number`` + ``driver_number``.
+    Two things are **derived, not passed**: the dispatch date is today (the
+    dispatch is being recorded as it happens), and the destination is the city
+    of the order's own delivery address, which is where the goods are going by
+    definition. ``from_city`` stays an argument until there is a warehouse to
+    default it from.
+
+    The ``lr_number`` is not set here. It is the one field a transporter issues
+    after collection, so a dispatch is always recorded without it -- it is
+    recorded later by ``DispatchOperations.set_lr_number``. Re-dispatching
+    therefore drops the previous LR with the previous ``DispatchDetails`` row:
+    that note described the previous journey.
+
+    ``lot_numbers`` maps each line's ``ProductPackaging.public_id`` to the batch
+    those bags came from, and must name every line exactly once. It is what the
+    challan is written from: the dispatch itself is one journey, but the goods
+    on it are traced batch by batch.
 
     The details are attached *before* the status moves: ``Order.clean`` rejects
     a DISPATCHED order that carries no dispatch record, so the other order would
     fail validation. No stock is written -- CONFIRMED to DISPATCHED moves the
     bags from reserved to consumed on its own.
     """
+    from .DispatchOperations import sync_dispatch_entry, validated_lot_numbers
+
     assert_order_status(order, DISPATCHABLE_STATUS_CODES, "dispatch")
 
-    if order.transport_agency_id:
-        attach_dispatch_details(
-            order,
-            dispatched_by=actor,
-            dispatch_date=dispatch_date,
-            from_city=from_city,
-            to_city=to_city,
-            lr_number=lr_number,
-        )
-    else:
-        attach_private_dispatch_details(
-            order,
-            dispatched_by=actor,
-            dispatch_date=dispatch_date,
-            from_city=from_city,
-            to_city=to_city,
-            vehicle_number=vehicle_number,
-            driver_number=driver_number,
-        )
+    # Validated before anything is written, so a bad lot number costs nothing.
+    validated_lot_numbers(order, lot_numbers)
+
+    dispatched_at = indian_now()
+    to_city = order.delivery_address.city
+
+    attach = (
+        attach_dispatch_details
+        if order.transport_agency_id
+        else attach_private_dispatch_details
+    )
+    attach(
+        order,
+        dispatched_by=actor,
+        dispatch_date=dispatched_at.date(),
+        from_city=from_city,
+        to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
+    )
+    sync_dispatch_entry(
+        order,
+        actor=actor,
+        dispatched_at=dispatched_at,
+        from_city=from_city,
+        to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
+        lot_numbers=lot_numbers,
+    )
     return update_order_status(order, StatusIds.DISPATCHED)
 
 
@@ -440,6 +481,21 @@ def order_payload(order: Order) -> dict:
                 "product_packaging__product"
             ).all()
         ],
+    }
+
+
+def order_export_payload(order: Order) -> dict:
+    """:func:`order_payload` for the date-range export.
+
+    Adds when the order was booked, the client's public id, and the city the
+    order goes to (its own delivery address's city). Business fields only --
+    no audit columns.
+    """
+    return {
+        **order_payload(order),
+        "created_at": order.created_at.isoformat(),
+        "client": client_summary_payload(order.client),
+        "city": order_city_payload(order),
     }
 
 

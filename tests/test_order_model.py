@@ -43,7 +43,7 @@ from aggregator.OrderOperations import (
 )
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, SalesPerson, User
-from tests.common import DMLTestCase
+from tests.common import DMLTestCase, book_raw_material_for_every_product
 
 
 class OrderModelTest(DMLTestCase):
@@ -93,6 +93,9 @@ class OrderModelTest(DMLTestCase):
             cls.product, packet_weight=Decimal("25.000"), packets=4,
             actor=cls.sp_user,
         )
+        # _count_stock counts every packaging, including the dml.sql seed
+        # rows, and every count is now checked against raw material.
+        book_raw_material_for_every_product(actor=cls.su)
 
     def _items(self, price="140.00", quantity=3):
         return [
@@ -150,6 +153,8 @@ class OrderModelTest(DMLTestCase):
             client=self.client_obj, dispatched_by=self.adm_user,
             dispatch_date=datetime.date.today(),
             from_city=self.city, to_city=self.city2, lr_number="LR1",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
         )
         pd = PrivateDispatchDetails.objects.create(
             client=self.client_obj, dispatched_by=self.adm_user,
@@ -175,6 +180,8 @@ class OrderModelTest(DMLTestCase):
         attach_dispatch_details(
             order, dispatched_by=self.adm_user, dispatch_date=datetime.date.today(),
             from_city=self.city, to_city=self.city2, lr_number="LR100",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
         )
         update_order_status(order, StatusIds.DISPATCHED)
         assert order.status.code == "DISPATCHED"
@@ -187,6 +194,8 @@ class OrderModelTest(DMLTestCase):
             attach_dispatch_details(
                 order, dispatched_by=self.plain_user, dispatch_date=datetime.date.today(),
                 from_city=self.city, to_city=self.city2, lr_number="LRX",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
             )
 
     def test_order_payload_has_no_pk(self):

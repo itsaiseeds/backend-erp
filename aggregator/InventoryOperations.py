@@ -2,8 +2,9 @@
 
 The stock model is a **daily physical count**, not a running ledger. An admin
 holding ``can_update_stock_count`` uploads what is on the floor; that count is
-the day's opening balance. Only the latest ``snapshot_date`` is retained --
-recording a count for a newer date hard-deletes every earlier row.
+the day's opening balance. Every day's count is kept as history; reads always
+pick **one** ``snapshot_date`` (today, an explicit date, or the latest counted
+date), so older days never leak into a computed figure.
 
 Stock lives in two pools that never mix, in two tables at two grains:
 
@@ -19,17 +20,25 @@ A packaged order may never be filled from loose stock, and a custom order may
 never break open a bag.
 
 The two pools run on **independent date lifecycles**. The bag count is
-compulsory (``is_stock_count_complete`` gates order verification) and is
-purged to its own latest date; the loose count is optional, written when it
-changes, excluded from that gate, and purged to *its* own latest date. A bag
-count for a new day must never delete a loose count that is still accurate.
+compulsory (``is_stock_count_complete`` gates order verification) and is read
+at its own latest date; the loose count is optional, written when it changes,
+excluded from that gate, and read at *its* own latest date.
 Because a loose count may be days old and still correct, loose figures are read
 at ``loose_date(...)`` -- the latest loose snapshot date -- rather than today.
 
 Reserved and consumed quantities are **derived from ``Order.status``**, never
 stored. That makes verification and dispatch inherently reversible (flip the
 status back and the numbers correct themselves) and means outstanding
-reservations survive the daily purge, which a stored counter would not.
+reservations carry across days, which a stored counter would not.
+
+**Counts are backed by raw material.** Bags and loose packets are packed out
+of a product's inward raw kilograms (``InwardRawMaterial`` lots that are
+``in_use`` with a reached ``effective_date``). Writing a count is how packing
+is recorded, so every count write is checked against that raw pool and rolls
+back when it would overdraw it. The packed kilograms are derived, never
+stored: whatever the latest count holds plus whatever was dispatched *before*
+that count (it left the floor but still used raw material). Lowering a count
+therefore releases its kilograms back to raw automatically.
 
 Snapshots are exposed to the frontend by their ``public_id`` (``INV-…``);
 payloads never include the internal primary key.
@@ -51,6 +60,8 @@ from common.models import indian_now
 from .models import (
     CustomOrderItem,
     InventorySnapshot,
+    InwardRawMaterial,
+    InwardRawMaterialStatus,
     LooseStockSnapshot,
     Order,
     OrderItem,
@@ -95,20 +106,6 @@ def _assert_can_update_stock_count(actor: User | None) -> None:
 # -- Writing the count --------------------------------------------------------
 
 
-def _purge_older_than(snapshot_date: date) -> int:
-    """Hard-delete every snapshot row for a date before ``snapshot_date``.
-
-    Only the latest date is ever retained. This is a real SQL DELETE:
-    ``SoftDeletedModel`` overrides the *instance* ``delete()`` only, so a
-    queryset delete bypasses the soft-delete flags entirely. ``all_objects`` is
-    used so already soft-deleted stragglers are removed too.
-    """
-    deleted, _ = InventorySnapshot.all_objects.filter(
-        snapshot_date__lt=snapshot_date
-    ).delete()
-    return deleted
-
-
 @transaction.atomic
 def record_stock_count(
     *,
@@ -117,14 +114,32 @@ def record_stock_count(
     actor: User,
     snapshot_date: date | None = None,
 ) -> InventorySnapshot:
-    """Record the count for a single packaging, then purge older days.
+    """Record the count for a single packaging on ``snapshot_date``.
 
     Re-recording the same ``(snapshot_date, product_packaging)`` overwrites the
-    earlier figures rather than adding a second row.
+    earlier figures rather than adding a second row. Rejected (and rolled back)
+    when the product's raw material cannot cover the bags.
     """
     _assert_can_update_stock_count(actor)
-    snapshot_date = snapshot_date or today()
+    _lock_products([product_packaging.product_id])
+    snapshot = _write_stock_count(
+        product_packaging=product_packaging,
+        bags=bags,
+        actor=actor,
+        snapshot_date=snapshot_date or today(),
+    )
+    _assert_raw_available([product_packaging.product_id])
+    return snapshot
 
+
+def _write_stock_count(
+    *,
+    product_packaging: ProductPackaging,
+    bags: int,
+    actor: User,
+    snapshot_date: date,
+) -> InventorySnapshot:
+    """Upsert one bag line. No permission or raw-material check -- callers do both."""
     snapshot = InventorySnapshot.all_objects.filter(
         snapshot_date=snapshot_date, product_packaging=product_packaging
     ).first()
@@ -140,8 +155,6 @@ def record_stock_count(
     snapshot.deleted_by = None
     snapshot.full_clean()
     snapshot.save()
-
-    _purge_older_than(snapshot_date)
     return snapshot
 
 
@@ -161,13 +174,20 @@ def record_stock_counts(
     Loose stock is *not* recorded here -- it is a separate, optional count; see
     ``record_loose_stocks``.
 
-    Every line is written and the older days are purged exactly once.
+    Every line is written; earlier days' counts are kept as history.
+
+    The raw-material check runs once, after every line is written, so one
+    upload may raise one packaging of a product and lower another: only the
+    net kilograms per product must fit its raw pool. Any shortfall rolls the
+    whole upload back.
     """
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
+    product_ids = {packaging.product_id for packaging in counts}
+    _lock_products(product_ids)
 
-    return [
-        record_stock_count(
+    snapshots = [
+        _write_stock_count(
             product_packaging=product_packaging,
             bags=bags,
             actor=actor,
@@ -175,6 +195,8 @@ def record_stock_counts(
         )
         for product_packaging, bags in counts.items()
     ]
+    _assert_raw_available(product_ids)
+    return snapshots
 
 
 # -- Reading the count --------------------------------------------------------
@@ -332,19 +354,6 @@ def product_loose_weights(product: Product):
     )
 
 
-def _purge_loose_older_than(snapshot_date: date) -> int:
-    """Hard-delete every loose row for a date before ``snapshot_date``.
-
-    Scoped to ``LooseStockSnapshot`` alone: the bag purge and the loose purge
-    never touch each other's table, which is what lets the loose count be
-    optional and outlive any number of daily bag counts.
-    """
-    deleted, _ = LooseStockSnapshot.all_objects.filter(
-        snapshot_date__lt=snapshot_date
-    ).delete()
-    return deleted
-
-
 @transaction.atomic
 def record_loose_stock(
     *,
@@ -354,14 +363,34 @@ def record_loose_stock(
     actor: User,
     snapshot_date: date | None = None,
 ) -> LooseStockSnapshot:
-    """Record the loose count for one ``(product, packet_weight)``, then purge.
+    """Record the loose count for one ``(product, packet_weight)`` on ``snapshot_date``.
 
     Re-recording the same ``(snapshot_date, product, packet_weight)`` overwrites
-    the earlier figure rather than adding a second row.
+    the earlier figure rather than adding a second row. Rejected (and rolled
+    back) when the product's raw material cannot cover the packets.
     """
     _assert_can_update_stock_count(actor)
-    snapshot_date = snapshot_date or today()
+    _lock_products([product.id])
+    snapshot = _write_loose_stock(
+        product=product,
+        packet_weight=packet_weight,
+        packets=packets,
+        actor=actor,
+        snapshot_date=snapshot_date or today(),
+    )
+    _assert_raw_available([product.id])
+    return snapshot
 
+
+def _write_loose_stock(
+    *,
+    product: Product,
+    packet_weight,
+    packets: int,
+    actor: User,
+    snapshot_date: date,
+) -> LooseStockSnapshot:
+    """Upsert one loose line. No permission or raw-material check -- callers do both."""
     snapshot = LooseStockSnapshot.all_objects.filter(
         snapshot_date=snapshot_date, product=product, packet_weight=packet_weight
     ).first()
@@ -378,8 +407,6 @@ def record_loose_stock(
     snapshot.deleted_by = None
     snapshot.full_clean()
     snapshot.save()
-
-    _purge_loose_older_than(snapshot_date)
     return snapshot
 
 
@@ -397,13 +424,16 @@ def record_loose_stocks(
         record_loose_stocks(counts={(product, Decimal("1.000")): 12}, actor=admin)
 
     Unlike the bag count this is **optional** -- nothing requires it to be
-    written daily, or at all.
+    written daily, or at all. Like the bag count, the net kilograms per product
+    must fit its raw pool or the whole upload rolls back.
     """
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
+    product_ids = {product.id for product, _ in counts}
+    _lock_products(product_ids)
 
-    return [
-        record_loose_stock(
+    snapshots = [
+        _write_loose_stock(
             product=product,
             packet_weight=packet_weight,
             packets=packets,
@@ -412,6 +442,8 @@ def record_loose_stocks(
         )
         for (product, packet_weight), packets in counts.items()
     ]
+    _assert_raw_available(product_ids)
+    return snapshots
 
 
 def loose_lines(snapshot_date: date | None = None):
@@ -496,6 +528,154 @@ def available_loose_packets(
     )
 
 
+# -- Raw material backing ------------------------------------------------
+#
+# Bags and loose packets are packed out of a product's inward raw kilograms --
+# ``InwardRawMaterial`` lots that are ``in_use`` with a reached
+# ``effective_date`` (the same pool ``InwardOperations.raw_incoming_stock``
+# reports). Every count write below is checked against it: kilograms spent on
+# a bag or loose count can never exceed what has come in, and lowering a count
+# releases its kilograms straight back to raw. Nothing is stored -- the spent
+# figure is derived the same way ``consumed_bags``/``consumed_loose_packets``
+# derive dispatches, from the current count plus whatever left the floor
+# before that count was taken.
+
+
+def raw_inward_kg(product: Product, as_of: date | None = None) -> Decimal:
+    """In-use raw kilograms of ``product`` with a reached effective date.
+
+    The same filter as one product's line in
+    ``InwardOperations.raw_incoming_stock`` -- the pool a count's bags and
+    loose packets are packed from.
+    """
+    as_of = as_of or today()
+    total = InwardRawMaterial.objects.filter(
+        product=product,
+        effective_date__isnull=False,
+        effective_date__lte=as_of,
+        status=InwardRawMaterialStatus.IN_USE,
+    ).aggregate(total=Sum("quantity_kg"))["total"]
+    return total or Decimal("0")
+
+
+def _lock_products(product_ids) -> None:
+    """Lock ``product_ids``' in-use raw lots for the rest of this transaction.
+
+    Must run inside ``@transaction.atomic``, before a count is written, so two
+    concurrent uploads for the same product cannot both spend the same
+    kilograms past each other.
+    """
+    if not product_ids:
+        return
+    list(
+        InwardRawMaterial.objects.select_for_update().filter(
+            product_id__in=product_ids, status=InwardRawMaterialStatus.IN_USE
+        )
+    )
+
+
+def _bags_dispatched_before(
+    product_packaging: ProductPackaging, before: date | None
+) -> int:
+    """Bags of ``product_packaging`` dispatched strictly before ``before``.
+
+    Those bags already left the floor before the count ``before`` names, so
+    they carry no on-hand figure any more -- but they were packed from raw
+    material and must still count as spent. ``before=None`` (no bag count has
+    ever been taken) counts every dispatch ever made.
+    """
+    base = {"order__status_id__in": CONSUMING_STATUS_IDS}
+    if before is None:
+        return _bag_demand(product_packaging, base)
+    return _bag_demand(
+        product_packaging,
+        {**base, "order__dispatch_details__dispatch_date__lt": before},
+    ) + _bag_demand(
+        product_packaging,
+        {**base, "order__private_dispatch_details__dispatch_date__lt": before},
+    )
+
+
+def _loose_dispatched_before(
+    product: Product, packet_weight, before: date | None
+) -> int:
+    """Loose packets of ``(product, packet_weight)`` dispatched before ``before``.
+
+    The loose-pool counterpart of ``_bags_dispatched_before``.
+    """
+    base = {"custom_order__status_id__in": CONSUMING_STATUS_IDS}
+    if before is None:
+        return _loose_demand(product, packet_weight, base)
+    return _loose_demand(
+        product,
+        packet_weight,
+        {**base, "custom_order__dispatch_details__dispatch_date__lt": before},
+    ) + _loose_demand(
+        product,
+        packet_weight,
+        {**base, "custom_order__private_dispatch_details__dispatch_date__lt": before},
+    )
+
+
+def raw_bagged_kg(product: Product) -> Decimal:
+    """Raw kilograms currently spent on ``product``'s bags, every packaging summed.
+
+    Per packaging: the latest bag count, plus bags already dispatched before
+    that count was taken -- gone from the floor, but still packed from raw
+    material, so still spent.
+    """
+    snapshot_date = latest_snapshot_date()
+    total = Decimal("0")
+    for packaging in ProductPackaging.objects.filter(product=product):
+        bags = on_hand_bags(packaging, snapshot_date) + _bags_dispatched_before(
+            packaging, snapshot_date
+        )
+        total += bags * packaging.total_weight
+    return total
+
+
+def raw_loose_kg(product: Product) -> Decimal:
+    """Raw kilograms currently spent on ``product``'s loose packets.
+
+    Mirrors ``raw_bagged_kg`` for the loose pool, one packet weight at a time.
+    """
+    snapshot_date = latest_loose_snapshot_date()
+    total = Decimal("0")
+    for weight in product_loose_weights(product):
+        packets = on_hand_loose_packets(
+            product, weight, snapshot_date
+        ) + _loose_dispatched_before(product, weight, snapshot_date)
+        total += packets * weight
+    return total
+
+
+def raw_available_kg(product: Product) -> Decimal:
+    """Raw kilograms of ``product`` not yet packed into a bag or loose packet.
+
+    ``inward - bagged - loose``. Writing a bag or loose count is rejected when
+    it would push this negative -- see ``_assert_raw_available``.
+    """
+    return raw_inward_kg(product) - raw_bagged_kg(product) - raw_loose_kg(product)
+
+
+def _assert_raw_available(product_ids) -> None:
+    """Raise unless every product in ``product_ids`` still has raw kg >= 0.
+
+    Called after a count write, inside the same transaction as the write, so
+    a shortfall rolls the whole write back (see ``record_stock_counts`` /
+    ``record_loose_stocks``). Raises plain ``ValueError`` -- callers (the
+    update-stock views) catch it and turn it into a 400, the same convention
+    ``InwardOperations.assert_raw_status_transition`` uses.
+    """
+    for product in Product.objects.filter(id__in=product_ids):
+        available = raw_available_kg(product)
+        if available < 0:
+            raise ValueError(
+                f"Not enough raw material for '{product.name}': short by "
+                f"{-available} kg."
+            )
+
+
 # -- Shared -------------------------------------------------------------------
 
 
@@ -532,8 +712,13 @@ def stock_position(snapshot_date: date | None = None) -> list[dict]:
     ]
 
 
-def snapshot_payload(snapshot: InventorySnapshot) -> dict:
-    """Frontend-facing dict for one counted line, keyed by public ids only."""
+def snapshot_count_payload(snapshot: InventorySnapshot) -> dict:
+    """What was counted on one line: the recorded figures, no derived position.
+
+    Keyed by public ids only. The live reserved/consumed/available figures are
+    left to :func:`snapshot_payload` -- they describe the stock *now*, not the
+    day of the count, so a historical export must not carry them.
+    """
     packaging = snapshot.product_packaging
     return {
         "public_id": snapshot.public_id,
@@ -550,7 +735,16 @@ def snapshot_payload(snapshot: InventorySnapshot) -> dict:
         "bags": snapshot.bags,
         "total_packets": snapshot.total_packets,
         "total_weight": str(snapshot.total_weight),
-        "packets_available": available_bags(packaging, snapshot.snapshot_date),
+    }
+
+
+def snapshot_payload(snapshot: InventorySnapshot) -> dict:
+    """Frontend-facing dict for one counted line, keyed by public ids only."""
+    return {
+        **snapshot_count_payload(snapshot),
+        "packets_available": available_bags(
+            snapshot.product_packaging, snapshot.snapshot_date
+        ),
     }
 
 
@@ -574,19 +768,29 @@ def loose_stock_position(snapshot_date: date | None = None) -> list[dict]:
     ]
 
 
-def loose_stock_payload(snapshot: LooseStockSnapshot) -> dict:
-    """Frontend-facing dict for one loose line, keyed by public ids only."""
-    product, weight = snapshot.product, snapshot.packet_weight
+def loose_stock_count_payload(snapshot: LooseStockSnapshot) -> dict:
+    """What was counted on one loose line: the recorded figures only.
+
+    See :func:`snapshot_count_payload` for why the derived position is left out.
+    """
     return {
         "public_id": snapshot.public_id,
         "snapshot_date": snapshot.snapshot_date.isoformat(),
         "product": {
-            "public_id": product.public_id,
-            "name": product.name,
+            "public_id": snapshot.product.public_id,
+            "name": snapshot.product.name,
         },
-        "packet_weight": str(weight),
+        "packet_weight": str(snapshot.packet_weight),
         "packets": snapshot.packets,
         "total_weight": str(snapshot.total_weight),
+    }
+
+
+def loose_stock_payload(snapshot: LooseStockSnapshot) -> dict:
+    """Frontend-facing dict for one loose line, keyed by public ids only."""
+    product, weight = snapshot.product, snapshot.packet_weight
+    return {
+        **loose_stock_count_payload(snapshot),
         "reserved": reserved_loose_packets(product, weight),
         "consumed": consumed_loose_packets(product, weight, snapshot.snapshot_date),
         "available": available_loose_packets(product, weight, snapshot.snapshot_date),

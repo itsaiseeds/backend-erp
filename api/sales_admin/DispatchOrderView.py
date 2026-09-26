@@ -4,26 +4,31 @@ A sales admin records that a verified order has left the warehouse. **Only a
 CONFIRMED order can be dispatched**: an unverified order has not been checked
 against stock, so shipping it would consume bags nobody confirmed were there.
 
-**Which kind of dispatch this is comes from the order, not from the request.**
-An order carrying a ``transport_agency`` goes by that carrier; one without it
-goes on our own vehicle. That is the same rule ``dispatch_mode`` reports on every
-order payload, so what was planned at booking time is what gets recorded -- and
-the caller cannot contradict it.
+The request is the same four fields whichever kind of dispatch it is: where it
+left from, and who drove it in what.
 
-* **agency** (the order has a transport agency) -- ``lr_number`` is *optional*.
-  The transporter usually issues the consignment note after collection, so a
-  dispatch is recorded while it is still pending and the number is filled in
-  later through ``edit-order``.
-* **private** (the order has none) -- ``vehicle_number`` and ``driver_number``
-  are both required.
+**Which kind it is comes from the order, not the request.** An order carrying a
+``transport_agency`` is recorded against ``DispatchDetails``; one without it
+against ``PrivateDispatchDetails``. That is the same rule ``dispatch_mode``
+reports on every order payload, so what was planned at booking time is what gets
+recorded -- and the caller cannot contradict it.
 
-Both kinds take ``dispatch_date``, ``from_city_id`` and ``to_city_id``. Fields
-belonging to the other kind are rejected rather than ignored, so a request that
-misunderstands which kind of dispatch it is fails loudly.
+Two fields are derived rather than accepted: the dispatch **date** is today,
+because the dispatch is being recorded as it happens, and the **destination**
+city is the order's own delivery address, which is where the goods are going by
+definition. ``from_city_id`` is still an input until there is a warehouse to
+default it from.
 
-The details are written and the status moved in one transaction, and the order's
-bags shift from reserved to consumed on their own -- both figures are derived
-from its status, never stored.
+The transporter's ``lr_number`` is not accepted here -- it is issued after
+collection, so every agency dispatch starts with it blank. It is recorded later
+by ``POST /api/sales-admin/upload-lr-number/<public_id>``.
+
+``items`` is the one addition to the four: a **lot number per line**, keyed by
+``product_packaging_public_id`` (the id ``GET /order/<public_id>`` hands back for
+each line). It must name every line of the order exactly once -- the dispatch
+writes the order's challan, and a challan that cannot say which batch a bag came
+from is not a challan. Which packaging is which is checked against the order
+itself, in ``DispatchOperations``.
 """
 
 from __future__ import annotations
@@ -42,64 +47,79 @@ from .GetOrderView import ORDER_PUBLIC_ID_PARAMETER
 from .OrderTransitionView import OrderTransitionView
 
 
+class DispatchItemLotSerializer(serializers.Serializer):
+    """The lot number for one line of the order being dispatched."""
+
+    product_packaging_public_id = serializers.CharField(
+        max_length=20,
+        error_messages={
+            "blank": "product_packaging_public_id is required.",
+            "required": "product_packaging_public_id is required.",
+        },
+    )
+    lot_number = serializers.CharField(
+        max_length=64,
+        error_messages={
+            "blank": "lot_number is required.",
+            "required": "lot_number is required.",
+        },
+    )
+
+
 class DispatchOrderSerializer(serializers.Serializer):
     """Request validation for recording a dispatch.
 
-    The kind of dispatch is read off the order in ``context["order"]`` -- it is
-    whether that order has a ``transport_agency`` -- so this serializer only
-    checks that the body matches the kind, never decides it.
+    Every field is required. There is no per-kind branching: an agency dispatch
+    and an own-vehicle one carry exactly the same details, and which table they
+    land in is the order's business, not the request's.
     """
 
-    dispatch_date = serializers.DateField(
-        error_messages={"required": "dispatch_date is required."}
-    )
     from_city_id = serializers.PrimaryKeyRelatedField(
         queryset=City.objects.all(),
         error_messages={"required": "from_city_id is required."},
+        help_text="Where the goods left from. An input until a warehouse can default it.",
     )
-    to_city_id = serializers.PrimaryKeyRelatedField(
-        queryset=City.objects.all(),
-        error_messages={"required": "to_city_id is required."},
+    driver_name = serializers.CharField(
+        max_length=255,
+        error_messages={
+            "required": "driver_name is required.",
+            "blank": "driver_name is required.",
+        },
     )
-    lr_number = serializers.CharField(
-        max_length=64,
-        required=False,
-        allow_blank=True,
-        help_text=(
-            "Agency dispatches only, and optional even then: leave it out while "
-            "the transporter's consignment note is still pending."
-        ),
-    )
-    vehicle_number = serializers.CharField(max_length=32, required=False)
     driver_number = serializers.CharField(
-        max_length=10, required=False, validators=[validate_phone_number]
+        max_length=10,
+        validators=[validate_phone_number],
+        error_messages={
+            "required": "driver_number is required.",
+            "blank": "driver_number is required.",
+        },
+    )
+    vehicle_number = serializers.CharField(
+        max_length=32,
+        error_messages={
+            "required": "vehicle_number is required.",
+            "blank": "vehicle_number is required.",
+        },
+    )
+    items = DispatchItemLotSerializer(
+        many=True,
+        allow_empty=False,
+        error_messages={"required": "items is required."},
+        help_text="One lot number per line of the order; every line must appear.",
     )
 
-    def validate(self, attrs):
-        order = self.context["order"]
-        private_fields = ("vehicle_number", "driver_number")
+    def validate_items(self, value):
+        """Reject a packaging listed twice -- one lot number per line, no more.
 
-        if order.transport_agency_id:
-            sent = [field for field in private_fields if field in attrs]
-            if sent:
-                raise serializers.ValidationError(
-                    f"This order is dispatched by {order.transport_agency.name}, "
-                    f"so {' and '.join(sent)} do not apply. Send lr_number, or "
-                    "nothing while it is still pending."
-                )
-        else:
-            if "lr_number" in attrs:
-                raise serializers.ValidationError(
-                    "This order has no transport agency, so it is a private "
-                    "dispatch and carries no LR number. Send vehicle_number and "
-                    "driver_number instead."
-                )
-            missing = [field for field in private_fields if not attrs.get(field)]
-            if missing:
-                raise serializers.ValidationError(
-                    f"A private dispatch needs {' and '.join(missing)}."
-                )
-        return attrs
+        Whether the list *covers* the order is not checked here: that needs the
+        order, which the serializer does not have. ``dispatch_order`` does it.
+        """
+        public_ids = [item["product_packaging_public_id"] for item in value]
+        if len(set(public_ids)) != len(public_ids):
+            raise serializers.ValidationError(
+                "The same product packaging is listed twice."
+            )
+        return value
 
 
 class DispatchOrderView(OrderTransitionView):
@@ -108,7 +128,7 @@ class DispatchOrderView(OrderTransitionView):
     serializer_class = DispatchOrderSerializer
 
     @extend_schema(
-        summary="Dispatch a verified order (by agency or own vehicle)",
+        summary="Dispatch a verified order",
         request=DispatchOrderSerializer,
         parameters=[ORDER_PUBLIC_ID_PARAMETER],
         responses={200: OrderDetailPayloadSerializer},
@@ -117,19 +137,19 @@ class DispatchOrderView(OrderTransitionView):
         return self.transition(request, public_id)
 
     def apply_transition(self, order: Order, request: Request) -> None:
-        serializer = DispatchOrderSerializer(
-            data=request.data, context={"order": order}
-        )
+        serializer = DispatchOrderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
         dispatch_order(
             order,
             actor=request.user,
-            dispatch_date=data["dispatch_date"],
             from_city=data["from_city_id"],
-            to_city=data["to_city_id"],
-            lr_number=data.get("lr_number", ""),
-            vehicle_number=data.get("vehicle_number", ""),
-            driver_number=data.get("driver_number", ""),
+            driver_name=data["driver_name"],
+            driver_number=data["driver_number"],
+            vehicle_number=data["vehicle_number"],
+            lot_numbers={
+                item["product_packaging_public_id"]: item["lot_number"]
+                for item in data["items"]
+            },
         )

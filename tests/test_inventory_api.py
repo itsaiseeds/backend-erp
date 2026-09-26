@@ -2,8 +2,8 @@
 
 Covers:
     GET  /api/sales-admin/check-todays-inventory
-    POST /api/sales-admin/update-todays-inventory
-    PATCH /api/sales-admin/update-todays-inventory
+    POST /api/sales-admin/update-bag-stock
+    PATCH /api/sales-admin/update-bag-stock
     GET  /api/sales-admin/get-stock/<public_id>
 
 Run: tests/test_inventory_api.py::InventoryApiTest
@@ -18,10 +18,11 @@ from rest_framework import status
 
 from aggregator.models import ProductPackaging, Stage, StageIds
 from authentication.models import Admin, SalesPerson, User
-from tests.common import WebApiTestCase
+from tests.common import WebApiTestCase, book_raw_material_for_every_product
 
 CHECK_URL = "/api/sales-admin/check-todays-inventory"
-UPDATE_URL = "/api/sales-admin/update-todays-inventory"
+UPDATE_URL = "/api/sales-admin/update-bag-stock"
+BAG_STOCK_URL = "/api/sales-admin/bag-stock"
 
 SUPERUSER_PHONE = "9999999999"
 
@@ -113,6 +114,10 @@ class InventoryApiTest(WebApiTestCase):
             selling_price=Decimal("1387.50"),
             created_by=cls.stock_admin_user,
         )
+        # Bag counts are checked against raw material -- book far more than
+        # any test writes, for every product (one test counts every
+        # packaging, including the dml.sql seed rows).
+        book_raw_material_for_every_product(actor=cls.stock_admin_user)
 
     # ------------------------------------------------------------------
     # helpers
@@ -135,10 +140,6 @@ class InventoryApiTest(WebApiTestCase):
         resp = self._stock_admin_request("get", CHECK_URL)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertFalse(resp.data["is_complete"])
-        self.assertEqual(resp.data["snapshot_date"], datetime.date.today().isoformat())
-        missing_ids = {m["public_id"] for m in resp.data["missing_packagings"]}
-        self.assertIn(self.pack1.public_id, missing_ids)
-        self.assertIn(self.pack2.public_id, missing_ids)
 
         # The same payload names who is allowed to do the counting: only admins
         # with can_update_stock_count=True.
@@ -157,9 +158,6 @@ class InventoryApiTest(WebApiTestCase):
         resp = self._stock_admin_request("get", CHECK_URL)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(resp.data["is_complete"])
-        self.assertEqual(resp.data["missing_packagings"], [])
-        # is_complete covers bags only; loose was never counted.
-        self.assertIsNone(resp.data["loose_snapshot_date"])
 
     def test_check_inventory_partial_count(self):
         """Run: tests/test_inventory_api.py::InventoryApiTest::test_check_inventory_partial_count"""
@@ -173,12 +171,9 @@ class InventoryApiTest(WebApiTestCase):
         resp = self._stock_admin_request("get", CHECK_URL)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertFalse(resp.data["is_complete"])
-        missing_ids = {m["public_id"] for m in resp.data["missing_packagings"]}
-        self.assertNotIn(self.pack1.public_id, missing_ids)
-        self.assertIn(self.pack2.public_id, missing_ids)
 
     # ------------------------------------------------------------------
-    # POST update-todays-inventory
+    # POST update-bag-stock
     # ------------------------------------------------------------------
 
     def test_post_update_inventory_replaces_the_whole_day(self):
@@ -232,24 +227,50 @@ class InventoryApiTest(WebApiTestCase):
                 self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_invalid_count_payloads_are_rejected(self):
-        """Run: tests/test_inventory_api.py::InventoryApiTest::test_invalid_count_payloads_are_rejected"""
+        """Only bag counts may be posted or patched -- loose packets are rejected
+        on both verbs, and so is any shape that is not a bare non-negative int.
+
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_invalid_count_payloads_are_rejected
+        """
         cases = [
             ("unknown packaging", {"PP-NONEXISTENT": 10}),
             ("negative count", {self.pack1.public_id: -5}),
             # The {bags, loose_packets} object form is gone: counts are bare ints.
             ("legacy object shape", {self.pack1.public_id: {"bags": 15, "loose_packets": 3}}),
+            ("loose-packet count on a bag endpoint", {self.pack1.public_id: {"packets": 5}}),
         ]
-        for label, counts in cases:
-            with self.subTest(case=label):
-                resp = self._stock_admin_request(
-                    "post", UPDATE_URL, data={"counts": counts}, format="json"
-                )
-                self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+        for verb in ("post", "patch"):
+            for label, counts in cases:
+                with self.subTest(verb=verb.upper(), case=label):
+                    resp = self._stock_admin_request(
+                        verb, UPDATE_URL, data={"counts": counts}, format="json"
+                    )
+                    self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
 
-    def test_post_update_inventory_replaces_previous_day(self):
-        """Recording today's count hard-deletes older-day rows.
+    def test_bag_count_exceeding_raw_material_is_rejected(self):
+        """A bag count that would spend more raw material than the product has
+        in use is rejected with a 400, and nothing is written.
 
-        Run: tests/test_inventory_api.py::InventoryApiTest::test_post_update_inventory_replaces_previous_day
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_bag_count_exceeding_raw_material_is_rejected
+        """
+        # pack1 is 0.5kg x 50 packets = 25kg/bag; 50000 bags needs 1,250,000kg,
+        # over the 1,000,000kg setUpTestData booked for self.product.
+        resp = self._stock_admin_request(
+            "patch", UPDATE_URL,
+            data={"counts": {self.pack1.public_id: 50000}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.content)
+        self.assertIn("raw material", resp.data["detail"].lower())
+
+        empty = self._stock_admin_request("get", BAG_STOCK_URL)
+        self.assertEqual(empty.data["lines"], [])
+
+    def test_post_update_inventory_keeps_previous_day(self):
+        """Recording today's count keeps older days as history, while the
+        bag-stock position reports today's count alone.
+
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_post_update_inventory_keeps_previous_day
         """
         from aggregator.InventoryOperations import record_stock_counts
         from aggregator.models import InventorySnapshot
@@ -264,19 +285,88 @@ class InventoryApiTest(WebApiTestCase):
             InventorySnapshot.all_objects.filter(snapshot_date=yesterday).exists()
         )
 
-        # Now record today — yesterday's rows should be purged
+        # Now record today -- yesterday's rows stay as history.
         self._stock_admin_request(
             "post",
             UPDATE_URL,
             data={"counts": {self.pack1.public_id: 10, self.pack2.public_id: 8}},
             format="json",
         )
-        self.assertFalse(
-            InventorySnapshot.all_objects.filter(snapshot_date=yesterday).exists()
+        self.assertTrue(
+            InventorySnapshot.objects.filter(snapshot_date=yesterday).exists()
         )
 
+        resp = self._stock_admin_request("get", BAG_STOCK_URL)
+        self.assertEqual(resp.data["snapshot_date"], datetime.date.today().isoformat())
+        on_hand = {line["packaging"]["public_id"]: line["on_hand"] for line in resp.data["lines"]}
+        self.assertEqual(on_hand[self.pack1.public_id], 10)
+        self.assertEqual(on_hand[self.pack2.public_id], 8)
+
     # ------------------------------------------------------------------
-    # PATCH update-todays-inventory
+    # GET bag-stock
+    # ------------------------------------------------------------------
+
+    def test_get_bag_stock_reports_full_position(self):
+        """GET bag-stock returns the full sealed-bag position: one line per
+        counted packaging with on-hand, reserved, consumed and available bags,
+        plus the snapshot date the position reflects.
+
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_get_bag_stock_reports_full_position
+        """
+        from aggregator.InventoryOperations import record_stock_counts
+
+        # No count ever recorded: the position is an empty, null-dated report,
+        # not a 404.
+        empty = self._stock_admin_request("get", BAG_STOCK_URL)
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertIsNone(empty.data["snapshot_date"])
+        self.assertEqual(empty.data["lines"], [])
+
+        record_stock_counts(
+            counts={self.pack1: 50, self.pack2: 25},
+            actor=self.stock_admin_user,
+        )
+
+        resp = self._stock_admin_request("get", BAG_STOCK_URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["snapshot_date"], datetime.date.today().isoformat())
+        by_id = {line["packaging"]["public_id"]: line for line in resp.data["lines"]}
+        self.assertIn(self.pack1.public_id, by_id)
+        self.assertIn(self.pack2.public_id, by_id)
+        pack1 = by_id[self.pack1.public_id]
+        self.assertEqual(
+            pack1["packaging"]["product"]["public_id"], self.product.public_id
+        )
+        self.assertEqual(pack1["packaging"]["packet_weight"], "0.500")
+        self.assertEqual(pack1["on_hand"], 50)
+        self.assertEqual(pack1["reserved"], 0)
+        self.assertEqual(pack1["consumed"], 0)
+        self.assertEqual(pack1["available"], 50)
+        self.assertEqual(by_id[self.pack2.public_id]["on_hand"], 25)
+
+    def test_get_bag_stock_reports_last_count_date_when_today_is_empty(self):
+        """The position reflects the most recent count: its date is reported as
+        the snapshot date even when nothing was counted today.
+
+        Run: tests/test_inventory_api.py::InventoryApiTest::test_get_bag_stock_reports_last_count_date_when_today_is_empty
+        """
+        from aggregator.InventoryOperations import record_stock_counts
+
+        yesterday = datetime.date.today() - datetime.timedelta(days=1)
+        record_stock_counts(
+            counts={self.pack1: 50},
+            actor=self.stock_admin_user,
+            snapshot_date=yesterday,
+        )
+
+        resp = self._stock_admin_request("get", BAG_STOCK_URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["snapshot_date"], yesterday.isoformat())
+        by_id = {line["packaging"]["public_id"] for line in resp.data["lines"]}
+        self.assertEqual(by_id, {self.pack1.public_id})
+
+    # ------------------------------------------------------------------
+    # PATCH update-bag-stock
     # ------------------------------------------------------------------
 
     def test_patch_update_inventory_only_updates_named_packagings(self):
@@ -310,9 +400,6 @@ class InventoryApiTest(WebApiTestCase):
         # pack1 should still have its old count
         check_resp = self._stock_admin_request("get", CHECK_URL)
         self.assertFalse(check_resp.data["is_complete"])
-        missing_ids = {m["public_id"] for m in check_resp.data["missing_packagings"]}
-        self.assertNotIn(self.pack1.public_id, missing_ids)
-        self.assertNotIn(self.pack2.public_id, missing_ids)
 
         # Re-patching a packaging that already has a count overwrites it.
         resp = self._stock_admin_request(

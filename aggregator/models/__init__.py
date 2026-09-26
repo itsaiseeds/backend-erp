@@ -1,4 +1,5 @@
 from .Address import Address
+from .BagStockSnapshot import InventorySnapshot
 from .City import City
 from .Client import Client
 from .ClientAddress import ClientAddress
@@ -10,15 +11,22 @@ from .Crop import Crop
 from .CustomOrder import CustomOrder
 from .CustomOrderItem import CustomOrderItem
 from .DispatchDetails import DispatchDetails
-from .InventorySnapshot import InventorySnapshot
-from .LooseStockSnapshot import LooseStockSnapshot
+from .DispatchEntry import DispatchEntry
+from .DispatchEntryItem import DispatchEntryItem
+from .InwardEntryMixin import InwardEntryMixin
+from .InwardOtherMaterial import InwardOtherMaterial
+from .InwardRawMaterial import InwardRawMaterial, InwardRawMaterialStatus
 from .Order import Order
 from .OrderItem import OrderItem
+from .OtherMaterialRecipe import OtherMaterialRecipe
+from .OtherMaterialType import OtherMaterialType, OtherMaterialUnitType
+from .Party import Party
 from .Pincode import Pincode
 from .PrivateDispatchDetails import PrivateDispatchDetails
 from .Product import Product
 from .ProductDescriptionItem import ProductDescriptionItem
 from .ProductPackaging import ProductPackaging
+from .SamplePacketStockSnapshot import LooseStockSnapshot
 from .Stage import Stage, StageIds
 from .State import State
 from .Status import Status, StatusIds
@@ -48,8 +56,18 @@ __all__ = [
     "LooseStockSnapshot",
     "DispatchDetails",
     "PrivateDispatchDetails",
+    "DispatchEntry",
+    "DispatchEntryItem",
     "Order",
     "OrderItem",
     "CustomOrder",
     "CustomOrderItem",
+    "Party",
+    "InwardEntryMixin",
+    "InwardRawMaterial",
+    "InwardRawMaterialStatus",
+    "OtherMaterialType",
+    "OtherMaterialUnitType",
+    "OtherMaterialRecipe",
+    "InwardOtherMaterial",
 ]

@@ -14,13 +14,7 @@ from rest_framework.response import Response
 
 from aggregator.models import Product, ProductPackaging
 from api.admin import AdminApiView
-
-
-class ProductRefSerializer(serializers.Serializer):
-    """Output shape for the ``product`` reference on a packaging."""
-
-    public_id = serializers.CharField()
-    name = serializers.CharField()
+from api.order_serializers import ProductRefSerializer
 
 
 class ProductPackagingPayloadSerializer(serializers.Serializer):

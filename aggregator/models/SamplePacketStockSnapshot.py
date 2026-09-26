@@ -8,7 +8,7 @@ from common.models import (
     TimeStampedModel,
 )
 
-from .InventorySnapshot import default_snapshot_date
+from .BagStockSnapshot import default_snapshot_date
 
 
 class LooseStockSnapshot(
@@ -29,9 +29,9 @@ class LooseStockSnapshot(
     Unlike ``InventorySnapshot``, recording this count is **optional**: it is
     excluded from ``is_stock_count_complete``, so a missing loose count never
     blocks order verification. The two tables therefore run on **independent
-    date lifecycles** -- each purge touches only its own table, and a bag count
-    for a new day must never delete a loose count that is still accurate.
-    Because of that, loose figures are read at the latest *loose* snapshot date
+    date lifecycles** -- a bag count for a new day says nothing about a loose
+    count that is still accurate. Every day's count is kept as history, and
+    loose figures are read at the latest *loose* snapshot date
     rather than today (see ``InventoryOperations.loose_date``).
 
     Exposed to the frontend by its ``public_id`` (``LS-...``); the primary key is

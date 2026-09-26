@@ -30,7 +30,8 @@ jobs:
           flutter pub get
           flutter build web --release \
             --base-href /sales-admin/ \
-            --dart-define=API_BASE_URL=https://sai-seeds-preprod.onrender.com
+            --dart-define=API_BASE_URL=https://sai-seeds-preprod-tzdp.onrender.com
+            # --dart-define=API_BASE_URL=https://sai-seeds-preprod.onrender.com
 
       - name: Commit preprod build
         run: |

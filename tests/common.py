@@ -123,3 +123,62 @@ class WebApiTestCase(DMLTestCase):
     def clear_auth(self) -> None:
         """Drop the current session, leaving the client anonymous."""
         self.client.logout()
+
+
+def book_raw_material(product, quantity_kg, *, actor, effective_date=None, booked_on=None):
+    """Book an ``in_use`` inward raw-material lot covering ``quantity_kg`` of
+    ``product``, so a bag or loose-stock count can be written for it.
+
+    Bag and loose counts are now checked against a product's in-use raw
+    kilograms (see ``InventoryOperations.raw_available_kg``); any test that
+    records a count must back it with a lot first. This bypasses the real
+    ``lab_testing -> in_use`` flip a booking goes through -- the lot is
+    created already ``in_use`` and dated -- because stock/order tests care
+    about the count, not the inward lifecycle (see
+    ``tests/test_inward_raw_material_api.py`` for that). A throwaway
+    ``Party`` (on the DML-seeded city id 1) backs every lot.
+
+    ``booked_on`` backdates ``created_at`` (the auto-now field a test cannot
+    set on create) after the fact, for a test whose own assertions are
+    sensitive to *when* a lot was booked -- e.g. an inward-entries export
+    grouped by booking day, which would otherwise pick up this fixture lot as
+    one of today's entries.
+    """
+    from datetime import date
+
+    from aggregator.models import InwardRawMaterial, InwardRawMaterialStatus, Party
+
+    party, _ = Party.objects.get_or_create(
+        name="Test Raw Material Party", city_id=1, defaults={"created_by": actor}
+    )
+    lot = InwardRawMaterial.objects.create(
+        product=product,
+        party=party,
+        quantity_kg=quantity_kg,
+        status=InwardRawMaterialStatus.IN_USE,
+        effective_date=effective_date or date.today(),
+        created_by=actor,
+    )
+    if booked_on is not None:
+        InwardRawMaterial.all_objects.filter(id=lot.id).update(created_at=booked_on)
+        lot.refresh_from_db()
+    return lot
+
+
+def book_raw_material_for_every_product(*, actor, quantity_kg=None, booked_on=None):
+    """``book_raw_material`` for every ``Product`` that exists so far.
+
+    For the common test pattern of counting *every* packaging (``counts=
+    dict.fromkeys(ProductPackaging.objects.all(), bags)``), which reaches the
+    dml.sql-seeded products too, not just a test's own fixtures. Call this
+    after every product the test needs has been created.
+    """
+    from decimal import Decimal
+
+    from aggregator.models import Product
+
+    quantity_kg = quantity_kg if quantity_kg is not None else Decimal("1000000.000")
+    return [
+        book_raw_material(product, quantity_kg, actor=actor, booked_on=booked_on)
+        for product in Product.objects.all()
+    ]

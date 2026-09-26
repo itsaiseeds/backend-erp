@@ -426,7 +426,8 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
             dispatch_date="2026-09-13",
             from_city=self.city,
             to_city=self.city,
-            vehicle_number="GJ05AB1234",
+            driver_name="Ramesh Driver",
             driver_number="9876500002",
+            vehicle_number="GJ05AB1234",
         )
         update_order_status(order, StatusIds.DISPATCHED)

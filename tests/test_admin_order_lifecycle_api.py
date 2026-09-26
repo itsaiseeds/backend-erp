@@ -32,7 +32,8 @@ from aggregator.models import (
 from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import create_order
 from authentication.models import Admin, SalesPerson
-from tests.common import WebApiTestCase
+from common.models import indian_now
+from tests.common import WebApiTestCase, book_raw_material_for_every_product
 
 User = get_user_model()
 
@@ -117,6 +118,9 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
             selling_price=Decimal("1000.00"),
             created_by=cls.superuser,
         )
+        # _count_stock counts every packaging, including the dml.sql seed
+        # rows, and every count is now checked against raw material.
+        book_raw_material_for_every_product(actor=cls.superuser)
 
     def setUp(self):
         super().setUp()
@@ -156,20 +160,26 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
             url.format(public_id=order.public_id), body or {}, format="json"
         )
 
-    def _where_and_when(self):
-        """The fields every dispatch takes, whichever kind it is."""
-        return {
-            "dispatch_date": "2026-09-13",
-            "from_city_id": self.city.id,
-            "to_city_id": self.other_city.id,
-        }
+    def _dispatch_body(self, **overrides):
+        """The one body every dispatch takes, whichever kind the order is.
 
-    def _private_dispatch_body(self):
-        return {
-            **self._where_and_when(),
-            "vehicle_number": "GJ05AB1234",
+        ``items`` carries a lot number per line and must cover the order; every
+        order booked here has the single ``self.bag`` line.
+        """
+        body = {
+            "from_city_id": self.city.id,
+            "driver_name": "Ramesh Driver",
             "driver_number": "9876500002",
+            "vehicle_number": "GJ05AB1234",
+            "items": [
+                {
+                    "product_packaging_public_id": self.bag.public_id,
+                    "lot_number": "LOT-2026-01",
+                }
+            ],
         }
+        body.update(overrides)
+        return body
 
     def _verified_order(self, quantity=2, *, by_agency=False):
         order = self._order(quantity, by_agency=by_agency)
@@ -181,9 +191,7 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
 
     def _dispatched_order(self):
         order = self._verified_order(by_agency=True)
-        response = self._post(
-            DISPATCH_URL, order, {**self._where_and_when(), "lr_number": "LR-2026-1"}
-        )
+        response = self._post(DISPATCH_URL, order, self._dispatch_body())
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         order.refresh_from_db()
         return order
@@ -323,9 +331,7 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_an_order_with_an_agency_dispatches_by_agency"""
         order = self._verified_order(by_agency=True)
 
-        response = self._post(
-            DISPATCH_URL, order, {**self._where_and_when(), "lr_number": "LR-2026-1"}
-        )
+        response = self._post(DISPATCH_URL, order, self._dispatch_body())
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["status"], "DISPATCHED")
@@ -333,31 +339,21 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         order.refresh_from_db()
         self.assertIsNotNone(order.dispatch_details_id)
         self.assertIsNone(order.private_dispatch_details_id)
-        self.assertEqual(order.dispatch_details.lr_number, "LR-2026-1")
-
-    def test_an_agency_dispatch_can_be_recorded_before_the_lr_number_exists(self):
-        """The consignment note is often issued only after collection.
-
-        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_an_agency_dispatch_can_be_recorded_before_the_lr_number_exists
-        """
-        order = self._verified_order(by_agency=True)
-
-        response = self._post(DISPATCH_URL, order, self._where_and_when())
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(response.data["status"], "DISPATCHED")
-        # Still an agency dispatch: the agency on the order decides, not the LR.
-        self.assertEqual(response.data["dispatch_mode"], "AGENCY")
-        order.refresh_from_db()
-        self.assertIsNotNone(order.dispatch_details_id)
-        self.assertIsNone(order.private_dispatch_details_id)
-        self.assertEqual(order.dispatch_details.lr_number, "")
+        dispatch = order.dispatch_details
+        self.assertEqual(dispatch.driver_name, "Ramesh Driver")
+        self.assertEqual(dispatch.driver_number, "9876500002")
+        self.assertEqual(dispatch.vehicle_number, "GJ05AB1234")
+        # The transporter issues the consignment note later.
+        self.assertEqual(dispatch.lr_number, "")
 
     def test_an_order_without_an_agency_dispatches_privately(self):
-        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_an_order_without_an_agency_dispatches_privately"""
+        """The same body; only the table it lands in differs.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_an_order_without_an_agency_dispatches_privately
+        """
         order = self._verified_order()
 
-        response = self._post(DISPATCH_URL, order, self._private_dispatch_body())
+        response = self._post(DISPATCH_URL, order, self._dispatch_body())
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["status"], "DISPATCHED")
@@ -365,56 +361,171 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         order.refresh_from_db()
         self.assertIsNotNone(order.private_dispatch_details_id)
         self.assertIsNone(order.dispatch_details_id)
-        self.assertEqual(order.private_dispatch_details.vehicle_number, "GJ05AB1234")
+        dispatch = order.private_dispatch_details
+        self.assertEqual(dispatch.driver_name, "Ramesh Driver")
+        self.assertEqual(dispatch.vehicle_number, "GJ05AB1234")
+
+    def test_the_date_and_destination_are_derived_not_sent(self):
+        """Today, and the city of the order's own delivery address.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_the_date_and_destination_are_derived_not_sent
+        """
+        order = self._verified_order()
+
+        response = self._post(DISPATCH_URL, order, self._dispatch_body())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        dispatch = order.private_dispatch_details
+        self.assertEqual(dispatch.dispatch_date, indian_now().date())
+        # The client's address is in Surat, so that is where it is going.
+        self.assertEqual(dispatch.to_city, self.city)
+        self.assertEqual(dispatch.from_city, self.city)
 
     def test_only_a_verified_order_can_be_dispatched(self):
         """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_only_a_verified_order_can_be_dispatched"""
         order = self._order()
 
         self._assert_refused(
-            self._post(DISPATCH_URL, order, self._private_dispatch_body()),
+            self._post(DISPATCH_URL, order, self._dispatch_body()),
             "Cannot dispatch an order that is BOOKED",
         )
         order.refresh_from_db()
         self.assertIsNone(order.private_dispatch_details_id)
 
-    def test_the_body_must_match_the_kind_of_dispatch_the_order_is(self):
-        """Fields belonging to the other kind are refused, not ignored.
+    def test_every_dispatch_field_is_mandatory(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_every_dispatch_field_is_mandatory"""
+        order = self._verified_order()
+        required = (
+            "from_city_id",
+            "driver_name",
+            "driver_number",
+            "vehicle_number",
+            "items",
+        )
 
-        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_the_body_must_match_the_kind_of_dispatch_the_order_is
+        for field in required:
+            with self.subTest(missing=field):
+                body = self._dispatch_body()
+                del body[field]
+
+                self._assert_refused(
+                    self._post(DISPATCH_URL, order, body), f"{field} is required."
+                )
+
+    def test_a_malformed_driver_number_is_rejected(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_malformed_driver_number_is_rejected"""
+        order = self._verified_order()
+
+        response = self._post(
+            DISPATCH_URL, order, self._dispatch_body(driver_number="12345")
+        )
+
+        self.assertEqual(
+            response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+        )
+
+    # -- the challan the dispatch writes --------------------------------------
+
+    def test_dispatching_writes_the_challan_and_its_lot_numbers(self):
+        """The DispatchEntry snapshots the receiver; its lines carry the lots.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_dispatching_writes_the_challan_and_its_lot_numbers
         """
-        private = self._verified_order()
-        agency = self._verified_order(by_agency=True)
-        base = self._where_and_when()
-        cases = [
-            (
-                "an LR number on a private order",
-                private,
-                {**base, "lr_number": "LR-1"},
-                "no transport agency",
+        order = self._verified_order(by_agency=True)
+
+        response = self._post(DISPATCH_URL, order, self._dispatch_body())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        entry = order.dispatch_entry
+        self.assertTrue(entry.public_id.startswith("DE-"))
+        self.assertEqual(entry.dispatch_details_id, order.dispatch_details_id)
+        self.assertFalse(entry.is_private)
+        self.assertEqual(entry.client_id, self.acme.pk)
+        self.assertEqual(entry.client_address_id, order.delivery_address_id)
+        # The receiver is snapshotted from the client's primary contact.
+        self.assertEqual(entry.contact_name, "Ramesh")
+        self.assertEqual(entry.contact_number, "9876500001")
+        self.assertEqual(entry.dispatch_date, indian_now().date())
+        self.assertEqual(entry.vehicle_number, "GJ05AB1234")
+
+        line = entry.items.get()
+        self.assertEqual(line.product_packaging_id, self.bag.pk)
+        self.assertEqual(line.lot_number, "LOT-2026-01")
+        self.assertEqual(line.quantity, 2)
+        self.assertEqual(line.negotiated_selling_price, Decimal("1000.00"))
+
+    def test_a_private_dispatch_writes_a_challan_with_no_transporter(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_private_dispatch_writes_a_challan_with_no_transporter"""
+        order = self._verified_order()
+
+        response = self._post(DISPATCH_URL, order, self._dispatch_body())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        entry = order.dispatch_entry
+        self.assertIsNone(entry.dispatch_details_id)
+        self.assertTrue(entry.is_private)
+        self.assertEqual(entry.lr_number, "")
+
+    def test_a_lot_number_is_required_for_every_line(self):
+        """Missing, unknown and duplicated packagings are each refused.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_lot_number_is_required_for_every_line
+        """
+        order = self._verified_order()
+        lot = {"product_packaging_public_id": self.bag.public_id, "lot_number": "L1"}
+        stranger = {"product_packaging_public_id": "PP-NOTONORDER", "lot_number": "L2"}
+        cases = (
+            ([stranger], "No lot number for"),
+            ([lot, stranger], "Not on this order"),
+            ([lot, lot], "listed twice"),
+        )
+
+        for items, fragment in cases:
+            with self.subTest(items=items):
+                self._assert_refused(
+                    self._post(DISPATCH_URL, order, self._dispatch_body(items=items)),
+                    fragment,
+                )
+
+        order.refresh_from_db()
+        self.assertFalse(hasattr(order, "dispatch_entry"))
+
+    def test_re_dispatching_rewrites_the_same_challan(self):
+        """One order, one DE-... -- reverting and dispatching again reuses it.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_re_dispatching_rewrites_the_same_challan
+        """
+        order = self._dispatched_order()
+        first = order.dispatch_entry
+        original_public_id = first.public_id
+
+        self._post(REVERT_URL, order)
+        order.refresh_from_db()
+        response = self._post(
+            DISPATCH_URL,
+            order,
+            self._dispatch_body(
+                vehicle_number="GJ05ZZ9999",
+                items=[
+                    {
+                        "product_packaging_public_id": self.bag.public_id,
+                        "lot_number": "LOT-2026-02",
+                    }
+                ],
             ),
-            (
-                "a vehicle on an agency order",
-                agency,
-                {**base, "vehicle_number": "GJ05AB1234"},
-                "do not apply",
-            ),
-            (
-                "half a private dispatch",
-                private,
-                {**base, "vehicle_number": "GJ05AB1234"},
-                "A private dispatch needs driver_number",
-            ),
-            (
-                "a private dispatch with nothing",
-                private,
-                base,
-                "A private dispatch needs vehicle_number and driver_number",
-            ),
-        ]
-        for label, order, body, fragment in cases:
-            with self.subTest(case=label):
-                self._assert_refused(self._post(DISPATCH_URL, order, body), fragment)
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        entry = order.dispatch_entry
+        self.assertEqual(entry.public_id, original_public_id)
+        self.assertEqual(entry.vehicle_number, "GJ05ZZ9999")
+        self.assertEqual(entry.items.get().lot_number, "LOT-2026-02")
+        # A new journey gets a new DispatchDetails row, so the LR starts blank.
+        self.assertEqual(entry.lr_number, "")
 
     # -- revert dispatch ------------------------------------------------------
 

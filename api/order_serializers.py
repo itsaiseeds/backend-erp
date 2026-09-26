@@ -20,13 +20,18 @@ class TransportAgencyRefSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
+class ProductRefSerializer(serializers.Serializer):
+    """Output shape for a ``{public_id, name}`` product reference."""
+
+    public_id = serializers.CharField()
+    name = serializers.CharField()
+
+
 class PackagingPayloadSerializer(serializers.Serializer):
     """Output shape for one bag (``ProductOperations.packaging_payload``)."""
 
     public_id = serializers.CharField()
-    product = serializers.DictField(
-        help_text="The bag's product: {public_id, name}.",
-    )
+    product = ProductRefSerializer(help_text="The bag's product.")
     packet_weight = serializers.CharField()
     packets = serializers.IntegerField()
     total_weight = serializers.CharField()
@@ -67,6 +72,9 @@ class OrderCardPackagingSerializer(serializers.Serializer):
     total_weight = serializers.CharField()
     selling_price = serializers.CharField(
         help_text="The bag's own list price, not what this order was charged."
+    )
+    negotiated_selling_price = serializers.CharField(
+        help_text="The per-bag rate this order was actually charged for the line."
     )
     quantity = serializers.IntegerField(help_text="Bags of this kind on the order.")
 

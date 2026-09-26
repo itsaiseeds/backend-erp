@@ -18,10 +18,17 @@ from .models import (
     CustomOrder,
     CustomOrderItem,
     DispatchDetails,
+    DispatchEntry,
+    DispatchEntryItem,
     InventorySnapshot,
+    InwardOtherMaterial,
+    InwardRawMaterial,
     LooseStockSnapshot,
     Order,
     OrderItem,
+    OtherMaterialRecipe,
+    OtherMaterialType,
+    Party,
     Pincode,
     PrivateDispatchDetails,
     Product,
@@ -391,6 +398,66 @@ class PrivateDispatchDetailsAdmin(SoftDeleteModelAdmin):
     list_select_related = ("client", "from_city", "to_city")
 
 
+class DispatchEntryItemInline(CreatedByStampInlineMixin, admin.TabularInline):
+    model = DispatchEntryItem
+    extra = 0
+    autocomplete_fields = ("product_packaging",)
+
+
+@admin.register(DispatchEntry)
+class DispatchEntryAdmin(SoftDeleteParentAdmin):
+    list_display = (
+        "public_id",
+        "order",
+        "client",
+        "lr_number",
+        "dispatch_date",
+        "from_city",
+        "to_city",
+        "vehicle_number",
+    )
+    search_fields = (
+        "public_id",
+        "order__public_id",
+        "client__company_name",
+        "dispatch_details__lr_number",
+        "vehicle_number",
+    )
+    autocomplete_fields = (
+        "order",
+        "dispatch_details",
+        "client",
+        "client_address",
+        "from_city",
+        "to_city",
+    )
+    list_select_related = ("order", "client", "dispatch_details", "from_city", "to_city")
+    inlines = (DispatchEntryItemInline,)
+
+    @admin.display(description="LR number")
+    def lr_number(self, obj):
+        return obj.lr_number or "-"
+
+
+@admin.register(DispatchEntryItem)
+class DispatchEntryItemAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "dispatch_entry",
+        "product_packaging",
+        "lot_number",
+        "quantity",
+        "negotiated_selling_price",
+        "created_at",
+    )
+    search_fields = (
+        "dispatch_entry__public_id",
+        "lot_number",
+        "product_packaging__product__name",
+    )
+    autocomplete_fields = ("dispatch_entry", "product_packaging")
+    list_select_related = ("dispatch_entry", "product_packaging__product")
+
+
 class OrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):
     model = OrderItem
     extra = 0
@@ -537,3 +604,88 @@ class CustomOrderItemAdmin(SoftDeleteModelAdmin):
     search_fields = ("custom_order__public_id", "product__name")
     autocomplete_fields = ("custom_order", "product")
     list_select_related = ("custom_order", "product")
+
+
+# -- Inward movements ---------------------------------------------------------
+
+
+@admin.register(Party)
+class PartyAdmin(SoftDeleteModelAdmin):
+    list_display = ("name", "city", "created_by", "created_at")
+    search_fields = ("name", "city__name", "city__state__name")
+    autocomplete_fields = ("city",)
+    list_select_related = ("city__state",)
+    ordering = ("name",)
+
+
+@admin.register(InwardRawMaterial)
+class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "public_id",
+        "product",
+        "party",
+        "quantity_kg",
+        "status",
+        "effective_date",
+        "lab_sampling_date",
+        "created_by",
+        "created_at",
+    )
+    search_fields = (
+        "public_id",
+        "product__name",
+        "product__crop__name",
+        "party__name",
+    )
+    list_filter = ("status", "effective_date")
+    autocomplete_fields = ("product", "party")
+    list_select_related = ("product", "party")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+
+
+@admin.register(OtherMaterialType)
+class OtherMaterialTypeAdmin(SoftDeleteModelAdmin):
+    list_display = ("name", "unit_type", "created_at")
+    search_fields = ("name",)
+    ordering = ("name",)
+
+
+@admin.register(OtherMaterialRecipe)
+class OtherMaterialRecipeAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "public_id",
+        "product",
+        "material_type",
+        "packet_weight",
+        "quantity",
+        "created_at",
+    )
+    search_fields = ("public_id", "product__name", "material_type__name")
+    list_filter = ("material_type", "product__crop")
+    autocomplete_fields = ("product", "material_type")
+    list_select_related = ("product", "material_type")
+    ordering = ("product__name", "packet_weight")
+
+
+@admin.register(InwardOtherMaterial)
+class InwardOtherMaterialAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "public_id",
+        "recipe",
+        "party",
+        "quantity",
+        "effective_date",
+        "created_by",
+        "created_at",
+    )
+    search_fields = (
+        "public_id",
+        "recipe__product__name",
+        "recipe__material_type__name",
+        "party__name",
+    )
+    autocomplete_fields = ("party", "recipe")
+    list_select_related = ("recipe__product", "recipe__material_type", "party")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)

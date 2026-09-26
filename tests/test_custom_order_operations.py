@@ -38,7 +38,7 @@ from aggregator.models import (
 )
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, SalesPerson, User
-from tests.common import DMLTestCase
+from tests.common import DMLTestCase, book_raw_material_for_every_product
 
 
 class CustomOrderOperationsTest(DMLTestCase):
@@ -110,6 +110,9 @@ class CustomOrderOperationsTest(DMLTestCase):
             cls.other_product, packet_weight=Decimal("1.000"), packets=50,
             actor=cls.su,
         )
+        # _count/_count_loose count every packaging, including the dml.sql
+        # seed rows, and every count is now checked against raw material.
+        book_raw_material_for_every_product(actor=cls.su)
         cls.today = datetime.date.today()
         cls.w1 = Decimal("1.000")
         cls.w15 = Decimal("1.500")
@@ -160,6 +163,8 @@ class CustomOrderOperationsTest(DMLTestCase):
         attach_dispatch_details(
             order, dispatched_by=self.stock_admin, dispatch_date=date or self.today,
             from_city=self.city, to_city=self.city2, lr_number="LR-CO",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
         )
         update_custom_order_status(order, StatusIds.DISPATCHED)
 
