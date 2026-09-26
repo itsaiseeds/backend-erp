@@ -178,7 +178,7 @@ class PartyApiTest(WebApiTestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
-        self.assertNotIn("contact_number", response.data)
+        self.assertIsNone(response.data["contact_number"])
         created = Party.all_objects.get(pk=response.data["id"])
         self.assertIsNone(created.contact_number)
 
