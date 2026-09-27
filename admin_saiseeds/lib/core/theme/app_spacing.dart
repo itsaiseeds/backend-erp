@@ -137,7 +137,9 @@ class AppSizes {
   // A date range prints two full dates and an arrow, so it needs more
   // room than a single-value filter.
   static const double tableFilterRangeMaxWidth = 360.0;
-  static const double tableSearchFieldMinWidth = 160.0;
+  // Wide enough that the longest hint ("Search other material...") is read in
+  // full rather than ellipsised; the field still grows with typed text.
+  static const double tableSearchFieldMinWidth = 380.0;
   static const double tableEmptyStateMinHeight = 200.0;
   static const double dividerThin = 0.5;
   static const double launchingSoonIconTile = 72.0;
@@ -199,6 +201,9 @@ class AppSizes {
   static const double orderStepperCountWidth = 28.0;
   static const double orderPriceFieldWidth = 130.0;
 
+  // Used only to pick the menu's open direction, so an estimate is enough.
+  static const double rowActionItemHeight = 42.0;
+  static const double rowActionHintHeight = 34.0;
   static const double rowActionsMenuWidth = 220.0;
   static const double rowActionsItemHeight = 40.0;
   static const double recordDialogAsideWidth = 280.0;

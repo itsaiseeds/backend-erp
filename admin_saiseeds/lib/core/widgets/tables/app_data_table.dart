@@ -99,6 +99,10 @@ class AppDataTable<T> extends StatefulWidget {
   /// are already a short fixed list.
   final bool requireSearchBar;
 
+  /// Freezes the actions column against the right edge so it stays reachable
+  /// while the middle columns scroll.
+  final bool pinActionsColumn;
+
   /// Replaces the pagination bar with scroll-to-load. The owner appends each
   /// page to its list rather than replacing it.
   final bool isInfiniteScroll;
@@ -163,6 +167,7 @@ class AppDataTable<T> extends StatefulWidget {
     this.requireExpandableColumnWidth = true,
     this.requireColumnSettings = true,
     this.requireSearchBar = true,
+    this.pinActionsColumn = true,
     this.isInfiniteScroll = false,
     this.hasMore = false,
     this.onLoadMore,
@@ -402,14 +407,34 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     return [...selectColumn, ...pinnedColumns];
   }
 
+  bool _isTrailingColumn(String id) =>
+      widget.pinActionsColumn && id == AppStrings.TABLE_ACTIONS_COLUMN_LABEL;
+
+  /// The actions column, frozen to the right edge. Empty when the table has
+  /// no actions or the caller opted out.
+  List<AppDataColumn> get _trailingColumns =>
+      _visibleColumns.where((col) => _isTrailingColumn(col.id)).toList();
+
+  double get _trailingWidth {
+    final List<AppDataColumn> cols = _trailingColumns;
+    if (cols.isEmpty) return 0;
+    return _effectiveColumnsWidth(cols) + _dividerTotal(cols.length);
+  }
+
   List<AppDataColumn> get _scrollableColumns => widget.requirePin
       ? _visibleColumns
             .where(
               (col) =>
-                  !_pinnedColumns.contains(col.id) && !_isSelectColumn(col.id),
+                  !_pinnedColumns.contains(col.id) &&
+                  !_isSelectColumn(col.id) &&
+                  !_isTrailingColumn(col.id),
             )
             .toList()
-      : _visibleColumns.where((col) => !_isSelectColumn(col.id)).toList();
+      : _visibleColumns
+            .where(
+              (col) => !_isSelectColumn(col.id) && !_isTrailingColumn(col.id),
+            )
+            .toList();
 
   void _togglePinned(String columnId) {
     if (!widget.requirePin || _isSelectColumn(columnId)) return;
@@ -813,6 +838,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
   ) {
     final List<AppDataColumn> stickyCols = _stickyColumns;
     final List<AppDataColumn> scrollCols = _scrollableColumns;
+    final List<AppDataColumn> trailingCols = _trailingColumns;
     final double stickyWidth =
         (_effectiveColumnsWidth(stickyCols) * scaleFactor) +
         _dividerTotal(stickyCols.length);
@@ -854,8 +880,16 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
                 left: 0,
                 top: 0,
                 bottom: 0,
-                child: ColoredBox(
-                  color: AppColors.TABLE_HEADER_BG,
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: AppColors.TABLE_HEADER_BG,
+                    border: Border(
+                      right: BorderSide(
+                        color: AppColors.TABLE_HEADER_DIVIDER,
+                        width: AppSizes.borderMedium,
+                      ),
+                    ),
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -868,6 +902,33 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
                   ),
                 ),
               ),
+              if (trailingCols.isNotEmpty)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: AppColors.TABLE_HEADER_BG,
+                      border: Border(
+                        left: BorderSide(
+                          color: AppColors.TABLE_HEADER_DIVIDER,
+                          width: AppSizes.borderMedium,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: trailingCols
+                          .map(
+                            (col) =>
+                                _buildHeaderCell(col, scaleFactor: scaleFactor),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -998,7 +1059,9 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
           ? const NeverScrollableScrollPhysics()
           : const ClampingScrollPhysics(),
       child: SizedBox(
-        width: needsFilling ? maxWidth : renderedWidth,
+        width: needsFilling
+            ? maxWidth
+            : renderedWidth + _trailingWidth * _appliedScaleFactor,
         child: Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.smd),
           child: ListView.builder(
@@ -1019,6 +1082,8 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
               stickyWidth:
                   (_effectiveColumnsWidth(stickyCols) * scaleFactor) +
                   _dividerTotal(stickyCols.length),
+              trailingColumns: _trailingColumns,
+              viewportWidth: maxWidth,
               cellBuilder: _buildDataCell,
             ),
           ),
@@ -1221,6 +1286,8 @@ class _TableRow<T> extends StatefulWidget {
   final double scaleFactor;
   final double rowHeight;
   final double stickyWidth;
+  final List<AppDataColumn> trailingColumns;
+  final double viewportWidth;
   final bool isBusy;
   final ScrollController scrollController;
   final void Function(T item)? onTap;
@@ -1239,6 +1306,8 @@ class _TableRow<T> extends StatefulWidget {
     required this.scaleFactor,
     required this.rowHeight,
     required this.stickyWidth,
+    this.trailingColumns = const [],
+    this.viewportWidth = 0,
     required this.isBusy,
     required this.scrollController,
     required this.onTap,
@@ -1253,6 +1322,14 @@ class _TableRowState<T> extends State<_TableRow<T>> {
   bool _isHovered = false;
 
   bool get _isInteractive => widget.onTap != null && !widget.isBusy;
+
+  double get _trailingWidth => widget.trailingColumns.fold<double>(
+    0,
+    (total, col) =>
+        total +
+        (col.width * widget.scaleFactor) +
+        AppSizes.tableResizeHandleWidth,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -1307,11 +1384,62 @@ class _TableRowState<T> extends State<_TableRow<T>> {
                       left: offset,
                       top: 0,
                       bottom: 0,
-                      child: ColoredBox(color: background, child: child!),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: background,
+                          border: const Border(
+                            right: BorderSide(
+                              color: AppColors.BORDER_STRONG,
+                              width: AppSizes.borderMedium,
+                            ),
+                          ),
+                        ),
+                        child: child!,
+                      ),
                     );
                   },
                   child: Row(
                     children: widget.stickyColumns
+                        .map(
+                          (col) => widget.cellBuilder(
+                            context,
+                            col,
+                            widget.item,
+                            widget.scaleFactor,
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              // Anchored to the viewport's right edge rather than the row's,
+              // so it holds still while the middle columns scroll.
+              if (widget.trailingColumns.isNotEmpty)
+                AnimatedBuilder(
+                  animation: widget.scrollController,
+                  builder: (context, child) {
+                    final double offset = widget.scrollController.hasClients
+                        ? widget.scrollController.offset
+                        : 0.0;
+                    return Positioned(
+                      left: offset + widget.viewportWidth - _trailingWidth,
+                      top: 0,
+                      bottom: 0,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: background,
+                          border: const Border(
+                            left: BorderSide(
+                              color: AppColors.BORDER_STRONG,
+                              width: AppSizes.borderMedium,
+                            ),
+                          ),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                  },
+                  child: Row(
+                    children: widget.trailingColumns
                         .map(
                           (col) => widget.cellBuilder(
                             context,

@@ -5,7 +5,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/formatters/date_formatter.dart';
 import '../../../../core/widgets/buttons/row_actions_menu.dart';
-import '../../../../core/widgets/feedback/app_badge.dart';
 import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
 import '../../../../core/widgets/inputs/date_range_field.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
@@ -108,8 +107,7 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
     AppDataColumn(
       id: DispatchChallansTable.COLUMN_TRANSPORT,
       label: AppStrings.COLUMN_TRANSPORT_TYPE,
-      width: AppSizes.tableColumnWidthNarrow,
-      isCenter: true,
+      width: AppSizes.tableColumnWidthWide,
     ),
     AppDataColumn(
       id: DispatchChallansTable.COLUMN_VEHICLE,
@@ -312,14 +310,7 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
         return _textCell(DateFormatter.dayLabel(dispatch?.dispatchDateTime));
       case DispatchChallansTable.COLUMN_TRANSPORT:
         if (dispatch == null) return _textCell('');
-        return AppBadge(
-          label: dispatch.isPrivate
-              ? AppStrings.TRANSPORT_PRIVATE
-              : AppStrings.TRANSPORT_AGENCY,
-          variant: dispatch.isPrivate
-              ? AppBadgeVariant.info
-              : AppBadgeVariant.neutral,
-        );
+        return _textCell(dispatch.transportLabel);
       case DispatchChallansTable.COLUMN_VEHICLE:
         return _textCell(dispatch?.vehicleNumber ?? '');
       case DispatchChallansTable.COLUMN_DRIVER:

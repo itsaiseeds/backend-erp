@@ -84,6 +84,7 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
     if (key == null) return false;
     return widget.isDateRangeFilter?.call(key) ?? false;
   }
+
   String _editingPreviousValue = '';
 
   @override
@@ -501,22 +502,27 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
   }
 
   Widget _buildSearchButton() {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: _performSearch,
-        child: Container(
-          height: AppSizes.tableControlHeight,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.PRIMARY,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: Text(
-            AppStrings.TABLE_SEARCH,
-            style: AppTypography.labelMedium.copyWith(
-              color: AppColors.TEXT_ON_PRIMARY,
+    // The dashboard sits inside a SelectionArea, whose text cursor paints over
+    // the label and beats this region; excluding the button restores the
+    // pointer.
+    return SelectionContainer.disabled(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: _performSearch,
+          child: Container(
+            height: AppSizes.tableControlHeight,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.PRIMARY,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Text(
+              AppStrings.TABLE_SEARCH,
+              style: AppTypography.labelMedium.copyWith(
+                color: AppColors.TEXT_ON_PRIMARY,
+              ),
             ),
           ),
         ),

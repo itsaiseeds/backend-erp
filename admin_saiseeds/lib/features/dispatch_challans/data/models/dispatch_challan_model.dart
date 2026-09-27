@@ -1,3 +1,4 @@
+import '../../../../core/constants/app_strings.dart';
 class ChallanAddressModel {
   final String line1;
   final String line2;
@@ -118,6 +119,26 @@ class ChallanReceiverModel {
   }
 }
 
+class ChallanAgencyRef {
+  final int id;
+  final String name;
+
+  const ChallanAgencyRef({required this.id, this.name = ''});
+
+  factory ChallanAgencyRef.fromJson(Map<String, dynamic> json) {
+    return ChallanAgencyRef(
+      id: _asInt(json['id']),
+      name: json['name'] as String? ?? '',
+    );
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse('$value') ?? 0;
+  }
+}
+
 class ChallanDispatchModel {
   final String publicId;
   final String lrNumber;
@@ -128,6 +149,7 @@ class ChallanDispatchModel {
   final String driverNumber;
   final String fromCity;
   final String toCity;
+  final ChallanAgencyRef? transportAgency;
 
   const ChallanDispatchModel({
     this.publicId = '',
@@ -139,9 +161,12 @@ class ChallanDispatchModel {
     this.driverNumber = '',
     this.fromCity = '',
     this.toCity = '',
+    this.transportAgency,
   });
 
   factory ChallanDispatchModel.fromJson(Map<String, dynamic> json) {
+    final dynamic agency = json['transport_agency'];
+
     return ChallanDispatchModel(
       publicId: '${json['public_id'] ?? ''}',
       lrNumber: '${json['lr_number'] ?? ''}',
@@ -152,10 +177,20 @@ class ChallanDispatchModel {
       driverNumber: '${json['driver_number'] ?? ''}',
       fromCity: json['from_city'] as String? ?? '',
       toCity: json['to_city'] as String? ?? '',
+      transportAgency: agency is Map
+          ? ChallanAgencyRef.fromJson(Map<String, dynamic>.from(agency))
+          : null,
     );
   }
 
   DateTime? get dispatchDateTime => DateTime.tryParse(dispatchDate);
+
+  /// "Private" for an own vehicle, otherwise the agency's name.
+  String get transportLabel {
+    if (isPrivate) return AppStrings.TRANSPORT_PRIVATE;
+    final String name = transportAgency?.name.trim() ?? '';
+    return name.isEmpty ? AppStrings.TRANSPORT_AGENCY : name;
+  }
 
   String get driverSummary {
     final String name = driverName.trim();
