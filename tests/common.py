@@ -146,7 +146,7 @@ def book_raw_material(product, quantity_kg, *, actor, effective_date=None, booke
     """
     from datetime import date
 
-    from aggregator.models import InwardRawMaterial, InwardRawMaterialStatus, Party
+    from aggregator.models import InwardRawMaterial, Party, StatusIds
 
     party, _ = Party.objects.get_or_create(
         name="Test Raw Material Party", city_id=1, defaults={"created_by": actor}
@@ -155,7 +155,7 @@ def book_raw_material(product, quantity_kg, *, actor, effective_date=None, booke
         product=product,
         party=party,
         quantity_kg=quantity_kg,
-        status=InwardRawMaterialStatus.IN_USE,
+        status_id=StatusIds.IN_USE.value,
         effective_date=effective_date or date.today(),
         created_by=actor,
     )

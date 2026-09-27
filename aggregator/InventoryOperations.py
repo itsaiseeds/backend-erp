@@ -61,7 +61,6 @@ from .models import (
     CustomOrderItem,
     InventorySnapshot,
     InwardRawMaterial,
-    InwardRawMaterialStatus,
     LooseStockSnapshot,
     Order,
     OrderItem,
@@ -553,7 +552,7 @@ def raw_inward_kg(product: Product, as_of: date | None = None) -> Decimal:
         product=product,
         effective_date__isnull=False,
         effective_date__lte=as_of,
-        status=InwardRawMaterialStatus.IN_USE,
+        status_id=StatusIds.IN_USE.value,
     ).aggregate(total=Sum("quantity_kg"))["total"]
     return total or Decimal("0")
 
@@ -569,7 +568,7 @@ def _lock_products(product_ids) -> None:
         return
     list(
         InwardRawMaterial.objects.select_for_update().filter(
-            product_id__in=product_ids, status=InwardRawMaterialStatus.IN_USE
+            product_id__in=product_ids, status_id=StatusIds.IN_USE.value
         )
     )
 

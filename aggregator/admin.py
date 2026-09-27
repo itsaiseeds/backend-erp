@@ -638,8 +638,8 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
         "party__name",
     )
     list_filter = ("status", "effective_date")
-    autocomplete_fields = ("product", "party")
-    list_select_related = ("product", "party")
+    autocomplete_fields = ("product", "party", "status")
+    list_select_related = ("product", "party", "status")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
 

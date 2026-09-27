@@ -237,7 +237,8 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)
---   Order lifecycle + client verification. created_by left NULL (seed data).
+--   Order lifecycle + client verification + inward raw-material lot lifecycle.
+--   created_by left NULL (seed data).
 -- -------------------------------------------------------------------------
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(1, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'BOOKED', 'Booked', 1);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(2, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'UNDER_REVIEW', 'Under review', 2);
@@ -248,6 +249,8 @@ INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, de
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(7, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'REJECTED', 'Rejected', 7);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(8, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'VERIFICATION_PENDING', 'Verification pending', 1);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(9, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'VERIFIED', 'Verified', 2);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(10, '2026-09-27 00:00:00.000', '2026-09-27 00:00:00.000', false, NULL, NULL, NULL, 'LAB_TESTING', 'Lab Testing', 1);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(11, '2026-09-27 00:00:00.000', '2026-09-27 00:00:00.000', false, NULL, NULL, NULL, 'IN_USE', 'In Use', 2);
 
 -- -------------------------------------------------------------------------
 -- aggregator_stage (seed classification of a product; enum-like, 4 fixed rows)

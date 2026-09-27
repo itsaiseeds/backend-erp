@@ -12,8 +12,8 @@ class StatusIds(IntEnum):
 
     Each member's ``name`` is exactly the seeded ``code`` and its ``value`` is
     the row ``id`` (see ``sql/dml.sql``): ids 1-7 are the order lifecycle, ids
-    8-9 the client verification states. No migrations — keep in sync with the
-    seed rows.
+    8-9 the client verification states, ids 10-11 the inward raw-material lot
+    lifecycle. No migrations — keep in sync with the seed rows.
     """
 
     BOOKED = 1
@@ -25,6 +25,8 @@ class StatusIds(IntEnum):
     REJECTED = 7
     VERIFICATION_PENDING = 8
     VERIFIED = 9
+    LAB_TESTING = 10
+    IN_USE = 11
 
     @classmethod
     def order_statuses(cls) -> list[StatusIds]:
@@ -35,6 +37,11 @@ class StatusIds(IntEnum):
     def client_statuses(cls) -> list[StatusIds]:
         """The client verification ids (8–9)."""
         return [cls(value) for value in range(cls.VERIFICATION_PENDING, cls.VERIFIED + 1)]
+
+    @classmethod
+    def raw_material_statuses(cls) -> list[StatusIds]:
+        """The inward raw-material lot lifecycle ids (10–11)."""
+        return [cls(value) for value in range(cls.LAB_TESTING, cls.IN_USE + 1)]
 
 
 class Status(TimeStampedModel, SoftDeletedModel, CreatedByModel):

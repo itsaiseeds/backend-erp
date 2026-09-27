@@ -1114,7 +1114,9 @@ CREATE INDEX IF NOT EXISTS aggregator_party_deleted_by_id_idx ON public.aggregat
 -- Inward movement of raw material (product replenishment). The entry's date is
 -- created_at; flipping status to 'In Use' stamps effective_date with today and,
 -- once that date has come, the lot counts toward stock. status='Lab Testing'
--- rows are held back until the lab signs off.
+-- rows are held back until the lab signs off. status_id references the same
+-- aggregator_status lookup table as aggregator_order / aggregator_client (see
+-- StatusIds.raw_material_statuses, ids 10-11).
 CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1129,15 +1131,14 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	product_id int8 NOT NULL,
 	party_id int8 NOT NULL,
 	quantity_kg numeric(10, 3) NOT NULL,
-	status varchar(16) NOT NULL,
+	status_id int8 NOT NULL,
 	CONSTRAINT aggregator_inwardrawmaterial_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_inwardrawmaterial_public_id_key UNIQUE (public_id),
-	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0),
-	CONSTRAINT aggregator_inwardrawmaterial_status_check CHECK (status IN ('Lab Testing', 'In Use'))
+	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0)
 );
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_public_id_like ON public.aggregator_inwardrawmaterial USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_effective_date_idx ON public.aggregator_inwardrawmaterial USING btree (effective_date);
-CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_status_idx ON public.aggregator_inwardrawmaterial USING btree (status);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_status_id_idx ON public.aggregator_inwardrawmaterial USING btree (status_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_product_id_idx ON public.aggregator_inwardrawmaterial USING btree (product_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_party_id_idx ON public.aggregator_inwardrawmaterial USING btree (party_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_is_deleted_idx ON public.aggregator_inwardrawmaterial USING btree (is_deleted);
@@ -1330,6 +1331,7 @@ ALTER TABLE public.aggregator_party ADD CONSTRAINT aggregator_party_deleted_by_i
 
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_party_id_fk FOREIGN KEY (party_id) REFERENCES public.aggregator_party(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
