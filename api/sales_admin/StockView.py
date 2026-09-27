@@ -14,6 +14,9 @@ breakdown is the only honest shape.
 
 Reserved and consumed figures are derived from order / custom-order status,
 never stored, so the numbers always reflect the current state of the books.
+``on_hand`` is likewise live -- ``available + reserved``, i.e. what is still
+physically in the warehouse right now -- not the raw count from the last
+physical upload, which may include bags/packets already dispatched since.
 """
 
 from __future__ import annotations
@@ -59,6 +62,23 @@ class ProductLooseStockPayloadSerializer(serializers.Serializer):
     lines = ProductLooseWeightLineSerializer(many=True)
 
 
+def _loose_weight_line(product: Product, packet_weight, loose_date) -> dict:
+    """One packet-weight line of a product's loose position."""
+    reserved = InventoryOperations.reserved_loose_packets(product, packet_weight)
+    available = InventoryOperations.available_loose_packets(
+        product, packet_weight, loose_date
+    )
+    return {
+        "packet_weight": str(packet_weight),
+        "on_hand": reserved + available,
+        "reserved": reserved,
+        "consumed": InventoryOperations.consumed_loose_packets(
+            product, packet_weight, loose_date
+        ),
+        "available": available,
+    }
+
+
 class StockView(AdminApiView):
     """Read the current stock position for a packaging or product."""
 
@@ -89,6 +109,8 @@ class StockView(AdminApiView):
             packaging = ProductPackaging.objects.filter(public_id=public_id).first()
             if packaging is None:
                 raise NotFound("Unknown product packaging.")
+            reserved = InventoryOperations.reserved_bags(packaging)
+            available = InventoryOperations.available_bags(packaging, snapshot_date)
             return Response(
                 {
                     "public_id": packaging.public_id,
@@ -97,16 +119,12 @@ class StockView(AdminApiView):
                         f"{packaging.packets} × {packaging.packet_weight}kg"
                     ),
                     "snapshot_date": snapshot_date.isoformat(),
-                    "on_hand": InventoryOperations.on_hand_bags(
-                        packaging, snapshot_date
-                    ),
-                    "reserved": InventoryOperations.reserved_bags(packaging),
+                    "on_hand": reserved + available,
+                    "reserved": reserved,
                     "consumed": InventoryOperations.consumed_bags(
                         packaging, snapshot_date
                     ),
-                    "available": InventoryOperations.available_bags(
-                        packaging, snapshot_date
-                    ),
+                    "available": available,
                 }
             )
 
@@ -123,21 +141,7 @@ class StockView(AdminApiView):
                     "name": product.name,
                     "snapshot_date": loose_date.isoformat(),
                     "lines": [
-                        {
-                            "packet_weight": str(weight),
-                            "on_hand": InventoryOperations.on_hand_loose_packets(
-                                product, weight, loose_date
-                            ),
-                            "reserved": InventoryOperations.reserved_loose_packets(
-                                product, weight
-                            ),
-                            "consumed": InventoryOperations.consumed_loose_packets(
-                                product, weight, loose_date
-                            ),
-                            "available": InventoryOperations.available_loose_packets(
-                                product, weight, loose_date
-                            ),
-                        }
+                        _loose_weight_line(product, weight, loose_date)
                         for weight in InventoryOperations.product_loose_weights(product)
                     ],
                 }
