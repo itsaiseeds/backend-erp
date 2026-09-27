@@ -31,8 +31,12 @@ class SoftDeletedModel(models.Model):
     this table, otherwise ``PermissionDenied`` is raised.
     """
 
-    is_deleted = models.BooleanField("deleted", default=False, editable=False, db_index=True)
-    deleted_at = models.DateTimeField("deleted at", null=True, blank=True, editable=False)
+    # Editable (unlike created_at/updated_at) so the Django admin can write to
+    # them directly -- see common.admin.AuditFieldsAdminMixin. The API surface
+    # never exposes them as writable regardless: every hand-written serializer
+    # in this project simply never declares them as input fields.
+    is_deleted = models.BooleanField("deleted", default=False, db_index=True)
+    deleted_at = models.DateTimeField("deleted at", null=True, blank=True)
     deleted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="deleted by",
@@ -40,7 +44,6 @@ class SoftDeletedModel(models.Model):
         null=True,
         blank=True,
         related_name="+",
-        editable=False,
     )
 
     # ``objects`` hides soft-deleted rows; ``all_objects`` shows everything.
