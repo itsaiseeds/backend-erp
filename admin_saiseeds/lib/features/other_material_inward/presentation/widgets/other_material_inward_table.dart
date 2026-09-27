@@ -15,6 +15,7 @@ import '../../data/models/other_material_inward_model.dart';
 class OtherMaterialInwardTable extends StatefulWidget {
   static const String CONFIG_KEY = 'other-material-inward';
   static const String COLUMN_PRODUCT = 'product';
+  static const String COLUMN_MATERIAL_TYPE = 'material_type';
   static const String COLUMN_PACKET_WEIGHT = 'packet_weight';
   static const String COLUMN_PARTY = 'party';
   static const String COLUMN_QUANTITY = 'quantity';
@@ -66,6 +67,11 @@ class OtherMaterialInwardTableState extends State<OtherMaterialInwardTable> {
       id: OtherMaterialInwardTable.COLUMN_PRODUCT,
       label: AppStrings.COLUMN_PRODUCT,
       width: AppSizes.tableColumnWidthWide,
+    ),
+    AppDataColumn(
+      id: OtherMaterialInwardTable.COLUMN_MATERIAL_TYPE,
+      label: AppStrings.COLUMN_MATERIAL_TYPE,
+      width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
       id: OtherMaterialInwardTable.COLUMN_PACKET_WEIGHT,
@@ -184,6 +190,8 @@ class OtherMaterialInwardTableState extends State<OtherMaterialInwardTable> {
     switch (col.id) {
       case OtherMaterialInwardTable.COLUMN_PRODUCT:
         return _textCell(lot.productName, isStrong: true);
+      case OtherMaterialInwardTable.COLUMN_MATERIAL_TYPE:
+        return _textCell(lot.materialTypeName);
       case OtherMaterialInwardTable.COLUMN_PACKET_WEIGHT:
         return _textCell(lot.packetWeight);
       case OtherMaterialInwardTable.COLUMN_PARTY:
