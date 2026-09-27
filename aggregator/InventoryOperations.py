@@ -96,7 +96,7 @@ def _assert_can_update_stock_count(actor: User | None) -> None:
         raise PermissionDenied("A user must be provided to record a stock count.")
     if getattr(actor, "is_superuser", False):
         return
-    admin = getattr(actor, "admin_profile", None)
+    admin = getattr(actor, "live_admin_profile", None)
     if admin is None:
         raise PermissionDenied("Stock counts can only be recorded by a sales admin.")
     if not admin.can_update_stock_count:

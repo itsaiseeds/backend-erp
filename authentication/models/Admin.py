@@ -1,6 +1,10 @@
+from collections.abc import Callable
+
 from django.db import models
 
 from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
+
+from ..credentials import revoke_user_credentials
 
 
 class Admin(CreatedByModel, TimeStampedModel, SoftDeletedModel):
@@ -19,6 +23,11 @@ class Admin(CreatedByModel, TimeStampedModel, SoftDeletedModel):
     class Meta:
         verbose_name = "admin"
         verbose_name_plural = "admins"
+
+    def guard_soft_delete(self, perform: Callable[[], None]) -> None:
+        """Losing the admin role logs the user out of every session and token."""
+        perform()
+        revoke_user_credentials(self.user)
 
     def __str__(self):
         return f"Admin: {self.user}"

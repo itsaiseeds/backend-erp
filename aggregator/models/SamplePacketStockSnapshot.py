@@ -124,7 +124,7 @@ class LooseStockSnapshot(
         # ``can_update_stock_count`` gates exactly one thing: writing a stock
         # count. It deliberately does not gate order verification.
         if self.created_by_id and not self.created_by.is_superuser:
-            admin = getattr(self.created_by, "admin_profile", None)
+            admin = self.created_by.live_admin_profile
             if admin is None:
                 errors["created_by"] = (
                     "Stock counts can only be recorded by a sales admin."

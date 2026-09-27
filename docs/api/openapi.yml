@@ -880,9 +880,8 @@ paths:
   /api/execute-code/:
     post:
       operationId: execute_code
-      description: Execute Python on the server (``execute_python_code`` permission
-        only).
-      summary: Execute Python code on the server (permission-gated)
+      description: Execute Python on the server (superuser with ``execute_python_code``).
+      summary: Execute Python code on the server (superuser; off unless enabled)
       tags:
       - Developer tools
       requestBody:
