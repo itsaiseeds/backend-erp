@@ -31,6 +31,8 @@ class OtherRawMaterialsTable extends StatefulWidget {
   final List<ClientSortModel> availableSorts;
   final void Function(OtherMaterialRecipeModel recipe)? onView;
   final void Function(OtherMaterialRecipeModel recipe)? onDelete;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
   final String emptyTitle;
   final String emptyDescription;
@@ -50,6 +52,8 @@ class OtherRawMaterialsTable extends StatefulWidget {
     this.availableSorts = const [],
     this.onView,
     this.onDelete,
+    this.hasMore = false,
+    this.onLoadMore,
     this.searchBarActions = const [],
     this.emptyTitle = AppStrings.RECIPE_EMPTY_STATE_TITLE,
     this.emptyDescription = AppStrings.RECIPE_EMPTY_STATE_BODY,
@@ -148,6 +152,9 @@ class OtherRawMaterialsTableState extends State<OtherRawMaterialsTable> {
       totalPages: widget.totalPages,
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
+      isInfiniteScroll: true,
+      hasMore: widget.hasMore,
+      onLoadMore: widget.onLoadMore,
       searchBarActions: widget.searchBarActions,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _COLUMNS,

@@ -33,6 +33,8 @@ class OtherMaterialInwardTable extends StatefulWidget {
   final List<ClientFilterModel> availableFilters;
   final List<ClientSortModel> availableSorts;
   final void Function(OtherMaterialInwardModel lot)? onDelete;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
   final String emptyTitle;
   final String emptyDescription;
@@ -51,6 +53,8 @@ class OtherMaterialInwardTable extends StatefulWidget {
     this.availableFilters = const [],
     this.availableSorts = const [],
     this.onDelete,
+    this.hasMore = false,
+    this.onLoadMore,
     this.searchBarActions = const [],
     this.emptyTitle = AppStrings.OTHER_INWARD_EMPTY_STATE_TITLE,
     this.emptyDescription = AppStrings.OTHER_INWARD_EMPTY_STATE_BODY,
@@ -155,6 +159,9 @@ class OtherMaterialInwardTableState extends State<OtherMaterialInwardTable> {
       totalPages: widget.totalPages,
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
+      isInfiniteScroll: true,
+      hasMore: widget.hasMore,
+      onLoadMore: widget.onLoadMore,
       searchBarActions: widget.searchBarActions,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _COLUMNS,

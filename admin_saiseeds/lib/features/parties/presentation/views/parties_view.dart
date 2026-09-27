@@ -113,6 +113,8 @@ class _PartiesContentState extends State<_PartiesContent> {
             availableFilters: state.availableFilters,
             availableSorts: state.availableSorts,
             onFetchData: _onFetchData,
+            hasMore: state.hasMore,
+            onLoadMore: cubit.loadMore,
             onView: (party) =>
                 PartyRecordDialog.show(context, party, cubit: cubit),
             onDelete: _onDelete,

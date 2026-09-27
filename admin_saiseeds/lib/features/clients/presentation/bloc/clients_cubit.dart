@@ -89,6 +89,8 @@ class ClientsState extends Equatable {
 
   bool get isEmptySource => status == ClientsStatus.loaded && clients.isEmpty;
 
+  bool get hasMore => currentPage < totalPages;
+
   ClientFilterModel? filterFor(String key) {
     for (final filter in availableFilters) {
       if (filter.key == key) return filter;
@@ -248,7 +250,14 @@ class ClientsCubit extends SafeCubit<ClientsState> {
     return params;
   }
 
-  Future<void> _fetch({required int page}) async {
+  /// Pulls the next page and appends it, for scroll-to-load.
+  Future<void> loadMore() async {
+    if (!state.hasMore) return;
+    if (state.status == ClientsStatus.loading) return;
+    await _fetch(page: state.currentPage + 1, append: true);
+  }
+
+  Future<void> _fetch({required int page, bool append = false}) async {
     emit(state.copyWith(status: ClientsStatus.loading, clearError: true));
 
     try {
@@ -259,7 +268,9 @@ class ClientsCubit extends SafeCubit<ClientsState> {
       emit(
         state.copyWith(
           status: ClientsStatus.loaded,
-          clients: result.results,
+          clients: append
+              ? [...state.clients, ...result.results]
+              : result.results,
           availableFilters: result.availableFilters.isEmpty
               ? state.availableFilters
               : result.availableFilters,

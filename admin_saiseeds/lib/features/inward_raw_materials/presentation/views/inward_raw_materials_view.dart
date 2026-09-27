@@ -150,6 +150,8 @@ class _InwardRawMaterialsContentState
             availableFilters: state.availableFilters,
             availableSorts: state.availableSorts,
             onFetchData: _onFetchData,
+            hasMore: state.hasMore,
+            onLoadMore: cubit.loadMore,
             onView: (lot) =>
                 InwardRecordDialog.show(context, lot, cubit: cubit),
             onDelete: _onDelete,

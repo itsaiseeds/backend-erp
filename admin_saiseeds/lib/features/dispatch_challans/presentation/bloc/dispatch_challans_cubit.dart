@@ -44,6 +44,8 @@ class DispatchChallansState extends Equatable {
 
   bool get isEmptySource => (search?.trim().isEmpty ?? true);
 
+  bool get hasMore => currentPage < totalPages;
+
   DispatchChallansState copyWith({
     DispatchChallansStatus? status,
     List<DispatchChallanModel>? challans,
@@ -183,7 +185,14 @@ class DispatchChallansCubit extends SafeCubit<DispatchChallansState> {
     return DateTime(end.year, end.month, end.day, 23, 59, 59).toIso8601String();
   }
 
-  Future<void> _fetch({required int page}) async {
+  /// Pulls the next page and appends it, for scroll-to-load.
+  Future<void> loadMore() async {
+    if (!state.hasMore) return;
+    if (state.status == DispatchChallansStatus.loading) return;
+    await _fetch(page: state.currentPage + 1, append: true);
+  }
+
+  Future<void> _fetch({required int page, bool append = false}) async {
     emit(
       state.copyWith(status: DispatchChallansStatus.loading, clearError: true),
     );
@@ -195,7 +204,9 @@ class DispatchChallansCubit extends SafeCubit<DispatchChallansState> {
       emit(
         state.copyWith(
           status: DispatchChallansStatus.loaded,
-          challans: result.results,
+          challans: append
+              ? [...state.challans, ...result.results]
+              : result.results,
           availableFilters: result.availableFilters.isEmpty
               ? state.availableFilters
               : result.availableFilters,

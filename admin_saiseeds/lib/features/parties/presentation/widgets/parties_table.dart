@@ -29,6 +29,8 @@ class PartiesTable extends StatefulWidget {
   final List<ClientSortModel> availableSorts;
   final void Function(PartyModel party)? onDelete;
   final void Function(PartyModel party)? onView;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
   final String emptyTitle;
   final String emptyDescription;
@@ -48,6 +50,8 @@ class PartiesTable extends StatefulWidget {
     this.availableSorts = const [],
     this.onDelete,
     this.onView,
+    this.hasMore = false,
+    this.onLoadMore,
     this.searchBarActions = const [],
     this.emptyTitle = AppStrings.PARTIES_EMPTY_STATE_TITLE,
     this.emptyDescription = AppStrings.PARTIES_EMPTY_STATE_BODY,
@@ -136,6 +140,9 @@ class PartiesTableState extends State<PartiesTable> {
       totalPages: widget.totalPages,
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
+      isInfiniteScroll: true,
+      hasMore: widget.hasMore,
+      onLoadMore: widget.onLoadMore,
       searchBarActions: widget.searchBarActions,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _COLUMNS,

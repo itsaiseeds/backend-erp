@@ -148,6 +148,8 @@ class _OtherRawMaterialsContentState extends State<_OtherRawMaterialsContent> {
             availableFilters: state.availableFilters,
             availableSorts: state.availableSorts,
             onFetchData: _onFetchData,
+            hasMore: state.hasMore,
+            onLoadMore: cubit.loadMore,
             onView: (recipe) =>
                 RecipeRecordDialog.show(context, recipe, cubit: cubit),
             onDelete: _onDelete,

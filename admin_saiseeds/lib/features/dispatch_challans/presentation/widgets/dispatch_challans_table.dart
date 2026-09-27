@@ -49,6 +49,8 @@ class DispatchChallansTable extends StatefulWidget {
   final void Function(DispatchChallanModel challan)? onPreview;
   final void Function(DispatchChallanModel challan)? onDownload;
   final bool isMutating;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
   final String emptyTitle;
   final String emptyDescription;
@@ -70,6 +72,8 @@ class DispatchChallansTable extends StatefulWidget {
     this.onPreview,
     this.onDownload,
     this.isMutating = false,
+    this.hasMore = false,
+    this.onLoadMore,
     this.searchBarActions = const [],
     this.emptyTitle = AppStrings.CHALLANS_EMPTY_STATE_TITLE,
     this.emptyDescription = AppStrings.CHALLANS_EMPTY_STATE_BODY,
@@ -257,6 +261,9 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
       totalPages: widget.totalPages,
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
+      isInfiniteScroll: true,
+      hasMore: widget.hasMore,
+      onLoadMore: widget.onLoadMore,
       searchBarActions: widget.searchBarActions,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _COLUMNS,

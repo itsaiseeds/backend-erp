@@ -43,6 +43,8 @@ class InwardRawMaterialsState extends Equatable {
 
   bool get isEmptySource => (search?.trim().isEmpty ?? true) && filters.isEmpty;
 
+  bool get hasMore => currentPage < totalPages;
+
   InwardRawMaterialsState copyWith({
     InwardRawMaterialsStatus? status,
     List<InwardRawMaterialModel>? lots,
@@ -202,7 +204,14 @@ class InwardRawMaterialsCubit extends SafeCubit<InwardRawMaterialsState> {
     return params;
   }
 
-  Future<void> _fetch({required int page}) async {
+  /// Pulls the next page and appends it, for scroll-to-load.
+  Future<void> loadMore() async {
+    if (!state.hasMore) return;
+    if (state.status == InwardRawMaterialsStatus.loading) return;
+    await _fetch(page: state.currentPage + 1, append: true);
+  }
+
+  Future<void> _fetch({required int page, bool append = false}) async {
     emit(
       state.copyWith(
         status: InwardRawMaterialsStatus.loading,
@@ -217,7 +226,7 @@ class InwardRawMaterialsCubit extends SafeCubit<InwardRawMaterialsState> {
       emit(
         state.copyWith(
           status: InwardRawMaterialsStatus.loaded,
-          lots: result.results,
+          lots: append ? [...state.lots, ...result.results] : result.results,
           availableFilters: result.availableFilters.isEmpty
               ? state.availableFilters
               : result.availableFilters,

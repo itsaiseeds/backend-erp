@@ -150,6 +150,8 @@ class _OtherMaterialInwardContentState
             availableFilters: state.availableFilters,
             availableSorts: state.availableSorts,
             onFetchData: _onFetchData,
+            hasMore: state.hasMore,
+            onLoadMore: cubit.loadMore,
             onDelete: _onDelete,
             emptyTitle: state.isEmptySource
                 ? AppStrings.OTHER_INWARD_EMPTY_STATE_TITLE

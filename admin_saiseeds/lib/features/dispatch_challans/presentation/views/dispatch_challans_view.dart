@@ -113,6 +113,8 @@ class _DispatchChallansContentState extends State<_DispatchChallansContent> {
             availableFilters: state.availableFilters,
             availableSorts: state.availableSorts,
             onFetchData: _onFetchData,
+            hasMore: state.hasMore,
+            onLoadMore: cubit.loadMore,
             onView: (challan) => ChallanDetailDialog.show(context, challan),
             onPreview: _onPreview,
             onDownload: _onDownload,
