@@ -1,8 +1,11 @@
 """Bag-stock position endpoint: ``GET`` ``/api/sales-admin/bag-stock``.
 
 Only an application Admin may view it (``admin_required``). Returns every
-counted sealed-bag line -- one per active packaging -- with the reserved,
-consumed and available bag figures derived from order status.
+counted sealed-bag line -- one per active packaging -- with the on-hand,
+reserved, consumed and available bag figures. ``on_hand`` is live
+(``available + reserved`` -- what's still physically in the warehouse right
+now), not the raw count from the last upload; reserved/consumed/available are
+likewise derived from order status, never stored.
 
 ``snapshot_date`` is the date the bag count was last taken, and is ``null``
 when no bag count has ever been recorded. It is the most recent bag snapshot;
