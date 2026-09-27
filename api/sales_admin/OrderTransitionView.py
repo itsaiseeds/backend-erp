@@ -9,11 +9,18 @@ documenting the path parameter are identical in all six, so they live here.
 Which statuses a verb may be applied from is **not** decided here: those guards
 live beside the transitions themselves in ``aggregator.OrderOperations``, so the
 rule holds however the function is reached. This base is only the HTTP shape.
+
+**The order row is locked for the whole transition.** Without it two
+concurrent calls -- two dispatches, two verifies -- both load the order at its
+old status, both pass the guard, and both write: a double dispatch then trips
+the ``DispatchEntry.order`` unique constraint as a 500 and leaves an orphan
+dispatch row. With it the second call waits, re-reads the order the first one
+left, and is refused by the status guard with an ordinary 400.
 """
 
 from __future__ import annotations
 
-from django.shortcuts import get_object_or_404
+from django.db import transaction
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -21,7 +28,7 @@ from aggregator.models import Order
 from aggregator.OrderOperations import order_detail_payload
 from api.admin import AdminApiView
 
-from .GetOrderView import order_detail_queryset
+from .GetOrderView import get_locked_order
 
 
 class OrderTransitionView(AdminApiView):
@@ -43,7 +50,8 @@ class OrderTransitionView(AdminApiView):
         )
 
     def transition(self, request: Request, public_id: str) -> Response:
-        order = get_object_or_404(order_detail_queryset(), public_id=public_id)
-        self.apply_transition(order, request)
+        with transaction.atomic():
+            order = get_locked_order(public_id)
+            self.apply_transition(order, request)
         order.refresh_from_db()
         return Response(order_detail_payload(order))

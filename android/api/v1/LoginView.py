@@ -100,7 +100,7 @@ class LoginView(APIView):
             user = (
                 User.objects.select_for_update().filter(phone_number=data["phone_number"]).first()
             )
-            if user is None or not user.is_salesperson:
+            if user is None or not user.is_active or not user.is_salesperson:
                 return Response(_GENERIC_FAILURE, status=400)
 
             if user.is_totp_locked():

@@ -31,7 +31,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from django.urls import get_resolver
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
@@ -214,8 +214,8 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/update-sample-packet-stock": ("UpdateLooseStockView", SESSION_ADMIN),
     "api/sales-admin/update-bag-stock": ("UpdateTodaysInventoryView", SESSION_ADMIN),
     "api/sales-admin/verify-client/": ("VerifyClientView", SESSION_ADMIN),
-    # Role-free: gated only by REQUIRED_PERMISSIONS below.
-    "api/execute-code/": ("ExecuteCodeView", SESSION_AUTH),
+    # Superuser *and* REQUIRED_PERMISSIONS below (and off unless enabled).
+    "api/execute-code/": ("ExecuteCodeView", SESSION_SUPERUSER),
     "api/test-sentry/": ("TestSentryView", SESSION_SUPERUSER),
     "api/utilities/cities": ("CitiesView", SESSION_ADMIN),
     "api/utilities/countries": ("CountriesView", SESSION_ADMIN),
@@ -468,27 +468,38 @@ class SessionAuthContractTest(WebApiTestCase):
         self.login_as(self.superuser)
         self.assertEqual(self.client.get(self.SUPERUSER_URL).status_code, 200)
 
-    def test_required_permission_endpoints_need_the_permission_whatever_the_role(self):
-        """Holding the Django permission is necessary and sufficient; role is irrelevant.
+    @override_settings(ENABLE_EXECUTE_CODE=True)
+    def test_required_permission_endpoints_need_a_superuser_holding_the_permission(self):
+        """The permission alone is not enough: only a superuser gets through.
 
-        tests/test_view_contracts.py::SessionAuthContractTest::test_required_permission_endpoints_need_the_permission_whatever_the_role
+        tests/test_view_contracts.py::SessionAuthContractTest::test_required_permission_endpoints_need_a_superuser_holding_the_permission
         """
         from django.contrib.auth.models import Permission
 
         body = {"code": "result = 1"}
-        for user in (self.plain, self.salesperson.user, self.admin):
-            with self.subTest(user=user.name, granted=False):
-                self.login_as(user)
-                resp = self.client.post(self.PERMISSION_URL, body, format="json")
-                self.assertEqual(resp.status_code, 403)
-
         permission = Permission.objects.get(codename="execute_python_code")
-        self.plain.user_permissions.add(permission)
-        for user in (User.objects.get(id=self.plain.id), self.superuser):
-            with self.subTest(user=user.name, granted=True):
-                self.login_as(user)
-                resp = self.client.post(self.PERMISSION_URL, body, format="json")
-                self.assertEqual(resp.status_code, 200)
+        for user in (self.plain, self.salesperson.user, self.admin):
+            for granted in (False, True):
+                if granted:
+                    user.user_permissions.add(permission)
+                    user = User.objects.get(id=user.id)  # drop the perm cache
+                with self.subTest(user=user.name, granted=granted):
+                    self.login_as(user)
+                    resp = self.client.post(self.PERMISSION_URL, body, format="json")
+                    self.assertEqual(resp.status_code, 403)
+
+        self.login_as(self.superuser)
+        resp = self.client.post(self.PERMISSION_URL, body, format="json")
+        self.assertEqual(resp.status_code, 200)
+
+    @override_settings(ENABLE_EXECUTE_CODE=False)
+    def test_execute_code_does_not_exist_unless_enabled(self):
+        """tests/test_view_contracts.py::SessionAuthContractTest::test_execute_code_does_not_exist_unless_enabled"""
+        body = {"code": "result = 1"}
+        self.assertEqual(self.client.post(self.PERMISSION_URL, body, format="json").status_code, 404)
+        self.login_as(self.superuser)
+        self.assertEqual(self.client.post(self.PERMISSION_URL, body, format="json").status_code, 404)
+        self.assertEqual(self.client.get("/execute-code/").status_code, 404)
 
     def test_a_bearer_token_never_authenticates_the_web_side(self):
         """tests/test_view_contracts.py::SessionAuthContractTest::test_a_bearer_token_never_authenticates_the_web_side"""

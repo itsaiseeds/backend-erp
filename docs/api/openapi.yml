@@ -880,9 +880,8 @@ paths:
   /api/execute-code/:
     post:
       operationId: execute_code
-      description: Execute Python on the server (``execute_python_code`` permission
-        only).
-      summary: Execute Python code on the server (permission-gated)
+      description: Execute Python on the server (superuser with ``execute_python_code``).
+      summary: Execute Python code on the server (superuser; off unless enabled)
       tags:
       - Developer tools
       requestBody:
@@ -6310,7 +6309,9 @@ components:
           $ref: '#/components/schemas/OtherMaterialTypeRef'
         on_hand:
           type: string
-          description: Sum of units with a reached effective date.
+          description: Units received (reached effective date) minus units used by
+            the packets currently packed. Negative when the counts outrun the recorded
+            inward lots.
       required:
       - material_type
       - on_hand
@@ -6602,19 +6603,13 @@ components:
           maxLength: 10
     PatchedUpdateProductPackagingRequest:
       type: object
-      description: Request validation for updating a ``ProductPackaging`` (all fields
-        optional).
+      description: |-
+        Request validation for updating a ``ProductPackaging``: its selling price only.
+
+        A packaging's product, packet weight and packet count are fixed once it is
+        created; a request carrying them is ignored. To change them, create a new
+        packaging.
       properties:
-        product:
-          type: string
-          minLength: 1
-        packet_weight:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
-        packets:
-          type: integer
-          minimum: 1
         selling_price:
           type: string
           format: decimal

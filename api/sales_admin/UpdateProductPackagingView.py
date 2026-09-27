@@ -5,9 +5,17 @@ Handles ``PATCH``/``DELETE``
 
 Only an application Admin may update or delete a packaging (``admin_required``
 on ``AdminApiView``). Packagings are addressed by their ``public_id``
-(``PP-…``); the ``product`` + ``packet_weight`` + ``packets`` triple is
-validated for uniqueness, excluding the packaging being edited. Soft-deleted
-packagings are never found (404).
+(``PP-…``). Soft-deleted packagings are never found (404).
+
+**Only the selling price can be edited.** A packaging's ``product``,
+``packet_weight`` and ``packets`` are its shape, and nothing that uses the
+packaging keeps a copy of them: order lines, challans, stock counts and the
+raw-material ledger all read them live. Changing one would rewrite every
+existing order's totals and every printed challan, rescale every historical
+count's raw kilograms, and move reserved and dispatched bags into another
+product's pool. They are therefore not fields here -- a request carrying them
+is simply ignored, like any other unknown key. To change a shape, create a new
+packaging and delete the old one.
 """
 
 from __future__ import annotations
@@ -17,7 +25,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
-from aggregator.models import Product, ProductPackaging
+from aggregator.models import ProductPackaging
 from api.admin import AdminApiView
 from common.models.timestamped import indian_now
 
@@ -25,45 +33,16 @@ from .ProductPackagingsView import ProductPackagingPayloadSerializer, packaging_
 
 
 class UpdateProductPackagingSerializer(serializers.Serializer):
-    """Request validation for updating a ``ProductPackaging`` (all fields optional)."""
+    """Request validation for updating a ``ProductPackaging``: its selling price only.
 
-    product = serializers.SlugRelatedField(
-        slug_field="public_id", queryset=Product.objects.all(), required=False
-    )
-    packet_weight = serializers.DecimalField(
-        max_digits=8,
-        decimal_places=3,
-        required=False,
-        error_messages={"invalid": "Packing packet weight must be a valid number."},
-    )
-    packets = serializers.IntegerField(
-        min_value=1,
-        required=False,
-        error_messages={"min_value": "Packing packet count must be at least 1."},
-    )
+    A packaging's product, packet weight and packet count are fixed once it is
+    created; a request carrying them is ignored. To change them, create a new
+    packaging.
+    """
+
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, min_value=0
     )
-
-    def validate(self, attrs):
-        if self.instance is None:
-            return attrs
-        product = attrs.get("product", self.instance.product)
-        weight = attrs.get("packet_weight", self.instance.packet_weight)
-        packets = attrs.get("packets", self.instance.packets)
-        if weight <= 0:
-            raise serializers.ValidationError(
-                "Packing packet weight must be positive."
-            )
-        qs = ProductPackaging.all_objects.filter(
-            product=product, packet_weight=weight, packets=packets
-        )
-        qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError(
-                "This product already has a packaging with this packet weight and packet count."
-            )
-        return attrs
 
 
 class UpdateProductPackagingView(AdminApiView):
@@ -86,10 +65,9 @@ class UpdateProductPackagingView(AdminApiView):
             instance=packaging, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        for field in ("product", "packet_weight", "packets", "selling_price"):
-            if field in serializer.validated_data:
-                setattr(packaging, field, serializer.validated_data[field])
-        packaging.save()
+        if "selling_price" in serializer.validated_data:
+            packaging.selling_price = serializer.validated_data["selling_price"]
+            packaging.save(update_fields=["selling_price", "updated_at"])
 
         return Response(packaging_payload(packaging))
 

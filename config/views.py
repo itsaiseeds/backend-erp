@@ -1,41 +1,27 @@
 import os
 
 from django.conf import settings
+from django.core.exceptions import SuspiciousFileOperation
 from django.http import FileResponse, HttpResponseNotFound
+from django.utils._os import safe_join
 
 
 def flutter_catch_all(request, path=""):
     """Serve the Flutter web app for /sales-admin/* routes."""
     build_dir = os.path.join(settings.BASE_DIR, "admin_saiseeds", "build", "web")
 
-    # Try to serve the requested file directly (JS, CSS, images, etc.)
+    # Serve the requested file directly (JS, CSS, images, etc.). ``safe_join``
+    # refuses any path that resolves outside build_dir -- ``..`` segments, an
+    # absolute path (``//etc/passwd`` would make os.path.join drop build_dir)
+    # or their percent-encoded forms, which arrive here already decoded.
     if path:
-        file_path = os.path.join(build_dir, path)
+        try:
+            file_path = safe_join(build_dir, path)
+        except SuspiciousFileOperation:
+            return HttpResponseNotFound()
         if os.path.isfile(file_path):
-            # Determine content type
-            content_type = "application/octet-stream"
-            if file_path.endswith(".js"):
-                content_type = "application/javascript"
-            elif file_path.endswith(".css"):
-                content_type = "text/css"
-            elif file_path.endswith(".html"):
-                content_type = "text/html"
-            elif file_path.endswith(".json"):
-                content_type = "application/json"
-            elif file_path.endswith(".png"):
-                content_type = "image/png"
-            elif file_path.endswith(".svg"):
-                content_type = "image/svg+xml"
-            elif file_path.endswith(".ico"):
-                content_type = "image/x-icon"
-            elif file_path.endswith(".woff"):
-                content_type = "font/woff"
-            elif file_path.endswith(".woff2"):
-                content_type = "font/woff2"
-            elif file_path.endswith(".ttf"):
-                content_type = "font/ttf"
-
-            return FileResponse(open(file_path, "rb"), content_type=content_type)
+            # FileResponse guesses the content type from the file name.
+            return FileResponse(open(file_path, "rb"))
 
     # For all other routes, serve index.html (Flutter handles client-side routing)
     index_path = os.path.join(build_dir, "index.html")

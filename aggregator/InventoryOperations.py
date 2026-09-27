@@ -46,24 +46,27 @@ payloads never include the internal primary key.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from datetime import date
+from collections.abc import Callable, Iterable, Mapping
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 
 from common.models import indian_now
 
 from .models import (
     CustomOrderItem,
     InventorySnapshot,
+    InwardOtherMaterial,
     InwardRawMaterial,
     LooseStockSnapshot,
     Order,
     OrderItem,
+    OtherMaterialRecipe,
+    OtherMaterialType,
     Product,
     ProductPackaging,
     StatusIds,
@@ -93,7 +96,7 @@ def _assert_can_update_stock_count(actor: User | None) -> None:
         raise PermissionDenied("A user must be provided to record a stock count.")
     if getattr(actor, "is_superuser", False):
         return
-    admin = getattr(actor, "admin_profile", None)
+    admin = getattr(actor, "live_admin_profile", None)
     if admin is None:
         raise PermissionDenied("Stock counts can only be recorded by a sales admin.")
     if not admin.can_update_stock_count:
@@ -117,10 +120,11 @@ def record_stock_count(
 
     Re-recording the same ``(snapshot_date, product_packaging)`` overwrites the
     earlier figures rather than adding a second row. Rejected (and rolled back)
-    when the product's raw material cannot cover the bags.
+    when the product's raw material or packing material cannot cover the bags.
     """
     _assert_can_update_stock_count(actor)
-    _lock_products([product_packaging.product_id])
+    lock_raw_pools([product_packaging.product_id])
+    materials_before = _material_guard([product_packaging.product_id])
     snapshot = _write_stock_count(
         product_packaging=product_packaging,
         bags=bags,
@@ -128,6 +132,7 @@ def record_stock_count(
         snapshot_date=snapshot_date or today(),
     )
     _assert_raw_available([product_packaging.product_id])
+    _assert_material_available(materials_before)
     return snapshot
 
 
@@ -138,7 +143,12 @@ def _write_stock_count(
     actor: User,
     snapshot_date: date,
 ) -> InventorySnapshot:
-    """Upsert one bag line. No permission or raw-material check -- callers do both."""
+    """Upsert one bag line. No permission or raw-material check -- callers do both.
+
+    Takes the packaging's bag-pool lock, so a count cannot land between an
+    order's availability read and its reservation.
+    """
+    lock_bag_pools([product_packaging])
     snapshot = InventorySnapshot.all_objects.filter(
         snapshot_date=snapshot_date, product_packaging=product_packaging
     ).first()
@@ -149,6 +159,7 @@ def _write_stock_count(
             created_by=actor,
         )
     snapshot.bags = bags
+    snapshot.counted_at = indian_now()
     snapshot.is_deleted = False
     snapshot.deleted_at = None
     snapshot.deleted_by = None
@@ -177,13 +188,17 @@ def record_stock_counts(
 
     The raw-material check runs once, after every line is written, so one
     upload may raise one packaging of a product and lower another: only the
-    net kilograms per product must fit its raw pool. Any shortfall rolls the
+    net kilograms per product must fit its raw pool. The packing-material
+    check works the same way, per material type. Any shortfall rolls the
     whole upload back.
     """
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
     product_ids = {packaging.product_id for packaging in counts}
-    _lock_products(product_ids)
+    lock_raw_pools(product_ids)
+    # All up front and in pk order; _write_stock_count re-takes each as a no-op.
+    lock_bag_pools(counts)
+    materials_before = _material_guard(product_ids)
 
     snapshots = [
         _write_stock_count(
@@ -195,6 +210,7 @@ def record_stock_counts(
         for product_packaging, bags in counts.items()
     ]
     _assert_raw_available(product_ids)
+    _assert_material_available(materials_before)
     return snapshots
 
 
@@ -249,12 +265,82 @@ def is_stock_count_complete(snapshot_date: date | None = None) -> bool:
 # -- Deriving position: sealed bags ----------------------------------------
 
 
-def _bag_demand(product_packaging: ProductPackaging, order_filter: dict) -> int:
-    """Sum ``OrderItem.quantity`` for this packaging across matching orders."""
+def _bag_demand(
+    product_packaging: ProductPackaging, order_filter: dict, *conditions: Q
+) -> int:
+    """Sum ``OrderItem.quantity`` for this packaging across matching orders.
+
+    ``OrderItem.objects`` hides deleted lines, but a lookup spanning to the
+    order does not apply the order's manager, so deleted orders are excluded
+    explicitly. That is always right because an order holding stock (CONFIRMED
+    and later) cannot be deleted -- see ``Order.guard_soft_delete``.
+    """
     total = OrderItem.objects.filter(
-        product_packaging=product_packaging, **order_filter
+        *conditions,
+        product_packaging=product_packaging,
+        order__is_deleted=False,
+        **order_filter,
     ).aggregate(total=Sum("quantity"))["total"]
     return total or 0
+
+
+# Where each kind of dispatch record hangs off an order or a custom order.
+_DISPATCH_RECORDS = ("dispatch_details", "private_dispatch_details")
+
+
+def _dispatch_conditions(
+    order_path: str,
+    snapshot_date: date,
+    counted_at: datetime | None,
+    *,
+    after_count: bool,
+) -> list[Q]:
+    """One filter per dispatch record kind: dispatched after (or before) the count.
+
+    A count is taken at a moment of its day, not at midnight, so the dispatch
+    *date* alone cannot place a dispatch relative to it:
+
+    * a different day is decided by the date -- ``dispatch_date`` may be
+      backdated, and a count describes the floor as of its own day;
+    * the count's own day is decided by time: a dispatch recorded (its
+      record's ``created_at``) before the line's ``counted_at`` had already
+      left the floor when it was counted.
+
+    Every consuming dispatch lands on exactly one side, so what the count
+    already excludes is never subtracted a second time, and is never left out
+    of the raw material spent. With no count line (``counted_at`` is ``None``)
+    the whole day falls after the count, since nothing was counted.
+    """
+    conditions = []
+    for record in _DISPATCH_RECORDS:
+        dispatch_date = f"{order_path}__{record}__dispatch_date"
+        recorded_at = f"{order_path}__{record}__created_at"
+        if after_count:
+            same_day = Q(**{dispatch_date: snapshot_date})
+            if counted_at is not None:
+                same_day &= Q(**{f"{recorded_at}__gte": counted_at})
+            conditions.append(Q(**{f"{dispatch_date}__gt": snapshot_date}) | same_day)
+        else:
+            earlier = Q(**{f"{dispatch_date}__lt": snapshot_date})
+            if counted_at is not None:
+                earlier |= Q(
+                    **{dispatch_date: snapshot_date, f"{recorded_at}__lt": counted_at}
+                )
+            conditions.append(earlier)
+    return conditions
+
+
+def _bag_counted_at(
+    product_packaging: ProductPackaging, snapshot_date: date
+) -> datetime | None:
+    """When ``product_packaging``'s line for ``snapshot_date`` was counted, if it was."""
+    return (
+        InventorySnapshot.objects.filter(
+            snapshot_date=snapshot_date, product_packaging=product_packaging
+        )
+        .values_list("counted_at", flat=True)
+        .first()
+    )
 
 
 def reserved_bags(product_packaging: ProductPackaging) -> int:
@@ -267,20 +353,21 @@ def reserved_bags(product_packaging: ProductPackaging) -> int:
 def consumed_bags(
     product_packaging: ProductPackaging, snapshot_date: date | None = None
 ) -> int:
-    """Bags dispatched on or after ``snapshot_date``.
+    """Bags dispatched after ``snapshot_date``'s count was taken.
 
     Dispatches predating the count already left the warehouse before it was
     taken, so they are absent from the counted figure and must not be
-    subtracted a second time.
+    subtracted a second time -- including earlier on the count's own day (see
+    ``_dispatch_conditions``).
     """
     snapshot_date = snapshot_date or today()
+    counted_at = _bag_counted_at(product_packaging, snapshot_date)
     base = {"order__status_id__in": CONSUMING_STATUS_IDS}
-    return _bag_demand(
-        product_packaging,
-        {**base, "order__dispatch_details__dispatch_date__gte": snapshot_date},
-    ) + _bag_demand(
-        product_packaging,
-        {**base, "order__private_dispatch_details__dispatch_date__gte": snapshot_date},
+    return sum(
+        _bag_demand(product_packaging, base, condition)
+        for condition in _dispatch_conditions(
+            "order", snapshot_date, counted_at, after_count=True
+        )
     )
 
 
@@ -373,10 +460,12 @@ def record_loose_stock(
 
     Re-recording the same ``(snapshot_date, product, packet_weight)`` overwrites
     the earlier figure rather than adding a second row. Rejected (and rolled
-    back) when the product's raw material cannot cover the packets.
+    back) when the product's raw material or packing material cannot cover
+    the packets.
     """
     _assert_can_update_stock_count(actor)
-    _lock_products([product.id])
+    lock_raw_pools([product.id])
+    materials_before = _material_guard([product.id])
     snapshot = _write_loose_stock(
         product=product,
         packet_weight=packet_weight,
@@ -385,6 +474,7 @@ def record_loose_stock(
         snapshot_date=snapshot_date or today(),
     )
     _assert_raw_available([product.id])
+    _assert_material_available(materials_before)
     return snapshot
 
 
@@ -396,7 +486,12 @@ def _write_loose_stock(
     actor: User,
     snapshot_date: date,
 ) -> LooseStockSnapshot:
-    """Upsert one loose line. No permission or raw-material check -- callers do both."""
+    """Upsert one loose line. No permission or raw-material check -- callers do both.
+
+    Takes the product's loose-pool lock, so a count cannot land between a
+    custom order's availability read and its reservation.
+    """
+    lock_loose_pools([product.id])
     snapshot = LooseStockSnapshot.all_objects.filter(
         snapshot_date=snapshot_date, product=product, packet_weight=packet_weight
     ).first()
@@ -408,6 +503,7 @@ def _write_loose_stock(
             created_by=actor,
         )
     snapshot.packets = packets
+    snapshot.counted_at = indian_now()
     snapshot.is_deleted = False
     snapshot.deleted_at = None
     snapshot.deleted_by = None
@@ -431,12 +527,16 @@ def record_loose_stocks(
 
     Unlike the bag count this is **optional** -- nothing requires it to be
     written daily, or at all. Like the bag count, the net kilograms per product
-    must fit its raw pool or the whole upload rolls back.
+    must fit its raw pool, and the net units per packing material its
+    material pool, or the whole upload rolls back.
     """
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
     product_ids = {product.id for product, _ in counts}
-    _lock_products(product_ids)
+    lock_raw_pools(product_ids)
+    # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
+    lock_loose_pools(product_ids)
+    materials_before = _material_guard(product_ids)
 
     snapshots = [
         _write_loose_stock(
@@ -449,6 +549,7 @@ def record_loose_stocks(
         for (product, packet_weight), packets in counts.items()
     ]
     _assert_raw_available(product_ids)
+    _assert_material_available(materials_before)
     return snapshots
 
 
@@ -470,12 +571,34 @@ def loose_line(
     ).first()
 
 
-def _loose_demand(product: Product, packet_weight, order_filter: dict) -> int:
-    """Sum ``CustomOrderItem.packets`` for this pool across matching custom orders."""
+def _loose_demand(
+    product: Product, packet_weight, order_filter: dict, *conditions: Q
+) -> int:
+    """Sum ``CustomOrderItem.packets`` for this pool across matching custom orders.
+
+    Deleted custom orders are excluded explicitly, as in ``_bag_demand``.
+    """
     total = CustomOrderItem.objects.filter(
-        product=product, packet_weight=packet_weight, **order_filter
+        *conditions,
+        product=product,
+        packet_weight=packet_weight,
+        custom_order__is_deleted=False,
+        **order_filter,
     ).aggregate(total=Sum("packets"))["total"]
     return total or 0
+
+
+def _loose_counted_at(
+    product: Product, packet_weight, snapshot_date: date
+) -> datetime | None:
+    """When one loose pool's line for ``snapshot_date`` was counted, if it was."""
+    return (
+        LooseStockSnapshot.objects.filter(
+            snapshot_date=snapshot_date, product=product, packet_weight=packet_weight
+        )
+        .values_list("counted_at", flat=True)
+        .first()
+    )
 
 
 def reserved_loose_packets(product: Product, packet_weight) -> int:
@@ -488,25 +611,21 @@ def reserved_loose_packets(product: Product, packet_weight) -> int:
 def consumed_loose_packets(
     product: Product, packet_weight, snapshot_date: date | None = None
 ) -> int:
-    """Loose packets dispatched by custom orders on or after the count.
+    """Loose packets dispatched by custom orders after the count was taken.
 
     Dispatches predating the count already left the warehouse before it was
     taken, so they are absent from the counted figure and must not be
-    subtracted a second time.
+    subtracted a second time -- including earlier on the count's own day (see
+    ``_dispatch_conditions``).
     """
     snapshot_date = loose_date(snapshot_date)
+    counted_at = _loose_counted_at(product, packet_weight, snapshot_date)
     base = {"custom_order__status_id__in": CONSUMING_STATUS_IDS}
-    return _loose_demand(
-        product,
-        packet_weight,
-        {**base, "custom_order__dispatch_details__dispatch_date__gte": snapshot_date},
-    ) + _loose_demand(
-        product,
-        packet_weight,
-        {
-            **base,
-            "custom_order__private_dispatch_details__dispatch_date__gte": snapshot_date,
-        },
+    return sum(
+        _loose_demand(product, packet_weight, base, condition)
+        for condition in _dispatch_conditions(
+            "custom_order", snapshot_date, counted_at, after_count=True
+        )
     )
 
 
@@ -565,7 +684,7 @@ def raw_inward_kg(product: Product, as_of: date | None = None) -> Decimal:
     return total or Decimal("0")
 
 
-def _lock_products(product_ids) -> None:
+def lock_raw_pools(product_ids) -> None:
     """Lock ``product_ids``' in-use raw lots for the rest of this transaction.
 
     Must run inside ``@transaction.atomic``, before a count is written, so two
@@ -574,32 +693,81 @@ def _lock_products(product_ids) -> None:
     """
     if not product_ids:
         return
+    # Ordered, so every caller acquires the same rows in the same order and two
+    # of them can never each hold a lot the other is waiting for.
     list(
-        InwardRawMaterial.objects.select_for_update().filter(
-            product_id__in=product_ids, status_id=StatusIds.IN_USE.value
-        )
+        InwardRawMaterial.objects.select_for_update()
+        .filter(product_id__in=product_ids, status_id=StatusIds.IN_USE.value)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+
+
+def lock_bag_pools(packagings: Iterable[ProductPackaging]) -> None:
+    """Lock ``packagings``' rows for the rest of this transaction.
+
+    Bag availability is derived at read time (counted - reserved - consumed),
+    so there is no stock row to lock. The ``ProductPackaging`` row stands in as
+    the per-bag mutex instead: every writer that reads a bag pool and then
+    changes it -- verifying or editing a confirmed order, writing a count --
+    takes this lock first, so two of them can never both read the same
+    "available" figure and together spend more bags than exist.
+
+    Must run inside ``@transaction.atomic``. Rows are locked in pk order so two
+    callers needing overlapping packagings cannot deadlock. Re-locking a row
+    this transaction already holds is a no-op.
+    """
+    ids = sorted({packaging.pk for packaging in packagings})
+    if not ids:
+        return
+    list(
+        ProductPackaging.all_objects.select_for_update()
+        .filter(pk__in=ids)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+
+
+def lock_loose_pools(product_ids: Iterable[int]) -> None:
+    """Lock the ``Product`` rows whose loose pools this transaction will spend.
+
+    The loose-packet counterpart of :func:`lock_bag_pools`. A loose pool is
+    keyed by ``(product, packet_weight)`` and has no row of its own, so the
+    product row is the mutex: coarser than one pool, but every weight of a
+    product is counted and spent by the same few writers, so it costs nothing
+    in practice. Same contract: inside ``@transaction.atomic``, pk order.
+    """
+    ids = sorted(set(product_ids))
+    if not ids:
+        return
+    list(
+        Product.all_objects.select_for_update()
+        .filter(pk__in=ids)
+        .order_by("pk")
+        .values_list("pk", flat=True)
     )
 
 
 def _bags_dispatched_before(
     product_packaging: ProductPackaging, before: date | None
 ) -> int:
-    """Bags of ``product_packaging`` dispatched strictly before ``before``.
+    """Bags of ``product_packaging`` dispatched before ``before``'s count was taken.
 
     Those bags already left the floor before the count ``before`` names, so
     they carry no on-hand figure any more -- but they were packed from raw
-    material and must still count as spent. ``before=None`` (no bag count has
-    ever been taken) counts every dispatch ever made.
+    material and must still count as spent. That includes a dispatch earlier
+    on the count's own day (see ``_dispatch_conditions``). ``before=None`` (no
+    bag count has ever been taken) counts every dispatch ever made.
     """
     base = {"order__status_id__in": CONSUMING_STATUS_IDS}
     if before is None:
         return _bag_demand(product_packaging, base)
-    return _bag_demand(
-        product_packaging,
-        {**base, "order__dispatch_details__dispatch_date__lt": before},
-    ) + _bag_demand(
-        product_packaging,
-        {**base, "order__private_dispatch_details__dispatch_date__lt": before},
+    counted_at = _bag_counted_at(product_packaging, before)
+    return sum(
+        _bag_demand(product_packaging, base, condition)
+        for condition in _dispatch_conditions(
+            "order", before, counted_at, after_count=False
+        )
     )
 
 
@@ -613,14 +781,12 @@ def _loose_dispatched_before(
     base = {"custom_order__status_id__in": CONSUMING_STATUS_IDS}
     if before is None:
         return _loose_demand(product, packet_weight, base)
-    return _loose_demand(
-        product,
-        packet_weight,
-        {**base, "custom_order__dispatch_details__dispatch_date__lt": before},
-    ) + _loose_demand(
-        product,
-        packet_weight,
-        {**base, "custom_order__private_dispatch_details__dispatch_date__lt": before},
+    counted_at = _loose_counted_at(product, packet_weight, before)
+    return sum(
+        _loose_demand(product, packet_weight, base, condition)
+        for condition in _dispatch_conditions(
+            "custom_order", before, counted_at, after_count=False
+        )
     )
 
 
@@ -681,6 +847,225 @@ def _assert_raw_available(product_ids) -> None:
                 f"Not enough raw material for '{product.name}': short by "
                 f"{-available} kg."
             )
+
+
+# -- Packing (other) material backing -----------------------------------------
+#
+# Every packet also uses packing material -- leaflets, covers -- per the
+# product's ``OtherMaterialRecipe`` for its packet weight: ``recipe.quantity``
+# units of the material type per packet. The pool is the **material type**:
+# inward lots are booked against a recipe but any recipe of a type draws on
+# the same stock. Spent material is derived exactly like raw kilograms, from
+# the packets currently packed (latest bag and loose counts, plus what was
+# dispatched before them), valued at each product's *current* recipe.
+
+
+def packed_packets(product: Product) -> dict[Decimal, int]:
+    """Packets of ``product`` currently packed, per packet weight.
+
+    The packet counterpart of ``raw_bagged_kg`` + ``raw_loose_kg``, with the
+    same terms: each packaging's latest bag count plus bags dispatched before
+    it (times packets per bag), and each loose pool's latest count plus loose
+    packets dispatched before it.
+    """
+    packed: dict[Decimal, int] = {}
+    snapshot_date = latest_snapshot_date()
+    for packaging in ProductPackaging.objects.filter(product=product):
+        bags = on_hand_bags(packaging, snapshot_date) + _bags_dispatched_before(
+            packaging, snapshot_date
+        )
+        weight = packaging.packet_weight
+        packed[weight] = packed.get(weight, 0) + bags * packaging.packets
+    loose_snapshot_date = latest_loose_snapshot_date()
+    for weight in product_loose_weights(product):
+        packets = on_hand_loose_packets(
+            product, weight, loose_snapshot_date
+        ) + _loose_dispatched_before(product, weight, loose_snapshot_date)
+        packed[weight] = packed.get(weight, 0) + packets
+    return packed
+
+
+def other_material_inward(
+    material_type_ids: Iterable[int] | None = None, as_of: date | None = None
+) -> dict[int, Decimal]:
+    """Units received per material type, over lots with a reached effective date.
+
+    Lots booked against a since-replaced recipe still count: the stock is the
+    material type's, whichever recipe version brought it in.
+    """
+    as_of = as_of or today()
+    query = InwardOtherMaterial.objects.filter(
+        effective_date__isnull=False, effective_date__lte=as_of
+    )
+    if material_type_ids is not None:
+        query = query.filter(recipe__material_type_id__in=list(material_type_ids))
+    rows = query.values("recipe__material_type_id").annotate(total=Sum("quantity"))
+    return {row["recipe__material_type_id"]: row["total"] for row in rows}
+
+
+def other_material_used(
+    material_type_ids: Iterable[int] | None = None,
+) -> dict[int, Decimal]:
+    """Units per material type spent on the packets currently packed.
+
+    Each live recipe charges ``quantity`` per packed packet of its product at
+    its packet weight; packets of a weight with no recipe for the type use none.
+    """
+    recipes = OtherMaterialRecipe.objects.all()
+    if material_type_ids is not None:
+        recipes = recipes.filter(material_type_id__in=list(material_type_ids))
+    used: dict[int, Decimal] = {}
+    packed_by_product: dict[int, dict[Decimal, int]] = {}
+    for recipe in recipes.select_related("product"):
+        if recipe.product_id not in packed_by_product:
+            packed_by_product[recipe.product_id] = packed_packets(recipe.product)
+        packets = packed_by_product[recipe.product_id].get(recipe.packet_weight, 0)
+        used[recipe.material_type_id] = (
+            used.get(recipe.material_type_id, Decimal("0")) + recipe.quantity * packets
+        )
+    return used
+
+
+def other_material_available(material_type_ids: Iterable[int]) -> dict[int, Decimal]:
+    """``inward - used`` for each of ``material_type_ids``."""
+    material_type_ids = list(material_type_ids)
+    inward = other_material_inward(material_type_ids)
+    used = other_material_used(material_type_ids)
+    return {
+        material_type_id: inward.get(material_type_id, Decimal("0"))
+        - used.get(material_type_id, Decimal("0"))
+        for material_type_id in material_type_ids
+    }
+
+
+def _lock_materials(product_ids, material_type_ids: Iterable[int] = ()) -> list[int]:
+    """Lock the material types ``product_ids``' recipes use, plus ``material_type_ids``.
+
+    Rows are locked in pk order, so two writers sharing a material cannot both
+    spend its last units. Returns the locked ids.
+    """
+    locked = sorted(
+        set(
+            OtherMaterialRecipe.objects.filter(product_id__in=product_ids).values_list(
+                "material_type_id", flat=True
+            )
+        )
+        | set(material_type_ids)
+    )
+    list(
+        OtherMaterialType.all_objects.select_for_update()
+        .filter(pk__in=locked)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+    return locked
+
+
+def _material_guard(product_ids) -> dict[int, Decimal]:
+    """Lock the packing materials ``product_ids`` use; return their availability.
+
+    Called before a count write, inside its transaction. The returned figures
+    are what :func:`_assert_material_available` compares the write against.
+    """
+    return other_material_available(_lock_materials(product_ids))
+
+
+def guard_stock_deletion(
+    perform: Callable[[], None],
+    *,
+    product_ids: Iterable[int] = (),
+    packagings: Iterable[ProductPackaging] = (),
+    loose_pools: Iterable[tuple[Product, Decimal]] = (),
+    material_type_ids: Iterable[int] = (),
+) -> None:
+    """Run ``perform`` -- soft-deleting a count line or an inward lot -- or refuse it.
+
+    Every stock figure the deletion can move is read before and after it:
+    available bags of ``packagings``, available loose packets of
+    ``loose_pools``, raw kilograms of ``product_ids``, and every packing
+    material those products use plus ``material_type_ids``. The deletion is
+    refused -- ``ValidationError``, which also rolls ``perform`` back -- when a
+    figure ends up negative *and* lower than before. A figure that was already
+    negative and does not move does not block it, the same rule the count
+    writers apply (see ``_assert_material_available``).
+
+    Deleting a count line can move more than its own pool: when the deleted
+    row was the latest count date's last, an earlier day becomes "the latest
+    count", and raw and packing material are re-derived from it.
+
+    Locks are taken in the order the count writers take them -- raw pools, bag
+    pools, loose pools, materials -- so a deletion and a count cannot deadlock.
+    Must run inside ``transaction.atomic`` (``SoftDeletedModel`` provides it).
+    """
+    product_ids = sorted(set(product_ids))
+    packagings = list(packagings)
+    loose_pools = list(loose_pools)
+    lock_raw_pools(product_ids)
+    lock_bag_pools(packagings)
+    lock_loose_pools(product.id for product, _ in loose_pools)
+    material_ids = _lock_materials(product_ids, material_type_ids)
+    materials = {
+        material.id: material
+        for material in OtherMaterialType.all_objects.filter(id__in=material_ids)
+    }
+
+    def figures() -> dict[str, tuple[Decimal, str]]:
+        """Each watched figure, by a label naming it, with its unit."""
+        current: dict[str, tuple[Decimal, str]] = {}
+        for packaging in packagings:
+            current[f"'{packaging}'"] = (Decimal(available_bags(packaging)), "bags")
+        for product, weight in loose_pools:
+            current[f"'{product.name}' loose {weight}kg packets"] = (
+                Decimal(available_loose_packets(product, weight)),
+                "packets",
+            )
+        for product in Product.all_objects.filter(id__in=product_ids):
+            current[f"raw material of '{product.name}'"] = (raw_available_kg(product), "kg")
+        for material_id, available in other_material_available(material_ids).items():
+            material = materials[material_id]
+            current[f"'{material.name}'"] = (available, material.unit_type)
+        return current
+
+    before = figures()
+    perform()
+    after = figures()
+    short = [
+        f"{label} short by {-value} {unit}"
+        for label, (value, unit) in after.items()
+        if value < 0 and value < before[label][0]
+    ]
+    if short:
+        raise ValidationError(f"This deletion would leave {'; '.join(short)}.")
+
+
+def _assert_material_available(before: Mapping[int, Decimal]) -> None:
+    """Raise if the count just written took a packing material below zero.
+
+    Only a write that *spends more* of a material and leaves it negative is
+    refused. A material already short before this write -- inward entries
+    lagging behind the counts -- does not block a count that uses no more of
+    it, so lowering a count is never refused. Same ``ValueError`` convention
+    as ``_assert_raw_available``: the whole write rolls back and the view
+    answers 400.
+    """
+    after = other_material_available(before)
+    short = [
+        material_type_id
+        for material_type_id, available in after.items()
+        if available < 0 and available < before[material_type_id]
+    ]
+    if not short:
+        return
+    names = {
+        material.id: material
+        for material in OtherMaterialType.all_objects.filter(id__in=short)
+    }
+    details = "; ".join(
+        f"'{names[material_type_id].name}' short by "
+        f"{-after[material_type_id]} {names[material_type_id].unit_type}"
+        for material_type_id in short
+    )
+    raise ValueError(f"Not enough packing material: {details}.")
 
 
 # -- Shared -------------------------------------------------------------------

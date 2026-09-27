@@ -71,7 +71,6 @@ class _ProductPackagingRecordDialogState
   ProductModel? _selectedProduct;
   bool _isSubmitting = false;
   bool _areProductsUnavailable = false;
-  String? _productError;
 
   ProductPackagingModel get _packaging => widget.packaging;
 
@@ -158,7 +157,6 @@ class _ProductPackagingRecordDialogState
   void _onProductSelected(ProductModel product) {
     setState(() {
       _selectedProduct = product;
-      _productError = null;
     });
     _applyAutofill();
   }
@@ -188,30 +186,22 @@ class _ProductPackagingRecordDialogState
 
     setState(() {
       _selectedProduct = _resolveSelectedProduct();
-      _productError = null;
       _mode = RecordDialogMode.view;
     });
   }
 
-  void _notifyViewMode() {
+  void _notifyLocked() {
     ToastUtils.showInfo(
       context,
       AppStrings.VIEW_MODE_TOAST_TITLE,
-      description: AppStrings.VIEW_MODE_TOAST_BODY,
+      description: AppStrings.VIEW_MODE_LOCKED_TOAST_BODY,
     );
   }
 
   Future<void> _submit() async {
+    // Only the selling price is sent, so the (locked) product is not validated.
     final bool isFormValid = _formKey.currentState?.validate() ?? false;
-    final bool isProductValid = _selectedProduct != null;
-
-    setState(
-      () => _productError = isProductValid
-          ? null
-          : AppStrings.VALIDATION_PRODUCT_REQUIRED,
-    );
-
-    if (!isFormValid || !isProductValid) return;
+    if (!isFormValid) return;
 
     setState(() => _isSubmitting = true);
 
@@ -219,9 +209,6 @@ class _ProductPackagingRecordDialogState
 
     final bool succeeded = await cubit.updateProductPackaging(
       publicId: _packaging.publicId,
-      productPublicId: _selectedProduct!.publicId,
-      packetWeight: _packetWeightController.text.trim(),
-      packets: _packetsController.text.trim(),
       sellingPrice: _sellingPriceController.text.trim(),
     );
 
@@ -281,13 +268,14 @@ class _ProductPackagingRecordDialogState
       mainAxisSize: MainAxisSize.min,
       children: [
         RecordFieldRow(
+          // The product, like the packet weight and count, is fixed once a
+          // packaging exists: only its selling price can be edited.
           left: ProductPickerField(
             value: product,
             products: _products,
-            enabled: _canEdit,
-            errorText: _productError,
+            enabled: false,
             isUnavailable: _areProductsUnavailable,
-            onBlockedTap: _notifyViewMode,
+            onBlockedTap: _notifyLocked,
             onSelected: _onProductSelected,
           ),
           right: RecordField(

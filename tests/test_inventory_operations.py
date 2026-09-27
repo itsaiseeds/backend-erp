@@ -11,13 +11,19 @@ from decimal import Decimal
 from django.core.exceptions import PermissionDenied, ValidationError
 
 from aggregator import InventoryOperations as inv
+from aggregator import InwardOperations
 from aggregator.ClientOperations import add_client_address, create_client
 from aggregator.models import (
     Address,
     City,
     Country,
     InventorySnapshot,
+    InwardOtherMaterial,
     InwardRawMaterial,
+    Order,
+    OtherMaterialRecipe,
+    OtherMaterialType,
+    OtherMaterialUnitType,
     Party,
     Pincode,
     ProductPackaging,
@@ -29,6 +35,7 @@ from aggregator.models import (
 from aggregator.OrderOperations import (
     attach_dispatch_details,
     create_order,
+    mark_delivered,
     revert_dispatch,
     unverify_order,
     update_order_status,
@@ -303,6 +310,67 @@ class InventoryOperationsTest(DMLTestCase):
         assert inv.consumed_bags(self.pack) == 0
         assert inv.available_bags(self.pack) == 400
 
+    def _dispatch_today(self, order):
+        attach_dispatch_details(
+            order, dispatched_by=self.stock_admin, dispatch_date=self.today,
+            from_city=self.city, to_city=self.city2, lr_number="LR779",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+
+    def test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice(self):
+        """Dispatched at 10:00, counted at 17:00: the count already lacks those bags.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice
+        """
+        self._count_everything(bags=400)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        self._dispatch_today(order)
+
+        # The re-count finds the 5 dispatched bags gone from the floor.
+        inv.record_stock_count(product_packaging=self.pack, bags=395, actor=self.stock_admin)
+
+        assert inv.consumed_bags(self.pack) == 0
+        assert inv.available_bags(self.pack) == 395
+        # Still spent from raw material: 395 on the floor + 5 on the road.
+        assert inv.raw_available_kg(self.product) == raw_before
+
+    def test_a_same_day_dispatch_after_the_count_is_consumed(self):
+        """Counted first, dispatched later the same day: subtracted once, not ignored.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_same_day_dispatch_after_the_count_is_consumed
+        """
+        self._count_everything(bags=400)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        self._dispatch_today(order)
+
+        assert inv.consumed_bags(self.pack) == 5
+        assert inv.available_bags(self.pack) == 395
+        assert inv.raw_available_kg(self.product) == raw_before
+
+    def test_only_a_count_write_moves_the_count_time(self):
+        """An admin edit of a count line keeps ``counted_at``; a re-count moves it.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_only_a_count_write_moves_the_count_time
+        """
+        self._count_everything(bags=400)
+        line = inv.snapshot_line(self.pack)
+        counted_at = line.counted_at
+
+        line.full_clean()
+        line.save()  # what the Django admin's change form does
+        line.refresh_from_db()
+        assert line.counted_at == counted_at
+
+        inv.record_stock_count(product_packaging=self.pack, bags=399, actor=self.stock_admin)
+        line.refresh_from_db()
+        assert line.counted_at > counted_at
+
     # -- raw material backing ---------------------------------------------------
     #
     # self.product is booked with a huge (1,000,000 kg) raw lot in
@@ -438,6 +506,265 @@ class InventoryOperationsTest(DMLTestCase):
 
         assert inv.reserved_bags(self.pack) == 5
         assert inv.raw_available_kg(self.product) == before
+
+    # -- packing (other) material backing -----------------------------------------
+    #
+    # A recipe charges ``quantity`` units of its material per packet of its
+    # product at its packet weight. self.pack is 40 x 1kg packets per bag.
+
+    def _material(self, name="Test leaflets"):
+        return OtherMaterialType.objects.create(
+            name=name, unit_type=OtherMaterialUnitType.COUNT, created_by=self.su
+        )
+
+    def _recipe(self, material, *, product=None, packet_weight=None, per_packet="2"):
+        return OtherMaterialRecipe.objects.create(
+            product=product or self.product,
+            material_type=material,
+            packet_weight=packet_weight or self.pack.packet_weight,
+            quantity=Decimal(per_packet),
+            created_by=self.su,
+        )
+
+    def _receive(self, recipe, quantity):
+        party, _ = Party.objects.get_or_create(
+            name="Packing Supplier", city=self.city, defaults={"created_by": self.su}
+        )
+        return InwardOtherMaterial.objects.create(
+            recipe=recipe,
+            party=party,
+            quantity=Decimal(quantity),
+            effective_date=self.today,
+            created_by=self.su,
+        )
+
+    def _on_hand(self, material):
+        lines = {
+            line["material_type_id"]: line["on_hand"]
+            for line in InwardOperations.other_material_on_hand()
+        }
+        return lines[material.id]
+
+    def test_counted_bags_and_loose_packets_use_packing_material(self):
+        """3 bags x 40 packets + 10 loose, at 2 leaflets a packet = 260 used.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_counted_bags_and_loose_packets_use_packing_material
+        """
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets), 1000)
+
+        inv.record_stock_count(product_packaging=self.pack, bags=3, actor=self.stock_admin)
+        inv.record_loose_stock(
+            product=self.product, packet_weight=self.weight, packets=10, actor=self.stock_admin
+        )
+
+        assert inv.other_material_used([leaflets.id]) == {leaflets.id: Decimal("260")}
+        assert self._on_hand(leaflets) == Decimal("740")
+
+    def test_bags_dispatched_before_the_count_stay_used(self):
+        """Gone from the floor, but they were packed -- their leaflets stay spent.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_bags_dispatched_before_the_count_stay_used
+        """
+        self._count_everything(bags=400, loose_packets=0)
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets, per_packet="1"), 100000)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        attach_dispatch_details(
+            order, dispatched_by=self.stock_admin,
+            dispatch_date=self.today - datetime.timedelta(days=3),
+            from_city=self.city, to_city=self.city2, lr_number="LR901",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+
+        # 400 on the floor + 5 dispatched before the count, 40 packets a bag.
+        assert inv.other_material_used([leaflets.id]) == {leaflets.id: Decimal(405 * 40)}
+
+    def test_a_recipe_charges_only_its_own_weight_and_products_share_a_material(self):
+        """A 2kg recipe ignores 1kg packets; two products' recipes draw one pool.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_recipe_charges_only_its_own_weight_and_products_share_a_material
+        """
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets, packet_weight=Decimal("2.000")), 1000)
+        other_product, other_pack = self._raw_pack(name="Leaflet Sharer", packets=10)
+        book_raw_material(other_product, Decimal("1000"), actor=self.su)
+        self._recipe(leaflets, product=other_product, packet_weight=other_pack.packet_weight,
+                     per_packet="3")
+
+        inv.record_stock_count(product_packaging=self.pack, bags=3, actor=self.stock_admin)
+        inv.record_stock_count(product_packaging=other_pack, bags=2, actor=self.stock_admin)
+
+        # self.pack is 1kg, which the 2kg recipe does not cover: only the
+        # other product's 2 bags x 10 packets x 3 leaflets are charged.
+        assert self._on_hand(leaflets) == Decimal("940")
+
+    def test_a_count_that_outruns_packing_material_is_rolled_back(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_a_count_that_outruns_packing_material_is_rolled_back"""
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets), 160)  # exactly 2 bags' worth
+        inv.record_stock_count(product_packaging=self.pack, bags=2, actor=self.stock_admin)
+
+        with self.assertRaisesMessage(ValueError, "'Test leaflets' short by 80"):
+            inv.record_stock_counts(counts={self.pack: 3}, actor=self.stock_admin)
+
+        assert inv.on_hand_bags(self.pack) == 2
+        assert self._on_hand(leaflets) == Decimal("0")
+
+    def test_a_material_already_short_only_blocks_counts_that_use_more(self):
+        """Inward lagging behind the counts: lowering is allowed, raising is not.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_material_already_short_only_blocks_counts_that_use_more
+        """
+        inv.record_stock_count(product_packaging=self.pack, bags=5, actor=self.stock_admin)
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets), 100)  # 5 bags need 400
+        assert self._on_hand(leaflets) == Decimal("-300")
+
+        inv.record_stock_count(product_packaging=self.pack, bags=4, actor=self.stock_admin)
+        inv.record_stock_count(product_packaging=self.pack, bags=4, actor=self.stock_admin)
+        assert self._on_hand(leaflets) == Decimal("-220")
+
+        with self.assertRaisesMessage(ValueError, "Not enough packing material"):
+            inv.record_stock_count(product_packaging=self.pack, bags=6, actor=self.stock_admin)
+        assert inv.on_hand_bags(self.pack) == 4
+
+    # -- deleting counts and inward lots ------------------------------------------
+    #
+    # mark_deleted() is the API's path, delete(deleted_by=...) the Django
+    # admin's; both run the model's guard_soft_delete.
+
+    def test_a_count_line_under_reservations_cannot_be_deleted(self):
+        """Deleting today's line would leave the reserved bags uncovered.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_count_line_under_reservations_cannot_be_deleted
+        """
+        self._count_everything(bags=400)
+        verify_order(self._order(quantity=5), self.stock_admin)
+        line = inv.snapshot_line(self.pack)
+
+        for delete in (lambda: line.mark_deleted(self.stock_admin),
+                       lambda: line.delete(deleted_by=self.su)):
+            with self.assertRaisesMessage(ValidationError, "short by 5 bags"):
+                delete()
+            assert not line.is_deleted  # the in-memory flags are put back too
+            line.refresh_from_db()
+            assert not line.is_deleted
+        assert inv.available_bags(self.pack) == 395
+
+    def test_a_count_line_nothing_depends_on_can_be_deleted(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_a_count_line_nothing_depends_on_can_be_deleted"""
+        self._count_everything(bags=400)
+        line = inv.snapshot_line(self.pack)
+
+        line.delete(deleted_by=self.su)
+
+        line.refresh_from_db()
+        assert line.is_deleted
+        assert inv.available_bags(self.pack) == 0
+
+    def test_a_packing_lot_already_used_cannot_be_deleted(self):
+        """Deleting the lot would leave 240 leaflets' worth of counted packets uncovered.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_packing_lot_already_used_cannot_be_deleted
+        """
+        leaflets = self._material()
+        recipe = self._recipe(leaflets)
+        used_lot = self._receive(recipe, 240)
+        spare_lot = self._receive(recipe, 50)
+        inv.record_stock_count(product_packaging=self.pack, bags=3, actor=self.stock_admin)
+
+        spare_lot.mark_deleted(self.stock_admin)  # 240 still covers 240 used
+
+        with self.assertRaisesMessage(ValidationError, "'Test leaflets' short by 240.000 count"):
+            used_lot.mark_deleted(self.stock_admin)
+        used_lot.refresh_from_db()
+        assert not used_lot.is_deleted
+        assert self._on_hand(leaflets) == Decimal("0")
+
+    def test_the_admin_cannot_delete_raw_material_already_packed(self):
+        """The API always refused this; the admin delete now does too.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_the_admin_cannot_delete_raw_material_already_packed
+        """
+        product, pack = self._raw_pack(name="Admin Raw")
+        lot = book_raw_material(product, Decimal("10"), actor=self.su)
+        inv.record_stock_count(product_packaging=pack, bags=4, actor=self.stock_admin)
+
+        with self.assertRaisesMessage(ValidationError, "4.000 kg of this lot is already packed"):
+            lot.delete(deleted_by=self.su)
+        lot.refresh_from_db()
+        assert not lot.is_deleted
+
+    # -- deleting orders ------------------------------------------------------------
+
+    def test_an_order_holding_stock_cannot_be_deleted(self):
+        """Confirmed, dispatched and delivered orders refuse, via the API or the admin.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_an_order_holding_stock_cannot_be_deleted
+        """
+        self._count_everything(bags=400)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+
+        with self.assertRaisesMessage(ValidationError, "Cannot delete an order that is CONFIRMED"):
+            order.delete(deleted_by=self.su)
+        attach_dispatch_details(
+            order, dispatched_by=self.stock_admin, dispatch_date=self.today,
+            from_city=self.city, to_city=self.city2, lr_number="LR902",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+        with self.assertRaisesMessage(ValidationError, "Cannot delete an order that is DISPATCHED"):
+            order.mark_deleted(self.stock_admin)
+        mark_delivered(order)
+        with self.assertRaisesMessage(ValidationError, "Cannot delete an order that is DELIVERED"):
+            order.mark_deleted(self.stock_admin)
+
+        order.refresh_from_db()
+        assert not order.is_deleted
+        assert inv.consumed_bags(self.pack) == 5
+
+    def test_an_unverified_order_can_be_deleted_and_holds_nothing(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_an_unverified_order_can_be_deleted_and_holds_nothing"""
+        self._count_everything(bags=400)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        unverify_order(order)
+
+        order.delete(deleted_by=self.su)
+
+        order.refresh_from_db()
+        assert order.is_deleted
+        assert inv.available_bags(self.pack) == 400
+
+    def test_an_order_already_deleted_holds_no_stock(self):
+        """A row deleted before the guard existed no longer reserves or consumes.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_an_order_already_deleted_holds_no_stock
+        """
+        self._count_everything(bags=400)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        assert inv.reserved_bags(self.pack) == 5
+
+        Order.all_objects.filter(pk=order.pk).update(is_deleted=True)
+
+        assert inv.reserved_bags(self.pack) == 0
+        assert inv.available_bags(self.pack) == 400
+
+    def test_only_a_dispatched_order_can_be_delivered(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_only_a_dispatched_order_can_be_delivered"""
+        self._count_everything(bags=400)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+
+        with self.assertRaisesMessage(ValidationError, "Cannot deliver an order that is CONFIRMED"):
+            mark_delivered(order)
 
     def test_uncounted_packaging_has_no_stock(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_uncounted_packaging_has_no_stock"""

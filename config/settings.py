@@ -294,6 +294,14 @@ REST_FRAMEWORK = {
     },
 }
 
+# POST /api/execute-code/ runs arbitrary Python in the web process. It is off
+# (404) unless this is set, and must stay off in production.
+ENABLE_EXECUTE_CODE = os.environ.get("ENABLE_EXECUTE_CODE", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
 # Bearer (persistent-login) tokens are valid for this many hours from creation.
 TOKEN_TTL_HOURS = int(os.environ.get("TOKEN_TTL_HOURS", "24"))
 

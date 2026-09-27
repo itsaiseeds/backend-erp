@@ -15,7 +15,7 @@ payloads never include the internal primary key.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
@@ -41,6 +41,41 @@ if TYPE_CHECKING:
     from authentication.models import User
 
 
+def assert_loose_stock_covers(needed: Mapping[tuple[Product, object], int]) -> None:
+    """Raise unless the loose pools can supply ``needed`` packets per pool.
+
+    ``needed`` maps ``(product, packet_weight)`` to the packets a new custom
+    order takes from that exact pool -- a 1kg line is never filled from 500g
+    stock -- summed over **all** its lines, so two lines for the same pool
+    cannot each fit on their own while together exceeding it.
+
+    The pools are locked first (:func:`InventoryOperations.lock_loose_pools`)
+    and stay locked until the caller's transaction commits the order, so two
+    orders created at once cannot both spend the same packets. Callers must be
+    inside ``transaction.atomic``: ``create_custom_order`` and the admin's
+    add form, which Django already runs atomically.
+    """
+    from . import InventoryOperations
+
+    InventoryOperations.lock_loose_pools(product.id for product, _ in needed)
+    shortages = []
+    for (product, packet_weight), packets in needed.items():
+        available = InventoryOperations.available_loose_packets(product, packet_weight)
+        if packets > available:
+            shortages.append(
+                f"{product.name} @ {packet_weight}kg: need {packets}, have {available}"
+            )
+    if shortages:
+        raise ValidationError(
+            {
+                "packets": (
+                    "Not enough loose-packet stock to create this custom order -- "
+                    f"{'; '.join(shortages)}."
+                )
+            }
+        )
+
+
 @transaction.atomic
 def create_custom_order(
     *,
@@ -62,36 +97,15 @@ def create_custom_order(
     optional ``"negotiated_selling_price"`` (per packet); when omitted the line
     is priced at ``product.price_for_weight(packet_weight)``.
 
-    **Stock gate:** there must be enough loose-packet stock in the exact
-    ``(product, packet_weight)`` pool the line names -- a 1kg line is never
-    filled from 500g stock. The packets requested must not exceed what is
-    currently available (`available_loose_packets`); otherwise the order is not
-    created. Because the order confirms immediately, availability is checked
-    *before* it reserves.
+    **Stock gate:** see :func:`assert_loose_stock_covers`. Because the order
+    confirms immediately, availability is checked *before* it reserves.
     """
-    from . import InventoryOperations
-
     items = list(items)
-
-    shortages = []
+    needed: dict[tuple[Product, object], int] = {}
     for item in items:
-        product = item["product"]
-        packet_weight = item["packet_weight"]
-        needed = item["packets"]
-        available = InventoryOperations.available_loose_packets(product, packet_weight)
-        if needed > available:
-            shortages.append(
-                f"{product.name} @ {packet_weight}kg: need {needed}, have {available}"
-            )
-    if shortages:
-        raise ValidationError(
-            {
-                "packets": (
-                    "Not enough loose-packet stock to create this custom order -- "
-                    f"{'; '.join(shortages)}."
-                )
-            }
-        )
+        pool = (item["product"], item["packet_weight"])
+        needed[pool] = needed.get(pool, 0) + item["packets"]
+    assert_loose_stock_covers(needed)
 
     order = CustomOrder(
         client=client,
@@ -231,7 +245,23 @@ def attach_private_dispatch_details(
     return dispatch
 
 
+def _assert_dispatched(order: CustomOrder, action: str) -> None:
+    """Raise unless ``order`` is DISPATCHED -- the only status ``action`` applies to."""
+    code = order.status.code if order.status_id else None
+    if code != StatusIds.DISPATCHED.name:
+        raise ValidationError(
+            {
+                "status": (
+                    f"Cannot {action} a custom order that is {code}. "
+                    f"Allowed: {StatusIds.DISPATCHED.name}."
+                )
+            }
+        )
+
+
 def mark_delivered(order: CustomOrder, actual_delivery_date=None) -> CustomOrder:
+    """Mark a dispatched custom order delivered."""
+    _assert_dispatched(order, "deliver")
     order.status = Status.by_id(StatusIds.DELIVERED)
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
     order.full_clean()
@@ -245,6 +275,7 @@ def revert_dispatch(order: CustomOrder) -> CustomOrder:
     Its loose packets move back from consumed to reserved on their own -- both
     figures are derived from the status.
     """
+    _assert_dispatched(order, "revert the dispatch of")
     order.status = Status.by_id(StatusIds.CONFIRMED)
     order.actual_delivery_date = None
     order.full_clean()
