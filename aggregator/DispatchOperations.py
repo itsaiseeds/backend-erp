@@ -214,9 +214,14 @@ def dispatch_challan_payload(order: Order) -> dict:
     The receiver block is read off the ``DispatchEntry`` snapshot rather than the
     live client, so a challan reprinted next year still says what went out with
     the goods.
+
+    The transport agency is read off the order: it is chosen at booking, decides
+    the dispatch mode, and cannot be edited once the order has been dispatched.
+    Null on a private dispatch, where there is no carrier.
     """
     entry = order.dispatch_entry
     items = list(entry.items.all())
+    agency = order.transport_agency
     return {
         "order_public_id": order.public_id,
         "our_details": dict(COMPANY_DETAILS),
@@ -229,7 +234,12 @@ def dispatch_challan_payload(order: Order) -> dict:
         },
         "hsn_code": DEFAULT_HSN_CODE,
         "financial_year": current_financial_year(entry.dispatch_date),
-        "dispatch": dispatch_entry_payload(entry),
+        "dispatch": {
+            **dispatch_entry_payload(entry),
+            "transport_agency": (
+                {"id": agency.id, "name": agency.name} if agency else None
+            ),
+        },
         "items": [
             {
                 **packaging_payload(line.product_packaging),

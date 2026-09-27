@@ -287,6 +287,7 @@ class DispatchChallansApiTest(WebApiTestCase):
         self.assertEqual(challan["order_public_id"], order.public_id)
         self.assertTrue(challan["dispatch"]["is_private"])
         self.assertEqual(challan["dispatch"]["lr_number"], "")
+        self.assertIsNone(challan["dispatch"]["transport_agency"])
 
     def test_a_dispatch_outside_the_window_is_excluded(self):
         """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_dispatch_outside_the_window_is_excluded"""
@@ -355,6 +356,10 @@ class DispatchChallansApiTest(WebApiTestCase):
         self.assertEqual(dispatch["from_city"], "Surat")
         self.assertEqual(dispatch["to_city"], "Surat")
         self.assertFalse(dispatch["is_private"])
+        self.assertEqual(
+            dispatch["transport_agency"],
+            {"id": order.transport_agency_id, "name": "Acme Transport"},
+        )
 
         line = challan["items"][0]
         self.assertEqual(line["public_id"], self.bag.public_id)
