@@ -268,9 +268,10 @@ def assert_stock_covers(
         return
 
     if not InventoryOperations.is_stock_count_complete():
-        missing = list(
-            InventoryOperations.missing_packagings().values_list("public_id", flat=True)
-        )
+        missing = [
+            str(packaging)
+            for packaging in InventoryOperations.missing_packagings().select_related("product")
+        ]
         raise ValidationError(
             {
                 "status": (
@@ -284,7 +285,7 @@ def assert_stock_covers(
     for packaging, bags in increases.items():
         available = InventoryOperations.available_bags(packaging) + held.get(packaging, 0)
         if bags > available:
-            shortages.append(f"{packaging.public_id}: need {bags}, have {available}")
+            shortages.append(f"{packaging}: need {bags}, have {available}")
     if shortages:
         raise ValidationError(
             {
