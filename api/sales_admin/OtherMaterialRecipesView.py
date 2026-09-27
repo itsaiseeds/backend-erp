@@ -122,19 +122,45 @@ class RecipeListPageSerializer(serializers.Serializer):
     available_sorts = SortCatalogueEntrySerializer(many=True)
 
 
+def _products_with_recipes(request: Request) -> list[dict]:
+    """Every distinct product that has a live recipe.
+
+    The eligible value set for the ``product`` filter: the picker only ever
+    needs to offer a product that actually has a recipe behind it.
+    """
+    rows = (
+        OtherMaterialRecipe.objects.values_list("product__public_id", "product__name")
+        .distinct()
+        .order_by("product__name")
+    )
+    return [{"value": public_id, "label": name} for public_id, name in rows]
+
+
+def _material_types_with_recipes(request: Request) -> list[dict]:
+    """Every distinct material type that has a live recipe."""
+    rows = (
+        OtherMaterialRecipe.objects.values_list("material_type_id", "material_type__name")
+        .distinct()
+        .order_by("material_type__name")
+    )
+    return [{"value": material_type_id, "label": name} for material_type_id, name in rows]
+
+
 _QUERYSET_FILTERS = (
     QuerysetFilter(
         "product",
         label="Product",
         lookup="product__public_id__in",
         parse=parse_str,
-        description="Product public id(s).",
+        description="Product public id(s) (see options).",
+        options=_products_with_recipes,
     ),
     QuerysetFilter(
         "material_type",
         label="Material Type",
         lookup="material_type_id__in",
-        description="Material type id(s).",
+        description="Material type id(s) (see options).",
+        options=_material_types_with_recipes,
     ),
 )
 _SORT_OPTIONS = (
