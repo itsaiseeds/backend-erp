@@ -379,10 +379,14 @@ or rejecting a CONFIRMED order releases the bags it reserved, with no
 bookkeeping — reserved and consumed are derived from `Order.status`, never stored.
 
 `PATCH /api/sales-admin/edit-order/<public_id>` corrects everything else, with
-`items` as a declarative list (see below). It is **refused outright once the
-order is DISPATCHED or DELIVERED**: the goods have left, so the order is
-history. `verified_by` / `verified_at` / `created_by` / `created_at` are not
-fields on it at all.
+`items` as a declarative list (see below). It is **accepted only while the
+order is BOOKED or CONFIRMED** and refused outright in every other status
+(UNDER_REVIEW, ON_HOLD, REJECTED, DISPATCHED, DELIVERED). Editing a CONFIRMED
+order's items **re-checks stock** with the same gates as `verify-order` (today's
+count complete, enough available bags): the bags the order already reserves
+are credited back, and only a line that grows or is new is checked, so
+shrinking an order is never refused. `verified_by` / `verified_at` /
+`created_by` / `created_at` are not fields on it at all.
 
 Two rules that are not merely conventions there:
 

@@ -19,8 +19,14 @@ endpoint (``verify-order``).
 ``special_comments`` **accumulates**: whatever is sent is appended as a new
 line, so an admin adding a remark can never erase one somebody left earlier.
 
-**A dispatched order is frozen.** Once the goods have left, the order is history
--- every edit is rejected, not merely the ones touching its lines.
+**Only a BOOKED or CONFIRMED order is editable.** Any other status -- under
+review, on hold, rejected, dispatched, delivered -- rejects every edit, not
+merely the ones touching its lines.
+
+**A CONFIRMED order's lines are re-checked against stock.** Its bags are
+reserved, so raising a quantity or adding a bag must be covered by today's
+available stock (the bags it already holds count towards it); a shortfall is a
+400 and nothing is written.
 
 Every field is optional and only what is sent is applied. ``items``, when sent,
 is a **full declarative replacement**, the same contract the client's address /

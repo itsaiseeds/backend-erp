@@ -7,9 +7,9 @@ The bags it was holding are released automatically -- reservations are derived
 from the order's status, never stored.
 
 UNDER_REVIEW is itself verifiable, so this is a round trip rather than a dead
-end: an admin can pull an order back, correct it through ``edit-order`` (which a
-confirmed order also allows, but whose stock implications are only re-checked at
-verification), and approve it again.
+end. An UNDER_REVIEW order is **not** editable, though -- ``edit-order`` accepts
+only BOOKED and CONFIRMED orders, and re-checks stock when editing a confirmed
+one, so a correction does not need an unverify first.
 """
 
 from __future__ import annotations

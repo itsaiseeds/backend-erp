@@ -392,7 +392,7 @@ erDiagram
 │   ├── client/<public_id>   GET   GetClientView          (IsAdminUser → any client, full detail)
 │   ├── orders/              GET   GetOrdersView          (IsAdminUser → every order; paginated; ?created_by / ?client / ?product / ?city_id / ?status filters + ?sort=created_at|price; catalogues in available_filters/available_sorts)
 │   ├── order/<public_id>    GET   GetOrderView           (IsAdminUser → any order, full detail + the client in full)
-│   ├── edit-order/<public_id>      PATCH UpdateOrderView (IsAdminUser → core fields + declarative item list; refused once DISPATCHED)
+│   ├── edit-order/<public_id>      PATCH UpdateOrderView (IsAdminUser → core fields + declarative item list; BOOKED/CONFIRMED only; CONFIRMED re-checks stock)
 │   ├── verify-order/<public_id>    POST  VerifyOrderView      (IsAdminUser → BOOKED/UNDER_REVIEW/ON_HOLD → CONFIRMED, gated on today's stock count)
 │   ├── unverify-order/<public_id>  POST  UnverifyOrderView    (IsAdminUser → CONFIRMED → UNDER_REVIEW, clears verified_by/at)
 │   ├── dispatch-order/<public_id>  POST  DispatchOrderView    (IsAdminUser → CONFIRMED → DISPATCHED; kind follows the order's transport agency, LR optional)
