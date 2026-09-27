@@ -173,7 +173,14 @@ def set_lr_number(order: Order, *, lr_number: str):
 
     The number lands on ``DispatchDetails``, where it belongs; the challan reads
     it through ``DispatchEntry.lr_number``, so there is nothing else to write.
+
+    Only a DISPATCHED or DELIVERED order takes one. A reverted dispatch keeps its
+    dispatch record, so that alone would let an LR land on goods still on the
+    shelf; the status check comes after the record checks so an undispatched or
+    private order keeps its more specific message.
     """
+    from .OrderOperations import LR_RECORDABLE_STATUS_CODES, assert_order_status
+
     dispatch = order.dispatch_details
     if dispatch is None:
         if order.private_dispatch_details_id:
@@ -186,6 +193,8 @@ def set_lr_number(order: Order, *, lr_number: str):
                 }
             )
         raise ValidationError({"lr_number": "This order has not been dispatched yet."})
+
+    assert_order_status(order, LR_RECORDABLE_STATUS_CODES, "record an LR number for")
 
     dispatch.lr_number = lr_number.strip()
     dispatch.full_clean()

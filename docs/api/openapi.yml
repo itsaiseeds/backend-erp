@@ -6571,8 +6571,6 @@ components:
           type: string
           description: A remark to add to the order. Appended as a new line -- it
             never replaces what is already there.
-        status:
-          $ref: '#/components/schemas/UpdateOrderStatusEnum'
         items:
           type: array
           items:
@@ -7194,24 +7192,6 @@ components:
           description: Loose lines, one per (product, packet_weight) pair.
       required:
       - counts
-    UpdateOrderStatusEnum:
-      enum:
-      - BOOKED
-      - UNDER_REVIEW
-      - CONFIRMED
-      - DISPATCHED
-      - DELIVERED
-      - ON_HOLD
-      - REJECTED
-      type: string
-      description: |-
-        * `BOOKED` - BOOKED
-        * `UNDER_REVIEW` - UNDER_REVIEW
-        * `CONFIRMED` - CONFIRMED
-        * `DISPATCHED` - DISPATCHED
-        * `DELIVERED` - DELIVERED
-        * `ON_HOLD` - ON_HOLD
-        * `REJECTED` - REJECTED
     UpdateTodaysInventoryRequest:
       type: object
       description: |-

@@ -28,6 +28,7 @@ from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import (
     attach_private_dispatch_details,
     create_order,
+    update_order_core,
     update_order_status,
     verify_order,
 )
@@ -174,13 +175,29 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
         self.assertEqual(self.order.items.count(), 1)
         self.assertIsNone(self.order.transport_agency_id)
 
-    def test_the_status_can_be_changed(self):
-        """tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_the_status_can_be_changed"""
-        response = self._patch({"status": "ON_HOLD"})
+    def test_a_status_key_is_ignored(self):
+        """Status moves only through the lifecycle endpoints, never through an edit.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_status_key_is_ignored
+        """
+        response = self._patch({"status": "ON_HOLD", "special_comments": "noted"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["status"], "BOOKED")
+        self.assertEqual(response.data["special_comments"], "noted")
         self.order.refresh_from_db()
-        self.assertEqual(self.order.status.code, "ON_HOLD")
+        self.assertEqual(self.order.status.code, "BOOKED")
+
+    def test_update_order_core_refuses_a_status(self):
+        """The domain function fails loudly rather than quietly dropping a status.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_update_order_core_refuses_a_status
+        """
+        with self.assertRaises(TypeError):
+            update_order_core(self.order, status=StatusIds.CONFIRMED)
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status.code, "BOOKED")
 
     def test_the_transport_agency_can_be_set_and_cleared(self):
         """Setting an agency makes it an AGENCY dispatch; null returns it to PRIVATE.
@@ -382,16 +399,6 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
                 {"client_transport_agency_id": other_agency.id},
                 "No such transport agency for this client",
             ),
-            (
-                "confirming without verifying",
-                {"status": "CONFIRMED"},
-                "must record who verified it",
-            ),
-            (
-                "dispatching without dispatch details",
-                {"status": "DISPATCHED"},
-                "Dispatch details are required",
-            ),
         ]
         for label, body, fragment in cases:
             with self.subTest(case=label):
@@ -487,6 +494,51 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["items"][0]["quantity"], 1)
+
+    def test_a_confirmed_order_cannot_dodge_the_stock_check_via_status(self):
+        """The oversell chain: CONFIRMED -> BOOKED, grow unchecked, -> CONFIRMED.
+
+        The status key is ignored, so the order stays CONFIRMED and the grown
+        lines are checked against stock like any other confirmed edit.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_confirmed_order_cannot_dodge_the_stock_check_via_status
+        """
+        self._confirm(bags=5)
+
+        demoted = self._patch({"status": "BOOKED"})
+        self.assertEqual(demoted.status_code, status.HTTP_200_OK, demoted.data)
+        self.assertEqual(demoted.data["status"], "CONFIRMED")
+
+        grown = self._patch(
+            {"status": "BOOKED", "items": [self._line(self.alpha_bag, 50)]}
+        )
+
+        self.assertEqual(grown.status_code, status.HTTP_400_BAD_REQUEST, grown.data)
+        self.assertIn("Not enough stock to edit this order", grown.data["detail"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status.code, "CONFIRMED")
+        self.assertEqual(self.order.verified_by, self.admin_user)
+        self.assertEqual(
+            list(self.order.items.values_list("product_packaging", "quantity")),
+            [(self.alpha_bag.id, 2)],
+        )
+
+    def test_an_edit_cannot_move_a_confirmed_order_anywhere(self):
+        """Dispatch, delivery, hold, review and rejection each have their own verb.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_edit_cannot_move_a_confirmed_order_anywhere
+        """
+        self._confirm(bags=5)
+
+        for target in StatusIds:
+            with self.subTest(target=target.name):
+                response = self._patch({"status": target.name})
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                self.order.refresh_from_db()
+                self.assertEqual(self.order.status.code, "CONFIRMED")
+                self.assertIsNone(self.order.dispatch_details_id)
+                self.assertIsNone(self.order.private_dispatch_details_id)
 
     def test_a_booked_order_is_not_checked_against_stock(self):
         """Nothing is reserved until verification, which does its own check.
