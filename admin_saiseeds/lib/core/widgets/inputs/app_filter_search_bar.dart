@@ -649,7 +649,14 @@ class _FilterChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(label, style: AppTypography.labelSmall),
-              const SizedBox(width: AppSpacing.xs),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                AppStrings.FILTER_OPERATOR_EQUALS,
+                style: AppTypography.labelSmall.copyWith(
+                  color: AppColors.TEXT_SECONDARY,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
               ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: isWide
