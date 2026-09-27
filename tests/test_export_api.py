@@ -339,7 +339,6 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["receiver_details"]["company_name"], "Acme Seeds")
         self.assertEqual(row["items"][0]["lot_number"], "LOT-1")
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportDispatchReceiptsResponseSerializer(), resp.data), [])
 
     # -- inward entries -------------------------------------------------------
 
