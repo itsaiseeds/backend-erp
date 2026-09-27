@@ -34,6 +34,8 @@ class InwardRawMaterialsTable extends StatefulWidget {
   final List<ClientSortModel> availableSorts;
   final void Function(InwardRawMaterialModel lot)? onView;
   final void Function(InwardRawMaterialModel lot)? onDelete;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
   final String emptyTitle;
   final String emptyDescription;
@@ -53,6 +55,8 @@ class InwardRawMaterialsTable extends StatefulWidget {
     this.availableSorts = const [],
     this.onView,
     this.onDelete,
+    this.hasMore = false,
+    this.onLoadMore,
     this.searchBarActions = const [],
     this.emptyTitle = AppStrings.INWARD_EMPTY_STATE_TITLE,
     this.emptyDescription = AppStrings.INWARD_EMPTY_STATE_BODY,
@@ -158,6 +162,9 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
       totalPages: widget.totalPages,
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
+      isInfiniteScroll: true,
+      hasMore: widget.hasMore,
+      onLoadMore: widget.onLoadMore,
       searchBarActions: widget.searchBarActions,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _COLUMNS,

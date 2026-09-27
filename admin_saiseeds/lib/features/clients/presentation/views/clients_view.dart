@@ -128,6 +128,8 @@ class _ClientsContentState extends State<_ClientsContent> {
                   availableFilters: state.availableFilters,
                   availableSorts: state.availableSorts,
                   onFetchData: _onFetchData,
+            hasMore: state.hasMore,
+            onLoadMore: cubit.loadMore,
                   onView: _onView,
                   onAccept: isPending ? _onAccept : null,
                   emptyTitle: isPending

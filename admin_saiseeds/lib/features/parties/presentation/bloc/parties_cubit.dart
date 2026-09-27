@@ -44,6 +44,8 @@ class PartiesState extends Equatable {
   bool get isEmptySource =>
       (search?.trim().isEmpty ?? true) && filters.isEmpty;
 
+  bool get hasMore => currentPage < totalPages;
+
   PartiesState copyWith({
     PartiesStatus? status,
     List<PartyModel>? parties,
@@ -209,7 +211,14 @@ class PartiesCubit extends SafeCubit<PartiesState> {
     return params;
   }
 
-  Future<void> _fetch({required int page}) async {
+  /// Pulls the next page and appends it, for scroll-to-load.
+  Future<void> loadMore() async {
+    if (!state.hasMore) return;
+    if (state.status == PartiesStatus.loading) return;
+    await _fetch(page: state.currentPage + 1, append: true);
+  }
+
+  Future<void> _fetch({required int page, bool append = false}) async {
     emit(state.copyWith(status: PartiesStatus.loading, clearError: true));
 
     try {
@@ -220,7 +229,9 @@ class PartiesCubit extends SafeCubit<PartiesState> {
       emit(
         state.copyWith(
           status: PartiesStatus.loaded,
-          parties: result.results,
+          parties: append
+              ? [...state.parties, ...result.results]
+              : result.results,
           availableFilters: result.availableFilters.isEmpty
               ? state.availableFilters
               : result.availableFilters,

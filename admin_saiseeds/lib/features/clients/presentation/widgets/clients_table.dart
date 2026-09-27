@@ -38,6 +38,8 @@ class ClientsTable extends StatefulWidget {
   final void Function(ClientModel client)? onView;
   final void Function(ClientModel client)? onAccept;
   final void Function(ClientModel client)? onReject;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
   final String emptyTitle;
   final String emptyDescription;
@@ -59,6 +61,8 @@ class ClientsTable extends StatefulWidget {
     this.onView,
     this.onAccept,
     this.onReject,
+    this.hasMore = false,
+    this.onLoadMore,
     this.searchBarActions = const [],
     this.emptyTitle = AppStrings.CLIENTS_EMPTY_STATE_TITLE,
     this.emptyDescription = AppStrings.CLIENTS_EMPTY_STATE_BODY,
@@ -197,6 +201,9 @@ class ClientsTableState extends State<ClientsTable> {
       totalPages: widget.totalPages,
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
+      isInfiniteScroll: true,
+      hasMore: widget.hasMore,
+      onLoadMore: widget.onLoadMore,
       searchBarActions: widget.searchBarActions,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _columns,

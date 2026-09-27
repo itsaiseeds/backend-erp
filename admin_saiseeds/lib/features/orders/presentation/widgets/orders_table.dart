@@ -47,6 +47,8 @@ class OrdersTable extends StatefulWidget {
   final void Function(OrderModel order)? onDispatch;
   final void Function(OrderModel order)? onRevertDispatch;
   final void Function(OrderModel order)? onUploadLr;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
   final Widget? searchBarTrailing;
 
@@ -72,6 +74,8 @@ class OrdersTable extends StatefulWidget {
     this.onDispatch,
     this.onRevertDispatch,
     this.onUploadLr,
+    this.hasMore = false,
+    this.onLoadMore,
     this.searchBarActions = const [],
     this.searchBarTrailing,
   });
@@ -206,6 +210,9 @@ class OrdersTableState extends State<OrdersTable> {
       totalPages: widget.totalPages,
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
+      isInfiniteScroll: true,
+      hasMore: widget.hasMore,
+      onLoadMore: widget.onLoadMore,
       searchBarActions: widget.searchBarActions,
       searchBarTrailing: widget.searchBarTrailing,
       rowHeight: AppDataTable.standardRowHeight,

@@ -99,6 +99,17 @@ class AppDataTable<T> extends StatefulWidget {
   /// are already a short fixed list.
   final bool requireSearchBar;
 
+  /// Replaces the pagination bar with scroll-to-load. The owner appends each
+  /// page to its list rather than replacing it.
+  final bool isInfiniteScroll;
+
+  /// Whether another page exists. Ignored unless [isInfiniteScroll].
+  final bool hasMore;
+
+  /// Requests the next page. Called on scroll and, while the rows are too
+  /// short to fill the viewport, straight after a page lands.
+  final VoidCallback? onLoadMore;
+
   final String Function(T item)? selectionIdExtractor;
   final String Function(T item)? selectionLabelExtractor;
   final void Function(Map<String, String> selection)? onSelectionChanged;
@@ -152,6 +163,9 @@ class AppDataTable<T> extends StatefulWidget {
     this.requireExpandableColumnWidth = true,
     this.requireColumnSettings = true,
     this.requireSearchBar = true,
+    this.isInfiniteScroll = false,
+    this.hasMore = false,
+    this.onLoadMore,
     this.selectionIdExtractor,
     this.selectionLabelExtractor,
     this.onSelectionChanged,
@@ -172,6 +186,7 @@ class AppDataTable<T> extends StatefulWidget {
 class AppDataTableState<T> extends State<AppDataTable<T>> {
   late final TextEditingController _searchController;
   late final ScrollController _bodyScrollController;
+  late final ScrollController _rowScrollController;
   late final ValueNotifier<Map<String, String>> _selectionNotifier;
 
   final Map<String, String> _selection = {};
@@ -199,6 +214,8 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     super.initState();
     _searchController = TextEditingController();
     _bodyScrollController = ScrollController();
+    _rowScrollController = ScrollController()
+      ..addListener(_onRowScroll);
     _pinnedColumns = List<String>.from(widget.initialPinnedColumns);
     _hiddenColumns = List<String>.from(widget.initialHiddenColumns);
     _selection.addAll(widget.initialSelection);
@@ -212,8 +229,43 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     _searchController.dispose();
     _bodyScrollController.removeListener(_onBodyScroll);
     _bodyScrollController.dispose();
+    _rowScrollController.removeListener(_onRowScroll);
+    _rowScrollController.dispose();
     _selectionNotifier.dispose();
     super.dispose();
+  }
+
+  static const double _loadMoreThreshold = 320;
+
+  void _onRowScroll() {
+    if (!widget.isInfiniteScroll || !_rowScrollController.hasClients) return;
+
+    final ScrollPosition position = _rowScrollController.position;
+    if (position.pixels <
+        position.maxScrollExtent - _loadMoreThreshold) {
+      return;
+    }
+    _requestMore();
+  }
+
+  void _requestMore() {
+    if (!widget.isInfiniteScroll) return;
+    if (!widget.hasMore || widget.isLoading) return;
+    widget.onLoadMore?.call();
+  }
+
+  // A page shorter than the viewport leaves dead space and no way to scroll
+  // for the next one, so the table pulls until the rows overflow.
+  void _fillViewport() {
+    if (!widget.isInfiniteScroll || !widget.hasMore || widget.isLoading) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_rowScrollController.hasClients) return;
+      if (_rowScrollController.position.maxScrollExtent > 0) return;
+      _requestMore();
+    });
   }
 
   void _onBodyScroll() {
@@ -545,6 +597,8 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
   }
 
   Widget _buildTableArea() {
+    _fillViewport();
+
     return ResponsiveTableLayout(
       rowHeight: widget.rowHeight,
       overheadHeight: AppSizes.tableOverheadHeight,
@@ -731,7 +785,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
               backgroundColor: AppColors.TRANSPARENT,
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.PRIMARY),
             ),
-          if (widget.totalPages > 0)
+          if (!widget.isInfiniteScroll && widget.totalPages > 0)
             AppPagination(
               currentPage: widget.currentPage,
               totalPages: widget.totalPages,
@@ -948,9 +1002,12 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
         child: Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.smd),
           child: ListView.builder(
-            itemCount: data.length,
+            controller: _rowScrollController,
+            itemCount: data.length + (_showsLoadMoreRow ? 1 : 0),
             itemExtent: widget.rowHeight,
-            itemBuilder: (context, index) => _TableRow<T>(
+            itemBuilder: (context, index) => index >= data.length
+                ? const _LoadMoreRow()
+                : _TableRow<T>(
               item: data[index],
               stickyColumns: stickyCols,
               scrollableColumns: scrollCols,
@@ -969,6 +1026,8 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
       ),
     );
   }
+
+  bool get _showsLoadMoreRow => widget.isInfiniteScroll && widget.hasMore;
 
   Widget _buildDataCell(
     BuildContext context,
@@ -1098,6 +1157,24 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
           ),
         );
       },
+    );
+  }
+}
+
+class _LoadMoreRow extends StatelessWidget {
+  const _LoadMoreRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: SizedBox(
+        width: AppSizes.iconLg,
+        height: AppSizes.iconLg,
+        child: CircularProgressIndicator(
+          strokeWidth: AppSizes.borderMedium,
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.PRIMARY),
+        ),
+      ),
     );
   }
 }

@@ -205,6 +205,8 @@ class _OrdersContentState extends State<_OrdersContent> {
             availableFilters: state.availableFilters,
             availableSorts: state.availableSorts,
             onFetchData: _onFetchData,
+            hasMore: state.hasMore,
+            onLoadMore: cubit.loadMore,
             onView: _onView,
             onVerify: _onVerify,
             onUnverify: _onUnverify,

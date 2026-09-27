@@ -88,6 +88,8 @@ class OrdersState extends Equatable {
 
   bool get isEmptySource => status == OrdersStatus.loaded && orders.isEmpty;
 
+  bool get hasMore => currentPage < totalPages;
+
   @override
   List<Object?> get props => [
     status,
@@ -283,7 +285,14 @@ class OrdersCubit extends SafeCubit<OrdersState> {
         .toSet();
   }
 
-  Future<void> _fetch({required int page}) async {
+  /// Pulls the next page and appends it, for scroll-to-load.
+  Future<void> loadMore() async {
+    if (!state.hasMore) return;
+    if (state.status == OrdersStatus.loading) return;
+    await _fetch(page: state.currentPage + 1, append: true);
+  }
+
+  Future<void> _fetch({required int page, bool append = false}) async {
     emit(state.copyWith(status: OrdersStatus.loading, clearError: true));
     unawaited(loadTodaysStockStatus());
 
@@ -295,7 +304,9 @@ class OrdersCubit extends SafeCubit<OrdersState> {
       emit(
         state.copyWith(
           status: OrdersStatus.loaded,
-          orders: result.results,
+          orders: append
+              ? [...state.orders, ...result.results]
+              : result.results,
           availableFilters: result.availableFilters.isEmpty
               ? state.availableFilters
               : result.availableFilters,
