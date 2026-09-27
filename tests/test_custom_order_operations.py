@@ -412,6 +412,36 @@ class CustomOrderOperationsTest(DMLTestCase):
         assert inv.consumed_loose_packets(self.product, self.w1) == 0
         assert inv.available_loose_packets(self.product, self.w1) == 100
 
+    def test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice(self):
+        """Dispatched earlier today, then re-counted: the count already lacks them.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice
+        """
+        self._count(loose_packets=100)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._custom_order(packets=30)
+        self._dispatch(order)  # today
+
+        inv.record_loose_stock(
+            product=self.product, packet_weight=self.w1, packets=70, actor=self.stock_admin
+        )
+
+        assert inv.consumed_loose_packets(self.product, self.w1) == 0
+        assert inv.available_loose_packets(self.product, self.w1) == 70
+        # 70 on the floor + 30 on the road are still spent from raw material.
+        assert inv.raw_available_kg(self.product) == raw_before
+
+    def test_a_same_day_dispatch_after_the_count_is_consumed(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_same_day_dispatch_after_the_count_is_consumed"""
+        self._count(loose_packets=100)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._custom_order(packets=30)
+        self._dispatch(order)  # today, after the count
+
+        assert inv.consumed_loose_packets(self.product, self.w1) == 30
+        assert inv.available_loose_packets(self.product, self.w1) == 70
+        assert inv.raw_available_kg(self.product) == raw_before
+
     # -- both pools together ---------------------------------------------------
 
     def test_both_pools_move_independently(self):

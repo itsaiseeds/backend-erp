@@ -303,6 +303,67 @@ class InventoryOperationsTest(DMLTestCase):
         assert inv.consumed_bags(self.pack) == 0
         assert inv.available_bags(self.pack) == 400
 
+    def _dispatch_today(self, order):
+        attach_dispatch_details(
+            order, dispatched_by=self.stock_admin, dispatch_date=self.today,
+            from_city=self.city, to_city=self.city2, lr_number="LR779",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+
+    def test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice(self):
+        """Dispatched at 10:00, counted at 17:00: the count already lacks those bags.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice
+        """
+        self._count_everything(bags=400)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        self._dispatch_today(order)
+
+        # The re-count finds the 5 dispatched bags gone from the floor.
+        inv.record_stock_count(product_packaging=self.pack, bags=395, actor=self.stock_admin)
+
+        assert inv.consumed_bags(self.pack) == 0
+        assert inv.available_bags(self.pack) == 395
+        # Still spent from raw material: 395 on the floor + 5 on the road.
+        assert inv.raw_available_kg(self.product) == raw_before
+
+    def test_a_same_day_dispatch_after_the_count_is_consumed(self):
+        """Counted first, dispatched later the same day: subtracted once, not ignored.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_same_day_dispatch_after_the_count_is_consumed
+        """
+        self._count_everything(bags=400)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        self._dispatch_today(order)
+
+        assert inv.consumed_bags(self.pack) == 5
+        assert inv.available_bags(self.pack) == 395
+        assert inv.raw_available_kg(self.product) == raw_before
+
+    def test_only_a_count_write_moves_the_count_time(self):
+        """An admin edit of a count line keeps ``counted_at``; a re-count moves it.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_only_a_count_write_moves_the_count_time
+        """
+        self._count_everything(bags=400)
+        line = inv.snapshot_line(self.pack)
+        counted_at = line.counted_at
+
+        line.full_clean()
+        line.save()  # what the Django admin's change form does
+        line.refresh_from_db()
+        assert line.counted_at == counted_at
+
+        inv.record_stock_count(product_packaging=self.pack, bags=399, actor=self.stock_admin)
+        line.refresh_from_db()
+        assert line.counted_at > counted_at
+
     # -- raw material backing ---------------------------------------------------
     #
     # self.product is booked with a huge (1,000,000 kg) raw lot in

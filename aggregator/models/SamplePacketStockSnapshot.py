@@ -6,6 +6,7 @@ from common.models import (
     PrefixedPublicIdModel,
     SoftDeletedModel,
     TimeStampedModel,
+    indian_now,
 )
 
 from .BagStockSnapshot import default_snapshot_date
@@ -62,6 +63,17 @@ class LooseStockSnapshot(
         help_text=(
             "Loose packets of this product at this packet weight. Consumed only "
             "by custom orders -- a packaged order may never draw from here."
+        ),
+    )
+    counted_at = models.DateTimeField(
+        "counted at",
+        default=indian_now,
+        editable=False,
+        help_text=(
+            "When this count was last written. A dispatch recorded on "
+            "``snapshot_date`` before this moment is already absent from the "
+            "figure; one recorded after it is not. Set only by the count "
+            "writers in InventoryOperations, never by an admin edit."
         ),
     )
 

@@ -523,6 +523,7 @@ class InventorySnapshotAdmin(SoftDeleteModelAdmin):
         "product_packaging",
         "bags",
         "total_packets",
+        "counted_at",
         "created_by",
         "created_at",
     )
@@ -549,6 +550,7 @@ class LooseStockSnapshotAdmin(SoftDeleteModelAdmin):
         "packet_weight",
         "packets",
         "total_weight",
+        "counted_at",
         "created_by",
         "created_at",
     )
