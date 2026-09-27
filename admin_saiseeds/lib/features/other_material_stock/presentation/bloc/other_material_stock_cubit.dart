@@ -3,16 +3,16 @@ import '../../../../core/bloc/safe_cubit.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/utils/list_query.dart';
-import '../../data/models/raw_material_stock_model.dart';
-import '../../data/raw_material_stock_repository.dart';
+import '../../data/models/other_material_stock_model.dart';
+import '../../data/other_material_stock_repository.dart';
 
-enum RawMaterialStockStatus { initial, loading, loaded, failure }
+enum OtherMaterialStockStatus { initial, loading, loaded, failure }
 
-class RawMaterialStockState extends Equatable {
-  final RawMaterialStockStatus status;
+class OtherMaterialStockState extends Equatable {
+  final OtherMaterialStockStatus status;
   final String asOf;
-  final List<RawMaterialStockLineModel> allLines;
-  final List<RawMaterialStockLineModel> visibleLines;
+  final List<OtherMaterialStockLineModel> allLines;
+  final List<OtherMaterialStockLineModel> visibleLines;
   final int currentPage;
   final int totalPages;
   final int totalItems;
@@ -23,8 +23,8 @@ class RawMaterialStockState extends Equatable {
   final Map<String, String> filters;
   final String? errorMessage;
 
-  const RawMaterialStockState({
-    this.status = RawMaterialStockStatus.initial,
+  const OtherMaterialStockState({
+    this.status = OtherMaterialStockStatus.initial,
     this.asOf = '',
     this.allLines = const [],
     this.visibleLines = const [],
@@ -40,13 +40,13 @@ class RawMaterialStockState extends Equatable {
   });
 
   bool get isEmptySource =>
-      status == RawMaterialStockStatus.loaded && allLines.isEmpty;
+      status == OtherMaterialStockStatus.loaded && allLines.isEmpty;
 
-  RawMaterialStockState copyWith({
-    RawMaterialStockStatus? status,
+  OtherMaterialStockState copyWith({
+    OtherMaterialStockStatus? status,
     String? asOf,
-    List<RawMaterialStockLineModel>? allLines,
-    List<RawMaterialStockLineModel>? visibleLines,
+    List<OtherMaterialStockLineModel>? allLines,
+    List<OtherMaterialStockLineModel>? visibleLines,
     int? currentPage,
     int? totalPages,
     int? totalItems,
@@ -55,7 +55,7 @@ class RawMaterialStockState extends Equatable {
     String? errorMessage,
     bool clearError = false,
   }) {
-    return RawMaterialStockState(
+    return OtherMaterialStockState(
       status: status ?? this.status,
       asOf: asOf ?? this.asOf,
       allLines: allLines ?? this.allLines,
@@ -90,26 +90,26 @@ class RawMaterialStockState extends Equatable {
   ];
 }
 
-class RawMaterialStockCubit extends SafeCubit<RawMaterialStockState> {
-  final RawMaterialStockRepository _repository;
+class OtherMaterialStockCubit extends SafeCubit<OtherMaterialStockState> {
+  final OtherMaterialStockRepository _repository;
 
-  RawMaterialStockCubit({required RawMaterialStockRepository repository})
+  OtherMaterialStockCubit({required OtherMaterialStockRepository repository})
     : _repository = repository,
-      super(const RawMaterialStockState());
+      super(const OtherMaterialStockState());
 
-  Future<void> loadRawMaterialStock() async {
+  Future<void> loadOtherMaterialStock() async {
     emit(
-      state.copyWith(status: RawMaterialStockStatus.loading, clearError: true),
+      state.copyWith(status: OtherMaterialStockStatus.loading, clearError: true),
     );
 
     try {
-      final RawMaterialStockModel result = await _repository
-          .fetchRawMaterialStock();
+      final OtherMaterialStockModel result = await _repository
+          .fetchOtherMaterialStock();
 
       emit(
         _projected(
           state.copyWith(
-            status: RawMaterialStockStatus.loaded,
+            status: OtherMaterialStockStatus.loaded,
             asOf: result.asOf,
             allLines: result.lines,
             clearError: true,
@@ -120,7 +120,7 @@ class RawMaterialStockCubit extends SafeCubit<RawMaterialStockState> {
     } catch (error) {
       emit(
         state.copyWith(
-          status: RawMaterialStockStatus.failure,
+          status: OtherMaterialStockStatus.failure,
           errorMessage: _messageOf(error),
         ),
       );
@@ -135,7 +135,7 @@ class RawMaterialStockCubit extends SafeCubit<RawMaterialStockState> {
     String? sortOrder,
     Map<String, String>? filters,
   }) {
-    final RawMaterialStockState next = RawMaterialStockState(
+    final OtherMaterialStockState next = OtherMaterialStockState(
       status: state.status,
       asOf: state.asOf,
       allLines: state.allLines,
@@ -154,40 +154,41 @@ class RawMaterialStockCubit extends SafeCubit<RawMaterialStockState> {
     emit(_projected(next, page: page));
   }
 
-  RawMaterialStockState _projected(
-    RawMaterialStockState source, {
+  OtherMaterialStockState _projected(
+    OtherMaterialStockState source, {
     required int page,
   }) {
-    final List<RawMaterialStockLineModel> searched =
-        ListQuery.search<RawMaterialStockLineModel>(
+    final List<OtherMaterialStockLineModel> searched =
+        ListQuery.search<OtherMaterialStockLineModel>(
           source: source.allLines,
           query: source.search,
           searchableValues: (line) => [
-            line.name,
-            line.incomingKg,
-            line.packedKg,
-            line.availableKg,
+            line.materialTypeName,
+            line.unitType,
+            line.onHand,
           ],
         );
 
-    final List<RawMaterialStockLineModel> filtered =
-        ListQuery.filter<RawMaterialStockLineModel>(
+    final List<OtherMaterialStockLineModel> filtered =
+        ListQuery.filter<OtherMaterialStockLineModel>(
           source: searched,
           filters: source.filters,
           fieldValue: _fieldValue,
-          exactFields: const {AppStrings.FILTER_BY_PRODUCT},
+          exactFields: const {AppStrings.FILTER_BY_MATERIAL_TYPE},
         );
 
-    final List<RawMaterialStockLineModel> sorted =
-        ListQuery.sort<RawMaterialStockLineModel>(
+    final List<OtherMaterialStockLineModel> sorted =
+        ListQuery.sort<OtherMaterialStockLineModel>(
           source: filtered,
           sortBy: source.sortBy,
           sortOrder: source.sortOrder,
           sortValue: _sortValue,
         );
 
-    final ListQueryResult<RawMaterialStockLineModel> paged =
-        ListQuery.withoutPagination<RawMaterialStockLineModel>(source: sorted);
+    final ListQueryResult<OtherMaterialStockLineModel> paged =
+        ListQuery.withoutPagination<OtherMaterialStockLineModel>(
+          source: sorted,
+        );
 
     return source.copyWith(
       visibleLines: paged.items,
@@ -197,22 +198,22 @@ class RawMaterialStockCubit extends SafeCubit<RawMaterialStockState> {
     );
   }
 
-  static String? _fieldValue(RawMaterialStockLineModel line, String field) {
+  static String? _fieldValue(OtherMaterialStockLineModel line, String field) {
     switch (field) {
-      case AppStrings.FILTER_BY_PRODUCT:
-        return line.name;
+      case AppStrings.FILTER_BY_MATERIAL_TYPE:
+        return line.materialTypeName;
       default:
         return null;
     }
   }
 
   static Comparable<Object>? _sortValue(
-    RawMaterialStockLineModel line,
+    OtherMaterialStockLineModel line,
     String field,
   ) {
     switch (field) {
-      case AppStrings.SORT_BY_PRODUCT:
-        return line.name.toLowerCase();
+      case AppStrings.SORT_BY_MATERIAL_TYPE:
+        return line.materialTypeName.toLowerCase();
       default:
         return null;
     }

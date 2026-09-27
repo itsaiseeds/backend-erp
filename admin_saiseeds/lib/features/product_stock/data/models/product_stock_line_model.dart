@@ -10,6 +10,7 @@ class ProductStockLineModel {
   final int available;
   final ProductStockKind kind;
   final String packetWeight;
+  final int packetsPerBag;
 
   const ProductStockLineModel({
     required this.publicId,
@@ -21,6 +22,7 @@ class ProductStockLineModel {
     this.consumed = 0,
     this.available = 0,
     this.packetWeight = '',
+    this.packetsPerBag = 0,
   });
 
   factory ProductStockLineModel.fromJson(
@@ -45,6 +47,8 @@ class ProductStockLineModel {
   }
 
   bool get isBag => kind == ProductStockKind.bag;
+
+  bool get hasPacketsPerBag => isBag && packetsPerBag > 0;
 
   num? get packetWeightValue => num.tryParse(packetWeight);
 

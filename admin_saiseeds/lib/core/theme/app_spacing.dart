@@ -60,6 +60,12 @@ class AppSizes {
   static const double sidebarCollapsedWidth = 72.0;
   static const double sidebarBrandingHeight = 72.0;
   static const double sidebarItemHeight = 44.0;
+  static const double sidebarGroupHeaderHeight = 36.0;
+  static const double sidebarGroupIndent = 12.0;
+  static const double sidebarGroupSpineWidth = 1.0;
+  static const double sidebarGroupGap = 10.0;
+  static const double sidebarGroupChevron = 16.0;
+  static const double sidebarGroupDotSize = 5.0;
   static const double sidebarLogoutHeight = 48.0;
   static const double sidebarToggleTile = 32.0;
   static const double sidebarBrandMark = 36.0;

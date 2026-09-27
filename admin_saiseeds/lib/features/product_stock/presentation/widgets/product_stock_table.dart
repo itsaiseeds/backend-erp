@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/feedback/app_badge.dart';
+import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
 import '../../../../core/widgets/tables/app_data_table.dart';
 import '../../data/models/product_stock_line_model.dart';
@@ -98,6 +99,60 @@ class ProductStockTableState extends State<ProductStockTable> {
 
   void showColumnSettings() => _tableKey.currentState?.showColumnSettings();
 
+  // The endpoint sends no available_filters, so the options are derived
+  // from the rows already on screen.
+  List<FilterValueOption> _valueOptionsFor(String key) {
+    if (key == AppStrings.FILTER_BY_TYPE) {
+      return const [
+        FilterValueOption(
+          value: AppStrings.STOCK_KIND_BAG,
+          label: AppStrings.STOCK_KIND_BAG,
+        ),
+        FilterValueOption(
+          value: AppStrings.STOCK_KIND_LOOSE,
+          label: AppStrings.STOCK_KIND_LOOSE,
+        ),
+      ];
+    }
+
+    if (key == AppStrings.FILTER_BY_PRODUCT) {
+      final List<String> names =
+          widget.lines
+              .map((line) => line.name.trim())
+              .where((name) => name.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      return names
+          .map((name) => FilterValueOption(value: name, label: name))
+          .toList();
+    }
+
+    return const [];
+  }
+
+  static String _filterLabel(String key) {
+    switch (key) {
+      case AppStrings.FILTER_BY_PRODUCT:
+        return AppStrings.FILTER_LABEL_PRODUCT;
+      case AppStrings.FILTER_BY_TYPE:
+        return AppStrings.FILTER_LABEL_TYPE;
+      default:
+        return key;
+    }
+  }
+
+  static String _sortLabel(String key) {
+    switch (key) {
+      case AppStrings.SORT_BY_PRODUCT:
+        return AppStrings.SORT_LABEL_PRODUCT;
+      case AppStrings.SORT_BY_PACKET_WEIGHT:
+        return AppStrings.SORT_LABEL_PACKET_WEIGHT;
+      default:
+        return key;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppDataTable<ProductStockLineModel>(
@@ -120,6 +175,13 @@ class ProductStockTableState extends State<ProductStockTable> {
         AppStrings.SORT_BY_PRODUCT,
         AppStrings.SORT_BY_PACKET_WEIGHT,
       ],
+      filterByOptions: const [
+        AppStrings.FILTER_BY_PRODUCT,
+        AppStrings.FILTER_BY_TYPE,
+      ],
+      filterValueOptions: _valueOptionsFor,
+      getHumanReadableFilterName: _filterLabel,
+      getHumanReadableSortName: _sortLabel,
       currentSortBy: widget.currentSortBy,
       currentSortOrder: widget.currentSortOrder,
       currentFilters: widget.currentFilters,
@@ -138,7 +200,7 @@ class ProductStockTableState extends State<ProductStockTable> {
   ) {
     switch (col.id) {
       case ProductStockTable.COLUMN_PRODUCT:
-        return _textCell(line.name, isStrong: true);
+        return _productCell(line);
       case ProductStockTable.COLUMN_PACKET_WEIGHT:
         return _textCell(line.packetWeight);
       case ProductStockTable.COLUMN_TYPE:
@@ -159,6 +221,37 @@ class ProductStockTableState extends State<ProductStockTable> {
       default:
         return _textCell(AppStrings.TABLE_VALUE_UNAVAILABLE);
     }
+  }
+
+  Widget _productCell(ProductStockLineModel line) {
+    final String name = line.name.trim().isEmpty
+        ? AppStrings.TABLE_VALUE_UNAVAILABLE
+        : line.name;
+
+    if (!line.hasPacketsPerBag) return _textCell(name, isStrong: true);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.tableCellStrong,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Text(
+          '(${line.packetsPerBag} ${AppStrings.PACKETS_PER_BAG_SUFFIX})',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.tableCell.copyWith(
+            color: AppColors.TEXT_SECONDARY,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _textCell(String value, {bool isStrong = false}) {

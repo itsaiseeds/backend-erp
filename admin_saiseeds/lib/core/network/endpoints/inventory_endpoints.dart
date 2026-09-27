@@ -15,4 +15,5 @@ class InventoryEndpoints {
   static String getStock(String publicId) => '$_base/get-stock/$publicId';
 
   static const String rawMaterialStock = '$_base/raw-material-stock';
+  static const String otherMaterialStock = '$_base/other-material-stock';
 }

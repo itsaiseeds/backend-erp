@@ -34,10 +34,14 @@ class ListQuery {
         .toList();
   }
 
+  /// [exactFields] holds the filters whose value was picked from a list
+  /// rather than typed. Those must match whole, or "SAI-33" also selects
+  /// "SAI-3353"; free-text filters keep matching on substring.
   static List<T> filter<T>({
     required List<T> source,
     required Map<String, String>? filters,
     required String? Function(T item, String field) fieldValue,
+    Set<String> exactFields = const {},
   }) {
     if (filters == null || filters.isEmpty) return List<T>.from(source);
 
@@ -45,8 +49,15 @@ class ListQuery {
       for (final MapEntry<String, String> entry in filters.entries) {
         final String expected = entry.value.trim().toLowerCase();
         if (expected.isEmpty) continue;
-        final String actual = (fieldValue(item, entry.key) ?? '').toLowerCase();
-        if (!actual.contains(expected)) return false;
+
+        final String actual = (fieldValue(item, entry.key) ?? '')
+            .trim()
+            .toLowerCase();
+
+        final bool matches = exactFields.contains(entry.key)
+            ? actual == expected
+            : actual.contains(expected);
+        if (!matches) return false;
       }
       return true;
     }).toList();

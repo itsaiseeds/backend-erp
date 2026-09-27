@@ -3,6 +3,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
 import '../../../../core/widgets/inputs/stock_count_field.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
 import '../../../../core/widgets/tables/app_data_table.dart';
@@ -110,6 +111,39 @@ class BagStockTableState extends State<BagStockTable> {
 
   void showColumnSettings() => _tableKey.currentState?.showColumnSettings();
 
+  // The endpoint sends no available_filters, so the product options are
+  // derived from the rows already on screen.
+  List<FilterValueOption> _valueOptionsFor(String key) {
+    if (key != AppStrings.FILTER_BY_PRODUCT) return const [];
+
+    final List<String> names =
+        widget.lines
+            .map((line) => line.productName.trim())
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return names
+        .map((name) => FilterValueOption(value: name, label: name))
+        .toList();
+  }
+
+  static String _filterLabel(String key) =>
+      key == AppStrings.FILTER_BY_PRODUCT
+      ? AppStrings.FILTER_LABEL_PRODUCT
+      : key;
+
+  static String _sortLabel(String key) {
+    switch (key) {
+      case AppStrings.SORT_BY_PRODUCT:
+        return AppStrings.SORT_LABEL_PRODUCT;
+      case AppStrings.SORT_BY_PACKET_WEIGHT:
+        return AppStrings.SORT_LABEL_PACKET_WEIGHT;
+      default:
+        return key;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppDataTable<BagStockLineModel>(
@@ -136,6 +170,10 @@ class BagStockTableState extends State<BagStockTable> {
         AppStrings.SORT_BY_PRODUCT,
         AppStrings.SORT_BY_PACKET_WEIGHT,
       ],
+      filterByOptions: const [AppStrings.FILTER_BY_PRODUCT],
+      filterValueOptions: _valueOptionsFor,
+      getHumanReadableFilterName: _filterLabel,
+      getHumanReadableSortName: _sortLabel,
       currentSortBy: widget.currentSortBy,
       currentSortOrder: widget.currentSortOrder,
       currentFilters: widget.currentFilters,

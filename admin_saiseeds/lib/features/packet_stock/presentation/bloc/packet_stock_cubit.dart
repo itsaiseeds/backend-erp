@@ -292,6 +292,7 @@ class PacketStockCubit extends SafeCubit<PacketStockState> {
           source: searched,
           filters: source.filters,
           fieldValue: _fieldValue,
+          exactFields: const {AppStrings.FILTER_BY_PRODUCT},
         );
 
     final List<PacketStockLineModel> sorted =

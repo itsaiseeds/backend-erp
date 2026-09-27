@@ -43,6 +43,14 @@ class OrderStatusX {
     OrderStatus.onHold,
   };
 
+  // Dispatch records goods leaving, so only a verified order qualifies.
+  static const Set<OrderStatus> DISPATCHABLE = {OrderStatus.confirmed};
+
+  // Revert undoes a dispatch, so it only applies once already dispatched.
+  static const Set<OrderStatus> REVERTABLE_DISPATCH = {
+    OrderStatus.dispatched,
+  };
+
   static const Set<OrderStatus> EDITABLE = {
     OrderStatus.booked,
     OrderStatus.underReview,
@@ -121,6 +129,12 @@ class OrderStatusX {
   static bool canHold(OrderStatus status) => HOLDABLE.contains(status);
 
   static bool canReject(OrderStatus status) => REJECTABLE.contains(status);
+
+  static bool canDispatch(OrderStatus status) =>
+      DISPATCHABLE.contains(status);
+
+  static bool canRevertDispatch(OrderStatus status) =>
+      REVERTABLE_DISPATCH.contains(status);
 
   static bool canEdit(OrderStatus status) => EDITABLE.contains(status);
 }

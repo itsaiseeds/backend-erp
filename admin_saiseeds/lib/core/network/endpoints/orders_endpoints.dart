@@ -16,4 +16,10 @@ class OrdersEndpoints {
   static String hold(String publicId) => '$_base/hold-order/$publicId';
 
   static String reject(String publicId) => '$_base/reject-order/$publicId';
+
+  static String dispatch(String publicId) =>
+      '$_base/dispatch-order/$publicId';
+
+  static String revertDispatch(String publicId) =>
+      '$_base/revert-dispatch/$publicId';
 }

@@ -7,7 +7,9 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
 import '../../../../core/widgets/inputs/date_range_field.dart';
 import '../../../clients/data/models/client_filter_model.dart';
+import '../../data/models/dispatch_request_model.dart';
 import '../../data/models/order_model.dart';
+import '../../data/models/order_status.dart';
 import '../../data/models/paginated_orders_model.dart';
 import '../../data/orders_repository.dart';
 
@@ -40,7 +42,9 @@ class OrdersState extends Equatable {
     this.search,
     this.sortBy,
     this.sortOrder,
-    this.filters = const {},
+    this.filters = const {
+      OrdersCubit.STATUS_FILTER: OrderStatusX.BOOKED,
+    },
     this.isTodaysStockComplete = false,
     this.isMutating = false,
     this.errorMessage,
@@ -111,6 +115,7 @@ class OrdersCubit extends SafeCubit<OrdersState> {
       super(const OrdersState());
 
   static const String CLIENT_FILTER = 'client';
+  static const String STATUS_FILTER = 'status';
   static const int PAGE_SIZE = 10;
 
   Future<void> loadOrders() => _fetch(page: state.currentPage);
@@ -159,6 +164,18 @@ class OrdersCubit extends SafeCubit<OrdersState> {
 
   Future<bool> rejectOrder(String publicId) =>
       _mutate(() => _repository.rejectOrder(publicId));
+
+  Future<bool> revertDispatch(String publicId) =>
+      _mutate(() => _repository.revertDispatch(publicId));
+
+  Future<bool> dispatchOrder({
+    required String publicId,
+    required DispatchRequestModel request,
+  }) {
+    return _mutate(
+      () => _repository.dispatchOrder(publicId: publicId, request: request),
+    );
+  }
 
   Future<bool> updateOrder({
     required String publicId,

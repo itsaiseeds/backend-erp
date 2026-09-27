@@ -44,6 +44,8 @@ class OrdersTable extends StatefulWidget {
   final void Function(OrderModel order)? onUnverify;
   final void Function(OrderModel order)? onHold;
   final void Function(OrderModel order)? onReject;
+  final void Function(OrderModel order)? onDispatch;
+  final void Function(OrderModel order)? onRevertDispatch;
   final List<Widget> searchBarActions;
   final Widget? searchBarTrailing;
 
@@ -66,6 +68,8 @@ class OrdersTable extends StatefulWidget {
     this.onUnverify,
     this.onHold,
     this.onReject,
+    this.onDispatch,
+    this.onRevertDispatch,
     this.searchBarActions = const [],
     this.searchBarTrailing,
   });
@@ -216,6 +220,7 @@ class OrdersTableState extends State<OrdersTable> {
       ],
       sortByOptions: _sortOptions,
       filterByOptions: _filterOptions,
+      lockedFilters: const {AppStrings.FILTER_BY_STATUS},
       filterValueOptions: _valueOptionsFor,
       getFilterValueLabel: _valueLabelFor,
       isDateRangeFilter: _isDateRange,
@@ -294,6 +299,26 @@ class OrdersTableState extends State<OrdersTable> {
             onSelected: !order.canHold || isBusy || widget.onHold == null
                 ? null
                 : () => widget.onHold!(order),
+          ),
+          RowAction(
+            label: AppStrings.ORDER_DISPATCH,
+            icon: Icons.local_shipping_outlined,
+            blockedHint: AppStrings.ORDER_DISPATCH_BLOCKED,
+            onSelected:
+                !order.canDispatch || isBusy || widget.onDispatch == null
+                ? null
+                : () => widget.onDispatch!(order),
+          ),
+          RowAction(
+            label: AppStrings.ORDER_REVERT_DISPATCH,
+            icon: Icons.undo_outlined,
+            blockedHint: AppStrings.ORDER_REVERT_DISPATCH_BLOCKED,
+            onSelected:
+                !order.canRevertDispatch ||
+                    isBusy ||
+                    widget.onRevertDispatch == null
+                ? null
+                : () => widget.onRevertDispatch!(order),
           ),
           RowAction(
             label: AppStrings.ORDER_REJECT,

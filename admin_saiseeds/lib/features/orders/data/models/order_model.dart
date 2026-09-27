@@ -227,6 +227,10 @@ class OrderModel {
 
   bool get canReject => OrderStatusX.canReject(status);
 
+  bool get canDispatch => OrderStatusX.canDispatch(status);
+
+  bool get canRevertDispatch => OrderStatusX.canRevertDispatch(status);
+
   bool get canEdit => OrderStatusX.canEdit(status);
 
   static DateTime? _parseInstant(dynamic value) {

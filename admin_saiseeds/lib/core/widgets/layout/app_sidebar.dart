@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_strings.dart';
+import '../../models/sidebar_group_model.dart';
 import '../../models/sidebar_item_model.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 import '../../utils/formatters/initials_formatter.dart';
 import '../loaders/shimmer_box.dart';
+import 'sidebar_group_section.dart';
 
-class AppSidebar extends StatelessWidget {
-  final List<SidebarItemModel> items;
+class AppSidebar extends StatefulWidget {
+  final List<ResolvedSidebarGroup> groups;
   final String activeItemId;
   final ValueChanged<String> onItemSelected;
   final bool isCollapsed;
@@ -18,7 +20,7 @@ class AppSidebar extends StatelessWidget {
 
   const AppSidebar({
     super.key,
-    required this.items,
+    required this.groups,
     required this.activeItemId,
     required this.onItemSelected,
     required this.profileCard,
@@ -26,6 +28,42 @@ class AppSidebar extends StatelessWidget {
     this.onToggleCollapse,
     this.onLogout,
   });
+
+  @override
+  State<AppSidebar> createState() => _AppSidebarState();
+}
+
+class _AppSidebarState extends State<AppSidebar> {
+  final Set<String> _collapsedGroupIds = {};
+
+  bool get isCollapsed => widget.isCollapsed;
+
+  String get activeItemId => widget.activeItemId;
+
+  ValueChanged<String> get onItemSelected => widget.onItemSelected;
+
+  VoidCallback? get onToggleCollapse => widget.onToggleCollapse;
+
+  VoidCallback? get onLogout => widget.onLogout;
+
+  Widget get profileCard => widget.profileCard;
+
+  // A group opens by default and stays open unless the user shuts it, so a
+  // freshly added tab is never hidden behind a closed header.
+  bool _isExpanded(ResolvedSidebarGroup section) {
+    final String? id = section.group?.id;
+    if (id == null) return true;
+    return !_collapsedGroupIds.contains(id);
+  }
+
+  void _toggle(ResolvedSidebarGroup section) {
+    final String? id = section.group?.id;
+    if (id == null) return;
+
+    setState(() {
+      if (!_collapsedGroupIds.remove(id)) _collapsedGroupIds.add(id);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,14 +116,16 @@ class AppSidebar extends StatelessWidget {
                 padding: EdgeInsets.symmetric(
                   horizontal: isCollapsed ? AppSpacing.sm : AppSpacing.smd,
                 ),
-                itemCount: items.length,
+                itemCount: widget.groups.length,
                 itemBuilder: (context, index) {
-                  final item = items[index];
-                  return SidebarItem(
-                    item: item,
-                    isActive: activeItemId == item.id,
+                  final ResolvedSidebarGroup section = widget.groups[index];
+                  return SidebarGroupSection(
+                    section: section,
+                    activeItemId: activeItemId,
                     isCollapsed: isCollapsed,
-                    onTap: () => onItemSelected(item.id),
+                    isExpanded: _isExpanded(section),
+                    onItemSelected: onItemSelected,
+                    onToggle: () => _toggle(section),
                   );
                 },
               ),

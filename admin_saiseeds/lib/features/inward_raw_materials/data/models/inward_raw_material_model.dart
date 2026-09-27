@@ -37,6 +37,11 @@ class InwardStatus {
 
   static const String LAB_TESTING = 'lab_testing';
   static const String IN_USE = 'in_use';
+
+  // The API compares against the display label, not the slug: a PATCH with
+  // "in_use" comes back as `"in_use" is not a valid choice`.
+  static const String LAB_TESTING_WIRE = 'Lab Testing';
+  static const String IN_USE_WIRE = 'In Use';
 }
 
 class InwardRawMaterialModel {

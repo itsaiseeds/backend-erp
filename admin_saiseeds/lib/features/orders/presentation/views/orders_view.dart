@@ -12,6 +12,7 @@ import '../../data/orders_repository.dart';
 import '../../../product_packagings/data/product_packagings_repository.dart';
 import '../bloc/orders_cubit.dart';
 import '../widgets/order_detail_dialog.dart';
+import '../widgets/order_dispatch_dialog.dart';
 import '../widgets/orders_table.dart';
 
 class OrdersView extends StatelessWidget {
@@ -135,6 +136,26 @@ class _OrdersContentState extends State<_OrdersContent> {
     );
   }
 
+  Future<void> _onRevertDispatch(OrderModel order) {
+    final OrdersCubit cubit = context.read<OrdersCubit>();
+    return _runAction(
+      order: order,
+      title: AppStrings.ORDER_REVERT_DISPATCH_TITLE,
+      message: AppStrings.ORDER_REVERT_DISPATCH_BODY,
+      confirmLabel: AppStrings.ORDER_REVERT_DISPATCH,
+      successMessage: AppStrings.ORDER_REVERT_DISPATCH_DONE,
+      action: cubit.revertDispatch,
+    );
+  }
+
+  void _onDispatch(OrderModel order) {
+    OrderDispatchDialog.show(
+      context,
+      order,
+      cubit: context.read<OrdersCubit>(),
+    );
+  }
+
   Future<void> _onReject(OrderModel order) {
     final OrdersCubit cubit = context.read<OrdersCubit>();
     return _runAction(
@@ -184,6 +205,8 @@ class _OrdersContentState extends State<_OrdersContent> {
             onUnverify: _onUnverify,
             onHold: _onHold,
             onReject: _onReject,
+            onDispatch: _onDispatch,
+            onRevertDispatch: _onRevertDispatch,
             searchBarTrailing: StockStatusChip(
               isComplete: state.isTodaysStockComplete,
             ),

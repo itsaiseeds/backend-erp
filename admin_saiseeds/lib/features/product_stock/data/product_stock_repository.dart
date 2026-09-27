@@ -41,6 +41,7 @@ class ProductStockRepository {
           name: line.productName,
           snapshotDate: bagSnapshot.snapshotDate,
           packetWeight: line.packetWeight,
+          packetsPerBag: line.packetsPerBag,
           onHand: line.onHand,
           reserved: line.reserved,
           consumed: line.consumed,

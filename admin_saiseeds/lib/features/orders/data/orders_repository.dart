@@ -3,6 +3,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/endpoints/inventory_endpoints.dart';
 import '../../../core/network/endpoints/orders_endpoints.dart';
+import 'models/dispatch_request_model.dart';
 import 'models/order_model.dart';
 import 'models/paginated_orders_model.dart';
 
@@ -50,6 +51,19 @@ class OrdersRepository {
 
   Future<void> rejectOrder(String publicId) =>
       _apiClient.post(OrdersEndpoints.reject(publicId));
+
+  Future<void> revertDispatch(String publicId) =>
+      _apiClient.post(OrdersEndpoints.revertDispatch(publicId));
+
+  Future<void> dispatchOrder({
+    required String publicId,
+    required DispatchRequestModel request,
+  }) {
+    return _apiClient.post(
+      OrdersEndpoints.dispatch(publicId),
+      body: request.toJson(),
+    );
+  }
 
   Future<bool> fetchTodaysStockComplete() async {
     final dynamic response = await _apiClient.get(

@@ -107,7 +107,7 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
       labSamplingDate: _labSamplingDate == null
           ? null
           : InwardFormDialog.isoDate.format(_labSamplingDate!),
-      status: _markInUse ? InwardStatus.IN_USE : null,
+      status: _markInUse ? InwardStatus.IN_USE_WIRE : null,
     );
 
     if (!mounted) return;

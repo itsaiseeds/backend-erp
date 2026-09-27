@@ -1,3 +1,4 @@
+import 'package:admin_saiseeds/core/models/sidebar_group_model.dart';
 import 'package:admin_saiseeds/core/models/sidebar_item_model.dart';
 import 'package:admin_saiseeds/core/theme/app_colors.dart';
 import 'package:admin_saiseeds/core/widgets/layout/app_sidebar.dart';
@@ -23,6 +24,13 @@ const List<SidebarItemModel> _items = [
   ),
 ];
 
+// The hover behaviour under test belongs to the rows, so each item is passed
+// as its own ungrouped section.
+final List<ResolvedSidebarGroup> _groups = [
+  for (final SidebarItemModel item in _items)
+    ResolvedSidebarGroup(items: [item]),
+];
+
 Future<void> _pumpSidebar(WidgetTester tester) async {
   tester.view.devicePixelRatio = 1.0;
   tester.view.physicalSize = const Size(1400, 1000);
@@ -32,7 +40,7 @@ Future<void> _pumpSidebar(WidgetTester tester) async {
     MaterialApp(
       home: Scaffold(
         body: AppSidebar(
-          items: _items,
+          groups: _groups,
           activeItemId: 'dashboard',
           onItemSelected: (_) {},
           profileCard: const SizedBox(height: 60),

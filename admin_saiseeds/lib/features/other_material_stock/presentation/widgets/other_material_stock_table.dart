@@ -6,16 +6,15 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
 import '../../../../core/widgets/tables/app_data_table.dart';
-import '../../data/models/raw_material_stock_model.dart';
+import '../../data/models/other_material_stock_model.dart';
 
-class RawMaterialStockTable extends StatefulWidget {
-  static const String CONFIG_KEY = 'raw-material-stock';
-  static const String COLUMN_PRODUCT = 'product';
-  static const String COLUMN_INCOMING = 'incoming_kg';
-  static const String COLUMN_PACKED = 'packed_kg';
-  static const String COLUMN_AVAILABLE = 'available_kg';
+class OtherMaterialStockTable extends StatefulWidget {
+  static const String CONFIG_KEY = 'other-material-stock';
+  static const String COLUMN_MATERIAL_TYPE = 'material_type';
+  static const String COLUMN_UNIT = 'unit_type';
+  static const String COLUMN_ON_HAND = 'on_hand';
 
-  final List<RawMaterialStockLineModel> lines;
+  final List<OtherMaterialStockLineModel> lines;
   final bool isLoading;
   final int currentPage;
   final int totalPages;
@@ -29,7 +28,7 @@ class RawMaterialStockTable extends StatefulWidget {
   final String emptyTitle;
   final String emptyDescription;
 
-  const RawMaterialStockTable({
+  const OtherMaterialStockTable({
     super.key,
     required this.lines,
     required this.isLoading,
@@ -42,51 +41,47 @@ class RawMaterialStockTable extends StatefulWidget {
     this.currentFilters = const {},
     this.searchBarActions = const [],
     this.searchBarTrailing,
-    this.emptyTitle = AppStrings.RAW_MATERIAL_STOCK_EMPTY_STATE_TITLE,
-    this.emptyDescription = AppStrings.RAW_MATERIAL_STOCK_EMPTY_STATE_BODY,
+    this.emptyTitle = AppStrings.OTHER_MATERIAL_STOCK_EMPTY_STATE_TITLE,
+    this.emptyDescription = AppStrings.OTHER_MATERIAL_STOCK_EMPTY_STATE_BODY,
   });
 
   @override
-  State<RawMaterialStockTable> createState() => RawMaterialStockTableState();
+  State<OtherMaterialStockTable> createState() =>
+      OtherMaterialStockTableState();
 }
 
-class RawMaterialStockTableState extends State<RawMaterialStockTable> {
+class OtherMaterialStockTableState extends State<OtherMaterialStockTable> {
   static const List<AppDataColumn> _COLUMNS = [
     AppDataColumn(
-      id: RawMaterialStockTable.COLUMN_PRODUCT,
-      label: AppStrings.COLUMN_PRODUCT,
+      id: OtherMaterialStockTable.COLUMN_MATERIAL_TYPE,
+      label: AppStrings.COLUMN_MATERIAL_TYPE,
       width: AppSizes.tableColumnWidthWide,
     ),
     AppDataColumn(
-      id: RawMaterialStockTable.COLUMN_INCOMING,
-      label: AppStrings.COLUMN_INCOMING_KG,
-      width: AppSizes.tableColumnWidthMedium,
+      id: OtherMaterialStockTable.COLUMN_UNIT,
+      label: AppStrings.COLUMN_UNIT_TYPE,
+      width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
-      id: RawMaterialStockTable.COLUMN_PACKED,
-      label: AppStrings.COLUMN_PACKED_KG,
-      width: AppSizes.tableColumnWidthMedium,
-    ),
-    AppDataColumn(
-      id: RawMaterialStockTable.COLUMN_AVAILABLE,
-      label: AppStrings.COLUMN_AVAILABLE_KG,
+      id: OtherMaterialStockTable.COLUMN_ON_HAND,
+      label: AppStrings.COLUMN_ON_HAND,
       width: AppSizes.tableColumnWidthMedium,
     ),
   ];
 
-  final GlobalKey<AppDataTableState<RawMaterialStockLineModel>> _tableKey =
-      GlobalKey<AppDataTableState<RawMaterialStockLineModel>>();
+  final GlobalKey<AppDataTableState<OtherMaterialStockLineModel>> _tableKey =
+      GlobalKey<AppDataTableState<OtherMaterialStockLineModel>>();
 
   void showColumnSettings() => _tableKey.currentState?.showColumnSettings();
 
-  // The endpoint sends no available_filters, so the product options are
-  // derived from the rows already on screen.
+  // The endpoint sends no available_filters, so the material-type options
+  // are derived from the rows already on screen.
   List<FilterValueOption> _valueOptionsFor(String key) {
-    if (key != AppStrings.FILTER_BY_PRODUCT) return const [];
+    if (key != AppStrings.FILTER_BY_MATERIAL_TYPE) return const [];
 
     final List<String> names =
         widget.lines
-            .map((line) => line.name.trim())
+            .map((line) => line.materialTypeName.trim())
             .where((name) => name.isNotEmpty)
             .toSet()
             .toList()
@@ -97,16 +92,18 @@ class RawMaterialStockTableState extends State<RawMaterialStockTable> {
   }
 
   static String _filterLabel(String key) =>
-      key == AppStrings.FILTER_BY_PRODUCT
-      ? AppStrings.FILTER_LABEL_PRODUCT
+      key == AppStrings.FILTER_BY_MATERIAL_TYPE
+      ? AppStrings.FILTER_LABEL_MATERIAL_TYPE
       : key;
 
   static String _sortLabel(String key) =>
-      key == AppStrings.SORT_BY_PRODUCT ? AppStrings.SORT_LABEL_PRODUCT : key;
+      key == AppStrings.SORT_BY_MATERIAL_TYPE
+      ? AppStrings.SORT_LABEL_MATERIAL_TYPE
+      : key;
 
   @override
   Widget build(BuildContext context) {
-    return AppDataTable<RawMaterialStockLineModel>(
+    return AppDataTable<OtherMaterialStockLineModel>(
       key: _tableKey,
       items: widget.lines,
       isLoading: widget.isLoading,
@@ -118,43 +115,53 @@ class RawMaterialStockTableState extends State<RawMaterialStockTable> {
       searchBarTrailing: widget.searchBarTrailing,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _COLUMNS,
-      configKey: RawMaterialStockTable.CONFIG_KEY,
-      initialPinnedColumns: const [RawMaterialStockTable.COLUMN_PRODUCT],
-      excludeFromPin: const [RawMaterialStockTable.COLUMN_PRODUCT],
-      excludeFromHide: const [RawMaterialStockTable.COLUMN_PRODUCT],
-      sortByOptions: const [AppStrings.SORT_BY_PRODUCT],
-      filterByOptions: const [AppStrings.FILTER_BY_PRODUCT],
+      configKey: OtherMaterialStockTable.CONFIG_KEY,
+      initialPinnedColumns: const [
+        OtherMaterialStockTable.COLUMN_MATERIAL_TYPE,
+      ],
+      excludeFromPin: const [OtherMaterialStockTable.COLUMN_MATERIAL_TYPE],
+      excludeFromHide: const [OtherMaterialStockTable.COLUMN_MATERIAL_TYPE],
+      sortByOptions: const [AppStrings.SORT_BY_MATERIAL_TYPE],
+      filterByOptions: const [AppStrings.FILTER_BY_MATERIAL_TYPE],
       filterValueOptions: _valueOptionsFor,
       getHumanReadableFilterName: _filterLabel,
       getHumanReadableSortName: _sortLabel,
       currentSortBy: widget.currentSortBy,
       currentSortOrder: widget.currentSortOrder,
       currentFilters: widget.currentFilters,
-      searchHintText: AppStrings.RAW_MATERIAL_STOCK_TABLE_SEARCH_HINT,
+      searchHintText: AppStrings.OTHER_MATERIAL_STOCK_TABLE_SEARCH_HINT,
       emptyTitle: widget.emptyTitle,
       emptyDescription: widget.emptyDescription,
-      emptyIcon: Icons.grass_outlined,
+      emptyIcon: Icons.layers_outlined,
       cellBuilder: _buildCell,
     );
   }
 
   Widget _buildCell(
     BuildContext context,
-    RawMaterialStockLineModel line,
+    OtherMaterialStockLineModel line,
     AppDataColumn col,
   ) {
     switch (col.id) {
-      case RawMaterialStockTable.COLUMN_PRODUCT:
-        return _textCell(line.name, isStrong: true);
-      case RawMaterialStockTable.COLUMN_INCOMING:
-        return _textCell(line.incomingKg);
-      case RawMaterialStockTable.COLUMN_PACKED:
-        return _textCell(line.packedKg);
-      case RawMaterialStockTable.COLUMN_AVAILABLE:
-        return _textCell(line.availableKg, isStrong: true);
+      case OtherMaterialStockTable.COLUMN_MATERIAL_TYPE:
+        return _textCell(line.materialTypeName, isStrong: true);
+      case OtherMaterialStockTable.COLUMN_UNIT:
+        return _textCell(line.unitType);
+      case OtherMaterialStockTable.COLUMN_ON_HAND:
+        return _textCell(_onHandWithUnit(line), isStrong: true);
       default:
         return _textCell(AppStrings.TABLE_VALUE_UNAVAILABLE);
     }
+  }
+
+  static String _onHandWithUnit(OtherMaterialStockLineModel line) {
+    final String onHand = line.onHand.trim();
+    if (onHand.isEmpty) return onHand;
+
+    final String unit = line.unitType.trim();
+    if (unit.isEmpty) return onHand;
+
+    return '$onHand $unit';
   }
 
   Widget _textCell(String value, {bool isStrong = false}) {

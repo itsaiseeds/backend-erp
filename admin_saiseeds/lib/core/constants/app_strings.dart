@@ -532,9 +532,11 @@ class AppStrings {
 
   static const String SORT_BY_PRODUCT = 'product';
   static const String SORT_BY_PACKET_WEIGHT = 'packet_weight';
+  static const String SORT_BY_MATERIAL_TYPE = 'material_type';
   static const String SORT_BY_PACKETS = 'packets';
   static const String SORT_BY_TOTAL_WEIGHT = 'total_weight';
   static const String FILTER_BY_PRODUCT = 'product';
+  static const String FILTER_BY_MATERIAL_TYPE = 'material_type';
 
   static const String FIELD_PRODUCT = 'Product';
   static const String FIELD_PRODUCT_HINT = 'Select a product';
@@ -708,8 +710,69 @@ class AppStrings {
   static const String ORDER_NO_ITEMS = 'This order has no lines.';
   static const String TIMEZONE_IST = 'IST';
 
+  static const String GROUP_USER_MANAGEMENT = 'User Management';
+  static const String GROUP_ONBOARDING = 'Client & Party Onboarding';
+  static const String GROUP_CATALOGUE = 'Product Configuration';
+  static const String GROUP_INWARD = 'Inward Operations';
+  static const String GROUP_DAILY_STOCK = 'Daily Stock Update';
+  static const String GROUP_STOCK_ANALYSIS = 'Stock Analysis';
+  static const String SIDEBAR_GROUP_EXPAND = 'Expand group';
+  static const String SIDEBAR_GROUP_COLLAPSE = 'Collapse group';
+
+  static const String ORDER_DISPATCH = 'Dispatch';
+  static const String ORDER_DISPATCH_TITLE = 'Dispatch order';
+  static const String ORDER_DISPATCH_BLOCKED =
+      'Only a verified order can be dispatched.';
+  static const String ORDER_REVERT_DISPATCH = 'Revert dispatch';
+  static const String ORDER_REVERT_DISPATCH_BLOCKED =
+      'Only a dispatched order can be reverted.';
+  static const String ORDER_REVERT_DISPATCH_TITLE = 'Revert this dispatch?';
+  static const String ORDER_REVERT_DISPATCH_BODY =
+      'This returns the order to Confirmed so it can be dispatched again.';
+  static const String ORDER_REVERT_DISPATCH_DONE = 'Dispatch reverted';
+  static const String DISPATCH_STEP_TRANSPORT = 'Transport';
+  static const String DISPATCH_STEP_ITEMS = 'Lot numbers';
+  static const String DISPATCH_STEP_SUMMARY = 'Summary';
+  static const String DISPATCH_STEP_TRANSPORT_CAPTION =
+      'Where it ships from and who is driving.';
+  static const String DISPATCH_STEP_ITEMS_CAPTION =
+      'Record the lot number for each bag.';
+  static const String DISPATCH_STEP_SUMMARY_CAPTION =
+      'Check the details, then dispatch.';
+  static const String FIELD_FROM_CITY = 'From city';
+  static const String FIELD_DRIVER_NAME = 'Driver name';
+  static const String FIELD_DRIVER_NAME_HINT = 'Name of the driver';
+  static const String FIELD_DRIVER_NUMBER = 'Driver number';
+  static const String FIELD_VEHICLE_NUMBER = 'Vehicle number';
+  static const String FIELD_VEHICLE_NUMBER_HINT = 'e.g. GJ01AB1234';
+  static const String FIELD_LOT_NUMBER = 'Lot number';
+  static const String FIELD_LOT_NUMBER_HINT = 'Lot number for this bag';
+  static const String DISPATCH_ITEMS_EMPTY = 'This order has no bags.';
+  static const String DISPATCHED_TITLE = 'Order dispatched';
+  static const String VALIDATION_FROM_CITY_REQUIRED = 'From city is required.';
+  static const String DISPATCH_SUMMARY_ITEMS = 'Bags';
+
   static const String PRODUCT_STOCK = 'Product Stock Management';
   static const String RAW_MATERIAL_STOCK = 'Raw Material Stock Management';
+
+  static const String OTHER_MATERIAL_STOCK = 'Other Material Stock';
+  static const String PACKETS_PER_BAG_SUFFIX = 'packets / bag';
+  static const String FILTER_BY_TYPE = 'type';
+  static const String FILTER_LABEL_PRODUCT = 'Product';
+  static const String FILTER_LABEL_TYPE = 'Type';
+  static const String FILTER_LABEL_MATERIAL_TYPE = 'Material Type';
+  static const String SORT_LABEL_PRODUCT = 'Product';
+  static const String SORT_LABEL_PACKET_WEIGHT = 'Packet Weight';
+  static const String SORT_LABEL_MATERIAL_TYPE = 'Material Type';
+  static const String COLUMN_ON_HAND = 'On Hand';
+  static const String OTHER_MATERIAL_STOCK_TABLE_SEARCH_HINT =
+      'Search other material stock...';
+  static const String OTHER_MATERIAL_STOCK_EMPTY_STATE_TITLE =
+      'No other material stock';
+  static const String OTHER_MATERIAL_STOCK_EMPTY_STATE_BODY =
+      'Record an inward other-material lot to start tracking stock.';
+  static const String OTHER_MATERIAL_STOCK_LOAD_FAILED_TITLE =
+      'Could not load other material stock';
 
   static const String COLUMN_STOCK_TYPE = 'Type';
   static const String COLUMN_INCOMING_KG = 'Incoming (kg)';
@@ -717,7 +780,7 @@ class AppStrings {
   static const String COLUMN_AVAILABLE_KG = 'Available (kg)';
 
   static const String STOCK_KIND_BAG = 'Bag';
-  static const String STOCK_KIND_LOOSE = 'Loose';
+  static const String STOCK_KIND_LOOSE = 'Packet';
 
   static const String PRODUCT_STOCK_TABLE_SEARCH_HINT =
       'Search product stock...';
@@ -835,8 +898,8 @@ class AppStrings {
   static const String VALIDATION_LAB_DATE_REQUIRED =
       'Lab sampling date is required.';
 
-  static const String BAG_STOCK = 'Bag Stock Management';
-  static const String PACKET_STOCK = 'Packet Stock Management';
+  static const String BAG_STOCK = 'Bag Stocks';
+  static const String PACKET_STOCK = 'Packet Stock';
 
   static const String STOCK_UPDATE_ACTION = 'Update Stock';
   static const String STOCK_CONFIRM_TITLE = 'Update today\'s stock';

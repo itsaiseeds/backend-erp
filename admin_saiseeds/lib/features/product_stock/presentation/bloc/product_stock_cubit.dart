@@ -169,6 +169,10 @@ class ProductStockCubit extends SafeCubit<ProductStockState> {
           source: searched,
           filters: source.filters,
           fieldValue: _fieldValue,
+          exactFields: const {
+            AppStrings.FILTER_BY_PRODUCT,
+            AppStrings.FILTER_BY_TYPE,
+          },
         );
 
     final List<ProductStockLineModel> sorted =
@@ -194,6 +198,10 @@ class ProductStockCubit extends SafeCubit<ProductStockState> {
     switch (field) {
       case AppStrings.FILTER_BY_PRODUCT:
         return line.name;
+      case AppStrings.FILTER_BY_TYPE:
+        return line.isBag
+            ? AppStrings.STOCK_KIND_BAG
+            : AppStrings.STOCK_KIND_LOOSE;
       default:
         return null;
     }

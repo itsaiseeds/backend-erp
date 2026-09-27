@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/tab_ids.dart';
 import '../../../core/constants/user_roles.dart';
+import '../../../core/models/sidebar_group_model.dart';
 import '../../../core/models/sidebar_item_model.dart';
 
 class SidebarItems {
@@ -83,7 +84,92 @@ class SidebarItems {
       label: AppStrings.RAW_MATERIAL_STOCK,
       icon: Icons.grass_outlined,
     ),
+    SidebarItemModel(
+      id: TabIds.OTHER_MATERIAL_STOCK,
+      label: AppStrings.OTHER_MATERIAL_STOCK,
+      icon: Icons.layers_outlined,
+    ),
   ];
+
+  static const List<SidebarGroupModel> GROUPS = [
+    SidebarGroupModel(
+      id: 'user-management',
+      label: AppStrings.GROUP_USER_MANAGEMENT,
+      icon: Icons.manage_accounts_outlined,
+      itemIds: [TabIds.ADMINS, TabIds.SALES_PEOPLE],
+    ),
+    SidebarGroupModel(
+      id: 'onboarding',
+      label: AppStrings.GROUP_ONBOARDING,
+      icon: Icons.handshake_outlined,
+      itemIds: [TabIds.CLIENTS, TabIds.PARTIES],
+    ),
+    SidebarGroupModel(
+      id: 'catalogue',
+      label: AppStrings.GROUP_CATALOGUE,
+      icon: Icons.inventory_2_outlined,
+      itemIds: [TabIds.PRODUCTS, TabIds.PRODUCT_PACKAGINGS],
+    ),
+    SidebarGroupModel(
+      id: 'inward',
+      label: AppStrings.GROUP_INWARD,
+      icon: Icons.local_shipping_outlined,
+      itemIds: [
+        TabIds.INWARD_RAW_MATERIALS,
+        TabIds.OTHER_RAW_MATERIALS,
+        TabIds.OTHER_MATERIAL_INWARD,
+      ],
+    ),
+    SidebarGroupModel(
+      id: 'daily-stock',
+      label: AppStrings.GROUP_DAILY_STOCK,
+      icon: Icons.edit_note_outlined,
+      itemIds: [TabIds.BAG_STOCK, TabIds.PACKET_STOCK],
+    ),
+    SidebarGroupModel(
+      id: 'stock-analysis',
+      label: AppStrings.GROUP_STOCK_ANALYSIS,
+      icon: Icons.query_stats_outlined,
+      itemIds: [
+        TabIds.PRODUCT_STOCK,
+        TabIds.RAW_MATERIAL_STOCK,
+        TabIds.OTHER_MATERIAL_STOCK,
+      ],
+    ),
+  ];
+
+  /// Groups the permitted items, keeping ungrouped entries (Dashboard) as
+  /// standalone rows in their original order.
+  static List<ResolvedSidebarGroup> visibleGroups({required String? role}) {
+    final List<SidebarItemModel> permitted = visibleItems(role: role);
+    if (permitted.isEmpty) return const [];
+
+    final Map<String, SidebarItemModel> byId = {
+      for (final SidebarItemModel item in permitted) item.id: item,
+    };
+
+    final Set<String> grouped = {
+      for (final SidebarGroupModel group in GROUPS) ...group.itemIds,
+    };
+
+    final List<ResolvedSidebarGroup> resolved = [];
+
+    for (final SidebarItemModel item in permitted) {
+      if (grouped.contains(item.id)) continue;
+      resolved.add(ResolvedSidebarGroup(items: [item]));
+    }
+
+    for (final SidebarGroupModel group in GROUPS) {
+      final List<SidebarItemModel> items = [
+        for (final String id in group.itemIds)
+          if (byId.containsKey(id)) byId[id]!,
+      ];
+      if (items.isEmpty) continue;
+      resolved.add(ResolvedSidebarGroup(group: group, items: items));
+    }
+
+    return resolved;
+  }
 
   static const String DEFAULT_ITEM_ID = TabIds.DASHBOARD;
 

@@ -50,10 +50,21 @@ class PacketStockLineModel {
 
   num? get packetWeightValue => num.tryParse(packetWeight);
 
-  String get poolKey => '$productPublicId|$packetWeight';
+  String get poolKey => poolKeyOf(productPublicId, packetWeight);
 
+  // The same weight arrives as "1.000" from the snapshot and "1" from the
+  // packagings list, so the key compares the number, not the text.
   static String poolKeyOf(String productPublicId, String packetWeight) =>
-      '$productPublicId|$packetWeight';
+      '$productPublicId|${normalisedWeight(packetWeight)}';
+
+  static const int _WEIGHT_DECIMALS = 3;
+
+  static String normalisedWeight(String packetWeight) {
+    final String raw = packetWeight.trim();
+    final num? parsed = num.tryParse(raw);
+    if (parsed == null) return raw;
+    return parsed.toStringAsFixed(_WEIGHT_DECIMALS);
+  }
 
   static String _decimalOf(dynamic value) {
     if (value == null) return '';
