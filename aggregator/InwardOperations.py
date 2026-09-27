@@ -42,6 +42,8 @@ from .models import (
     InwardRawMaterialStatus,
     OtherMaterialType,
     Product,
+    Status,
+    StatusIds,
 )
 
 if TYPE_CHECKING:
@@ -79,6 +81,16 @@ def assert_raw_status_transition(current, requested) -> None:
         )
 
 
+def raw_status_of(entry: InwardRawMaterial) -> InwardRawMaterialStatus:
+    """The display status of ``entry``'s current ``Status`` row."""
+    return InwardRawMaterialStatus[entry.status.code]
+
+
+def status_row_for(choice: InwardRawMaterialStatus) -> Status:
+    """The seeded ``Status`` row a display choice resolves to."""
+    return Status.objects.get(code=choice.name)
+
+
 def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
     """Raise unless ``entry`` may leave the in-use raw pool (revert or delete).
 
@@ -92,7 +104,7 @@ def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
     convention as ``assert_raw_status_transition``.
     """
     is_counted = (
-        entry.status == InwardRawMaterialStatus.IN_USE
+        raw_status_of(entry) == InwardRawMaterialStatus.IN_USE
         and entry.effective_date is not None
         and entry.effective_date <= InventoryOperations.today()
     )
@@ -157,7 +169,7 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
         },
         "party": {"id": entry.party_id, "name": entry.party.name},
         "quantity_kg": str(entry.quantity_kg),
-        "status": entry.status,
+        "status": raw_status_of(entry).value,
         "lab_sampling_date": (
             entry.lab_sampling_date.isoformat()
             if entry.lab_sampling_date is not None
@@ -211,7 +223,7 @@ def raw_incoming_stock(
     query = InwardRawMaterial.objects.filter(
         effective_date__isnull=False,
         effective_date__lte=as_of,
-        status=InwardRawMaterialStatus.IN_USE,
+        status_id=StatusIds.IN_USE.value,
     )
     if product_public_ids:
         query = query.filter(product__public_id__in=product_public_ids)

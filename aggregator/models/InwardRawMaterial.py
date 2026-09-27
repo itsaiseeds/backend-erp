@@ -8,13 +8,17 @@ from common.models import (
 )
 
 from .InwardEntryMixin import InwardEntryMixin
+from .Status import StatusIds
 
 
 class InwardRawMaterialStatus(models.TextChoices):
     """Lifecycle of an inward raw-material lot.
 
     ``LAB_TESTING`` rows are held back from stock until the lab signs off;
-    the user flips the status to ``IN_USE`` when the material is usable.
+    the user flips the status to ``IN_USE`` when the material is usable. This
+    is a display-only enum: the ``status`` field itself is a foreign key to
+    ``aggregator.Status``, and each member's ``name`` here is exactly the
+    ``code`` of its seeded row (see ``StatusIds.raw_material_statuses``).
     """
 
     LAB_TESTING = "Lab Testing", "Lab Testing"
@@ -34,7 +38,9 @@ class InwardRawMaterial(
     ``Party``, when it was sampled for the lab, and its ``status``. The entry's
     date is ``created_at``; flipping ``status`` to ``IN_USE`` stamps
     ``effective_date`` with today, and once reached the lot counts toward stock.
-    Reverting to ``LAB_TESTING`` clears the date and stops the count.
+    Reverting to ``LAB_TESTING`` clears ``effective_date`` and re-stamps
+    ``lab_sampling_date`` with today, as if the lot were freshly back with the
+    lab.
 
     Exposed to the frontend by its ``public_id`` (``IR-…``).
     """
@@ -57,12 +63,12 @@ class InwardRawMaterial(
         max_digits=10,
         decimal_places=3,
     )
-    status = models.CharField(
-        "status",
-        max_length=16,
-        choices=InwardRawMaterialStatus.choices,
-        default=InwardRawMaterialStatus.LAB_TESTING,
-        db_index=True,
+    status = models.ForeignKey(
+        "aggregator.Status",
+        verbose_name="status",
+        on_delete=models.PROTECT,
+        default=StatusIds.LAB_TESTING.value,
+        related_name="inward_raw_materials",
     )
 
     class Meta:

@@ -3,8 +3,10 @@
 Only an application Admin may view or create lots (``admin_required``). A lot
 records raw-material replenishment: how many kilograms of a ``Product`` came in
 from a ``Party``, when it was sampled for the lab, and its ``status``. The
-entry's date is its ``created_at``; ``effective_date`` is **not** accepted here
--- flipping ``status`` to ``In Use`` with ``PATCH`` stamps it with today (see
+entry's date is its ``created_at``, and ``lab_sampling_date`` defaults to that
+same day (a lot arrives for lab testing the day it's booked) unless given
+explicitly. ``effective_date`` is **not** accepted here -- flipping ``status``
+to ``In Use`` with ``PATCH`` stamps it with today (see
 ``UpdateInwardRawMaterialView``), so a freshly booked lot never counts toward
 stock by accident.
 
@@ -20,7 +22,7 @@ from rest_framework import serializers, status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.InwardOperations import inward_raw_material_payload
+from aggregator.InwardOperations import inward_raw_material_payload, today
 from aggregator.models import InwardRawMaterial, InwardRawMaterialStatus, Party, Product
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
@@ -64,7 +66,10 @@ class CreateInwardRawMaterialSerializer(serializers.Serializer):
 
     ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
     ``In Use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
-    that flip and is deliberately absent here.
+    that flip and is deliberately absent here. ``lab_sampling_date`` may be
+    given explicitly; left out, it defaults to today -- a lot never starts
+    with no sampling date, since it arrives for lab testing the day it's
+    booked.
     """
 
     product = serializers.SlugRelatedField(
@@ -115,6 +120,7 @@ _QUERYSET_FILTERS = (
     QuerysetFilter(
         "status",
         label="Status",
+        lookup="status__name",
         parse=parse_str,
         description="Lot status (Lab Testing / In Use).",
         options=[
@@ -167,7 +173,7 @@ class InwardRawMaterialsView(AdminPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        return InwardRawMaterial.objects.select_related("product", "party")
+        return InwardRawMaterial.objects.select_related("product", "party", "status")
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:
         return [inward_raw_material_payload(entry) for entry in page_items]
@@ -185,7 +191,7 @@ class InwardRawMaterialsView(AdminPaginatedDateRangeListView):
             product=data["product"],
             party=data["party"],
             quantity_kg=data["quantity_kg"],
-            lab_sampling_date=data.get("lab_sampling_date"),
+            lab_sampling_date=data.get("lab_sampling_date") or today(),
             created_by=request.user,
         )
         return Response(inward_raw_material_payload(entry), status=status.HTTP_201_CREATED)
