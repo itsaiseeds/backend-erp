@@ -246,7 +246,7 @@ class _DateRangeFieldState extends State<DateRangeField> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: _MonthGrid(
+            child: CalendarMonthGrid(
               month: _leftMonth,
               start: _draftStart,
               end: _draftEnd,
@@ -259,7 +259,7 @@ class _DateRangeFieldState extends State<DateRangeField> {
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
-            child: _MonthGrid(
+            child: CalendarMonthGrid(
               month: rightMonth,
               start: _draftStart,
               end: _draftEnd,
@@ -337,7 +337,7 @@ class _DateRangeFieldState extends State<DateRangeField> {
   }
 }
 
-class _MonthGrid extends StatelessWidget {
+class CalendarMonthGrid extends StatelessWidget {
   final DateTime month;
   final DateTime? start;
   final DateTime? end;
@@ -345,7 +345,8 @@ class _MonthGrid extends StatelessWidget {
   final VoidCallback? onNext;
   final ValueChanged<DateTime> onSelect;
 
-  const _MonthGrid({
+  const CalendarMonthGrid({
+    super.key,
     required this.month,
     required this.start,
     required this.end,
@@ -430,7 +431,11 @@ class _MonthGrid extends StatelessWidget {
               children: [
                 for (int slot = 0; slot < 7; slot++)
                   Expanded(
-                    child: _buildCell(week * 7 + slot, leadingBlanks, daysInMonth),
+                    child: _buildCell(
+                      week * 7 + slot,
+                      leadingBlanks,
+                      daysInMonth,
+                    ),
                   ),
               ],
             ),
@@ -482,11 +487,7 @@ class _NavIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Icon(
-        icon,
-        size: AppSizes.iconMd,
-        color: AppColors.TEXT_SECONDARY,
-      ),
+      child: Icon(icon, size: AppSizes.iconMd, color: AppColors.TEXT_SECONDARY),
     );
   }
 }

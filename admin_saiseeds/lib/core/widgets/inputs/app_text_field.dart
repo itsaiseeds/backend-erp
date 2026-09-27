@@ -20,6 +20,7 @@ class AppTextField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final bool enabled;
   final bool readOnly;
+  final bool isMuted;
   final VoidCallback? onTap;
   final int maxLines;
   final FocusNode? focusNode;
@@ -43,6 +44,7 @@ class AppTextField extends StatefulWidget {
     this.onSubmitted,
     this.enabled = true,
     this.readOnly = false,
+    this.isMuted = false,
     this.onTap,
     this.maxLines = 1,
     this.focusNode,
@@ -73,7 +75,7 @@ class _AppTextFieldState extends State<AppTextField> {
     if (widget.prefixText != null) {
       return _AppTextFieldPrefix(
         text: widget.prefixText!,
-        enabled: widget.enabled,
+        enabled: widget.enabled && !widget.isMuted,
       );
     }
     if (widget.prefixIcon != null) {
@@ -92,7 +94,7 @@ class _AppTextFieldState extends State<AppTextField> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.label != null) ...[
+        if (widget.label != null && widget.label!.trim().isNotEmpty) ...[
           Text(widget.label!, style: widget.labelStyle ?? AppTypography.label),
           const SizedBox(height: AppSpacing.sm),
         ],
@@ -122,7 +124,7 @@ class _AppTextFieldState extends State<AppTextField> {
               color: AppColors.TEXT_DISABLED,
             ),
             filled: true,
-            fillColor: widget.enabled
+            fillColor: widget.enabled && !widget.isMuted
                 ? AppColors.SURFACE
                 : AppColors.SURFACE_VARIANT,
             contentPadding: EdgeInsets.only(
@@ -155,10 +157,12 @@ class _AppTextFieldState extends State<AppTextField> {
                 : widget.suffixIcon,
             border: _border(AppColors.BORDER),
             enabledBorder: _border(AppColors.BORDER),
-            focusedBorder: _border(
-              AppColors.BORDER_FOCUSED,
-              width: AppSizes.borderThick,
-            ),
+            focusedBorder: widget.isMuted
+                ? _border(AppColors.BORDER)
+                : _border(
+                    AppColors.BORDER_FOCUSED,
+                    width: AppSizes.borderThick,
+                  ),
             disabledBorder: _border(AppColors.BORDER),
             errorBorder: _border(AppColors.ERROR),
             focusedErrorBorder: _border(

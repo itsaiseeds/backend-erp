@@ -1,34 +1,49 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_strings.dart';
-import '../../theme/app_colors.dart';
+import '../inputs/app_text_field.dart';
 import '../../theme/app_spacing.dart';
-import '../../theme/app_typography.dart';
 
-class DetailField extends StatelessWidget {
+class DetailField extends StatefulWidget {
   final String label;
   final String value;
 
   const DetailField({super.key, required this.label, required this.value});
 
   @override
-  Widget build(BuildContext context) {
-    final String resolved = value.trim().isEmpty
-        ? AppStrings.TABLE_VALUE_UNAVAILABLE
-        : value.trim();
+  State<DetailField> createState() => _DetailFieldState();
+}
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: AppTypography.labelSmall.copyWith(
-            color: AppColors.TEXT_DISABLED,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xxs),
-        Text(resolved, style: AppTypography.bodyMedium),
-      ],
+class _DetailFieldState extends State<DetailField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _resolved);
+  }
+
+  @override
+  void didUpdateWidget(covariant DetailField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) _controller.text = _resolved;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String get _resolved => widget.value.trim().isEmpty
+      ? AppStrings.TABLE_VALUE_UNAVAILABLE
+      : widget.value.trim();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppTextField(
+      label: widget.label,
+      controller: _controller,
+      enabled: false,
     );
   }
 }

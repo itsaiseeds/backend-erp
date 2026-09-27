@@ -3,7 +3,6 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/widgets/buttons/outlined_action_button.dart';
 import '../../../../core/widgets/feedback/app_badge.dart';
 import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
@@ -37,9 +36,10 @@ class ClientsTable extends StatefulWidget {
   final List<ClientFilterModel> availableFilters;
   final List<ClientSortModel> availableSorts;
   final void Function(ClientModel client)? onView;
-  final void Function(ClientModel client)? onEdit;
   final void Function(ClientModel client)? onAccept;
   final void Function(ClientModel client)? onReject;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
   final String emptyTitle;
   final String emptyDescription;
@@ -59,9 +59,10 @@ class ClientsTable extends StatefulWidget {
     this.availableFilters = const [],
     this.availableSorts = const [],
     this.onView,
-    this.onEdit,
     this.onAccept,
     this.onReject,
+    this.hasMore = false,
+    this.onLoadMore,
     this.searchBarActions = const [],
     this.emptyTitle = AppStrings.CLIENTS_EMPTY_STATE_TITLE,
     this.emptyDescription = AppStrings.CLIENTS_EMPTY_STATE_BODY,
@@ -109,12 +110,6 @@ class ClientsTableState extends State<ClientsTable> {
         label: AppStrings.COLUMN_VERIFIED_BY,
         width: AppSizes.tableColumnWidthMedium,
       ),
-    const AppDataColumn(
-      id: AppStrings.TABLE_ACTIONS_COLUMN_LABEL,
-      label: AppStrings.TABLE_ACTIONS_COLUMN_LABEL,
-      width: AppSizes.tableColumnWidthCompact,
-      isCenter: true,
-    ),
     if (widget.isPendingView)
       const AppDataColumn(
         id: ClientsTable.COLUMN_REVIEW,
@@ -126,7 +121,6 @@ class ClientsTableState extends State<ClientsTable> {
 
   List<String> get _filterOptions => widget.availableFilters
       .where((filter) => filter.kind != ClientFilterKind.unsupported)
-      .where((filter) => filter.key != AppStrings.FILTER_BY_STATUS)
       .where(
         (filter) =>
             !widget.isPendingView ||
@@ -145,14 +139,31 @@ class ClientsTableState extends State<ClientsTable> {
     return null;
   }
 
+  static String _statusLabel(String value, String fallback) {
+    switch (value) {
+      case ClientStatusX.VERIFIED:
+        return AppStrings.CLIENT_STATUS_OPTION_VERIFIED;
+      case ClientStatusX.VERIFICATION_PENDING:
+        return AppStrings.CLIENT_STATUS_OPTION_PENDING;
+      default:
+        return fallback;
+    }
+  }
+
   List<FilterValueOption> _valueOptionsFor(String key) {
     final ClientFilterModel? filter = _filterFor(key);
     if (filter == null || !filter.isSelect) return const [];
 
+    final bool isStatus = key == AppStrings.FILTER_BY_STATUS;
+
     return filter.options
         .map(
-          (option) =>
-              FilterValueOption(value: option.value, label: option.label),
+          (option) => FilterValueOption(
+            value: option.value,
+            label: isStatus
+                ? _statusLabel(option.value, option.label)
+                : option.label,
+          ),
         )
         .toList();
   }
@@ -164,6 +175,9 @@ class ClientsTableState extends State<ClientsTable> {
     if (_isDateRange(key)) {
       final DateRangeValue parsed = DateRangeValue.parse(value);
       return parsed.isEmpty ? value : parsed.displayValue;
+    }
+    if (key == AppStrings.FILTER_BY_STATUS) {
+      return _statusLabel(value, _filterFor(key)?.labelForValue(value) ?? value);
     }
     return _filterFor(key)?.labelForValue(value) ?? value;
   }
@@ -187,6 +201,9 @@ class ClientsTableState extends State<ClientsTable> {
       totalPages: widget.totalPages,
       totalItems: widget.totalItems,
       onFetchData: widget.onFetchData,
+      isInfiniteScroll: true,
+      hasMore: widget.hasMore,
+      onLoadMore: widget.onLoadMore,
       searchBarActions: widget.searchBarActions,
       rowHeight: AppDataTable.standardRowHeight,
       columns: _columns,
@@ -195,7 +212,6 @@ class ClientsTableState extends State<ClientsTable> {
       excludeFromHide: const [
         ClientsTable.COLUMN_COMPANY,
         ClientsTable.COLUMN_REVIEW,
-        AppStrings.TABLE_ACTIONS_COLUMN_LABEL,
       ],
       excludeFromPin: const [
         ClientsTable.COLUMN_COMPANY,
@@ -203,6 +219,7 @@ class ClientsTableState extends State<ClientsTable> {
       ],
       sortByOptions: _sortOptions,
       filterByOptions: _filterOptions,
+      lockedFilters: const {AppStrings.FILTER_BY_STATUS},
       filterValueOptions: _valueOptionsFor,
       getFilterValueLabel: _valueLabelFor,
       isDateRangeFilter: _isDateRange,
@@ -240,8 +257,6 @@ class ClientsTableState extends State<ClientsTable> {
         return _textCell(client.verifiedBy);
       case ClientsTable.COLUMN_REVIEW:
         return _buildReviewActions(client);
-      case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:
-        return _buildActions(client);
       default:
         return _textCell(AppStrings.TABLE_VALUE_UNAVAILABLE);
     }
@@ -254,31 +269,6 @@ class ClientsTableState extends State<ClientsTable> {
       contact.name,
       contact.phoneNumber,
     ].where((part) => part.trim().isNotEmpty).join(' · ');
-  }
-
-  Widget _buildActions(ClientModel client) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconActionButton(
-          icon: Icons.visibility_outlined,
-          tooltip: AppStrings.VIEW_DETAILS,
-          type: IconActionType.primary,
-          onPressed: widget.onView == null
-              ? null
-              : () => widget.onView!(client),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        IconActionButton(
-          icon: Icons.edit_outlined,
-          tooltip: AppStrings.EDIT,
-          onPressed: widget.onEdit == null
-              ? null
-              : () => widget.onEdit!(client),
-        ),
-      ],
-    );
   }
 
   Widget _buildReviewActions(ClientModel client) {

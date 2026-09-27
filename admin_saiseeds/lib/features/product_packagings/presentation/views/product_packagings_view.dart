@@ -12,8 +12,8 @@ import '../../../products/data/products_repository.dart';
 import '../../data/models/product_packaging_model.dart';
 import '../../data/product_packagings_repository.dart';
 import '../bloc/product_packagings_cubit.dart';
-import '../widgets/product_packaging_detail_dialog.dart';
 import '../widgets/product_packaging_form_dialog.dart';
+import '../widgets/product_packaging_record_dialog.dart';
 import '../widgets/product_packagings_table.dart';
 
 class ProductPackagingsView extends StatelessWidget {
@@ -25,7 +25,6 @@ class ProductPackagingsView extends StatelessWidget {
     ProductsService.instance.repository = ProductsRepository(
       apiClient: apiClient,
     );
-    ProductsService.instance.loadProducts();
 
     return BlocProvider<ProductPackagingsCubit>(
       create: (context) => ProductPackagingsCubit(
@@ -47,6 +46,12 @@ class _ProductPackagingsContent extends StatefulWidget {
 class _ProductPackagingsContentState extends State<_ProductPackagingsContent> {
   final GlobalKey<ProductPackagingsTableState> _tableKey =
       GlobalKey<ProductPackagingsTableState>();
+
+  @override
+  void initState() {
+    super.initState();
+    ProductsService.instance.loadProducts(forceRefresh: true);
+  }
 
   void _onFetchData({
     required int page,
@@ -132,12 +137,10 @@ class _ProductPackagingsContentState extends State<_ProductPackagingsContent> {
             currentSortOrder: state.sortOrder,
             currentFilters: state.filters,
             onFetchData: _onFetchData,
-            onView: (packaging) =>
-                ProductPackagingDetailDialog.show(context, packaging),
-            onEdit: (packaging) => ProductPackagingFormDialog.show(
+            onView: (packaging) => ProductPackagingRecordDialog.show(
               context,
+              packaging,
               cubit: cubit,
-              packaging: packaging,
             ),
             onDelete: _onDelete,
             emptyTitle: state.isEmptySource

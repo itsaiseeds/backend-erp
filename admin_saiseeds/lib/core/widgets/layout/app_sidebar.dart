@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_strings.dart';
+import '../../constants/font_sizes.dart';
+import '../../models/sidebar_group_model.dart';
 import '../../models/sidebar_item_model.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 import '../../utils/formatters/initials_formatter.dart';
 import '../loaders/shimmer_box.dart';
+import 'overflow_tooltip.dart';
+import 'sidebar_group_section.dart';
 
-class AppSidebar extends StatelessWidget {
-  final List<SidebarItemModel> items;
+class AppSidebar extends StatefulWidget {
+  final List<ResolvedSidebarGroup> groups;
   final String activeItemId;
   final ValueChanged<String> onItemSelected;
   final bool isCollapsed;
@@ -18,7 +22,7 @@ class AppSidebar extends StatelessWidget {
 
   const AppSidebar({
     super.key,
-    required this.items,
+    required this.groups,
     required this.activeItemId,
     required this.onItemSelected,
     required this.profileCard,
@@ -26,6 +30,42 @@ class AppSidebar extends StatelessWidget {
     this.onToggleCollapse,
     this.onLogout,
   });
+
+  @override
+  State<AppSidebar> createState() => _AppSidebarState();
+}
+
+class _AppSidebarState extends State<AppSidebar> {
+  final Set<String> _collapsedGroupIds = {};
+
+  bool get isCollapsed => widget.isCollapsed;
+
+  String get activeItemId => widget.activeItemId;
+
+  ValueChanged<String> get onItemSelected => widget.onItemSelected;
+
+  VoidCallback? get onToggleCollapse => widget.onToggleCollapse;
+
+  VoidCallback? get onLogout => widget.onLogout;
+
+  Widget get profileCard => widget.profileCard;
+
+  // A group opens by default and stays open unless the user shuts it, so a
+  // freshly added tab is never hidden behind a closed header.
+  bool _isExpanded(ResolvedSidebarGroup section) {
+    final String? id = section.group?.id;
+    if (id == null) return true;
+    return !_collapsedGroupIds.contains(id);
+  }
+
+  void _toggle(ResolvedSidebarGroup section) {
+    final String? id = section.group?.id;
+    if (id == null) return;
+
+    setState(() {
+      if (!_collapsedGroupIds.remove(id)) _collapsedGroupIds.add(id);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,20 +114,20 @@ class AppSidebar extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Expanded(
             child: ClipRect(
-              child: ListView.separated(
+              child: ListView.builder(
                 padding: EdgeInsets.symmetric(
                   horizontal: isCollapsed ? AppSpacing.sm : AppSpacing.smd,
                 ),
-                itemCount: items.length,
-                separatorBuilder: (context, index) =>
-                    const SidebarDivider(indent: AppSizes.sidebarDividerIndent),
+                itemCount: widget.groups.length,
                 itemBuilder: (context, index) {
-                  final item = items[index];
-                  return SidebarItem(
-                    item: item,
-                    isActive: activeItemId == item.id,
+                  final ResolvedSidebarGroup section = widget.groups[index];
+                  return SidebarGroupSection(
+                    section: section,
+                    activeItemId: activeItemId,
                     isCollapsed: isCollapsed,
-                    onTap: () => onItemSelected(item.id),
+                    isExpanded: _isExpanded(section),
+                    onItemSelected: onItemSelected,
+                    onToggle: () => _toggle(section),
                   );
                 },
               ),
@@ -445,18 +485,23 @@ class _SidebarItemState extends State<SidebarItem> {
 
   @override
   Widget build(BuildContext context) {
-    final Color fill;
-    if (widget.isActive) {
-      fill = AppColors.SIDEBAR_ITEM_SELECTED;
-    } else if (_isHovered) {
-      fill = AppColors.SIDEBAR_ITEM_HOVER;
-    } else {
-      fill = AppColors.TRANSPARENT;
-    }
+    // Only the selected row is filled. Hover shifts the text and icon
+    // colour instead: a grey block appearing under the cursor read as
+    // heavy next to the flat sidebar.
+    final Color fill = widget.isActive
+        ? AppColors.SIDEBAR_ITEM_SELECTED
+        : AppColors.TRANSPARENT;
 
     final Color foreground = widget.isActive
         ? AppColors.SIDEBAR_ICON_ACTIVE
         : (_isHovered ? AppColors.SIDEBAR_TEXT_ACTIVE : AppColors.SIDEBAR_TEXT);
+
+    // 13px lets the longest tab names sit on one line in the 300px rail.
+    final TextStyle labelStyle = AppTypography.bodyMedium.copyWith(
+      color: foreground,
+      fontSize: AppFontSizes.FONT_13,
+      fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w500,
+    );
 
     final Widget tile = MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -468,7 +513,7 @@ class _SidebarItemState extends State<SidebarItem> {
           duration: _fillDuration,
           curve: Curves.easeOutCubic,
           height: AppSizes.sidebarItemHeight,
-          margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          margin: const EdgeInsets.only(bottom: AppSpacing.xs),
           decoration: BoxDecoration(
             color: fill,
             borderRadius: const BorderRadius.all(Radius.circular(AppRadius.md)),
@@ -490,7 +535,7 @@ class _SidebarItemState extends State<SidebarItem> {
               ),
               Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: widget.isCollapsed ? 0 : AppSpacing.md,
+                  horizontal: widget.isCollapsed ? 0 : AppSpacing.smd,
                 ),
                 child: Row(
                   mainAxisAlignment: widget.isCollapsed
@@ -514,21 +559,20 @@ class _SidebarItemState extends State<SidebarItem> {
                       ),
                     ),
                     if (!widget.isCollapsed) ...[
-                      const SizedBox(width: AppSpacing.smd),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
-                        child: AnimatedDefaultTextStyle(
-                          duration: _fillDuration,
-                          curve: Curves.easeOutCubic,
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: foreground,
-                            fontWeight: widget.isActive
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                          ),
-                          child: Text(
-                            widget.item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        child: OverflowTooltip(
+                          text: widget.item.label,
+                          style: labelStyle,
+                          child: AnimatedDefaultTextStyle(
+                            duration: _fillDuration,
+                            curve: Curves.easeOutCubic,
+                            style: labelStyle,
+                            child: Text(
+                              widget.item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ),

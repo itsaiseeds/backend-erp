@@ -44,10 +44,18 @@ class InwardOtherMaterialProductRefSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
+class InwardOtherMaterialTypeRefSerializer(serializers.Serializer):
+    """Output shape for the ``material_type`` reference inside a recipe ref."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
 class InwardOtherMaterialRecipeRefSerializer(serializers.Serializer):
     """Output shape for the ``recipe`` reference on a lot."""
 
     public_id = serializers.CharField()
+    material_type = InwardOtherMaterialTypeRefSerializer()
     product = InwardOtherMaterialProductRefSerializer()
     packet_weight = serializers.CharField(help_text="Weight of the covered packet, in kg.")
 

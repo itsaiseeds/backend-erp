@@ -104,7 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return AppShell(
           isCollapsed: isCollapsed,
           sidebar: DashboardSidebar(
-            items: SidebarItems.visibleItems(role: role),
+            groups: SidebarItems.visibleGroups(role: role),
             activeItemId: activeId,
             onItemSelected: _onItemSelected,
             isCollapsed: isCollapsed,

@@ -12,6 +12,8 @@ class AppDetailDialog extends StatelessWidget {
   final double width;
   final Widget? footer;
   final double? fixedHeight;
+  final bool isAccented;
+  final Widget? headerAction;
 
   const AppDetailDialog({
     super.key,
@@ -22,25 +24,37 @@ class AppDetailDialog extends StatelessWidget {
     this.width = AppSizes.detailDialogWidth,
     this.footer,
     this.fixedHeight,
+    this.isAccented = true,
+    this.headerAction,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Size viewport = MediaQuery.sizeOf(context);
+    final double available = viewport.height - (AppSpacing.lg * 2);
+    final double ceiling = available.clamp(0.0, AppSizes.dialogMaxHeight);
+    final double cardWidth = width.clamp(
+      0.0,
+      viewport.width - (AppSpacing.lg * 2),
+    );
+
     return Dialog(
       backgroundColor: AppColors.TRANSPARENT,
       insetPadding: const EdgeInsets.all(AppSpacing.lg),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: fixedHeight ?? AppSizes.dialogMaxHeight,
+          maxHeight: fixedHeight ?? ceiling,
           minHeight: fixedHeight ?? 0,
         ),
         child: Container(
-          width: width,
+          width: cardWidth,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: AppColors.SURFACE,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.BORDER),
+            borderRadius: BorderRadius.circular(AppRadius.dialog),
+            border: Border.all(
+              color: isAccented ? AppColors.PRIMARY : AppColors.BORDER,
+            ),
           ),
           child: Column(
             mainAxisSize: fixedHeight == null
@@ -52,9 +66,11 @@ class AppDetailDialog extends StatelessWidget {
                 icon: icon,
                 title: title,
                 subtitle: subtitle,
+                isAccented: isAccented,
+                actionButton: headerAction,
                 onClose: () => Navigator.of(context).pop(),
               ),
-              const AppHairline(),
+              if (!isAccented) const AppHairline(),
               if (fixedHeight == null)
                 Flexible(
                   child: SingleChildScrollView(
@@ -69,13 +85,15 @@ class AppDetailDialog extends StatelessWidget {
                     child: content,
                   ),
                 ),
-              if (footer != null) ...[
-                const AppHairline(),
-                Padding(
+              if (footer != null)
+                Container(
                   padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: const BoxDecoration(
+                    color: AppColors.BACKGROUND,
+                    border: Border(top: BorderSide(color: AppColors.DIVIDER)),
+                  ),
                   child: footer,
                 ),
-              ],
             ],
           ),
         ),

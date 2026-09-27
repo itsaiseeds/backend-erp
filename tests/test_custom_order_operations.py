@@ -349,6 +349,17 @@ class CustomOrderOperationsTest(DMLTestCase):
         assert inv.consumed_loose_packets(self.product, self.w1) == 30
         assert inv.available_loose_packets(self.product, self.w1) == 70
 
+        # The raw counted figure never moves (still the day's 100)...
+        assert inv.on_hand_loose_packets(self.product, self.w1) == 100
+        # ...but the live position's on-hand excludes what's already gone:
+        # available (70) + reserved (0) = 70, not the stale count of 100.
+        position = next(
+            e
+            for e in inv.loose_stock_position()
+            if e["product"] == self.product and e["packet_weight"] == self.w1
+        )
+        assert position["packets_on_hand"] == 70
+
         # Reverse the dispatch: packets return to reserved, still 70 available.
         revert_dispatch(order)
         assert order.status.code == "CONFIRMED"

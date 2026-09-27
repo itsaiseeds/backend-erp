@@ -104,11 +104,16 @@ class AppStrings {
   static const String RETRY = 'Retry';
   static const String CANCEL = 'Cancel';
   static const String CONFIRM = 'Confirm';
+  static const String OK = 'OK';
   static const String SAVE = 'Save';
   static const String EDIT = 'Edit';
   static const String DELETE = 'Delete';
   static const String SEARCH = 'Search...';
+  static const String NO_RESULTS_FOUND = 'No results found';
+  static const String REQUIRED_MARKER = ' *';
+  static const String TYPE_TO_SEARCH = 'Type to search...';
   static const String NO_DATA_FOUND = 'No data found.';
+  static const String SOMETHING_WENT_WRONG_TITLE = 'Action failed';
   static const String SOMETHING_WENT_WRONG =
       'Something went wrong. Please try again.';
   static const String SESSION_EXPIRED =
@@ -157,6 +162,8 @@ class AppStrings {
   static const String CLIENT_STATUS_PENDING = 'Pending';
   static const String CLIENTS_VIEW_PENDING = 'Pending requests';
   static const String CLIENTS_VIEW_VERIFIED = 'Verified clients';
+  static const String CLIENT_STATUS_OPTION_VERIFIED = 'Accepted clients';
+  static const String CLIENT_STATUS_OPTION_PENDING = 'Pending clients';
   static const String CLIENTS_TABLE_SEARCH_HINT = 'Search clients...';
   static const String CLIENTS_EMPTY_STATE_TITLE = 'No clients yet';
   static const String CLIENTS_EMPTY_STATE_BODY =
@@ -196,6 +203,7 @@ class AppStrings {
   static const String CLIENT_PRIMARY_BADGE = 'Primary';
   static const String FILTER_OPERATOR_EQUALS = '=';
   static const String DATE_RANGE_HINT = 'Select dates';
+  static const String DATE_PICK_HINT = 'Select a date';
   static const String DATE_RANGE_HELP = 'Select date range';
   static const String DATE_RANGE_APPLY = 'Apply';
   static const String DATE_RANGE_ARROW = '→';
@@ -209,11 +217,11 @@ class AppStrings {
   static const String DATE_RANGE_LAST_90 = 'Last 90 days';
   static const String DATE_RANGE_LAST_6M = 'Last 6 months';
   static const String DATE_RANGE_LAST_YEAR = 'Last 1 year';
-  static const String SMALL_SCREEN_TITLE = 'Best viewed on a larger screen';
+  static const String SMALL_SCREEN_TITLE = 'Best experienced on desktop';
   static const String SMALL_SCREEN_BODY =
-      'The Saiseeds admin portal is built for tablets and desktops. Open this '
-      'page on a wider screen for the full experience.';
-  static const String SMALL_SCREEN_HINT = 'Minimum width: 768px';
+      'The Saiseeds admin portal is designed for desktop screens. Open this '
+      'page on a desktop or widen your window for the full experience.';
+  static const String SMALL_SCREEN_HINT = 'Minimum width: 1200px';
   static const String CLIENT_STEP_DETAILS = 'Details';
   static const String CLIENT_STEP_ADDRESSES = 'Addresses';
   static const String CLIENT_STEP_CONTACTS = 'Contacts';
@@ -222,6 +230,10 @@ class AppStrings {
   static const String CLIENT_ADD_ADDRESS = 'Add address';
   static const String CLIENT_ADD_CONTACT = 'Add contact';
   static const String CLIENT_ADD_TRANSPORT = 'Add transport agency';
+  static const String CLIENT_RAIL_ADDRESSES_HINT = 'Manage client addresses.';
+  static const String CLIENT_RAIL_CONTACTS_HINT = 'Manage client contacts.';
+  static const String CLIENT_RAIL_TRANSPORT_HINT =
+      'Manage client transport agencies.';
   static const String CLIENT_ADDRESS_LABEL = 'Label';
   static const String CLIENT_ADDRESS_LINE_1 = 'Address line 1';
   static const String CLIENT_ADDRESS_LINE_2 = 'Address line 2';
@@ -235,8 +247,10 @@ class AppStrings {
   static const String CLIENT_REMOVE_ENTRY = 'Remove';
   static const String STEP_BACK = 'Back';
   static const String STEP_NEXT = 'Next';
-  static const String VALIDATION_ONE_PRIMARY = 'Exactly one entry must be primary.';
-  static const String VALIDATION_AT_LEAST_ONE = 'At least one entry is required.';
+  static const String VALIDATION_ONE_PRIMARY =
+      'Exactly one entry must be primary.';
+  static const String VALIDATION_AT_LEAST_ONE =
+      'At least one entry is required.';
   static const String VALIDATION_CITY_REQUIRED = 'City is required.';
   static const String CLIENT_CREATED_BY_LABEL = 'Added by';
   static const String CLIENT_COMPANY_NAME_HINT = 'Registered business name';
@@ -353,7 +367,31 @@ class AppStrings {
       'Scan this code in an authenticator app to enable sign-in.';
   static const String DETAIL_FIELD_CREATED_BY = 'Created By';
   static const String DETAIL_FIELD_CREATED_AT = 'Created At';
+  static const String SALES_PERSON_EDIT_HINT =
+      'Update the sales person account details.';
+  static const String VIEW_MODE_TOAST_TITLE = 'View mode';
+  static const String VIEW_MODE_TOAST_BODY =
+      'Select the edit action in the header to change these details.';
+  static const String VIEW_MODE_LOCKED_TOAST_BODY =
+      'This field is read-only and cannot be edited.';
   static const String TOTP_MANUAL_ENTRY = 'Setup key';
+  static const String TOTP_SEND_WHATSAPP = 'WhatsApp';
+  static const String TOTP_DOWNLOAD_QR = 'Download QR';
+  static const String TOTP_NO_PHONE = 'No phone number on record.';
+  static const String TOTP_DOWNLOAD_FAILED = 'Could not prepare the QR image.';
+  static const String TOTP_QR_FILE_SUFFIX = '-authenticator-qr.png';
+  static const String TOTP_QR_FALLBACK_NAME = 'saiseeds';
+  static const String TOTP_WHATSAPP_GREETING = 'Hello';
+  static const String TOTP_WHATSAPP_INTRO =
+      'Welcome to Saiseeds. Your account is ready.';
+  static const String TOTP_WHATSAPP_STEPS =
+      'To sign in, open any authenticator app (Google Authenticator, Authy) '
+      'and scan the QR code attached to this message.';
+  static const String TOTP_WHATSAPP_CLOSING =
+      'Keep this code private. It is what signs you in.';
+  static const String TOTP_WHATSAPP_QR_TITLE = 'Saiseeds sign-in QR';
+  static const String TOTP_QR_ATTACH_HINT =
+      'Attach the downloaded QR image to the chat.';
   static const String TOTP_UNAVAILABLE =
       'No authenticator setup code is available for this account.';
 
@@ -462,7 +500,7 @@ class AppStrings {
   static const String CROP_CREATED_TITLE = 'Crop created';
   static const String CROP_CREATE_FAILED_TITLE = 'Could not create crop';
 
-  static const String PRODUCT_PACKAGINGS = 'Product Packagings';
+  static const String PRODUCT_PACKAGINGS = 'Packagings';
   static const String PRODUCT_PACKAGINGS_TABLE_SEARCH_HINT =
       'Search packagings...';
   static const String PRODUCT_PACKAGINGS_LOAD_FAILED_TITLE =
@@ -495,9 +533,11 @@ class AppStrings {
 
   static const String SORT_BY_PRODUCT = 'product';
   static const String SORT_BY_PACKET_WEIGHT = 'packet_weight';
+  static const String SORT_BY_MATERIAL_TYPE = 'material_type';
   static const String SORT_BY_PACKETS = 'packets';
   static const String SORT_BY_TOTAL_WEIGHT = 'total_weight';
   static const String FILTER_BY_PRODUCT = 'product';
+  static const String FILTER_BY_MATERIAL_TYPE = 'material_type';
 
   static const String FIELD_PRODUCT = 'Product';
   static const String FIELD_PRODUCT_HINT = 'Select a product';
@@ -518,4 +558,435 @@ class AppStrings {
   static const String PRODUCTS_UNAVAILABLE =
       'Product list is unavailable. Refresh the page and try again.';
   static const String SELECTED_PRODUCT_SUMMARY_TITLE = 'Selected product';
+  static const String SELECTED_PRODUCT_SUMMARY_HINT =
+      'Read-only details of the product this packaging belongs to.';
+  static const String SELECTED_PRODUCT_NONE =
+      'Pick a product to see its details here.';
+  static const String ORDERS = 'Order Management';
+  static const String ORDERS_EMPTY_STATE_TITLE = 'No orders found';
+  static const String ORDERS_EMPTY_STATE_BODY =
+      'Orders booked by your sales team will appear here.';
+  static const String ORDERS_LOAD_FAILED_TITLE = 'Could not load orders';
+  static const String ORDERS_TABLE_SEARCH_HINT = 'Search by client';
+
+  static const String ORDER_STATUS_BOOKED = 'Booked';
+  static const String ORDER_STATUS_UNDER_REVIEW = 'Under review';
+  static const String ORDER_STATUS_CONFIRMED = 'Confirmed';
+  static const String ORDER_STATUS_DISPATCHED = 'Dispatched';
+  static const String ORDER_STATUS_DELIVERED = 'Delivered';
+  static const String ORDER_STATUS_ON_HOLD = 'On hold';
+  static const String ORDER_STATUS_REJECTED = 'Rejected';
+
+  static const String COLUMN_ORDER_CLIENT = 'Client';
+  static const String COLUMN_ORDER_STATUS = 'Status';
+  static const String COLUMN_ORDER_AMOUNT = 'Amount';
+  static const String COLUMN_ORDER_ID = 'Order ID';
+  static const String COLUMN_ORDER_ADDRESS = 'Delivery Address';
+  static const String COLUMN_ORDER_DISPATCH = 'Dispatch';
+  static const String COLUMN_ORDER_VERIFIED_BY = 'Verified By';
+  static const String COLUMN_ORDER_CLIENT_ONBOARDED_BY = 'Client Added By';
+  static const String COLUMN_ORDER_PLACED = 'Placed';
+  static const String COLUMN_ORDER_EXPECTED = 'Expected';
+  static const String COLUMN_ORDER_SALES_PERSON = 'Sales Person';
+  static const String COLUMN_ORDER_ACTIONS = 'Order Actions';
+
+  static const String ORDER_VERIFY = 'Verify';
+  static const String ORDER_UNVERIFY = 'Unverify';
+  static const String ORDER_HOLD = 'Hold';
+  static const String ORDER_REJECT = 'Reject';
+
+  static const String ORDER_VERIFY_TITLE = 'Verify this order?';
+  static const String ORDER_VERIFY_BODY =
+      'The order is approved against the current stock count and its bags are reserved.';
+  static const String ORDER_VERIFY_DONE = 'Order verified';
+
+  static const String ORDER_UNVERIFY_TITLE = 'Withdraw approval?';
+  static const String ORDER_UNVERIFY_BODY =
+      'The order returns to Under review and the bags it reserved are released.';
+  static const String ORDER_UNVERIFY_DONE = 'Approval withdrawn';
+
+  static const String ORDER_HOLD_TITLE = 'Put this order on hold?';
+  static const String ORDER_HOLD_BODY =
+      'The order is paused and any bags it reserved are released. It can be resumed by verifying it again.';
+  static const String ORDER_HOLD_DONE = 'Order on hold';
+
+  static const String ORDER_REJECT_TITLE = 'Reject this order?';
+  static const String ORDER_REJECT_BODY =
+      'Rejection is permanent. No action moves an order out of Rejected, and any reserved bags are released.';
+  static const String ORDER_REJECT_DONE = 'Order rejected';
+
+  static const String ORDER_VERIFY_BLOCKED =
+      'Only a booked, under-review or held order can be verified.';
+  static const String ORDER_UNVERIFY_BLOCKED =
+      'Only a confirmed order can be unverified.';
+  static const String ORDER_HOLD_BLOCKED =
+      'A dispatched, delivered or rejected order cannot be held.';
+  static const String ORDER_REJECT_BLOCKED =
+      'A dispatched or delivered order cannot be rejected.';
+  static const String ORDER_EDIT_BLOCKED =
+      'A dispatched or delivered order can no longer be edited.';
+
+  static const String ORDER_DETAILS_TITLE = 'Order details';
+  static const String ORDER_UPDATED_TITLE = 'Order updated';
+  static const String ORDER_EDIT_LOCKED_TITLE = 'Order locked';
+  static const String ORDER_EDIT_LOCKED_BODY =
+      'A dispatched order can no longer be edited.';
+  static const String ORDER_QUANTITY_LABEL = 'Quantity';
+  static const String ORDER_ADD_ITEM = 'Add item';
+  static const String ORDER_PICK_PRODUCTS_TITLE = 'Add products';
+  static const String ORDER_PICK_PRODUCTS_SUBTITLE =
+      'Choose the bags to add to this order.';
+  static const String ORDER_PICK_SEARCH_HINT = 'Search products...';
+  static const String ORDER_PICK_EMPTY = 'No packagings match your search.';
+  static const String ORDER_PICK_ADD = 'ADD';
+  static const String ORDER_PICK_CONFIRM = 'Add these products';
+  static const String ORDER_PICK_SELECTED_NONE = 'Nothing selected yet';
+  static const String ORDER_PICK_ON_ORDER = 'On this order';
+  static const String STOCK_UPDATED = 'Stock Updated';
+  static const String STOCK_NOT_UPDATED = 'Stock not updated';
+  static const String PARTIES = 'Party Management';
+  static const String PARTY_DETAIL_TITLE = 'Party details';
+  static const String PARTY_DETAIL_SUBTITLE =
+      'Name and city on record for this party.';
+  static const String ADD_PARTY = 'Add party';
+  static const String ADD_PARTY_SUBTITLE = 'Register a party in the directory.';
+  static const String EDIT_PARTY_SUBTITLE = 'Update the party details.';
+  static const String PARTY_CREATED_TITLE = 'Party created';
+  static const String PARTY_UPDATED_TITLE = 'Party updated';
+  static const String PARTY_DELETED_TITLE = 'Party deleted';
+  static const String DELETE_PARTY_TITLE = 'Delete party';
+  static const String DELETE_PARTY_BODY =
+      'This permanently removes the party. This cannot be undone.';
+  static const String COLUMN_PARTY_NAME = 'Party Name';
+  static const String COLUMN_PARTY_CONTACT = 'Contact Number';
+  static const String FIELD_PARTY_NAME_HINT = 'Party name';
+  static const String FIELD_PARTY_CONTACT_HINT = '10-digit mobile number';
+  static const String PARTIES_TABLE_SEARCH_HINT = 'Search parties...';
+  static const String PARTIES_EMPTY_STATE_TITLE = 'No parties yet';
+  static const String PARTIES_EMPTY_STATE_BODY =
+      'Add a party to start building the directory.';
+  static const String PARTIES_LOAD_FAILED_TITLE = 'Could not load parties';
+  static const String VALIDATION_PARTY_NAME_REQUIRED =
+      'Party name is required.';
+  static const String TABLE_ROW_ACTIONS = 'Options';
+  static const String TABLE_ROW_ACTIONS_TOOLTIP = 'Order options';
+  static const String ORDER_PICK_ALREADY_TITLE = 'Already on this order';
+  static const String ORDER_PICK_ALREADY_BODY =
+      'Close this and raise the quantity on the existing line instead.';
+  static const String ORDER_PICK_SELECTED_ONE = 'bag selected';
+  static const String ORDER_PICK_SELECTED_MANY = 'bags selected';
+  static const String ORDER_REMOVE_ITEM = 'Remove item';
+  static const String ORDER_NEW_ITEM = 'New item';
+  static const String ORDER_NEGOTIATED_PRICE_LABEL = 'Negotiated price';
+  static const String ORDER_PICK_DELIVERY_DATE = 'Pick a delivery date';
+  static const String ORDER_STEP_PREFIX = 'Step';
+  static const String LABEL_SEPARATOR = ':';
+  static const String ORDER_STEP_SUMMARY_CAPTION = 'Order overview';
+  static const String ORDER_STEP_ITEMS_CAPTION = 'Bags on this order';
+  static const String ORDER_STEP_DELIVERY_CAPTION = 'Where it is going';
+  static const String ORDER_STEP_SUMMARY = 'Summary';
+  static const String ORDER_STEP_ITEMS = 'Items';
+  static const String ORDER_STEP_DELIVERY = 'Delivery';
+
+  static const String ORDER_PUBLIC_ID_LABEL = 'Order ID';
+  static const String ORDER_PLACED_BY_LABEL = 'Booked by';
+  static const String ORDER_CLIENT_ONBOARDED_BY_LABEL = 'Client onboarded by';
+  static const String ORDER_VERIFIED_BY_LABEL = 'Verified by';
+  static const String ORDER_AWAITING_VERIFICATION = 'Awaiting verification';
+  static const String ORDER_TOTAL_AMOUNT_LABEL = 'Total amount';
+  static const String ORDER_TOTAL_PACKETS_LABEL = 'Total packets';
+  static const String ORDER_ITEM_COUNT_LABEL = 'Items';
+  static const String ORDER_BAG_COUNT_LABEL = 'Bags';
+  static const String ORDER_DELIVERY_ADDRESS_LABEL = 'Delivery address';
+  static const String ORDER_CITY_LABEL = 'City';
+  static const String ORDER_DISPATCH_MODE_LABEL = 'Dispatch';
+  static const String ORDER_TRANSPORT_AGENCY_LABEL = 'Transport agency';
+  static const String ORDER_EXPECTED_DELIVERY_LABEL = 'Expected delivery';
+  static const String ORDER_PLACED_ON_LABEL = 'Booked on';
+  static const String ORDER_DISPATCH_AGENCY = 'Transport agency';
+  static const String ORDER_DISPATCH_PRIVATE = 'Private dispatch';
+  static const String ORDER_QUANTITY_PREFIX = 'Qty';
+  static const String ORDER_PER_BAG = 'per bag';
+  static const String ORDER_LIST_PRICE_LABEL = 'List price';
+  static const String ORDER_NO_ITEMS = 'This order has no lines.';
+  static const String TIMEZONE_IST = 'IST';
+
+  static const String GROUP_ORDERS = 'Order Management';
+  static const String DISPATCH_CHALLANS = 'Dispatch Orders';
+  static const String COLUMN_DISPATCH_ID = 'Dispatch ID';
+  static const String COLUMN_LR_NUMBER = 'LR Number';
+  static const String COLUMN_DISPATCH_DATE = 'Dispatch Date';
+  static const String COLUMN_TRANSPORT_TYPE = 'Transport';
+  static const String COLUMN_VEHICLE_NUMBER = 'Vehicle';
+  static const String COLUMN_DRIVER = 'Driver';
+  static const String COLUMN_FROM_CITY = 'From City';
+  static const String COLUMN_TO_CITY = 'To City';
+  static const String COLUMN_RECEIVER = 'Receiver';
+  static const String COLUMN_RECEIVER_ADDRESS = 'Delivery Address';
+  static const String COLUMN_CONTACT_PERSON = 'Contact Person';
+  static const String COLUMN_HSN_CODE = 'HSN Code';
+  static const String COLUMN_FINANCIAL_YEAR = 'Financial Year';
+  static const String COLUMN_ITEM_COUNT = 'Items';
+  static const String COLUMN_TOTAL_PACKETS = 'Packets';
+  static const String COLUMN_TOTAL_AMOUNT = 'Total Amount';
+  static const String TRANSPORT_PRIVATE = 'Private';
+  static const String TRANSPORT_AGENCY = 'Agency';
+  static const String DOWNLOAD = 'Download';
+  static const String CHALLAN_EDIT_LR = 'Edit LR';
+  static const String CHALLAN_LR_TITLE = 'LR number';
+  static const String ORDER_LR_ACTION = 'Add LR number';
+  static const String ORDER_LR_SUBTITLE =
+      'Record the transporter LR against this dispatched order.';
+  static const String ORDER_LR_BLOCKED =
+      'Only a dispatched order can carry an LR number.';
+  static const String CHALLAN_LR_SUBTITLE =
+      'Record the transporter LR against this dispatch.';
+  static const String CHALLAN_LR_SAVED = 'LR number saved';
+  static const String FIELD_LR_NUMBER_HINT = 'Transporter LR number';
+  static const String CHALLAN_DOWNLOAD = 'Download challan';
+  static const String CHALLAN_VIEW = 'View challan';
+  static const String CHALLAN_PREVIEW_TITLE = 'Delivery challan';
+  static const String CHALLAN_FILE_PREFIX = 'challan-';
+  static const String CHALLAN_DOWNLOAD_FAILED =
+      'Could not generate the challan PDF.';
+  static const String CHALLAN_DETAIL_TITLE = 'Dispatch challan';
+  static const String CHALLAN_DETAIL_SUBTITLE =
+      'Items and lot numbers on this dispatch.';
+  static const String CHALLAN_ITEMS_EMPTY = 'This challan has no items.';
+  static const String CHALLANS_TABLE_SEARCH_HINT = 'Search dispatches...';
+  static const String CHALLANS_EMPTY_STATE_TITLE = 'No dispatches';
+  static const String CHALLANS_EMPTY_STATE_BODY =
+      'No dispatch challans were recorded in this date range.';
+  static const String CHALLANS_LOAD_FAILED_TITLE = 'Could not load dispatches';
+  static const String COLUMN_LOT_NUMBER = 'Lot Number';
+  static const String FILTER_BY_DATE_RANGE = 'date_range';
+  static const String FILTER_LABEL_DATE_RANGE = 'Dispatch Window';
+  static const String FILTER_LABEL_CITY = 'Destination City';
+  static const String FILTER_LABEL_CLIENT = 'Client';
+  static const String SORT_LABEL_DISPATCH_DATE = 'Dispatch Date';
+  static const String SORT_LABEL_CREATED = 'Created';
+  static const String SORT_BY_DISPATCH_DATE = 'dispatch_date';
+
+  static const String GROUP_USER_MANAGEMENT = 'User Management';
+  static const String GROUP_ONBOARDING = 'Client & Party';
+  static const String GROUP_CATALOGUE = 'Product Configuration';
+  static const String GROUP_INWARD = 'Inward Operations';
+  static const String GROUP_DAILY_STOCK = 'Daily Stock Update';
+  static const String GROUP_STOCK_ANALYSIS = 'Stock Analysis';
+
+  static const String ORDER_DISPATCH = 'Dispatch';
+  static const String ORDER_DISPATCH_TITLE = 'Dispatch order';
+  static const String ORDER_DISPATCH_BLOCKED =
+      'Only a verified order can be dispatched.';
+  static const String ORDER_REVERT_DISPATCH = 'Revert dispatch';
+  static const String ORDER_REVERT_DISPATCH_BLOCKED =
+      'Only a dispatched order can be reverted.';
+  static const String ORDER_REVERT_DISPATCH_TITLE = 'Revert this dispatch?';
+  static const String ORDER_REVERT_DISPATCH_BODY =
+      'This returns the order to Confirmed so it can be dispatched again.';
+  static const String ORDER_REVERT_DISPATCH_DONE = 'Dispatch reverted';
+  static const String DISPATCH_STEP_TRANSPORT = 'Transport';
+  static const String DISPATCH_STEP_ITEMS = 'Lot numbers';
+  static const String DISPATCH_STEP_SUMMARY = 'Summary';
+  static const String DISPATCH_STEP_TRANSPORT_CAPTION =
+      'Where it ships from and who is driving.';
+  static const String DISPATCH_STEP_ITEMS_CAPTION =
+      'Record the lot number for each bag.';
+  static const String DISPATCH_STEP_SUMMARY_CAPTION =
+      'Check the details, then dispatch.';
+  static const String FIELD_FROM_CITY = 'From city';
+  static const String FIELD_DRIVER_NAME = 'Driver name';
+  static const String FIELD_DRIVER_NAME_HINT = 'Name of the driver';
+  static const String FIELD_DRIVER_NUMBER = 'Driver number';
+  static const String FIELD_VEHICLE_NUMBER = 'Vehicle number';
+  static const String FIELD_VEHICLE_NUMBER_HINT = 'e.g. GJ01AB1234';
+  static const String FIELD_LOT_NUMBER = 'Lot number';
+  static const String FIELD_LOT_NUMBER_HINT = 'Lot number for this bag';
+  static const String DISPATCH_ITEMS_EMPTY = 'This order has no bags.';
+  static const String DISPATCHED_TITLE = 'Order dispatched';
+  static const String VALIDATION_FROM_CITY_REQUIRED = 'From city is required.';
+  static const String DISPATCH_SUMMARY_ITEMS = 'Bags';
+
+  static const String PRODUCT_STOCK = 'Product Stock';
+  static const String RAW_MATERIAL_STOCK = 'Raw Material';
+
+  static const String OTHER_MATERIAL_STOCK = 'Material Stock';
+  static const String PACKETS_PER_BAG_SUFFIX = 'packets / bag';
+  static const String FILTER_BY_TYPE = 'type';
+  static const String FILTER_LABEL_PRODUCT = 'Product';
+  static const String FILTER_LABEL_TYPE = 'Type';
+  static const String FILTER_LABEL_MATERIAL_TYPE = 'Material Type';
+  static const String SORT_LABEL_PRODUCT = 'Product';
+  static const String SORT_LABEL_PACKET_WEIGHT = 'Packet Weight';
+  static const String SORT_LABEL_MATERIAL_TYPE = 'Material Type';
+  static const String COLUMN_ON_HAND = 'On Hand';
+  static const String OTHER_MATERIAL_STOCK_TABLE_SEARCH_HINT =
+      'Search other material stock...';
+  static const String OTHER_MATERIAL_STOCK_EMPTY_STATE_TITLE =
+      'No other material stock';
+  static const String OTHER_MATERIAL_STOCK_EMPTY_STATE_BODY =
+      'Record an inward other-material lot to start tracking stock.';
+  static const String OTHER_MATERIAL_STOCK_LOAD_FAILED_TITLE =
+      'Could not load other material stock';
+
+  static const String COLUMN_STOCK_TYPE = 'Type';
+  static const String COLUMN_INCOMING_KG = 'Incoming (kg)';
+  static const String COLUMN_PACKED_KG = 'Packed (kg)';
+  static const String COLUMN_AVAILABLE_KG = 'Available (kg)';
+
+  static const String STOCK_KIND_BAG = 'Bag';
+  static const String STOCK_KIND_LOOSE = 'Packet';
+
+  static const String PRODUCT_STOCK_TABLE_SEARCH_HINT =
+      'Search product stock...';
+  static const String PRODUCT_STOCK_EMPTY_STATE_TITLE = 'No stock positions';
+  static const String PRODUCT_STOCK_EMPTY_STATE_BODY =
+      'Add a product packaging to start tracking stock.';
+  static const String PRODUCT_STOCK_LOAD_FAILED_TITLE =
+      'Could not load product stock';
+
+  static const String RAW_MATERIAL_STOCK_TABLE_SEARCH_HINT =
+      'Search raw material stock...';
+  static const String RAW_MATERIAL_STOCK_EMPTY_STATE_TITLE =
+      'No raw material stock';
+  static const String RAW_MATERIAL_STOCK_EMPTY_STATE_BODY =
+      'Record an inward raw-material lot to start tracking stock.';
+  static const String RAW_MATERIAL_STOCK_LOAD_FAILED_TITLE =
+      'Could not load raw material stock';
+  static const String STOCK_AS_OF_PREFIX = 'As of';
+
+  static const String INWARD_RAW_MATERIALS = 'Raw Material';
+  static const String OTHER_RAW_MATERIALS = 'Material Recipes';
+  static const String OTHER_MATERIAL_INWARD = 'Other Material Inward';
+
+  static const String COLUMN_RECIPE = 'Recipe';
+
+  static const String FIELD_RECIPE = 'Recipe';
+  static const String FIELD_RECIPE_HINT = 'Search a recipe';
+
+  static const String OTHER_INWARD_DETAIL_TITLE = 'Other material lot';
+  static const String OTHER_INWARD_DETAIL_SUBTITLE =
+      'Recipe, party and quantity received for this lot.';
+  static const String ADD_OTHER_INWARD = 'Add lot';
+  static const String ADD_OTHER_INWARD_SUBTITLE =
+      'Record an inward other-material lot.';
+  static const String OTHER_INWARD_CREATED_TITLE = 'Lot recorded';
+  static const String OTHER_INWARD_DELETED_TITLE = 'Lot deleted';
+  static const String DELETE_OTHER_INWARD_TITLE = 'Delete lot';
+  static const String DELETE_OTHER_INWARD_BODY =
+      'This permanently removes the other-material lot. This cannot be undone.';
+  static const String OTHER_INWARD_TABLE_SEARCH_HINT =
+      'Search other material...';
+  static const String OTHER_INWARD_EMPTY_STATE_TITLE =
+      'No other material lots yet';
+  static const String OTHER_INWARD_EMPTY_STATE_BODY =
+      'Record an inward lot to start tracking other material.';
+  static const String OTHER_INWARD_LOAD_FAILED_TITLE =
+      'Could not load other material lots';
+  static const String VALIDATION_RECIPE_REQUIRED = 'Recipe is required.';
+
+  static const String COLUMN_PARTY = 'Party';
+  static const String COLUMN_QUANTITY_KG = 'Quantity (kg)';
+  static const String COLUMN_LAB_SAMPLING_DATE = 'Lab Sampling Date';
+  static const String COLUMN_EFFECTIVE_DATE = 'Effective Date';
+  static const String COLUMN_MATERIAL_TYPE = 'Material Type';
+  static const String COLUMN_QUANTITY = 'Quantity';
+  static const String COLUMN_UNIT_TYPE = 'Unit';
+
+  static const String STATUS_LAB_TESTING = 'Lab Testing';
+  static const String STATUS_IN_USE = 'In Use';
+
+  static const String FIELD_PARTY = 'Party';
+  static const String FIELD_PARTY_HINT = 'Search a party';
+  static const String FIELD_QUANTITY_KG = 'Quantity (kg)';
+  static const String FIELD_QUANTITY_KG_HINT = 'Weight received in kg';
+  static const String FIELD_LAB_SAMPLING_DATE = 'Lab sampling date';
+  static const String FIELD_MATERIAL_TYPE = 'Material type';
+  static const String FIELD_MATERIAL_TYPE_HINT = 'Search a material type';
+  static const String FIELD_RECIPE_QUANTITY = 'Quantity';
+  static const String FIELD_RECIPE_QUANTITY_HINT = 'Amount per packet';
+
+  static const String INWARD_DETAIL_TITLE = 'Raw material lot';
+  static const String INWARD_DETAIL_SUBTITLE =
+      'Product, party and lab sampling details for this lot.';
+  static const String ADD_INWARD = 'Add lot';
+  static const String ADD_INWARD_SUBTITLE = 'Record an inward raw-material lot.';
+  static const String EDIT_INWARD_SUBTITLE =
+      'Update the sampling date or mark the lot in use.';
+  static const String INWARD_CREATED_TITLE = 'Lot recorded';
+  static const String INWARD_UPDATED_TITLE = 'Lot updated';
+  static const String INWARD_DELETED_TITLE = 'Lot deleted';
+  static const String DELETE_INWARD_TITLE = 'Delete lot';
+  static const String DELETE_INWARD_BODY =
+      'This permanently removes the raw-material lot. This cannot be undone.';
+  static const String INWARD_TABLE_SEARCH_HINT = 'Search raw material...';
+  static const String INWARD_EMPTY_STATE_TITLE = 'No raw material lots yet';
+  static const String INWARD_EMPTY_STATE_BODY =
+      'Record an inward lot to start tracking raw material.';
+  static const String INWARD_LOAD_FAILED_TITLE =
+      'Could not load raw material lots';
+  static const String INWARD_MARK_IN_USE = 'Mark in use';
+  static const String INWARD_STATUS_LOCKED_NOTE =
+      'A lot already in use cannot change status.';
+
+  static const String RECIPE_DETAIL_TITLE = 'Material recipe';
+  static const String RECIPE_DETAIL_SUBTITLE =
+      'Material consumed per packet of this product.';
+  static const String ADD_RECIPE = 'Add recipe';
+  static const String ADD_RECIPE_SUBTITLE =
+      'Define the material a packet consumes.';
+  static const String RECIPE_CREATED_TITLE = 'Recipe created';
+  static const String RECIPE_UPDATED_TITLE = 'Recipe updated';
+  static const String RECIPE_DELETED_TITLE = 'Recipe deleted';
+  static const String DELETE_RECIPE_TITLE = 'Delete recipe';
+  static const String DELETE_RECIPE_BODY =
+      'This permanently removes the recipe. This cannot be undone.';
+  static const String RECIPE_TABLE_SEARCH_HINT = 'Search recipes...';
+  static const String RECIPE_EMPTY_STATE_TITLE = 'No recipes yet';
+  static const String RECIPE_EMPTY_STATE_BODY =
+      'Add a recipe to define what a packet consumes.';
+  static const String RECIPE_LOAD_FAILED_TITLE = 'Could not load recipes';
+
+  static const String VALIDATION_PARTY_REQUIRED = 'Party is required.';
+  static const String VALIDATION_MATERIAL_TYPE_REQUIRED =
+      'Material type is required.';
+  static const String VALIDATION_LAB_DATE_REQUIRED =
+      'Lab sampling date is required.';
+
+  static const String BAG_STOCK = 'Bag Stocks';
+  static const String PACKET_STOCK = 'Packet Stock';
+
+  static const String STOCK_UPDATE_ACTION = 'Update Stock';
+  static const String STOCK_CONFIRM_TITLE = 'Update today\'s stock';
+  static const String STOCK_CONFIRM_BODY =
+      'Please update stock of all products together. Counts you leave blank '
+      'keep the value already recorded for today.';
+  static const String STOCK_CONFIRM_ACTION = 'Confirm';
+  static const String STOCK_NOTHING_ENTERED_TITLE = 'Nothing to update';
+  static const String STOCK_NOTHING_ENTERED_BODY =
+      'Enter at least one count before updating.';
+  static const String STOCK_COUNT_HINT = '0';
+
+  static const String COLUMN_STOCK_ON_HAND = 'On Hand';
+  static const String COLUMN_STOCK_RESERVED = 'Reserved';
+  static const String COLUMN_STOCK_CONSUMED = 'Consumed';
+  static const String COLUMN_STOCK_AVAILABLE = 'Available';
+  static const String COLUMN_STOCK_COUNTED = 'Counted';
+  static const String COLUMN_PACKETS_PER_BAG = 'Packets / Bag';
+
+  static const String BAG_STOCK_TABLE_SEARCH_HINT = 'Search bag stock...';
+  static const String BAG_STOCK_EMPTY_STATE_TITLE = 'No bag stock yet';
+  static const String BAG_STOCK_EMPTY_STATE_BODY =
+      'Add a product packaging to start counting sealed bags.';
+  static const String BAG_STOCK_LOAD_FAILED_TITLE = 'Could not load bag stock';
+  static const String BAG_STOCK_UPDATED_TITLE = 'Bag stock updated';
+
+  static const String PACKET_STOCK_TABLE_SEARCH_HINT =
+      'Search packet stock...';
+  static const String PACKET_STOCK_EMPTY_STATE_TITLE = 'No packet stock yet';
+  static const String PACKET_STOCK_EMPTY_STATE_BODY =
+      'Add a product to start counting loose sample packets.';
+  static const String PACKET_STOCK_LOAD_FAILED_TITLE =
+      'Could not load packet stock';
+  static const String PACKET_STOCK_UPDATED_TITLE = 'Packet stock updated';
 }

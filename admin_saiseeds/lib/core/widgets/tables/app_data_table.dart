@@ -54,6 +54,7 @@ class AppDataTable<T> extends StatefulWidget {
 
   final List<String> sortByOptions;
   final List<String> filterByOptions;
+  final Set<String> lockedFilters;
   final String? currentSortBy;
   final String? currentSortOrder;
   final Map<String, String> currentFilters;
@@ -66,6 +67,10 @@ class AppDataTable<T> extends StatefulWidget {
   final String Function(String sort)? getHumanReadableSortName;
   final String searchHintText;
   final List<Widget> searchBarActions;
+
+  /// Sits beside the search bar at its full height, free of the square
+  /// constraint `searchBarActions` imposes on icon buttons.
+  final Widget? searchBarTrailing;
   final double searchBarHeight;
 
   final List<AppDataColumn> columns;
@@ -90,6 +95,21 @@ class AppDataTable<T> extends StatefulWidget {
   final bool requireExpandableColumnWidth;
   final bool requireColumnSettings;
 
+  /// Hides the whole search / filter row, for embedded tables whose rows
+  /// are already a short fixed list.
+  final bool requireSearchBar;
+
+  /// Replaces the pagination bar with scroll-to-load. The owner appends each
+  /// page to its list rather than replacing it.
+  final bool isInfiniteScroll;
+
+  /// Whether another page exists. Ignored unless [isInfiniteScroll].
+  final bool hasMore;
+
+  /// Requests the next page. Called on scroll and, while the rows are too
+  /// short to fill the viewport, straight after a page lands.
+  final VoidCallback? onLoadMore;
+
   final String Function(T item)? selectionIdExtractor;
   final String Function(T item)? selectionLabelExtractor;
   final void Function(Map<String, String> selection)? onSelectionChanged;
@@ -113,6 +133,7 @@ class AppDataTable<T> extends StatefulWidget {
     this.onFetchData,
     this.sortByOptions = const [],
     this.filterByOptions = const [],
+    this.lockedFilters = const {},
     this.currentSortBy,
     this.currentSortOrder,
     this.currentFilters = const {},
@@ -125,6 +146,7 @@ class AppDataTable<T> extends StatefulWidget {
     this.getHumanReadableSortName,
     this.searchHintText = AppStrings.SEARCH,
     this.searchBarActions = const [],
+    this.searchBarTrailing,
     this.searchBarHeight = AppSizes.tableSearchBarHeight,
     this.initialPinnedColumns = const [],
     this.initialHiddenColumns = const [],
@@ -140,6 +162,10 @@ class AppDataTable<T> extends StatefulWidget {
     this.requirePin = true,
     this.requireExpandableColumnWidth = true,
     this.requireColumnSettings = true,
+    this.requireSearchBar = true,
+    this.isInfiniteScroll = false,
+    this.hasMore = false,
+    this.onLoadMore,
     this.selectionIdExtractor,
     this.selectionLabelExtractor,
     this.onSelectionChanged,
@@ -160,6 +186,7 @@ class AppDataTable<T> extends StatefulWidget {
 class AppDataTableState<T> extends State<AppDataTable<T>> {
   late final TextEditingController _searchController;
   late final ScrollController _bodyScrollController;
+  late final ScrollController _rowScrollController;
   late final ValueNotifier<Map<String, String>> _selectionNotifier;
 
   final Map<String, String> _selection = {};
@@ -173,6 +200,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
   bool _isAtEnd = false;
   bool _isHoveringScroll = false;
   bool _hasResized = false;
+  double _appliedScaleFactor = 1.0;
 
   Set<String> get selectedIds => _selection.keys.toSet();
 
@@ -186,6 +214,8 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     super.initState();
     _searchController = TextEditingController();
     _bodyScrollController = ScrollController();
+    _rowScrollController = ScrollController()
+      ..addListener(_onRowScroll);
     _pinnedColumns = List<String>.from(widget.initialPinnedColumns);
     _hiddenColumns = List<String>.from(widget.initialHiddenColumns);
     _selection.addAll(widget.initialSelection);
@@ -199,8 +229,43 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     _searchController.dispose();
     _bodyScrollController.removeListener(_onBodyScroll);
     _bodyScrollController.dispose();
+    _rowScrollController.removeListener(_onRowScroll);
+    _rowScrollController.dispose();
     _selectionNotifier.dispose();
     super.dispose();
+  }
+
+  static const double _loadMoreThreshold = 320;
+
+  void _onRowScroll() {
+    if (!widget.isInfiniteScroll || !_rowScrollController.hasClients) return;
+
+    final ScrollPosition position = _rowScrollController.position;
+    if (position.pixels <
+        position.maxScrollExtent - _loadMoreThreshold) {
+      return;
+    }
+    _requestMore();
+  }
+
+  void _requestMore() {
+    if (!widget.isInfiniteScroll) return;
+    if (!widget.hasMore || widget.isLoading) return;
+    widget.onLoadMore?.call();
+  }
+
+  // A page shorter than the viewport leaves dead space and no way to scroll
+  // for the next one, so the table pulls until the rows overflow.
+  void _fillViewport() {
+    if (!widget.isInfiniteScroll || !widget.hasMore || widget.isLoading) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_rowScrollController.hasClients) return;
+      if (_rowScrollController.position.maxScrollExtent > 0) return;
+      _requestMore();
+    });
   }
 
   void _onBodyScroll() {
@@ -406,6 +471,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     if (index == -1) return;
 
     setState(() {
+      _bakeScaledWidths();
       _hasResized = true;
       final double current =
           _columnWidthOverrides[columnId] ?? _allColumns[index].width;
@@ -415,6 +481,16 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
         minWidth: ColumnResizeHandle.minWidthFor(columnId),
       );
     });
+  }
+
+  void _bakeScaledWidths() {
+    if (_hasResized || _appliedScaleFactor == 1.0) return;
+
+    for (final AppDataColumn col in _allColumns) {
+      _columnWidthOverrides[col.id] =
+          _effectiveWidth(col) * _appliedScaleFactor;
+    }
+    _appliedScaleFactor = 1.0;
   }
 
   double _effectiveWidth(AppDataColumn col) =>
@@ -449,47 +525,59 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: AppFilterSearchBar(
-                  controller: _searchController,
-                  hintText: widget.searchHintText,
-                  sortByOptions: widget.sortByOptions,
-                  filterByOptions: widget.filterByOptions,
-                  filterValueOptions: widget.filterValueOptions,
-                  getFilterValueLabel: widget.getFilterValueLabel,
-                  isDateRangeFilter: widget.isDateRangeFilter,
-                  getFilterDescription: widget.getFilterDescription,
-                  getSortDescription: widget.getSortDescription,
-                  initialSortBy: widget.currentSortBy,
-                  initialSortOrder: widget.currentSortOrder,
-                  initialFilters: widget.currentFilters,
-                  getHumanReadableFilterName:
-                      widget.getHumanReadableFilterName ?? (value) => value,
-                  getHumanReadableSortName:
-                      widget.getHumanReadableSortName ?? (value) => value,
-                  onSearch: _onSearch,
-                  minHeight: widget.searchBarHeight,
-                ),
-              ),
-              for (final action in widget.searchBarActions) ...[
-                const SizedBox(width: AppSpacing.smd),
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(
-                    width: widget.searchBarHeight,
-                    height: widget.searchBarHeight,
-                    child: action,
+        if (widget.requireSearchBar)
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: AppFilterSearchBar(
+                    controller: _searchController,
+                    hintText: widget.searchHintText,
+                    sortByOptions: widget.sortByOptions,
+                    filterByOptions: widget.filterByOptions,
+                    lockedFilters: widget.lockedFilters,
+                    filterValueOptions: widget.filterValueOptions,
+                    getFilterValueLabel: widget.getFilterValueLabel,
+                    isDateRangeFilter: widget.isDateRangeFilter,
+                    getFilterDescription: widget.getFilterDescription,
+                    getSortDescription: widget.getSortDescription,
+                    initialSortBy: widget.currentSortBy,
+                    initialSortOrder: widget.currentSortOrder,
+                    initialFilters: widget.currentFilters,
+                    getHumanReadableFilterName:
+                        widget.getHumanReadableFilterName ?? (value) => value,
+                    getHumanReadableSortName:
+                        widget.getHumanReadableSortName ?? (value) => value,
+                    onSearch: _onSearch,
+                    minHeight: widget.searchBarHeight,
                   ),
                 ),
+                if (widget.searchBarTrailing != null) ...[
+                  const SizedBox(width: AppSpacing.smd),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      height: widget.searchBarHeight,
+                      child: widget.searchBarTrailing,
+                    ),
+                  ),
+                ],
+                for (final action in widget.searchBarActions) ...[
+                  const SizedBox(width: AppSpacing.smd),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      width: widget.searchBarHeight,
+                      height: widget.searchBarHeight,
+                      child: action,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.smd),
+        if (widget.requireSearchBar) const SizedBox(height: AppSpacing.smd),
         Expanded(
           child: Stack(
             children: [
@@ -509,6 +597,8 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
   }
 
   Widget _buildTableArea() {
+    _fillViewport();
+
     return ResponsiveTableLayout(
       rowHeight: widget.rowHeight,
       overheadHeight: AppSizes.tableOverheadHeight,
@@ -628,6 +718,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     final double scaleFactor = needsFilling
         ? (maxWidth - dividersWidth) / preferredContentWidth
         : 1.0;
+    _appliedScaleFactor = scaleFactor;
     final double renderedWidth =
         (preferredContentWidth * scaleFactor) + dividersWidth;
 
@@ -694,7 +785,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
               backgroundColor: AppColors.TRANSPARENT,
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.PRIMARY),
             ),
-          if (widget.totalPages > 0)
+          if (!widget.isInfiniteScroll && widget.totalPages > 0)
             AppPagination(
               currentPage: widget.currentPage,
               totalPages: widget.totalPages,
@@ -911,9 +1002,12 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
         child: Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.smd),
           child: ListView.builder(
-            itemCount: data.length,
+            controller: _rowScrollController,
+            itemCount: data.length + (_showsLoadMoreRow ? 1 : 0),
             itemExtent: widget.rowHeight,
-            itemBuilder: (context, index) => _TableRow<T>(
+            itemBuilder: (context, index) => index >= data.length
+                ? const _LoadMoreRow()
+                : _TableRow<T>(
               item: data[index],
               stickyColumns: stickyCols,
               scrollableColumns: scrollCols,
@@ -932,6 +1026,8 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
       ),
     );
   }
+
+  bool get _showsLoadMoreRow => widget.isInfiniteScroll && widget.hasMore;
 
   Widget _buildDataCell(
     BuildContext context,
@@ -1061,6 +1157,24 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
           ),
         );
       },
+    );
+  }
+}
+
+class _LoadMoreRow extends StatelessWidget {
+  const _LoadMoreRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: SizedBox(
+        width: AppSizes.iconLg,
+        height: AppSizes.iconLg,
+        child: CircularProgressIndicator(
+          strokeWidth: AppSizes.borderMedium,
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.PRIMARY),
+        ),
+      ),
     );
   }
 }

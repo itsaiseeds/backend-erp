@@ -40,9 +40,7 @@ class _OutlinedActionButtonState extends State<OutlinedActionButton> {
     final bool isHot = _isHovered && !isDisabled;
 
     return MouseRegion(
-      cursor: isDisabled
-          ? SystemMouseCursors.basic
-          : SystemMouseCursors.click,
+      cursor: isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(

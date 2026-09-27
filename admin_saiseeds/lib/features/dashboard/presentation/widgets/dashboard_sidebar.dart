@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/tab_ids.dart';
-import '../../../../core/models/sidebar_item_model.dart';
+import '../../../../core/models/sidebar_group_model.dart';
 import '../../../../core/utils/formatters/role_formatter.dart';
 import '../../../../core/widgets/layout/app_sidebar.dart';
 import '../../../auth/presentation/bloc/session_cubit.dart';
 import '../../../auth/presentation/logout_action.dart';
 
 class DashboardSidebar extends StatelessWidget {
-  final List<SidebarItemModel> items;
+  final List<ResolvedSidebarGroup> groups;
   final String activeItemId;
   final ValueChanged<String> onItemSelected;
   final bool isCollapsed;
@@ -17,7 +17,7 @@ class DashboardSidebar extends StatelessWidget {
 
   const DashboardSidebar({
     super.key,
-    required this.items,
+    required this.groups,
     required this.activeItemId,
     required this.onItemSelected,
     required this.isCollapsed,
@@ -27,7 +27,7 @@ class DashboardSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppSidebar(
-      items: items,
+      groups: groups,
       activeItemId: activeItemId,
       onItemSelected: onItemSelected,
       isCollapsed: isCollapsed,

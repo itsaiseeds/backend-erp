@@ -61,7 +61,6 @@ from .models import (
     CustomOrderItem,
     InventorySnapshot,
     InwardRawMaterial,
-    InwardRawMaterialStatus,
     LooseStockSnapshot,
     Order,
     OrderItem,
@@ -288,7 +287,14 @@ def consumed_bags(
 def on_hand_bags(
     product_packaging: ProductPackaging, snapshot_date: date | None = None
 ) -> int:
-    """Sealed bags counted for the day (0 when the packaging was not counted)."""
+    """The raw physical count for the day (0 when the packaging was not counted).
+
+    This is the stale, as-counted figure -- it still includes bags dispatched
+    later the same day. It is not what a stock-position response calls
+    "on hand" (that's ``available + reserved``, computed in ``stock_position``);
+    this one is only for internal use, e.g. ``available_bags`` and
+    ``raw_bagged_kg``.
+    """
     line = snapshot_line(product_packaging, snapshot_date)
     return line.bags if line else 0
 
@@ -507,10 +513,11 @@ def consumed_loose_packets(
 def on_hand_loose_packets(
     product: Product, packet_weight, snapshot_date: date | None = None
 ) -> int:
-    """Loose packets counted for one ``(product, packet_weight)``.
+    """The raw physical count for one ``(product, packet_weight)``.
 
     A single row lookup, not a sum across a product's packagings: the pool *is*
-    the pair.
+    the pair. Like ``on_hand_bags``, this is the stale as-counted figure for
+    internal use only -- see ``loose_stock_position`` for the live "on hand".
     """
     line = loose_line(product, packet_weight, snapshot_date)
     return line.packets if line else 0
@@ -553,7 +560,7 @@ def raw_inward_kg(product: Product, as_of: date | None = None) -> Decimal:
         product=product,
         effective_date__isnull=False,
         effective_date__lte=as_of,
-        status=InwardRawMaterialStatus.IN_USE,
+        status_id=StatusIds.IN_USE.value,
     ).aggregate(total=Sum("quantity_kg"))["total"]
     return total or Decimal("0")
 
@@ -569,7 +576,7 @@ def _lock_products(product_ids) -> None:
         return
     list(
         InwardRawMaterial.objects.select_for_update().filter(
-            product_id__in=product_ids, status=InwardRawMaterialStatus.IN_USE
+            product_id__in=product_ids, status_id=StatusIds.IN_USE.value
         )
     )
 
@@ -695,21 +702,33 @@ def order_bag_requirements(order: Order) -> dict[ProductPackaging, int]:
 def stock_position(snapshot_date: date | None = None) -> list[dict]:
     """The sealed-bag position for every counted packaging, ready for display.
 
+    ``packets_on_hand`` is the **live** total still physically in the
+    warehouse -- ``available + reserved`` -- not the raw count uploaded that
+    day: a bag dispatched since the count was taken is gone, so it no longer
+    counts as on hand even though the count itself hasn't been re-taken.
+    ``packets_consumed`` is reported separately for visibility, but does not
+    feed ``packets_on_hand``.
+
     Bags only -- loose stock is a different grain on a different lifecycle; see
     ``loose_stock_position``.
     """
     snapshot_date = snapshot_date or today()
-    return [
-        {
-            "packaging": line.product_packaging,
-            "product": line.product_packaging.product,
-            "packets_on_hand": line.bags,
-            "packets_reserved": reserved_bags(line.product_packaging),
-            "packets_consumed": consumed_bags(line.product_packaging, snapshot_date),
-            "packets_available": available_bags(line.product_packaging, snapshot_date),
-        }
-        for line in snapshot_for(snapshot_date)
-    ]
+    lines = []
+    for line in snapshot_for(snapshot_date):
+        packaging = line.product_packaging
+        reserved = reserved_bags(packaging)
+        available = available_bags(packaging, snapshot_date)
+        lines.append(
+            {
+                "packaging": packaging,
+                "product": packaging.product,
+                "packets_on_hand": reserved + available,
+                "packets_reserved": reserved,
+                "packets_consumed": consumed_bags(packaging, snapshot_date),
+                "packets_available": available,
+            }
+        )
+    return lines
 
 
 def snapshot_count_payload(snapshot: InventorySnapshot) -> dict:
@@ -749,23 +768,28 @@ def snapshot_payload(snapshot: InventorySnapshot) -> dict:
 
 
 def loose_stock_position(snapshot_date: date | None = None) -> list[dict]:
-    """The loose position for every counted pool, ready for display."""
+    """The loose position for every counted pool, ready for display.
+
+    ``packets_on_hand`` is the live ``available + reserved`` total, not the
+    raw counted figure -- see ``stock_position`` for why.
+    """
     snapshot_date = loose_date(snapshot_date)
-    return [
-        {
-            "product": line.product,
-            "packet_weight": line.packet_weight,
-            "packets_on_hand": line.packets,
-            "packets_reserved": reserved_loose_packets(line.product, line.packet_weight),
-            "packets_consumed": consumed_loose_packets(
-                line.product, line.packet_weight, snapshot_date
-            ),
-            "packets_available": available_loose_packets(
-                line.product, line.packet_weight, snapshot_date
-            ),
-        }
-        for line in loose_lines(snapshot_date)
-    ]
+    lines = []
+    for line in loose_lines(snapshot_date):
+        product, weight = line.product, line.packet_weight
+        reserved = reserved_loose_packets(product, weight)
+        available = available_loose_packets(product, weight, snapshot_date)
+        lines.append(
+            {
+                "product": product,
+                "packet_weight": weight,
+                "packets_on_hand": reserved + available,
+                "packets_reserved": reserved,
+                "packets_consumed": consumed_loose_packets(product, weight, snapshot_date),
+                "packets_available": available,
+            }
+        )
+    return lines
 
 
 def loose_stock_count_payload(snapshot: LooseStockSnapshot) -> dict:

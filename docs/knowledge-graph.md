@@ -67,7 +67,7 @@ graph TD
     end
 
     subgraph SALES["Sales domain (aggregator/)"]
-        STATUS["Status + StatusIds<br/>(generic enum: order + client)"]
+        STATUS["Status + StatusIds<br/>(generic enum: order + client +<br/>raw material + field trip)"]
         CROP["Crop"]
         STAGE["Stage + StageIds<br/>(seed classification: 4 fixed rows)"]
         CL["Client<br/>(created_by=salesperson,<br/>verified_by=sales admin)"]
@@ -244,8 +244,8 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `Status` | `aggregator/models/Status.py` | Generic enum-like status rows (ids 1–13, seeded in `sql/dml.sql`); hosts `StatusIds` and the `Status.by_id()` resolver. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Order.status`, `Client.status`, `FieldTrip.status`, `OrderOperations`, `ClientOperations` |
-| `StatusIds` | `aggregator/models/Status.py` | `enum.IntEnum` — the single source of truth for the status CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`StatusIds.BOOKED.name == "BOOKED"`, `int(StatusIds.BOOKED) == 1`). `order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9, `field_trip_statuses()` = ids 10–13. | derives → `Order.ORDER_STATUS_CODES`, `Client.CLIENT_STATUS_CODES`; used by → `OrderOperations`, `ClientOperations`, tests |
+| `Status` | `aggregator/models/Status.py` | Generic enum-like status rows (ids 1–15, seeded in `sql/dml.sql`); hosts `StatusIds` and the `Status.by_id()` resolver. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Order.status`, `Client.status`, `InwardRawMaterial.status`, `FieldTrip.status`, `OrderOperations`, `ClientOperations`, `InwardOperations`, `FieldTripOperations` |
+| `StatusIds` | `aggregator/models/Status.py` | `enum.IntEnum` — the single source of truth for the status CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`StatusIds.BOOKED.name == "BOOKED"`, `int(StatusIds.BOOKED) == 1`). `order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9, `raw_material_statuses()` = ids 10–11, `field_trip_statuses()` = ids 12–15. | derives → `Order.ORDER_STATUS_CODES`, `Client.CLIENT_STATUS_CODES`, `InwardRawMaterial`'s `InwardRawMaterialStatus`, `FieldTrip`'s status-code sets; used by → `OrderOperations`, `ClientOperations`, `InwardOperations`, `FieldTripOperations`, tests |
 | `Stage` | `aggregator/models/Stage.py` | Seeded, enum-like seed classification of a product (ids 1–4 in `sql/dml.sql`: `BREEDER`, `FOUNDATION`, `RESEARCH`, `CERTIFIED`); hosts `StageIds` and the `Stage.by_id()` resolver. Same shape as `Status`. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Product.stage` |
 | `StageIds` | `aggregator/models/Stage.py` | `enum.IntEnum` — the single source of truth for the stage CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`int(StageIds.BREEDER) == 1`). | used by → `ProductsView`, `UpdateProductView`, tests |
 | `Order` | `aggregator/models/Order.py` | Booked order exposed by `public_id` (`ORD-…`); `verified_by`/`verified_at` record the verifying sales admin (required once the status is `CONFIRMED`); lifecycle statuses limited to `StatusIds.order_statuses()`. No stored total — `total_amount` and `total_bags` are `@property`s summed from `items` | FK → `Client`, `Address`, `Status`; 1:N → `OrderItem` |
@@ -368,9 +368,10 @@ erDiagram
 ```
 
 > Statuses are not drawn above: `aggregator_status` is a generic seed table
-> referenced via `Order.status` / `Client.status`. The seeded CODE→id mapping
-> lives in Python in `StatusIds` (`aggregator/models/Status.py`) and must be
-> kept in sync with the `sql/dml.sql` rows.
+> referenced via `Order.status` / `Client.status` / `InwardRawMaterial.status` /
+> `FieldTrip.status`. The seeded CODE→id mapping lives in Python in
+> `StatusIds` (`aggregator/models/Status.py`) and must be kept in sync with
+> the `sql/dml.sql` rows.
 
 ## 4. URL / routing map
 
@@ -391,7 +392,7 @@ erDiagram
 │   ├── client/<public_id>   GET   GetClientView          (IsAdminUser → any client, full detail)
 │   ├── orders/              GET   GetOrdersView          (IsAdminUser → every order; paginated; ?created_by / ?client / ?product / ?city_id / ?status filters + ?sort=created_at|price; catalogues in available_filters/available_sorts)
 │   ├── order/<public_id>    GET   GetOrderView           (IsAdminUser → any order, full detail + the client in full)
-│   ├── edit-order/<public_id>      PATCH UpdateOrderView (IsAdminUser → core fields + declarative item list; refused once DISPATCHED)
+│   ├── edit-order/<public_id>      PATCH UpdateOrderView (IsAdminUser → core fields + declarative item list; BOOKED/CONFIRMED only; CONFIRMED re-checks stock)
 │   ├── verify-order/<public_id>    POST  VerifyOrderView      (IsAdminUser → BOOKED/UNDER_REVIEW/ON_HOLD → CONFIRMED, gated on today's stock count)
 │   ├── unverify-order/<public_id>  POST  UnverifyOrderView    (IsAdminUser → CONFIRMED → UNDER_REVIEW, clears verified_by/at)
 │   ├── dispatch-order/<public_id>  POST  DispatchOrderView    (IsAdminUser → CONFIRMED → DISPATCHED; kind follows the order's transport agency, LR optional)

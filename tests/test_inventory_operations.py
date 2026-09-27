@@ -462,3 +462,40 @@ class InventoryOperationsTest(DMLTestCase):
         assert payload["packaging"]["public_id"] == self.pack.public_id
         assert "loose_packets" not in payload
         assert payload["total_packets"] == 16000
+
+    def test_stock_position_on_hand_excludes_todays_dispatches(self):
+        """``packets_on_hand`` is the live present total (available + reserved),
+        not the raw count -- a bag dispatched today no longer counts as on
+        hand even though today's count still includes it.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_stock_position_on_hand_excludes_todays_dispatches
+        """
+        self._count_everything(bags=400)
+
+        reserved_order = self._order(quantity=5)
+        verify_order(reserved_order, self.stock_admin)  # reserves 5, stays CONFIRMED
+
+        dispatched_order = self._order(quantity=3)
+        verify_order(dispatched_order, self.stock_admin)
+        attach_dispatch_details(
+            dispatched_order, dispatched_by=self.stock_admin,
+            dispatch_date=self.today,
+            from_city=self.city, to_city=self.city2, lr_number="LR901",
+            driver_name="Suresh Driver", driver_number="9876500010",
+            vehicle_number="GJ05AB5678",
+        )
+        update_order_status(dispatched_order, StatusIds.DISPATCHED)
+
+        # The raw count itself never changes -- it's the day's opening balance.
+        assert inv.on_hand_bags(self.pack) == 400
+        assert inv.reserved_bags(self.pack) == 5
+        assert inv.consumed_bags(self.pack) == 3
+        assert inv.available_bags(self.pack) == 392  # 400 - 5 - 3
+
+        position = next(p for p in inv.stock_position() if p["packaging"] == self.pack)
+        assert position["packets_reserved"] == 5
+        assert position["packets_consumed"] == 3
+        assert position["packets_available"] == 392
+        # Live on hand = available + reserved = 397, NOT the raw count of 400:
+        # the 3 dispatched bags are gone even though today's count still has them.
+        assert position["packets_on_hand"] == 397

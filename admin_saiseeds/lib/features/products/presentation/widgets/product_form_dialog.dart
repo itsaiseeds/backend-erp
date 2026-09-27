@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
-import '../../../../core/widgets/feedback/form_step_indicator.dart';
 import '../../../../core/models/stage_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/widgets/inputs/searchable_popup_menu.dart';
+import '../../../../core/widgets/inputs/searchable_field.dart';
 import '../../../../core/widgets/buttons/secondary_button.dart';
 import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/models/crop_model.dart';
@@ -61,6 +60,17 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   StageModel? _selectedStage;
   String? _stageError;
   int _step = 0;
+
+  static const List<String> _stepLabels = [
+    AppStrings.PRODUCT_STEP_BASIC,
+    AppStrings.PRODUCT_STEP_DETAILS,
+    AppStrings.PRODUCT_STEP_IMAGE,
+  ];
+
+  String get _stepCaption =>
+      '${AppStrings.CLIENT_STEP_PROGRESS} ${_step + 1}/${_stepLabels.length}'
+      ' · ${_stepLabels[_step]}';
+
   ProductImageUpload? _pickedImage;
   bool _isSubmitting = false;
   bool _isCreatingCrop = false;
@@ -154,9 +164,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
 
     setState(() {
       _cropError = isCropValid ? null : AppStrings.VALIDATION_CROP_REQUIRED;
-      _stageError = isStageValid
-          ? null
-          : AppStrings.VALIDATION_STAGE_REQUIRED;
+      _stageError = isStageValid ? null : AppStrings.VALIDATION_STAGE_REQUIRED;
     });
 
     if (!isCropValid) {
@@ -230,63 +238,19 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildStagePicker() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(AppStrings.COLUMN_STAGE, style: AppTypography.labelStrong),
-        const SizedBox(height: AppSpacing.sm),
-        SearchablePopupMenu<StageModel>(
-          items: Stages.all,
-          itemToString: (stage) => stage.label,
-          isSelected: (stage) => stage.id == _selectedStage?.id,
-          onSelected: (stage) => setState(() {
-            _selectedStage = stage;
-            _stageError = null;
-          }),
-          child: Container(
-            height: AppSizes.inputHeight,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            decoration: BoxDecoration(
-              color: _isBusy ? AppColors.SURFACE_VARIANT : AppColors.SURFACE,
-              border: Border.all(
-                color: _stageError != null
-                    ? AppColors.ERROR
-                    : AppColors.BORDER,
-              ),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _selectedStage?.label ?? AppStrings.PRODUCT_STAGE_HINT,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: _selectedStage == null
-                          ? AppColors.TEXT_DISABLED
-                          : AppColors.TEXT_PRIMARY,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: AppSizes.iconLg,
-                  color: AppColors.TEXT_SECONDARY,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_stageError != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            _stageError!,
-            style: AppTypography.bodySmall.copyWith(color: AppColors.ERROR),
-          ),
-        ],
-      ],
+    return SearchableField<StageModel>(
+      label: AppStrings.COLUMN_STAGE,
+      hintText: AppStrings.PRODUCT_STAGE_HINT,
+      value: _selectedStage,
+      items: Stages.all,
+      itemToString: (stage) => stage.label,
+      isSame: (a, b) => a.id == b.id,
+      enabled: !_isBusy,
+      errorText: _stageError,
+      onSelected: (stage) => setState(() {
+        _selectedStage = stage;
+        _stageError = null;
+      }),
     );
   }
 
@@ -349,9 +313,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     return AppFormDialog(
       icon: Icons.inventory_2_outlined,
       title: _isEditing ? AppStrings.EDIT_PRODUCT : AppStrings.ADD_PRODUCT,
-      subtitle: _isEditing
-          ? AppStrings.EDIT_PRODUCT_SUBTITLE
-          : AppStrings.ADD_PRODUCT_SUBTITLE,
+      subtitle:
+          '${_isEditing ? AppStrings.EDIT_PRODUCT_SUBTITLE : AppStrings.ADD_PRODUCT_SUBTITLE}'
+          ' · $_stepCaption',
       submitLabel: isLastStep
           ? (_isEditing ? AppStrings.UPDATE : AppStrings.CREATE)
           : AppStrings.STEP_NEXT,
@@ -370,26 +334,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            FormStepIndicator(
-              labels: const [
-                AppStrings.PRODUCT_STEP_BASIC,
-                AppStrings.PRODUCT_STEP_DETAILS,
-                AppStrings.PRODUCT_STEP_IMAGE,
-              ],
-              currentIndex: _step,
-              onStepTapped: _isBusy ? null : _goTo,
-            ),
-            const SizedBox(height: AppSpacing.lg),
             _buildStepBody(),
           ],
         ),
       ),
     );
-  }
-
-  void _goTo(int step) {
-    if (step > _step && !_validateStep(_step)) return;
-    setState(() => _step = step);
   }
 
   void _next() {
@@ -488,10 +437,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     if (bytes == null) return;
 
     setState(
-      () => _pickedImage = ProductImageUpload(
-        bytes: bytes,
-        filename: file.name,
-      ),
+      () =>
+          _pickedImage = ProductImageUpload(bytes: bytes, filename: file.name),
     );
   }
 
@@ -546,7 +493,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
           SecondaryButton(
             label: AppStrings.PRODUCT_REMOVE_IMAGE,
             icon: Icons.close_rounded,
-            onPressed: _isBusy ? null : () => setState(() => _pickedImage = null),
+            onPressed: _isBusy
+                ? null
+                : () => setState(() => _pickedImage = null),
           ),
         ],
       ],
@@ -573,5 +522,4 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       ],
     );
   }
-
 }
