@@ -19,10 +19,13 @@ from common.models import indian_now
 
 # Placeholders -- replace with the real registration details.
 COMPANY_DETAILS = {
-    "company_name": "Sai Seeds Private Limited",
-    "company_address": "Plot 42, Industrial Area Phase II, Jalna, Maharashtra 431203",
-    "gst_number": "27AABCS1429B1ZQ",
-    "state_name": "Maharashtra",
+    "company_name": "Sai Seeds Company",
+    "company_address": "55, Gangotri Complex, Visnagar Road, Mansa, Gandhinagar (382845)",
+    "gst_number": "24ACGFS1809R1ZO",
+    "state_name": "Gujarat",
+    "contact_number": "9624532999",
+    "email": "info@saiseeds.in",
+    "web": "saiseeds.in"
 }
 
 # Stand-in until HSN is classified per product. 1209 91 00 is "vegetable seeds
