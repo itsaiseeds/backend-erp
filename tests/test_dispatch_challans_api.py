@@ -228,6 +228,40 @@ class DispatchChallansApiTest(WebApiTestCase):
         )
         self.assertIn("not been dispatched", response.data["detail"])
 
+    def test_a_reverted_dispatch_has_no_lr_to_record(self):
+        """The dispatch record survives a revert, but the goods are back on the shelf.
+
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_reverted_dispatch_has_no_lr_to_record
+        """
+        order = self._dispatched_order()
+        self._post(REVERT_URL, order)
+
+        response = self._upload_lr(order)
+
+        self.assertEqual(
+            response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+        )
+        self.assertIn(
+            "Cannot record an LR number for an order that is CONFIRMED",
+            response.data["detail"],
+        )
+        order.refresh_from_db()
+        self.assertIsNone(order.dispatch_details.lr_number or None)
+
+    def test_a_delivered_order_can_still_take_its_lr(self):
+        """The carrier's note can arrive after the goods do.
+
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_delivered_order_can_still_take_its_lr
+        """
+        order = self._dispatched_order()
+        mark_delivered(order)
+
+        response = self._upload_lr(order)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        self.assertEqual(order.dispatch_details.lr_number, "LR-12345")
+
     def test_a_blank_lr_number_is_refused(self):
         """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_blank_lr_number_is_refused"""
         order = self._dispatched_order()

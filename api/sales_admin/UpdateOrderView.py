@@ -1,8 +1,8 @@
 """Order update endpoint: ``PATCH /api/sales-admin/edit-order/<public_id>``.
 
 A sales admin corrects an order: its delivery address, its transport agency, its
-dates, its comments, its status, and its lines -- adding, removing, re-pricing
-and re-quantifying them in one call.
+dates, its comments and its lines -- adding, removing, re-pricing and
+re-quantifying them in one call.
 
 **The client cannot be changed.** An order belongs to the client it was booked
 for; moving it would invalidate its delivery address, its transport agency and
@@ -15,6 +15,14 @@ carrying a client key is simply ignored, like any other unknown field.
 fields here at all. They are the audit record: who booked the order and who
 approved it is not something an edit screen rewrites, and approval has its own
 endpoint (``verify-order``).
+
+**The status cannot be changed here either.** Every move between statuses has
+its own endpoint (``verify-order``, ``unverify-order``, ``hold-order``,
+``reject-order``, ``dispatch-order``, ``revert-dispatch``), each with the guards
+and stock checks that move needs. Setting the status directly would skip them
+-- re-confirming an order without a stock check, or marking it dispatched with
+no dispatch recorded -- so a ``status`` key is ignored like any other unknown
+field.
 
 ``special_comments`` **accumulates**: whatever is sent is appended as a new
 line, so an admin adding a remark can never erase one somebody left earlier.
@@ -49,7 +57,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator.models import ClientAddress, ClientTransportAgency, ProductPackaging
-from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import (
     EDITABLE_STATUS_CODES,
     ORDER_CORE_FIELDS,
@@ -61,7 +68,6 @@ from aggregator.OrderOperations import (
 from api.admin import AdminApiView
 from api.order_serializers import OrderDetailPayloadSerializer
 
-from .GetOrdersView import ORDER_STATUS_CODES
 from .GetOrderView import ORDER_PUBLIC_ID_PARAMETER, order_detail_queryset
 
 # Upper bound on distinct bags in one order -- an editing screen, not a bulk import.
@@ -127,7 +133,6 @@ class UpdateOrderSerializer(serializers.Serializer):
             "replaces what is already there."
         ),
     )
-    status = serializers.ChoiceField(choices=ORDER_STATUS_CODES, required=False)
     items = OrderItemWriteSerializer(many=True, required=False)
 
     def validate_items(self, value):
@@ -230,8 +235,6 @@ class UpdateOrderView(AdminApiView):
 
         with transaction.atomic():
             core = {field: data[field] for field in ORDER_CORE_FIELDS if field in data}
-            if "status" in data:
-                core["status"] = StatusIds[data["status"]]
             if core:
                 update_order_core(order, **core)
             if "items" in data:

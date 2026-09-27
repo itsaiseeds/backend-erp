@@ -211,6 +211,12 @@ HOLDABLE_STATUS_CODES = frozenset(
     {StatusIds.BOOKED.name, StatusIds.UNDER_REVIEW.name, StatusIds.CONFIRMED.name}
 )
 REJECTABLE_STATUS_CODES = HOLDABLE_STATUS_CODES | {StatusIds.ON_HOLD.name}
+# An LR is the transporter's note for goods that actually left. A reverted
+# dispatch (back to CONFIRMED) keeps its dispatch record, so the record alone
+# does not prove the goods are on the road -- the status does.
+LR_RECORDABLE_STATUS_CODES = frozenset(
+    {StatusIds.DISPATCHED.name, StatusIds.DELIVERED.name}
+)
 
 # Only a freshly booked order or a confirmed one may be edited. Every other
 # status is refused: DISPATCHED/DELIVERED because the goods have physically
@@ -636,8 +642,15 @@ def update_order_core(order: Order, **fields) -> Order:
 
     ``created_by`` / ``created_at`` / ``verified_by`` / ``verified_at`` are not
     editable either: they are the audit record, and approval belongs to
-    :func:`verify_order` alone. ``status`` is editable, and arrives as a
-    ``StatusIds`` member so no caller ever spells a code or an id.
+    :func:`verify_order` alone.
+
+    ``status`` is not editable here: every status change goes through its own
+    lifecycle verb (:func:`verify_order`, :func:`unverify_order`,
+    :func:`hold_order`, :func:`reject_order`, :func:`dispatch_order`,
+    :func:`revert_dispatch`), which carries the guards and stock checks that
+    move needs. Setting it here would skip them -- e.g. flipping CONFIRMED to
+    BOOKED, raising quantities unchecked, and flipping back. An unknown field
+    is a ``TypeError`` so such a call fails loudly rather than being dropped.
 
     ``special_comments`` is **appended to**, never replaced -- see
     :func:`appended_comment`.
@@ -646,6 +659,10 @@ def update_order_core(order: Order, **fields) -> Order:
     belongs to the client, transport agency is one of the client's own,
     CONFIRMED carries its verification details -- so they are not restated here.
     """
+    unknown = set(fields) - set(ORDER_CORE_FIELDS)
+    if unknown:
+        raise TypeError(f"Not an editable order field: {', '.join(sorted(unknown))}.")
+
     for field in ORDER_CORE_FIELDS:
         if field not in fields:
             continue
@@ -653,8 +670,6 @@ def update_order_core(order: Order, **fields) -> Order:
             setattr(order, field, appended_comment(getattr(order, field), fields[field]))
         else:
             setattr(order, field, fields[field])
-    if "status" in fields:
-        order.status = Status.by_id(fields["status"])
     order.full_clean()
     order.save()
     return order
