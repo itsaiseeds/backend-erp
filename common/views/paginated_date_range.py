@@ -71,6 +71,23 @@ _ModelT = TypeVar("_ModelT", bound=Model)
 FilterOptions = Sequence[dict] | Callable[[Request], Sequence[dict]]
 
 
+def query_flag(request: Request, name: str) -> bool:
+    """Read a boolean ``?<name>`` query param; a bad value is a ``400``.
+
+    Absent means ``false`` and a bare ``?<name>`` means ``true``; otherwise the
+    usual boolean spellings (``true``/``false``, ``1``/``0``, ...) are accepted.
+    """
+    raw = request.query_params.get(name)
+    if raw is None:
+        return False
+    if not raw.strip():
+        return True
+    try:
+        return serializers.BooleanField().to_internal_value(raw.strip())
+    except serializers.ValidationError as exc:
+        raise serializers.ValidationError({name: exc.detail}) from None
+
+
 class StandardPageNumberPagination(PageNumberPagination):
     """Project default page number pagination.
 
@@ -101,15 +118,7 @@ class StandardPageNumberPagination(PageNumberPagination):
         A bare ``?all`` counts as ``true``; otherwise the usual boolean spellings
         (``true``/``false``, ``1``/``0``, ...) are accepted.
         """
-        raw = request.query_params.get(self.all_query_param)
-        if raw is None:
-            return False
-        if not raw.strip():
-            return True
-        try:
-            return serializers.BooleanField().to_internal_value(raw.strip())
-        except serializers.ValidationError as exc:
-            raise serializers.ValidationError({self.all_query_param: exc.detail}) from None
+        return query_flag(request, self.all_query_param)
 
     def paginate_queryset(self, queryset, request: Request, view=None) -> list | None:
         if not self.wants_all(request):

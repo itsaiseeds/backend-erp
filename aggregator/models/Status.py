@@ -14,6 +14,8 @@ class StatusIds(IntEnum):
     the row ``id`` (see ``sql/dml.sql``): ids 1-7 are the order lifecycle, ids
     8-9 the client verification states, ids 10-11 the inward raw-material lot
     lifecycle. No migrations — keep in sync with the seed rows.
+    8-9 the client verification states, ids 10-13 the field-trip lifecycle. No
+    migrations — keep in sync with the seed rows.
     """
 
     BOOKED = 1
@@ -27,6 +29,10 @@ class StatusIds(IntEnum):
     VERIFIED = 9
     LAB_TESTING = 10
     IN_USE = 11
+    PLANNED = 12
+    APPROVED = 13
+    IN_PROGRESS = 14
+    COMPLETED = 15
 
     @classmethod
     def order_statuses(cls) -> list[StatusIds]:
@@ -42,13 +48,16 @@ class StatusIds(IntEnum):
     def raw_material_statuses(cls) -> list[StatusIds]:
         """The inward raw-material lot lifecycle ids (10–11)."""
         return [cls(value) for value in range(cls.LAB_TESTING, cls.IN_USE + 1)]
+    def field_trip_statuses(cls) -> list[StatusIds]:
+        """The field-trip lifecycle ids (10–13)."""
+        return [cls(value) for value in range(cls.PLANNED, cls.COMPLETED + 1)]
 
 
 class Status(TimeStampedModel, SoftDeletedModel, CreatedByModel):
     """A generic, enum-like status value shared across domains.
 
-    Rows are seeded (see ``sql/dml.sql``) and referenced by ``Order`` and
-    ``Client``. The table carries no transition rules; each consumer restricts
+    Rows are seeded (see ``sql/dml.sql``) and referenced by ``Order``,
+    ``Client`` and ``FieldTrip``. The table carries no transition rules; each consumer restricts
     which ``code`` values it accepts in its own ``clean()``.
     """
 

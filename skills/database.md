@@ -108,7 +108,7 @@ that would fail against existing data), apply it in phases to cause **minimum do
 | File | Purpose |
 |---|---|
 | `sql/ddl.sql` | `CREATE TABLE` for **every** app — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), `authentication_user`, `authentication_user_groups/…_user_permissions`, `authentication_admin`, `authentication_salesperson`, `aggregator_*` (address/city/country/pincode/state), `authtoken_token` |
-| `sql/dml.sql` | Seeds content types (41) + permissions (164: add/change/delete/view × 41 models, plus the custom `authentication.execute_python_code`), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`), a no-TOTP user (`8888888888`), and the `aggregator_status` rows (ids 1–9) mirrored by `StatusIds` — used by the DML-seeded tests |
+| `sql/dml.sql` | Seeds content types (45) + permissions (180: add/change/delete/view × 45 models, plus the custom `authentication.execute_python_code`), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`), a no-TOTP user (`8888888888`), and the `aggregator_status` rows (ids 1–13) mirrored by `StatusIds` — used by the DML-seeded tests |
 | `sql/admin_perf.sql` | Prod DDL: `pg_trgm` extension + GIN indexes on `authentication_user(name, email)` for Django-admin `ILIKE` search (idempotent) |
 | `sql/session_auth_24h.sql` | Prod DDL: `authtoken_token.user_id` FK (DRF adds it only via migrate) + `created` index for the 24h TTL sweep (idempotent) |
 
@@ -128,10 +128,10 @@ drf-authtoken (`authtoken_token`). `auth_user`, `auth_user_groups`, and
 
 Seeds the reference data Django and the tests need:
 
-1. **41 content types** (auth user/group/permission, contenttypes, sessions,
+1. **45 content types** (auth user/group/permission, contenttypes, sessions,
    admin logentry, authentication user/admin/salesperson, and the aggregator
    models)
-2. **165 permissions** (add/change/delete/view × 41 models, plus the custom
+2. **181 permissions** (add/change/delete/view × 45 models, plus the custom
    `authentication.execute_python_code` declared in `User.Meta.permissions`)
 3. **Reconciliation users**: superuser `9999999999`/`admin` (TOTP enabled,
    `created_by`/`verified_by` self-referenced) and non-TOTP user `8888888888`
@@ -145,11 +145,13 @@ Key details:
 - All `ON CONFLICT DO NOTHING` — idempotent
 - Sequence values explicitly reset via `setval()` after inserts
 - Wrapped in `BEGIN` / `COMMIT`
-- **`aggregator_status` rows (ids 1–9)** are the canonical status seed
-  (`1–7` order lifecycle, `8–9` client verification). They are mirrored by the
+- **`aggregator_status` rows (ids 1–13)** are the canonical status seed
+  (`1–7` order lifecycle, `8–9` client verification, `10–13` field-trip
+  lifecycle). They are mirrored by the
   `StatusIds` `IntEnum` in `aggregator/models/Status.py`, where member **name**
   == seeded `code` and member **value** == row `id`
-  (`order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9). The enum is
+  (`order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9,
+  `field_trip_statuses()` = ids 10–13). The enum is
   the CODE→id source of truth the code and tests read from — whenever a status
   row is added, renamed, or renumbered in `dml.sql`, update `StatusIds` in the
   same change.
@@ -233,7 +235,7 @@ The `reload_db.sh` script always reads from `.env.dev` (localhost).
 ## Adding Content Types and Permissions for New Models
 
 `sql/dml.sql` seeds the content types and permissions for every SQL-managed
-model (currently 41 content types → 164 CRUD permissions, plus one custom). When adding a new
+model (currently 45 content types → 180 CRUD permissions, plus one custom). When adding a new
 SQL-managed model, append its content type and 4 CRUD permissions **after the
 current max IDs** (check `SELECT max(id), setval(...)` in `dml.sql`):
 

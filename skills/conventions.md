@@ -99,7 +99,7 @@ backend-erp/
   DB) and paste it into Neon; `migrate` is never part of the workflow.
 
 ### Seed Data (DML)
-- `sql/dml.sql` seeds content types (41) + permissions (164 CRUD + the custom
+- `sql/dml.sql` seeds content types (45) + permissions (180 CRUD + the custom
   `authentication.execute_python_code`) + reconciliation
   users (superuser `9999999999` with TOTP, no-TOTP user `8888888888`).
 - Always use `ON CONFLICT DO NOTHING` for idempotency
@@ -146,7 +146,7 @@ backend-erp/
   kwarg as `id` and looks the row up with `id=…`.
 
 ### Enums & seeded statuses
-- Seed rows that act as enum values (`aggregator_status`, ids 1–9, and
+- Seed rows that act as enum values (`aggregator_status`, ids 1–13, and
   `aggregator_stage`, ids 1–4, both in `sql/dml.sql`) are mirrored by an
   `enum.IntEnum` (`aggregator/models/Status.py::StatusIds`,
   `aggregator/models/Stage.py::StageIds`): member **name** == seeded
