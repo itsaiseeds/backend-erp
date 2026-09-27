@@ -268,9 +268,18 @@ def is_stock_count_complete(snapshot_date: date | None = None) -> bool:
 def _bag_demand(
     product_packaging: ProductPackaging, order_filter: dict, *conditions: Q
 ) -> int:
-    """Sum ``OrderItem.quantity`` for this packaging across matching orders."""
+    """Sum ``OrderItem.quantity`` for this packaging across matching orders.
+
+    ``OrderItem.objects`` hides deleted lines, but a lookup spanning to the
+    order does not apply the order's manager, so deleted orders are excluded
+    explicitly. That is always right because an order holding stock (CONFIRMED
+    and later) cannot be deleted -- see ``Order.guard_soft_delete``.
+    """
     total = OrderItem.objects.filter(
-        *conditions, product_packaging=product_packaging, **order_filter
+        *conditions,
+        product_packaging=product_packaging,
+        order__is_deleted=False,
+        **order_filter,
     ).aggregate(total=Sum("quantity"))["total"]
     return total or 0
 
@@ -565,9 +574,16 @@ def loose_line(
 def _loose_demand(
     product: Product, packet_weight, order_filter: dict, *conditions: Q
 ) -> int:
-    """Sum ``CustomOrderItem.packets`` for this pool across matching custom orders."""
+    """Sum ``CustomOrderItem.packets`` for this pool across matching custom orders.
+
+    Deleted custom orders are excluded explicitly, as in ``_bag_demand``.
+    """
     total = CustomOrderItem.objects.filter(
-        *conditions, product=product, packet_weight=packet_weight, **order_filter
+        *conditions,
+        product=product,
+        packet_weight=packet_weight,
+        custom_order__is_deleted=False,
+        **order_filter,
     ).aggregate(total=Sum("packets"))["total"]
     return total or 0
 

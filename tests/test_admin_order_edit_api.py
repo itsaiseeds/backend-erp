@@ -651,6 +651,33 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
         with self.assertRaisesMessage(ValidationError, "must belong to the selected client"):
             update_order_core(self.order, transport_agency=agency)
 
+    # -- deleted products ---------------------------------------------------------
+
+    def test_a_deleted_products_bag_cannot_be_added(self):
+        """tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_deleted_products_bag_cannot_be_added"""
+        self.beta_bag.product.mark_deleted(self.superuser)
+
+        response = self._patch(
+            {"items": [self._line(self.alpha_bag, 2), self._line(self.beta_bag, 1)]}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn(
+            f"Unknown product packaging: {self.beta_bag.public_id}", response.data["detail"]
+        )
+
+    def test_a_line_already_on_the_order_survives_its_product_being_deleted(self):
+        """``items`` is a full replacement, so the existing line must stay sendable.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_line_already_on_the_order_survives_its_product_being_deleted
+        """
+        self.alpha_bag.product.mark_deleted(self.superuser)
+
+        response = self._patch({"items": [self._line(self.alpha_bag, 4)]})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["items"][0]["quantity"], 4)
+
     def test_a_booked_order_is_not_checked_against_stock(self):
         """Nothing is reserved until verification, which does its own check.
 

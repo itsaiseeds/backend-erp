@@ -16,6 +16,40 @@ from .Status import StatusIds
 
 ORDER_STATUS_CODES = {s.name for s in StatusIds.order_statuses()}
 DISPATCH_REQUIRED_STATUS_CODES = {StatusIds.DISPATCHED.name, StatusIds.DELIVERED.name}
+# Statuses in which an order holds stock: reserved (CONFIRMED) or consumed
+# (DISPATCHED, DELIVERED). Such an order cannot be deleted -- see
+# ``refuse_deleting_stock_holder``.
+STOCK_HOLDING_STATUS_IDS = frozenset(
+    {StatusIds.CONFIRMED, StatusIds.DISPATCHED, StatusIds.DELIVERED}
+)
+
+
+def refuse_deleting_stock_holder(order: models.Model) -> None:
+    """Raise unless ``order`` (an Order or CustomOrder) may be soft-deleted.
+
+    The stock math leaves deleted orders out entirely, which is only right if
+    a deleted order never held stock: a CONFIRMED order's reservation would
+    silently lapse, and a dispatched one's bags -- which physically left --
+    would reappear as available stock and hand their raw and packing material
+    back. So an order holding stock must first be moved out of it through its
+    lifecycle (unverify / revert the dispatch / reject). A delivered order is
+    history and can never be deleted.
+
+    The stored status is read under a row lock, so a concurrent transition
+    cannot slip between the check and the delete.
+    """
+    status_id = (
+        type(order)._base_manager.select_for_update()
+        .filter(pk=order.pk)
+        .values_list("status_id", flat=True)
+        .first()
+    )
+    if status_id in STOCK_HOLDING_STATUS_IDS:
+        code = StatusIds(status_id).name
+        raise ValidationError(
+            f"Cannot delete an order that is {code}: it holds stock. "
+            "Unverify, revert the dispatch of, or reject it first."
+        )
 
 
 def client_link_changed(instance: models.Model, *fields: str) -> bool:
@@ -142,6 +176,11 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
                 name="ck_order_not_both_dispatch_details",
             ),
         ]
+
+    def guard_soft_delete(self, perform):
+        """See ``refuse_deleting_stock_holder``."""
+        refuse_deleting_stock_holder(self)
+        perform()
 
     def __str__(self):
         return self.public_id or "Order"

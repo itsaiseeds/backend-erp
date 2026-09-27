@@ -25,6 +25,7 @@ from aggregator.CustomOrderOperations import (
     add_custom_order_item,
     attach_dispatch_details,
     create_custom_order,
+    mark_delivered,
     revert_dispatch,
     update_custom_order_status,
 )
@@ -248,6 +249,61 @@ class CustomOrderOperationsTest(DMLTestCase):
         order.refresh_from_db()
         assert order.status.code == "CONFIRMED"
         assert order.delivery_address == self.addr
+
+    def test_lines_for_one_pool_are_checked_together(self):
+        """30 + 30 from a pool of 50: each line fits alone, the order does not.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_lines_for_one_pool_are_checked_together
+        """
+        self._count(loose_packets=50)
+        line = {"product": self.product, "packet_weight": self.w1, "packets": 30}
+
+        with self.assertRaisesMessage(ValidationError, "need 60, have 50"):
+            create_custom_order(
+                client=self.client_obj, delivery_address=self.addr,
+                actor=self.stock_admin, items=[line, dict(line)],
+            )
+        assert not CustomOrder.objects.exists()
+
+    def test_a_custom_order_holding_stock_cannot_be_deleted(self):
+        """Born CONFIRMED, it reserves packets from the start.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_custom_order_holding_stock_cannot_be_deleted
+        """
+        self._count(loose_packets=100)
+        order = self._custom_order(packets=30)
+
+        with self.assertRaisesMessage(ValidationError, "Cannot delete an order that is CONFIRMED"):
+            order.delete(deleted_by=self.su)
+        update_custom_order_status(order, StatusIds.REJECTED)
+        order.delete(deleted_by=self.su)
+
+        assert inv.available_loose_packets(self.product, self.w1) == 100
+
+    def test_a_custom_order_already_deleted_holds_no_stock(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_custom_order_already_deleted_holds_no_stock"""
+        self._count(loose_packets=100)
+        order = self._custom_order(packets=30)
+
+        CustomOrder.all_objects.filter(pk=order.pk).update(is_deleted=True)
+
+        assert inv.reserved_loose_packets(self.product, self.w1) == 0
+        assert inv.available_loose_packets(self.product, self.w1) == 100
+
+    def test_only_a_dispatched_custom_order_can_be_reverted_or_delivered(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_only_a_dispatched_custom_order_can_be_reverted_or_delivered"""
+        self._count(loose_packets=100)
+        order = self._custom_order(packets=30)
+
+        with self.assertRaisesMessage(ValidationError, "Cannot revert the dispatch of a custom order that is CONFIRMED"):
+            revert_dispatch(order)
+        with self.assertRaisesMessage(ValidationError, "Cannot deliver a custom order that is CONFIRMED"):
+            mark_delivered(order)
+
+        self._dispatch(order)
+        mark_delivered(order)
+        order.refresh_from_db()
+        assert order.status.code == "DELIVERED"
 
     def test_one_line_per_product_and_weight(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_one_line_per_product_and_weight"""

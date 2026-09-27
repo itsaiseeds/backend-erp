@@ -14,6 +14,7 @@ from .Order import (
     ORDER_STATUS_CODES,
     client_link_changed,
     default_expected_delivery_date,
+    refuse_deleting_stock_holder,
 )
 from .Status import StatusIds
 
@@ -105,6 +106,11 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
                 name="ck_customorder_not_both_dispatch_details",
             ),
         ]
+
+    def guard_soft_delete(self, perform):
+        """See ``Order.refuse_deleting_stock_holder``."""
+        refuse_deleting_stock_holder(self)
+        perform()
 
     def __str__(self):
         return self.public_id or "Custom order"

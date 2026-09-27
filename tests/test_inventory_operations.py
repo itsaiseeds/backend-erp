@@ -20,6 +20,7 @@ from aggregator.models import (
     InventorySnapshot,
     InwardOtherMaterial,
     InwardRawMaterial,
+    Order,
     OtherMaterialRecipe,
     OtherMaterialType,
     OtherMaterialUnitType,
@@ -34,6 +35,7 @@ from aggregator.models import (
 from aggregator.OrderOperations import (
     attach_dispatch_details,
     create_order,
+    mark_delivered,
     revert_dispatch,
     unverify_order,
     update_order_status,
@@ -696,6 +698,73 @@ class InventoryOperationsTest(DMLTestCase):
             lot.delete(deleted_by=self.su)
         lot.refresh_from_db()
         assert not lot.is_deleted
+
+    # -- deleting orders ------------------------------------------------------------
+
+    def test_an_order_holding_stock_cannot_be_deleted(self):
+        """Confirmed, dispatched and delivered orders refuse, via the API or the admin.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_an_order_holding_stock_cannot_be_deleted
+        """
+        self._count_everything(bags=400)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+
+        with self.assertRaisesMessage(ValidationError, "Cannot delete an order that is CONFIRMED"):
+            order.delete(deleted_by=self.su)
+        attach_dispatch_details(
+            order, dispatched_by=self.stock_admin, dispatch_date=self.today,
+            from_city=self.city, to_city=self.city2, lr_number="LR902",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+        with self.assertRaisesMessage(ValidationError, "Cannot delete an order that is DISPATCHED"):
+            order.mark_deleted(self.stock_admin)
+        mark_delivered(order)
+        with self.assertRaisesMessage(ValidationError, "Cannot delete an order that is DELIVERED"):
+            order.mark_deleted(self.stock_admin)
+
+        order.refresh_from_db()
+        assert not order.is_deleted
+        assert inv.consumed_bags(self.pack) == 5
+
+    def test_an_unverified_order_can_be_deleted_and_holds_nothing(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_an_unverified_order_can_be_deleted_and_holds_nothing"""
+        self._count_everything(bags=400)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        unverify_order(order)
+
+        order.delete(deleted_by=self.su)
+
+        order.refresh_from_db()
+        assert order.is_deleted
+        assert inv.available_bags(self.pack) == 400
+
+    def test_an_order_already_deleted_holds_no_stock(self):
+        """A row deleted before the guard existed no longer reserves or consumes.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_an_order_already_deleted_holds_no_stock
+        """
+        self._count_everything(bags=400)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        assert inv.reserved_bags(self.pack) == 5
+
+        Order.all_objects.filter(pk=order.pk).update(is_deleted=True)
+
+        assert inv.reserved_bags(self.pack) == 0
+        assert inv.available_bags(self.pack) == 400
+
+    def test_only_a_dispatched_order_can_be_delivered(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_only_a_dispatched_order_can_be_delivered"""
+        self._count_everything(bags=400)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+
+        with self.assertRaisesMessage(ValidationError, "Cannot deliver an order that is CONFIRMED"):
+            mark_delivered(order)
 
     def test_uncounted_packaging_has_no_stock(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_uncounted_packaging_has_no_stock"""

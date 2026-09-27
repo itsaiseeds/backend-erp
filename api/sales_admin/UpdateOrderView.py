@@ -50,12 +50,18 @@ satisfied by construction.
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.models import ClientAddress, ClientTransportAgency, ProductPackaging
+from aggregator.models import (
+    ClientAddress,
+    ClientTransportAgency,
+    OrderItem,
+    ProductPackaging,
+)
 from aggregator.OrderOperations import (
     EDITABLE_STATUS_CODES,
     ORDER_CORE_FIELDS,
@@ -189,11 +195,23 @@ class UpdateOrderSerializer(serializers.Serializer):
 
         One query for every bag named, so an unknown public id is reported as a
         list rather than one id at a time.
+
+        A bag whose product (or the bag itself) has been deleted cannot be
+        *added*; it answers exactly like one that does not exist. A bag already
+        on the order stays acceptable, because ``items`` is a full replacement:
+        refusing it would make an order booked before the deletion impossible
+        to edit without dropping that line.
         """
         public_ids = [item["product_packaging_public_id"] for item in items]
+        on_order = OrderItem.objects.filter(order=self.context["order"]).values(
+            "product_packaging_id"
+        )
         packagings = {
             packaging.public_id: packaging
-            for packaging in ProductPackaging.objects.filter(public_id__in=public_ids)
+            for packaging in ProductPackaging.all_objects.filter(
+                Q(is_deleted=False, product__is_deleted=False) | Q(id__in=on_order),
+                public_id__in=public_ids,
+            )
         }
         missing = [pid for pid in public_ids if pid not in packagings]
         if missing:

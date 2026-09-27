@@ -207,6 +207,7 @@ VERIFIABLE_STATUS_CODES = frozenset(
 UNVERIFIABLE_STATUS_CODES = frozenset({StatusIds.CONFIRMED.name})
 DISPATCHABLE_STATUS_CODES = frozenset({StatusIds.CONFIRMED.name})
 REVERTIBLE_DISPATCH_STATUS_CODES = frozenset({StatusIds.DISPATCHED.name})
+DELIVERABLE_STATUS_CODES = frozenset({StatusIds.DISPATCHED.name})
 HOLDABLE_STATUS_CODES = frozenset(
     {StatusIds.BOOKED.name, StatusIds.UNDER_REVIEW.name, StatusIds.CONFIRMED.name}
 )
@@ -484,6 +485,8 @@ def revert_dispatch(order: Order) -> Order:
 
 
 def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
+    """Mark a dispatched order delivered."""
+    assert_order_status(order, DELIVERABLE_STATUS_CODES, "deliver")
     order.status = Status.by_id(StatusIds.DELIVERED)
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
     order.full_clean()
