@@ -33,7 +33,6 @@ from aggregator.models import (
 )
 from aggregator.OrderOperations import create_order
 from api.sales_admin.ExportCustomOrdersView import ExportCustomOrdersResponseSerializer
-from api.sales_admin.ExportDispatchReceiptsView import ExportDispatchReceiptsResponseSerializer
 from api.sales_admin.ExportInventorySnapshotsView import (
     ExportInventorySnapshotsPageSerializer,
 )
