@@ -277,7 +277,8 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         response = self._post(VERIFY_URL, order)
 
         self._assert_refused(response, "Not enough stock")
-        self.assertIn(self.bag.public_id, response.data["detail"])
+        self.assertIn(str(self.bag), response.data["detail"])
+        self.assertNotIn(self.bag.public_id, response.data["detail"])
         order.refresh_from_db()
         self.assertEqual(order.status.code, "BOOKED")
         self.assertIsNone(order.verified_by_id)
