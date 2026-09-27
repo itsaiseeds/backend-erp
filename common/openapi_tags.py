@@ -113,12 +113,22 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "reject-order",
             "unverify-order",
             "verify-order",
+            "custom-order",
+            "custom-orders",
+            "create-custom-order",
+            "edit-custom-order",
         ),
         (ADMIN_ORDERS,),
     ),
     (
         _route(
-            _ADMIN, "dispatch-order", "revert-dispatch", "dispatch-challans", "upload-lr-number"
+            _ADMIN,
+            "dispatch-order",
+            "revert-dispatch",
+            "dispatch-challans",
+            "upload-lr-number",
+            "dispatch-custom-order",
+            "revert-custom-order-dispatch",
         ),
         (ADMIN_DISPATCH,),
     ),

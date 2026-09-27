@@ -137,6 +137,21 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/client/<str:public_id>": ("GetClientView", SESSION_ADMIN),
     "api/sales-admin/crops": ("CropsView", SESSION_ADMIN),
     "api/sales-admin/crops/<int:id>": ("UpdateCropView", SESSION_ADMIN),
+    "api/sales-admin/create-custom-order": ("CreateCustomOrderView", SESSION_ADMIN),
+    "api/sales-admin/custom-orders/": ("GetCustomOrdersView", SESSION_ADMIN),
+    "api/sales-admin/custom-order/<str:public_id>": ("CustomOrderView", SESSION_ADMIN),
+    "api/sales-admin/edit-custom-order/<str:public_id>": (
+        "UpdateCustomOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/dispatch-custom-order/<str:public_id>": (
+        "DispatchCustomOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/revert-custom-order-dispatch/<str:public_id>": (
+        "RevertCustomOrderDispatchView",
+        SESSION_ADMIN,
+    ),
     "api/sales-admin/get-clients/": ("GetClientsView", SESSION_ADMIN),
     "api/sales-admin/dispatch-order/<str:public_id>": ("DispatchOrderView", SESSION_ADMIN),
     "api/sales-admin/dispatch-challans/": ("GetDispatchChallansView", SESSION_ADMIN),

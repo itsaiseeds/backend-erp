@@ -15,7 +15,10 @@ from api.order_serializers import (
     ProductRefSerializer,
     TransportAgencyRefSerializer,
 )
-from api.sales_admin.GetDispatchChallansView import DispatchChallanItemSerializer
+from api.sales_admin.GetDispatchChallansView import (
+    CustomDispatchChallanItemSerializer,
+    DispatchChallanItemSerializer,
+)
 from api.sales_admin.InwardOtherMaterialsView import InwardOtherMaterialPayloadSerializer
 from api.sales_admin.InwardRawMaterialsView import InwardRawMaterialPayloadSerializer
 from api.sales_admin.UpdateBagStockView import PackagingRefSerializer
@@ -102,6 +105,15 @@ class ExportDispatchReceiptSerializer(DispatchChallanItemSerializer):
     order_created_at = serializers.DateTimeField()
     city = ExportCitySerializer(
         allow_null=True, help_text="order -> delivery address -> city."
+    )
+
+
+class ExportCustomDispatchReceiptSerializer(CustomDispatchChallanItemSerializer):
+    """A custom order's row of ``export/dispatch-receipts``."""
+
+    order_created_at = serializers.DateTimeField()
+    city = ExportCitySerializer(
+        allow_null=True, help_text="custom order -> delivery address -> city."
     )
 
 
