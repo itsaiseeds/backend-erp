@@ -113,6 +113,7 @@ class AppStrings {
   static const String REQUIRED_MARKER = ' *';
   static const String TYPE_TO_SEARCH = 'Type to search...';
   static const String NO_DATA_FOUND = 'No data found.';
+  static const String SOMETHING_WENT_WRONG_TITLE = 'Action failed';
   static const String SOMETHING_WENT_WRONG =
       'Something went wrong. Please try again.';
   static const String SESSION_EXPIRED =

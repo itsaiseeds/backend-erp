@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:toastification/toastification.dart';
+import '../constants/app_strings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 
@@ -22,16 +23,26 @@ class ToastUtils {
     type: AppToastType.success,
   );
 
+  /// Titles clamp to two lines, so a long lone message (a backend validation
+  /// error, typically) is demoted to the description where it can wrap in
+  /// full under a short heading.
+  static const int _titleWrapLimit = 64;
+
   static ToastificationItem showError(
     BuildContext context,
     String title, {
     String? description,
-  }) => show(
-    context: context,
-    title: title,
-    description: description,
-    type: AppToastType.error,
-  );
+  }) {
+    final bool isLongLoneMessage =
+        description == null && title.trim().length > _titleWrapLimit;
+
+    return show(
+      context: context,
+      title: isLongLoneMessage ? AppStrings.SOMETHING_WENT_WRONG_TITLE : title,
+      description: isLongLoneMessage ? title : description,
+      type: AppToastType.error,
+    );
+  }
 
   static ToastificationItem showWarning(
     BuildContext context,
