@@ -856,7 +856,7 @@ class AppStrings {
 
   static const String INWARD_RAW_MATERIALS = 'Raw Material';
   static const String OTHER_RAW_MATERIALS = 'Material Recipes';
-  static const String OTHER_MATERIAL_INWARD = 'Material Inward';
+  static const String OTHER_MATERIAL_INWARD = 'Other Material Inward';
 
   static const String COLUMN_RECIPE = 'Recipe';
 

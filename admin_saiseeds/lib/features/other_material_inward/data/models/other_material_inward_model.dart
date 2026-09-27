@@ -12,24 +12,54 @@ class OtherInwardProductRef {
   }
 }
 
+/// The list nests only id and name, not the unit, so this stays separate
+/// from [OtherMaterialTypeModel].
+class OtherInwardMaterialTypeRef {
+  final int id;
+  final String name;
+
+  const OtherInwardMaterialTypeRef({required this.id, this.name = ''});
+
+  factory OtherInwardMaterialTypeRef.fromJson(Map<String, dynamic> json) {
+    return OtherInwardMaterialTypeRef(
+      id: _asInt(json['id']),
+      name: json['name'] as String? ?? '',
+    );
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse('$value') ?? 0;
+  }
+}
+
 class OtherInwardRecipeRef {
   final String publicId;
   final OtherInwardProductRef? product;
+  final OtherInwardMaterialTypeRef? materialType;
   final String packetWeight;
 
   const OtherInwardRecipeRef({
     required this.publicId,
     this.product,
+    this.materialType,
     this.packetWeight = '',
   });
 
   factory OtherInwardRecipeRef.fromJson(Map<String, dynamic> json) {
     final dynamic product = json['product'];
+    final dynamic materialType = json['material_type'];
 
     return OtherInwardRecipeRef(
       publicId: '${json['public_id'] ?? ''}',
       product: product is Map
           ? OtherInwardProductRef.fromJson(Map<String, dynamic>.from(product))
+          : null,
+      materialType: materialType is Map
+          ? OtherInwardMaterialTypeRef.fromJson(
+              Map<String, dynamic>.from(materialType),
+            )
           : null,
       packetWeight: _decimalOf(json['packet_weight']),
     );
@@ -101,6 +131,8 @@ class OtherMaterialInwardModel {
   String get productName => recipe?.productName ?? '';
 
   String get packetWeight => recipe?.packetWeight ?? '';
+
+  String get materialTypeName => recipe?.materialType?.name ?? '';
 
   String get partyName => party?.name ?? '';
 
