@@ -102,6 +102,7 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
         self.assertTrue(lot["public_id"].startswith("IO-"))
         self.assertEqual(lot["recipe"], {
             "public_id": self.recipe.public_id,
+            "material_type": {"id": self.packet_cover.id, "name": self.packet_cover.name},
             "product": {"public_id": "P-I34V7RI1JPUH", "name": "SAI-33"},
             "packet_weight": "2.500",
         })

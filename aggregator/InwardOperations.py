@@ -184,10 +184,15 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
 def inward_other_material_payload(entry: InwardOtherMaterial) -> dict:
     """Frontend-facing dict for one ``InwardOtherMaterial`` lot (``IO-…``)."""
     recipe = entry.recipe
+    material_type = recipe.material_type
     return {
         "public_id": entry.public_id,
         "recipe": {
             "public_id": recipe.public_id,
+            "material_type": {
+                "id": material_type.id,
+                "name": material_type.name,
+            },
             "product": {
                 "public_id": recipe.product.public_id,
                 "name": recipe.product.name,

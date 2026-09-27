@@ -59,7 +59,7 @@ class ExportInwardEntriesView(AdminDateRangeExportView):
 
         other_entries = (
             window.created_between(InwardOtherMaterial.objects.all())
-            .select_related("recipe__product", "party")
+            .select_related("recipe__product", "recipe__material_type", "party")
             .order_by("created_at", "id")
         )
         for other in other_entries:
