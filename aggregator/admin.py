@@ -20,6 +20,10 @@ from .models import (
     DispatchDetails,
     DispatchEntry,
     DispatchEntryItem,
+    FarmerVisit,
+    FarmerVisitCrop,
+    FarmerVisitProduct,
+    FieldTrip,
     InventorySnapshot,
     InwardOtherMaterial,
     InwardRawMaterial,
@@ -689,3 +693,67 @@ class InwardOtherMaterialAdmin(SoftDeleteModelAdmin):
     list_select_related = ("recipe__product", "recipe__material_type", "party")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
+
+
+@admin.register(FieldTrip)
+class FieldTripAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "public_id",
+        "created_by",
+        "city",
+        "village",
+        "status",
+        "expected_start_at",
+        "started_at",
+        "ended_at",
+        "approved_by",
+    )
+    search_fields = ("public_id", "village", "city__name", "created_by__name")
+    list_filter = ("status",)
+    autocomplete_fields = ("city", "status")
+    list_select_related = ("created_by", "city", "status", "approved_by")
+    date_hierarchy = "expected_start_at"
+    ordering = ("-expected_start_at",)
+
+
+class FarmerVisitCropInline(CreatedByStampInlineMixin, admin.TabularInline):
+    model = FarmerVisitCrop
+    extra = 0
+
+
+class FarmerVisitProductInline(CreatedByStampInlineMixin, admin.TabularInline):
+    model = FarmerVisitProduct
+    extra = 0
+    autocomplete_fields = ("product",)
+
+
+@admin.register(FarmerVisit)
+class FarmerVisitAdmin(SoftDeleteParentAdmin):
+    list_display = (
+        "public_id",
+        "field_trip",
+        "farmer_name",
+        "contact_number",
+        "village",
+        "land_area_bigha",
+        "created_at",
+    )
+    search_fields = ("public_id", "farmer_name", "contact_number", "village")
+    autocomplete_fields = ("field_trip",)
+    list_select_related = ("field_trip",)
+    ordering = ("-created_at",)
+    inlines = (FarmerVisitCropInline, FarmerVisitProductInline)
+
+
+@admin.register(FarmerVisitCrop)
+class FarmerVisitCropAdmin(SoftDeleteModelAdmin):
+    list_display = ("farmer_visit", "crop", "created_at")
+    autocomplete_fields = ("farmer_visit",)
+    list_select_related = ("farmer_visit", "crop")
+
+
+@admin.register(FarmerVisitProduct)
+class FarmerVisitProductAdmin(SoftDeleteModelAdmin):
+    list_display = ("farmer_visit", "product", "created_at")
+    autocomplete_fields = ("farmer_visit", "product")
+    list_select_related = ("farmer_visit", "product")

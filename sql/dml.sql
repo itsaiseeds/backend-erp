@@ -59,6 +59,10 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(43, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(44, 'aggregator', 'inwardothermaterial');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(45, 'aggregator', 'dispatchentry');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(46, 'aggregator', 'dispatchentryitem');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(47, 'aggregator', 'fieldtrip');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(48, 'aggregator', 'farmervisit');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(49, 'aggregator', 'farmervisitcrop');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(50, 'aggregator', 'farmervisitproduct');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -232,12 +236,29 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(162, 'Can change dispatch entry item', 46, 'change_dispatchentryitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(163, 'Can delete dispatch entry item', 46, 'delete_dispatchentryitem');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(164, 'Can view dispatch entry item', 46, 'view_dispatchentryitem');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(166, 'Can add field trip', 47, 'add_fieldtrip');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(167, 'Can change field trip', 47, 'change_fieldtrip');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(168, 'Can delete field trip', 47, 'delete_fieldtrip');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(169, 'Can view field trip', 47, 'view_fieldtrip');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(170, 'Can add farmer visit', 48, 'add_farmervisit');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(171, 'Can change farmer visit', 48, 'change_farmervisit');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(172, 'Can delete farmer visit', 48, 'delete_farmervisit');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(173, 'Can view farmer visit', 48, 'view_farmervisit');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(174, 'Can add farmer visit crop', 49, 'add_farmervisitcrop');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(175, 'Can change farmer visit crop', 49, 'change_farmervisitcrop');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(176, 'Can delete farmer visit crop', 49, 'delete_farmervisitcrop');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(177, 'Can view farmer visit crop', 49, 'view_farmervisitcrop');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(178, 'Can add farmer visit product', 50, 'add_farmervisitproduct');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(179, 'Can change farmer visit product', 50, 'change_farmervisitproduct');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(180, 'Can delete farmer visit product', 50, 'delete_farmervisitproduct');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(181, 'Can view farmer visit product', 50, 'view_farmervisitproduct');
 -- Custom permission (authentication.User.Meta.permissions): gates POST /api/execute-code/.
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(165, 'Can execute Python code on the server', 1, 'execute_python_code');
 
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)
---   Order lifecycle + client verification. created_by left NULL (seed data).
+--   Order lifecycle (1-7) + client verification (8-9) + field-trip lifecycle
+--   (10-13). created_by left NULL (seed data).
 -- -------------------------------------------------------------------------
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(1, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'BOOKED', 'Booked', 1);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(2, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'UNDER_REVIEW', 'Under review', 2);
@@ -248,6 +269,10 @@ INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, de
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(7, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'REJECTED', 'Rejected', 7);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(8, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'VERIFICATION_PENDING', 'Verification pending', 1);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(9, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'VERIFIED', 'Verified', 2);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(10, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'PLANNED', 'Planned', 1);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(11, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'APPROVED', 'Approved', 2);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(12, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'IN_PROGRESS', 'In progress', 3);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(13, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'COMPLETED', 'Completed', 4);
 
 -- -------------------------------------------------------------------------
 -- aggregator_stage (seed classification of a product; enum-like, 4 fixed rows)

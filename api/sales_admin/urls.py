@@ -7,6 +7,7 @@ plain ``APIView``.
 from django.urls import path
 
 from .AdminsView import AdminsView
+from .ApproveFieldTripView import ApproveFieldTripView
 from .BagStockView import BagStockView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .CropsView import CropsView
@@ -17,9 +18,12 @@ from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
 from .ExportInventorySnapshotsView import ExportInventorySnapshotsView
 from .ExportInwardEntriesView import ExportInwardEntriesView
 from .ExportOrdersView import ExportOrdersView
+from .FieldTripView import FieldTripView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetDispatchChallansView import GetDispatchChallansView
+from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
+from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
 from .HoldOrderView import HoldOrderView
@@ -38,11 +42,13 @@ from .RevertDispatchView import RevertDispatchView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
 from .StockView import StockView
+from .UnapproveFieldTripView import UnapproveFieldTripView
 from .UnverifyOrderView import UnverifyOrderView
 from .UpdateAdminView import UpdateAdminView
 from .UpdateBagStockView import UpdateTodaysInventoryView
 from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
+from .UpdateFieldTripView import UpdateFieldTripView
 from .UpdateInwardOtherMaterialView import UpdateInwardOtherMaterialView
 from .UpdateInwardRawMaterialView import UpdateInwardRawMaterialView
 from .UpdateOrderView import UpdateOrderView
@@ -141,6 +147,31 @@ urlpatterns = [
     ),
     path("hold-order/<str:public_id>", HoldOrderView.as_view(), name="hold-order"),
     path("reject-order/<str:public_id>", RejectOrderView.as_view(), name="reject-order"),
+    # Field trips follow the order convention: ``field-trips/`` is a collection,
+    # ``field-trip/<public_id>`` a collection item (GET / DELETE), and the verbs
+    # carry the id in the path.
+    path("field-trips/", GetFieldTripsView.as_view(), name="field-trips"),
+    path("field-trip/<str:public_id>", FieldTripView.as_view(), name="field-trip-detail"),
+    path(
+        "field-trip-farmer-visits/<str:public_id>",
+        GetFieldTripFarmerVisitsView.as_view(),
+        name="field-trip-farmer-visits",
+    ),
+    path(
+        "edit-field-trip/<str:public_id>",
+        UpdateFieldTripView.as_view(),
+        name="edit-field-trip",
+    ),
+    path(
+        "approve-field-trip/<str:public_id>",
+        ApproveFieldTripView.as_view(),
+        name="approve-field-trip",
+    ),
+    path(
+        "unapprove-field-trip/<str:public_id>",
+        UnapproveFieldTripView.as_view(),
+        name="unapprove-field-trip",
+    ),
     # Inward movement: master data, bookings, recipe and stock positions. The
     # lookups (parties, other-material-types) are id-addressed like ``crops``;
     # the bookable rows (inward-raw-material, inward-other-material) and recipes

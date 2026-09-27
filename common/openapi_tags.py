@@ -20,6 +20,7 @@ ADMIN_USERS = "Admin · Users"
 ADMIN_CLIENTS = "Admin · Clients"
 ADMIN_ORDERS = "Admin · Orders"
 ADMIN_DISPATCH = "Admin · Dispatch"
+ADMIN_FIELD_TRIPS = "Admin · Field trips"
 ADMIN_INWARD = "Admin · Inward"
 ADMIN_STOCK_COUNT = "Admin · Stock count"
 ADMIN_STOCK_LEVELS = "Admin · Stock levels"
@@ -30,6 +31,7 @@ ANDROID_AUTH = "Android · Auth"
 ANDROID_CLIENTS = "Android · Clients"
 ANDROID_ORDERS = "Android · Orders"
 ANDROID_CATALOGUE = "Android · Catalogue"
+ANDROID_FIELD_TRIPS = "Android · Field trips"
 ANDROID_UTILITIES = "Android · Utilities"
 DEVELOPER = "Developer tools"
 
@@ -40,6 +42,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {"name": ADMIN_CLIENTS, "description": "Client records and verification."},
     {"name": ADMIN_ORDERS, "description": "Order review: verify, hold, reject, edit."},
     {"name": ADMIN_DISPATCH, "description": "Dispatching orders, challans and LR numbers."},
+    {
+        "name": ADMIN_FIELD_TRIPS,
+        "description": "Sales people's field trips: review, edit, approve, and the farmers met.",
+    },
     {
         "name": ADMIN_INWARD,
         "description": "Inward movement: raw and other material received into stock.",
@@ -65,7 +71,14 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {"name": ANDROID_CLIENTS, "description": "The sales person's clients, addresses, transport."},
     {"name": ANDROID_ORDERS, "description": "Placing and listing the sales person's orders."},
     {"name": ANDROID_CATALOGUE, "description": "Products the sales person can sell."},
-    {"name": ANDROID_UTILITIES, "description": "Geography look-ups for the app."},
+    {
+        "name": ANDROID_FIELD_TRIPS,
+        "description": "Planning, running and ending field trips, and recording farmers met.",
+    },
+    {
+        "name": ANDROID_UTILITIES,
+        "description": "Look-ups for the app: geography, crops and products.",
+    },
     {"name": DEVELOPER, "description": "Internal debugging endpoints."},
 ]
 
@@ -149,6 +162,18 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
         ),
         (ADMIN_MASTER_DATA,),
     ),
+    (
+        _route(
+            _ADMIN,
+            "field-trip",
+            "field-trips",
+            "field-trip-farmer-visits",
+            "edit-field-trip",
+            "approve-field-trip",
+            "unapprove-field-trip",
+        ),
+        (ADMIN_FIELD_TRIPS,),
+    ),
     (_route(_ADMIN, "export/orders", "export/custom-orders"), (ADMIN_ORDERS, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/dispatch-receipts"), (ADMIN_DISPATCH, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/inward-entries"), (ADMIN_INWARD, ADMIN_EXPORTS)),
@@ -171,7 +196,28 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     (_route(_ANDROID, "create-multi-select-bag-order", "get-orders"), (ANDROID_ORDERS,)),
     (_route(_ANDROID, "sales-person-catalogue"), (ANDROID_CATALOGUE,)),
     (
-        _route(_ANDROID, "utilities/cities", "utilities/countries", "utilities/states"),
+        _route(
+            _ANDROID,
+            "create-field-trip",
+            "get-field-trips",
+            "edit-field-trip",
+            "start-field-trip",
+            "end-field-trip",
+            "delete-field-trip",
+            "field-trip-farmer-visits",
+            "create-farmer-visit",
+        ),
+        (ANDROID_FIELD_TRIPS,),
+    ),
+    (
+        _route(
+            _ANDROID,
+            "utilities/cities",
+            "utilities/countries",
+            "utilities/states",
+            "utilities/crops",
+            "utilities/products",
+        ),
         (ANDROID_UTILITIES,),
     ),
     # -- internal -----------------------------------------------------------------
