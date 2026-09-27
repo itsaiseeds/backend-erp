@@ -92,6 +92,35 @@ class _InwardRawMaterialsContentState
     );
   }
 
+  Future<void> _onMarkInUse(InwardRawMaterialModel lot) async {
+    final InwardRawMaterialsCubit cubit = context
+        .read<InwardRawMaterialsCubit>();
+
+    final bool confirmed = await ConfirmationDialog.show(
+      context,
+      title: AppStrings.INWARD_MARK_IN_USE_TITLE,
+      message: '${lot.productName} — '
+          '${AppStrings.INWARD_MARK_IN_USE_BODY}',
+      confirmLabel: AppStrings.INWARD_MARK_IN_USE,
+    );
+    if (!confirmed) return;
+
+    final bool succeeded = await cubit.updateLot(
+      publicId: lot.publicId,
+      status: InwardStatus.IN_USE_WIRE,
+    );
+    if (!mounted) return;
+
+    if (succeeded) {
+      ToastUtils.showSuccess(context, AppStrings.INWARD_MARK_IN_USE_DONE);
+      return;
+    }
+    ToastUtils.showError(
+      context,
+      cubit.state.errorMessage ?? AppStrings.SOMETHING_WENT_WRONG,
+    );
+  }
+
   Future<void> _onDelete(InwardRawMaterialModel lot) async {
     final InwardRawMaterialsCubit cubit = context
         .read<InwardRawMaterialsCubit>();
@@ -155,6 +184,8 @@ class _InwardRawMaterialsContentState
             onView: (lot) =>
                 InwardRecordDialog.show(context, lot, cubit: cubit),
             onDelete: _onDelete,
+            onMarkInUse: _onMarkInUse,
+            isMutating: state.isMutating,
             emptyTitle: state.isEmptySource
                 ? AppStrings.INWARD_EMPTY_STATE_TITLE
                 : AppStrings.TABLE_EMPTY_TITLE,

@@ -926,6 +926,12 @@ class AppStrings {
   static const String INWARD_LOAD_FAILED_TITLE =
       'Could not load raw material lots';
   static const String INWARD_MARK_IN_USE = 'Mark in use';
+  static const String INWARD_MARK_IN_USE_TITLE = 'Mark this lot in use?';
+  static const String INWARD_MARK_IN_USE_BODY =
+      'The lot moves from Lab Testing to In Use.';
+  static const String INWARD_MARK_IN_USE_DONE = 'Lot marked in use';
+  static const String INWARD_MARK_IN_USE_BLOCKED =
+      'This lot is already in use.';
   static const String INWARD_STATUS_LOCKED_NOTE =
       'A lot already in use cannot change status.';
 

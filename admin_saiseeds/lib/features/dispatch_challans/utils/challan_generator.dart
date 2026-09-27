@@ -283,12 +283,8 @@ class ChallanGenerator {
     );
   }
 
-  static String _transportLabel(ChallanDispatchModel? dispatch) {
-    if (dispatch == null) return '';
-    return dispatch.isPrivate
-        ? AppStrings.TRANSPORT_PRIVATE
-        : AppStrings.TRANSPORT_AGENCY;
-  }
+  static String _transportLabel(ChallanDispatchModel? dispatch) =>
+      dispatch?.transportLabel ?? '';
 
   static pw.Widget _partyCard({
     required String title,
