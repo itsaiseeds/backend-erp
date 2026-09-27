@@ -6,7 +6,7 @@ never include the internal primary key.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -28,7 +28,6 @@ from .models import (
     StatusIds,
     TransportAgency,
 )
-from .models.Order import DISPATCH_REQUIRED_STATUS_CODES, ORDER_STATUS_CODES
 from .ProductOperations import packaging_payload
 
 if TYPE_CHECKING:
@@ -213,10 +212,12 @@ HOLDABLE_STATUS_CODES = frozenset(
 )
 REJECTABLE_STATUS_CODES = HOLDABLE_STATUS_CODES | {StatusIds.ON_HOLD.name}
 
-# Anything the warehouse has not yet shipped. Once an order is DISPATCHED or
-# DELIVERED the goods have physically left, so its contents are history and are
-# no longer editable.
-EDITABLE_STATUS_CODES = frozenset(ORDER_STATUS_CODES - DISPATCH_REQUIRED_STATUS_CODES)
+# Only a freshly booked order or a confirmed one may be edited. Every other
+# status is refused: DISPATCHED/DELIVERED because the goods have physically
+# left, REJECTED because rejection is terminal, and UNDER_REVIEW/ON_HOLD because
+# they are parked awaiting a decision -- verify the order first, then edit it.
+# Editing a CONFIRMED order re-checks stock (see ``sync_order_items``).
+EDITABLE_STATUS_CODES = frozenset({StatusIds.BOOKED.name, StatusIds.CONFIRMED.name})
 
 
 def assert_order_status(order: Order, allowed: frozenset[str], action: str) -> None:
@@ -232,6 +233,64 @@ def assert_order_status(order: Order, allowed: frozenset[str], action: str) -> N
                 "status": (
                     f"Cannot {action} an order that is {code}. "
                     f"Allowed: {', '.join(sorted(allowed))}."
+                )
+            }
+        )
+
+
+def assert_stock_covers(
+    needed: Mapping[ProductPackaging, int],
+    action: str,
+    *,
+    held: Mapping[ProductPackaging, int] | None = None,
+) -> None:
+    """Raise unless today's stock can supply ``needed`` bags per packaging.
+
+    ``held`` is what the order already reserves (a CONFIRMED order's current
+    lines). ``available_bags`` has already netted it off, so it is added back
+    before comparing -- otherwise the order would be counted against itself.
+    A packaging whose need does not exceed what is held asks for nothing new
+    and is not checked, so shrinking an order is never refused.
+
+    Two gates, the same ones verification applies: today's stock count must be
+    complete, and every packaging must have the bags. Raises
+    ``ValidationError``, which the API turns into a 400.
+    """
+    from . import InventoryOperations
+
+    held = held or {}
+    increases = {
+        packaging: bags
+        for packaging, bags in needed.items()
+        if bags > held.get(packaging, 0)
+    }
+    if not increases:
+        return
+
+    if not InventoryOperations.is_stock_count_complete():
+        missing = list(
+            InventoryOperations.missing_packagings().values_list("public_id", flat=True)
+        )
+        raise ValidationError(
+            {
+                "status": (
+                    f"Today's stock count is incomplete -- cannot {action} this order. "
+                    f"Missing packagings: {', '.join(missing)}."
+                )
+            }
+        )
+
+    shortages = []
+    for packaging, bags in increases.items():
+        available = InventoryOperations.available_bags(packaging) + held.get(packaging, 0)
+        if bags > available:
+            shortages.append(f"{packaging.public_id}: need {bags}, have {available}")
+    if shortages:
+        raise ValidationError(
+            {
+                "status": (
+                    f"Not enough stock to {action} this order -- "
+                    f"{'; '.join(shortages)}."
                 )
             }
         )
@@ -362,33 +421,7 @@ def verify_order(order: Order, admin: User) -> Order:
     if not (admin is not None and (admin.is_admin_user or admin.is_superuser)):
         raise PermissionDenied("Orders can only be verified by a sales admin.")
 
-    if not InventoryOperations.is_stock_count_complete():
-        missing = list(
-            InventoryOperations.missing_packagings().values_list("public_id", flat=True)
-        )
-        raise ValidationError(
-            {
-                "status": (
-                    "Today's stock count is incomplete -- orders cannot be verified. "
-                    f"Missing packagings: {', '.join(missing)}."
-                )
-            }
-        )
-
-    shortages = []
-    for packaging, needed in InventoryOperations.order_bag_requirements(order).items():
-        available = InventoryOperations.available_bags(packaging)
-        if needed > available:
-            shortages.append(f"{packaging.public_id}: need {needed}, have {available}")
-    if shortages:
-        raise ValidationError(
-            {
-                "status": (
-                    "Not enough stock to verify this order -- "
-                    f"{'; '.join(shortages)}."
-                )
-            }
-        )
+    assert_stock_covers(InventoryOperations.order_bag_requirements(order), "verify")
 
     order.status = Status.by_id(StatusIds.CONFIRMED)
     order.verified_by = admin
@@ -643,11 +676,11 @@ def sync_order_items(order: Order, items: list[dict], actor: User) -> list[Order
     have its original row restored; inserting a second one would hit the
     constraint and surface as a 500 rather than a validation error.
 
-    Raising the quantities of a CONFIRMED order increases its reserved bags
-    with no availability re-check. That is deliberate: ``available_bags``
-    already nets off this order's own reservation, so a naive re-check would
-    double-count it. The intended flow for a confirmed order is unverify, edit,
-    re-verify.
+    **A CONFIRMED order is re-checked against stock** before anything is
+    written: its lines are reserved bags, so raising a quantity or adding a
+    bag must be covered by what is available. The bags it already holds are
+    credited back (``available_bags`` has netted them off), and a line that
+    shrinks or stays put asks for nothing new -- see :func:`assert_stock_covers`.
     """
     if not items:
         raise ValidationError("An order must keep at least one item.")
@@ -658,8 +691,19 @@ def sync_order_items(order: Order, items: list[dict], actor: User) -> list[Order
 
     existing = {
         line.product_packaging_id: line
-        for line in OrderItem.all_objects.filter(order=order)
+        for line in OrderItem.all_objects.filter(order=order).select_related(
+            "product_packaging"
+        )
     }
+
+    if order.is_verified:
+        held = {
+            line.product_packaging: line.quantity
+            for line in existing.values()
+            if not line.is_deleted
+        }
+        needed = {item["product_packaging"]: item["quantity"] for item in items}
+        assert_stock_covers(needed, "edit", held=held)
 
     ordered: list[OrderItem] = []
     for item in items:
