@@ -176,9 +176,7 @@ class UpdateInwardRawMaterialView(AdminApiView):
             entry = locked_raw_lot(
                 InwardRawMaterial.objects.select_related("status"), public_id
             )
-            try:
-                assert_raw_lot_removable(entry)
-            except ValueError as exc:
-                raise serializers.ValidationError({"detail": str(exc)}) from None
+            # Refused by InwardRawMaterial.guard_soft_delete (a 400) when the
+            # lot's kilograms are already packed.
             entry.mark_deleted(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

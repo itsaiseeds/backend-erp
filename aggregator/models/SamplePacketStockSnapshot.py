@@ -92,6 +92,18 @@ class LooseStockSnapshot(
             ),
         ]
 
+    def guard_soft_delete(self, perform):
+        """Refuse a deletion that leaves this loose pool, or the raw or packing
+        material behind it, short -- see
+        ``InventoryOperations.guard_stock_deletion``."""
+        from aggregator import InventoryOperations
+
+        InventoryOperations.guard_stock_deletion(
+            perform,
+            product_ids=[self.product_id],
+            loose_pools=[(self.product, self.packet_weight)],
+        )
+
     def __str__(self):
         if self.product_id:
             return (

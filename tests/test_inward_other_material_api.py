@@ -12,16 +12,17 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
-from aggregator import InwardOperations
+from aggregator import InventoryOperations, InwardOperations
 from aggregator.models import (
     InwardOtherMaterial,
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
     Product,
+    ProductPackaging,
 )
 from authentication.models import Admin
-from tests.common import WebApiTestCase
+from tests.common import WebApiTestCase, book_raw_material
 
 User = get_user_model()
 
@@ -235,6 +236,34 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
         self.assertEqual(empty.data["total_count"], 0)
 
     # -- deletion -------------------------------------------------------------
+
+    def test_a_lot_the_counted_packets_already_use_cannot_be_deleted(self):
+        """400 with the usual ``detail`` envelope, and the lot stays.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_a_lot_the_counted_packets_already_use_cannot_be_deleted
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot(quantity="12")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+        # 1 bag x 4 packets of 2.5kg, at 3 covers a packet = all 12 covers.
+        packaging = ProductPackaging.objects.create(
+            product=self.product,
+            packet_weight=Decimal("2.500"),
+            packets=4,
+            selling_price=Decimal("1000.00"),
+            created_by=self.seed_admin,
+        )
+        book_raw_material(self.product, Decimal("1000"), actor=self.superuser)
+        InventoryOperations.record_stock_count(
+            product_packaging=packaging, bags=1, actor=self.seed_admin
+        )
+
+        response = self.client.delete(self._url(created.data))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
+        self.assertIn("'packet_outer_cover' short by 12.000", response.data["detail"])
+        lot = InwardOtherMaterial.all_objects.get(public_id=created.data["public_id"])
+        self.assertFalse(lot.is_deleted)
 
     def test_delete_soft_deletes_and_removes_the_lot_from_the_api(self):
         """The row is flagged and attributed, drops out of the list, and 404s after.

@@ -46,12 +46,12 @@ payloads never include the internal primary key.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q, Sum
 
@@ -922,28 +922,104 @@ def other_material_available(material_type_ids: Iterable[int]) -> dict[int, Deci
     }
 
 
-def _material_guard(product_ids) -> dict[int, Decimal]:
-    """Lock the packing materials ``product_ids`` use; return their availability.
+def _lock_materials(product_ids, material_type_ids: Iterable[int] = ()) -> list[int]:
+    """Lock the material types ``product_ids``' recipes use, plus ``material_type_ids``.
 
-    Called before a count write, inside its transaction. The material type rows
-    are locked in pk order, so two uploads for different products sharing a
-    material cannot both spend its last units. The returned figures are what
-    :func:`_assert_material_available` compares the write against.
+    Rows are locked in pk order, so two writers sharing a material cannot both
+    spend its last units. Returns the locked ids.
     """
-    material_type_ids = sorted(
+    locked = sorted(
         set(
             OtherMaterialRecipe.objects.filter(product_id__in=product_ids).values_list(
                 "material_type_id", flat=True
             )
         )
+        | set(material_type_ids)
     )
     list(
         OtherMaterialType.all_objects.select_for_update()
-        .filter(pk__in=material_type_ids)
+        .filter(pk__in=locked)
         .order_by("pk")
         .values_list("pk", flat=True)
     )
-    return other_material_available(material_type_ids)
+    return locked
+
+
+def _material_guard(product_ids) -> dict[int, Decimal]:
+    """Lock the packing materials ``product_ids`` use; return their availability.
+
+    Called before a count write, inside its transaction. The returned figures
+    are what :func:`_assert_material_available` compares the write against.
+    """
+    return other_material_available(_lock_materials(product_ids))
+
+
+def guard_stock_deletion(
+    perform: Callable[[], None],
+    *,
+    product_ids: Iterable[int] = (),
+    packagings: Iterable[ProductPackaging] = (),
+    loose_pools: Iterable[tuple[Product, Decimal]] = (),
+    material_type_ids: Iterable[int] = (),
+) -> None:
+    """Run ``perform`` -- soft-deleting a count line or an inward lot -- or refuse it.
+
+    Every stock figure the deletion can move is read before and after it:
+    available bags of ``packagings``, available loose packets of
+    ``loose_pools``, raw kilograms of ``product_ids``, and every packing
+    material those products use plus ``material_type_ids``. The deletion is
+    refused -- ``ValidationError``, which also rolls ``perform`` back -- when a
+    figure ends up negative *and* lower than before. A figure that was already
+    negative and does not move does not block it, the same rule the count
+    writers apply (see ``_assert_material_available``).
+
+    Deleting a count line can move more than its own pool: when the deleted
+    row was the latest count date's last, an earlier day becomes "the latest
+    count", and raw and packing material are re-derived from it.
+
+    Locks are taken in the order the count writers take them -- raw pools, bag
+    pools, loose pools, materials -- so a deletion and a count cannot deadlock.
+    Must run inside ``transaction.atomic`` (``SoftDeletedModel`` provides it).
+    """
+    product_ids = sorted(set(product_ids))
+    packagings = list(packagings)
+    loose_pools = list(loose_pools)
+    lock_raw_pools(product_ids)
+    lock_bag_pools(packagings)
+    lock_loose_pools(product.id for product, _ in loose_pools)
+    material_ids = _lock_materials(product_ids, material_type_ids)
+    materials = {
+        material.id: material
+        for material in OtherMaterialType.all_objects.filter(id__in=material_ids)
+    }
+
+    def figures() -> dict[str, tuple[Decimal, str]]:
+        """Each watched figure, by a label naming it, with its unit."""
+        current: dict[str, tuple[Decimal, str]] = {}
+        for packaging in packagings:
+            current[f"'{packaging}'"] = (Decimal(available_bags(packaging)), "bags")
+        for product, weight in loose_pools:
+            current[f"'{product.name}' loose {weight}kg packets"] = (
+                Decimal(available_loose_packets(product, weight)),
+                "packets",
+            )
+        for product in Product.all_objects.filter(id__in=product_ids):
+            current[f"raw material of '{product.name}'"] = (raw_available_kg(product), "kg")
+        for material_id, available in other_material_available(material_ids).items():
+            material = materials[material_id]
+            current[f"'{material.name}'"] = (available, material.unit_type)
+        return current
+
+    before = figures()
+    perform()
+    after = figures()
+    short = [
+        f"{label} short by {-value} {unit}"
+        for label, (value, unit) in after.items()
+        if value < 0 and value < before[label][0]
+    ]
+    if short:
+        raise ValidationError(f"This deletion would leave {'; '.join(short)}.")
 
 
 def _assert_material_available(before: Mapping[int, Decimal]) -> None:

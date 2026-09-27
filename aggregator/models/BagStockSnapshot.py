@@ -86,6 +86,18 @@ class InventorySnapshot(
             ),
         ]
 
+    def guard_soft_delete(self, perform):
+        """Refuse a deletion that leaves this packaging's stock, or the raw or
+        packing material behind it, short -- see
+        ``InventoryOperations.guard_stock_deletion``."""
+        from aggregator import InventoryOperations
+
+        InventoryOperations.guard_stock_deletion(
+            perform,
+            product_ids=[self.product_packaging.product_id],
+            packagings=[self.product_packaging],
+        )
+
     def __str__(self):
         if self.product_packaging_id:
             return f"{self.snapshot_date}: {self.bags} × {self.product_packaging}"

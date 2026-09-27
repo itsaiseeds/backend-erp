@@ -630,6 +630,73 @@ class InventoryOperationsTest(DMLTestCase):
             inv.record_stock_count(product_packaging=self.pack, bags=6, actor=self.stock_admin)
         assert inv.on_hand_bags(self.pack) == 4
 
+    # -- deleting counts and inward lots ------------------------------------------
+    #
+    # mark_deleted() is the API's path, delete(deleted_by=...) the Django
+    # admin's; both run the model's guard_soft_delete.
+
+    def test_a_count_line_under_reservations_cannot_be_deleted(self):
+        """Deleting today's line would leave the reserved bags uncovered.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_count_line_under_reservations_cannot_be_deleted
+        """
+        self._count_everything(bags=400)
+        verify_order(self._order(quantity=5), self.stock_admin)
+        line = inv.snapshot_line(self.pack)
+
+        for delete in (lambda: line.mark_deleted(self.stock_admin),
+                       lambda: line.delete(deleted_by=self.su)):
+            with self.assertRaisesMessage(ValidationError, "short by 5 bags"):
+                delete()
+            assert not line.is_deleted  # the in-memory flags are put back too
+            line.refresh_from_db()
+            assert not line.is_deleted
+        assert inv.available_bags(self.pack) == 395
+
+    def test_a_count_line_nothing_depends_on_can_be_deleted(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_a_count_line_nothing_depends_on_can_be_deleted"""
+        self._count_everything(bags=400)
+        line = inv.snapshot_line(self.pack)
+
+        line.delete(deleted_by=self.su)
+
+        line.refresh_from_db()
+        assert line.is_deleted
+        assert inv.available_bags(self.pack) == 0
+
+    def test_a_packing_lot_already_used_cannot_be_deleted(self):
+        """Deleting the lot would leave 240 leaflets' worth of counted packets uncovered.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_packing_lot_already_used_cannot_be_deleted
+        """
+        leaflets = self._material()
+        recipe = self._recipe(leaflets)
+        used_lot = self._receive(recipe, 240)
+        spare_lot = self._receive(recipe, 50)
+        inv.record_stock_count(product_packaging=self.pack, bags=3, actor=self.stock_admin)
+
+        spare_lot.mark_deleted(self.stock_admin)  # 240 still covers 240 used
+
+        with self.assertRaisesMessage(ValidationError, "'Test leaflets' short by 240.000 count"):
+            used_lot.mark_deleted(self.stock_admin)
+        used_lot.refresh_from_db()
+        assert not used_lot.is_deleted
+        assert self._on_hand(leaflets) == Decimal("0")
+
+    def test_the_admin_cannot_delete_raw_material_already_packed(self):
+        """The API always refused this; the admin delete now does too.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_the_admin_cannot_delete_raw_material_already_packed
+        """
+        product, pack = self._raw_pack(name="Admin Raw")
+        lot = book_raw_material(product, Decimal("10"), actor=self.su)
+        inv.record_stock_count(product_packaging=pack, bags=4, actor=self.stock_admin)
+
+        with self.assertRaisesMessage(ValidationError, "4.000 kg of this lot is already packed"):
+            lot.delete(deleted_by=self.su)
+        lot.refresh_from_db()
+        assert not lot.is_deleted
+
     def test_uncounted_packaging_has_no_stock(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_uncounted_packaging_has_no_stock"""
         assert inv.on_hand_bags(self.pack) == 0

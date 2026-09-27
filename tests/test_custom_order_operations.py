@@ -403,6 +403,18 @@ class CustomOrderOperationsTest(DMLTestCase):
         assert inv.consumed_loose_packets(self.product, self.w1) == 0
         assert inv.available_loose_packets(self.product, self.w1) == 70
 
+    def test_a_loose_count_line_under_reservations_cannot_be_deleted(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_loose_count_line_under_reservations_cannot_be_deleted"""
+        self._count(loose_packets=100)
+        self._custom_order(packets=30)
+        line = inv.loose_line(self.product, self.w1)
+
+        with self.assertRaisesMessage(ValidationError, "short by 30 packets"):
+            line.mark_deleted(self.stock_admin)
+        line.refresh_from_db()
+        assert not line.is_deleted
+        assert inv.available_loose_packets(self.product, self.w1) == 70
+
     def test_dispatch_before_count_not_subtracted_twice(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_dispatch_before_count_not_subtracted_twice"""
         self._count(loose_packets=100)
