@@ -42,10 +42,15 @@ class ClientsState extends Equatable {
     this.search,
     this.sortBy,
     this.sortOrder,
-    this.filters = const {},
+    this.filters = const {ClientsCubit.STATUS_FILTER: ClientStatusX.VERIFIED},
     this.isMutating = false,
     this.errorMessage,
   });
+
+  ClientsViewMode get resolvedView =>
+      filters[ClientsCubit.STATUS_FILTER] == ClientStatusX.VERIFICATION_PENDING
+      ? ClientsViewMode.pending
+      : ClientsViewMode.verified;
 
   ClientsState copyWith({
     ClientsStatus? status,
@@ -125,12 +130,6 @@ class ClientsCubit extends SafeCubit<ClientsState> {
   Future<void> loadClients() => _fetch(page: state.currentPage);
 
   Future<void> refresh() => _fetch(page: 1);
-
-  Future<void> selectView(ClientsViewMode view) async {
-    if (view == state.view) return;
-    emit(state.copyWith(view: view, currentPage: 1));
-    await _fetch(page: 1);
-  }
 
   Future<void> applyQuery({
     required int page,
@@ -215,22 +214,15 @@ class ClientsCubit extends SafeCubit<ClientsState> {
     final Map<String, dynamic> params = {
       'page': page,
       'page_size': PAGE_SIZE,
-      STATUS_FILTER: state.view == ClientsViewMode.pending
-          ? ClientStatusX.VERIFICATION_PENDING
-          : ClientStatusX.VERIFIED,
     };
 
     state.filters.forEach((key, value) {
-      if (key == STATUS_FILTER) return;
-
       final String trimmed = value.trim();
       if (trimmed.isEmpty) return;
 
       final ClientFilterModel? filter = _filterFor(key);
       if (filter != null && filter.kind == ClientFilterKind.datetimeRange) {
-        final List<String> bounds = trimmed.split(
-          DateRangeValue.SEPARATOR,
-        );
+        final List<String> bounds = trimmed.split(DateRangeValue.SEPARATOR);
         final String lower = bounds.isNotEmpty ? bounds.first.trim() : '';
         final String upper = bounds.length > 1 ? bounds[1].trim() : '';
         if (lower.isNotEmpty) params[filter.lowerBoundParam] = lower;

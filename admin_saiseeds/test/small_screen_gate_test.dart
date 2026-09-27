@@ -23,18 +23,19 @@ void main() {
     expect(find.text('portal'), findsNothing);
   });
 
-  testWidgets('just below the tablet breakpoint shows the notice',
-      (tester) async {
-    await _pumpAt(tester, const Size(767, 1024));
-
-    expect(find.byType(SmallScreenNotice), findsOneWidget);
-  });
-
-  testWidgets('tablet width shows the portal', (tester) async {
+  testWidgets('tablet width shows the notice', (tester) async {
     await _pumpAt(tester, const Size(768, 1024));
 
-    expect(find.text('portal'), findsOneWidget);
-    expect(find.byType(SmallScreenNotice), findsNothing);
+    expect(find.byType(SmallScreenNotice), findsOneWidget);
+    expect(find.text('portal'), findsNothing);
+  });
+
+  testWidgets('just below the desktop breakpoint shows the notice', (
+    tester,
+  ) async {
+    await _pumpAt(tester, const Size(1199, 900));
+
+    expect(find.byType(SmallScreenNotice), findsOneWidget);
   });
 
   testWidgets('desktop width shows the portal', (tester) async {

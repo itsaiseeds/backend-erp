@@ -12,8 +12,20 @@ void main() {
       TabIds.DASHBOARD,
       TabIds.ADMINS,
       TabIds.SALES_PEOPLE,
+      TabIds.CLIENTS,
+      TabIds.ORDERS,
+      TabIds.DISPATCH_CHALLANS,
       TabIds.PRODUCTS,
       TabIds.PRODUCT_PACKAGINGS,
+      TabIds.PARTIES,
+      TabIds.BAG_STOCK,
+      TabIds.PACKET_STOCK,
+      TabIds.INWARD_RAW_MATERIALS,
+      TabIds.OTHER_RAW_MATERIALS,
+      TabIds.OTHER_MATERIAL_INWARD,
+      TabIds.PRODUCT_STOCK,
+      TabIds.RAW_MATERIAL_STOCK,
+      TabIds.OTHER_MATERIAL_STOCK,
     ]);
   });
 
@@ -24,8 +36,20 @@ void main() {
     expect(ids, [
       TabIds.DASHBOARD,
       TabIds.SALES_PEOPLE,
+      TabIds.CLIENTS,
+      TabIds.ORDERS,
+      TabIds.DISPATCH_CHALLANS,
       TabIds.PRODUCTS,
       TabIds.PRODUCT_PACKAGINGS,
+      TabIds.PARTIES,
+      TabIds.BAG_STOCK,
+      TabIds.PACKET_STOCK,
+      TabIds.INWARD_RAW_MATERIALS,
+      TabIds.OTHER_RAW_MATERIALS,
+      TabIds.OTHER_MATERIAL_INWARD,
+      TabIds.PRODUCT_STOCK,
+      TabIds.RAW_MATERIAL_STOCK,
+      TabIds.OTHER_MATERIAL_STOCK,
     ]);
   });
 

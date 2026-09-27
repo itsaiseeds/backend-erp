@@ -5,7 +5,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/formatters/date_formatter.dart';
 import '../../../../core/utils/formatters/role_formatter.dart';
-import '../../../../core/widgets/buttons/icon_action_button.dart';
+import '../../../../core/widgets/buttons/outlined_action_button.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
 import '../../../../core/widgets/tables/app_data_table.dart';
 import '../../data/models/admin_model.dart';
@@ -28,7 +28,6 @@ class AdminsTable extends StatefulWidget {
   final String? currentSortBy;
   final String? currentSortOrder;
   final Map<String, String> currentFilters;
-  final void Function(AdminModel admin)? onEdit;
   final void Function(AdminModel admin)? onDelete;
   final void Function(AdminModel admin)? onView;
   final List<Widget> searchBarActions;
@@ -46,7 +45,6 @@ class AdminsTable extends StatefulWidget {
     this.currentSortBy,
     this.currentSortOrder,
     this.currentFilters = const {},
-    this.onEdit,
     this.onDelete,
     this.onView,
     this.searchBarActions = const [],
@@ -195,27 +193,10 @@ class AdminsTableState extends State<AdminsTable> {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconActionButton(
-              icon: Icons.qr_code_2_rounded,
-              tooltip: AppStrings.VIEW_DETAILS,
-              type: IconActionType.primary,
-              onPressed: widget.onView == null
-                  ? null
-                  : () => widget.onView!(admin),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            IconActionButton(
-              icon: Icons.edit_outlined,
-              tooltip: AppStrings.EDIT,
-              onPressed: widget.onEdit == null
-                  ? null
-                  : () => widget.onEdit!(admin),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            IconActionButton(
+            OutlinedActionButton(
+              label: AppStrings.DELETE,
               icon: Icons.delete_outline_rounded,
-              tooltip: AppStrings.DELETE,
-              type: IconActionType.error,
+              tone: OutlinedActionTone.error,
               onPressed: widget.onDelete == null
                   ? null
                   : () => widget.onDelete!(admin),

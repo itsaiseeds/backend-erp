@@ -33,6 +33,7 @@ class AppFilterSearchBar extends StatefulWidget {
   final String? initialSortOrder;
   final List<String> filterByOptions;
   final Map<String, String> initialFilters;
+  final Set<String> lockedFilters;
   final String Function(String key) getHumanReadableFilterName;
   final String Function(String key) getHumanReadableSortName;
   final List<FilterValueOption> Function(String key)? filterValueOptions;
@@ -56,6 +57,7 @@ class AppFilterSearchBar extends StatefulWidget {
     this.initialSortOrder,
     this.filterByOptions = const [],
     this.initialFilters = const {},
+    this.lockedFilters = const {},
     this.filterValueOptions,
     this.getFilterValueLabel,
     this.isDateRangeFilter,
@@ -76,6 +78,13 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
   late final TextEditingController _inlineEditingController;
   late Map<String, String> _localFilters;
   String? _activeFilterField;
+
+  bool get _isEditingDateRange {
+    final String? key = _activeFilterField;
+    if (key == null) return false;
+    return widget.isDateRangeFilter?.call(key) ?? false;
+  }
+  String _editingPreviousValue = '';
 
   @override
   void initState() {
@@ -144,6 +153,7 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
     if (_activeFilterField != null) _applyInlineFilter();
     setState(() {
       _activeFilterField = fieldKey;
+      _editingPreviousValue = initialValue;
       _inlineEditingController.text = initialValue;
       _inlineEditingController.selection = TextSelection.fromPosition(
         TextPosition(offset: initialValue.length),
@@ -151,6 +161,23 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _inlineFocusNode.requestFocus();
+    });
+  }
+
+  void _discardInlineFilter() {
+    final String? key = _activeFilterField;
+    final String previous = _editingPreviousValue;
+
+    setState(() {
+      // A locked filter must survive a discarded edit.
+      if (key != null &&
+          previous.isNotEmpty &&
+          widget.lockedFilters.contains(key)) {
+        _localFilters[key] = previous;
+      }
+      _activeFilterField = null;
+      _editingPreviousValue = '';
+      _inlineEditingController.clear();
     });
   }
 
@@ -216,8 +243,11 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
 
   List<Widget> _buildFilterChips() {
     return _localFilters.entries.map((entry) {
+      final bool isLocked = widget.lockedFilters.contains(entry.key);
+
       return _FilterChip(
         label: widget.getHumanReadableFilterName(entry.key),
+        isWide: widget.isDateRangeFilter?.call(entry.key) ?? false,
         value: widget.getFilterValueLabel == null
             ? entry.value
             : widget.getFilterValueLabel!(entry.key, entry.value),
@@ -226,10 +256,12 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
           setState(() => _localFilters.remove(entry.key));
           _beginEditingFilter(entry.key, initialValue: value);
         },
-        onRemove: () {
-          setState(() => _localFilters.remove(entry.key));
-          _performSearch();
-        },
+        onRemove: isLocked
+            ? null
+            : () {
+                setState(() => _localFilters.remove(entry.key));
+                _performSearch();
+              },
       );
     }).toList();
   }
@@ -268,9 +300,11 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
           ),
           const SizedBox(width: AppSpacing.xs),
           ConstrainedBox(
-            constraints: const BoxConstraints(
+            constraints: BoxConstraints(
               minWidth: AppSizes.tableFilterValueMinWidth,
-              maxWidth: AppSizes.tableFilterValueMaxWidth,
+              maxWidth: _isEditingDateRange
+                  ? AppSizes.tableFilterRangeMaxWidth
+                  : AppSizes.tableFilterValueMaxWidth,
             ),
             child: IntrinsicWidth(child: _buildFilterValueInput()),
           ),
@@ -279,12 +313,7 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
             icon: Icons.close_rounded,
             color: AppColors.TEXT_SECONDARY,
             tooltip: AppStrings.TABLE_DISCARD_FILTER,
-            onTap: () {
-              setState(() {
-                _activeFilterField = null;
-                _inlineEditingController.clear();
-              });
-            },
+            onTap: _discardInlineFilter,
           ),
         ],
       ),
@@ -590,14 +619,16 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
 class _FilterChip extends StatelessWidget {
   final String label;
   final String value;
+  final bool isWide;
   final VoidCallback onEdit;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove;
 
   const _FilterChip({
     required this.label,
     required this.value,
     required this.onEdit,
     required this.onRemove,
+    this.isWide = false,
   });
 
   @override
@@ -620,8 +651,10 @@ class _FilterChip extends StatelessWidget {
               Text(label, style: AppTypography.labelSmall),
               const SizedBox(width: AppSpacing.xs),
               ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppSizes.tableFilterValueMaxWidth,
+                constraints: BoxConstraints(
+                  maxWidth: isWide
+                      ? AppSizes.tableFilterRangeMaxWidth
+                      : AppSizes.tableFilterValueMaxWidth,
                 ),
                 child: Text(
                   value,
@@ -632,13 +665,15 @@ class _FilterChip extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.xs),
-              _InlineIconButton(
-                icon: Icons.close_rounded,
-                color: AppColors.PRIMARY,
-                tooltip: AppStrings.TABLE_REMOVE_FILTER,
-                onTap: onRemove,
-              ),
+              if (onRemove != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                _InlineIconButton(
+                  icon: Icons.close_rounded,
+                  color: AppColors.PRIMARY,
+                  tooltip: AppStrings.TABLE_REMOVE_FILTER,
+                  onTap: onRemove!,
+                ),
+              ],
             ],
           ),
         ),

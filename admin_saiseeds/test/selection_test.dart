@@ -21,6 +21,8 @@ void main() {
   });
 
   testWidgets('app applies AppScrollBehavior globally', (tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.binding.setSurfaceSize(const Size(1600, 1000));
     AppRouter.router.go(Routes.LOGIN);
 
@@ -32,6 +34,8 @@ void main() {
   });
 
   testWidgets('routes render inside a SelectionArea', (tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.binding.setSurfaceSize(const Size(1600, 1000));
     AppRouter.router.go(Routes.LOGIN);
 

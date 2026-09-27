@@ -9,10 +9,8 @@ import '../../../../core/widgets/feedback/confirmation_dialog.dart';
 import '../../data/clients_repository.dart';
 import '../../data/models/client_model.dart';
 import '../bloc/clients_cubit.dart';
-import '../widgets/client_detail_dialog.dart';
-import '../widgets/client_form_dialog.dart';
+import '../widgets/client_record_dialog.dart';
 import '../widgets/clients_table.dart';
-import '../widgets/clients_view_switcher.dart';
 
 class ClientsView extends StatelessWidget {
   const ClientsView({super.key});
@@ -86,15 +84,11 @@ class _ClientsContentState extends State<_ClientsContent> {
     final ClientModel? detail = await cubit.fetchClient(client.publicId);
     if (!mounted) return;
 
-    ClientDetailDialog.show(context, detail ?? client);
-  }
-
-  Future<void> _onEdit(ClientModel client) async {
-    final ClientsCubit cubit = context.read<ClientsCubit>();
-    final ClientModel? detail = await cubit.fetchClient(client.publicId);
-    if (!mounted) return;
-
-    ClientFormDialog.show(context, cubit: cubit, client: detail ?? client);
+    ClientRecordDialog.show(
+      context,
+      cubit: cubit,
+      client: detail ?? client,
+    );
   }
 
   @override
@@ -112,24 +106,13 @@ class _ClientsContentState extends State<_ClientsContent> {
       },
       builder: (context, state) {
         final ClientsCubit cubit = context.read<ClientsCubit>();
-        final bool isPending = state.view == ClientsViewMode.pending;
+        final bool isPending = state.resolvedView == ClientsViewMode.pending;
 
         return Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: AppSizes.clientSwitcherWidth,
-                  child: ClientsViewSwitcher(
-                    selected: state.view,
-                    onChanged: cubit.selectView,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
               Expanded(
                 child: ClientsTable(
                   key: _tableKey,
@@ -146,7 +129,6 @@ class _ClientsContentState extends State<_ClientsContent> {
                   availableSorts: state.availableSorts,
                   onFetchData: _onFetchData,
                   onView: _onView,
-                  onEdit: _onEdit,
                   onAccept: isPending ? _onAccept : null,
                   emptyTitle: isPending
                       ? AppStrings.CLIENTS_PENDING_EMPTY_TITLE
