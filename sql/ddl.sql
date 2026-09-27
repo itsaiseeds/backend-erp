@@ -1266,8 +1266,8 @@ CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_approved_by_id_idx ON public.agg
 CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_is_deleted_idx ON public.aggregator_fieldtrip USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_created_by_id_idx ON public.aggregator_fieldtrip USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_deleted_by_id_idx ON public.aggregator_fieldtrip USING btree (deleted_by_id);
--- 12 = aggregator_status IN_PROGRESS (StatusIds.IN_PROGRESS).
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_fieldtrip_one_in_progress_per_sales_person ON public.aggregator_fieldtrip USING btree (created_by_id) WHERE (status_id = 12 AND NOT is_deleted);
+-- 14 = aggregator_status IN_PROGRESS (StatusIds.IN_PROGRESS).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_fieldtrip_one_in_progress_per_sales_person ON public.aggregator_fieldtrip USING btree (created_by_id) WHERE (status_id = 14 AND NOT is_deleted);
 
 -- aggregator_farmervisit ------------------------------------------------------
 -- One farmer met on a field trip: a visit, not a farmer master record, so the
