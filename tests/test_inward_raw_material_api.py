@@ -307,6 +307,20 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(listing.data["total_count"], 1)
         self.assertEqual(listing.data["results"][0]["public_id"], created.data["public_id"])
 
+    def test_product_filter_offers_only_products_with_a_lot(self):
+        """The ``product`` filter's options list only products that have a lot.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_product_filter_offers_only_products_with_a_lot
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot()
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+
+        available_filters = self.client.get(LOTS_URL).data["available_filters"]
+        entry = next(item for item in available_filters if item["filter"] == "product")
+        options = {opt["value"]: opt["label"] for opt in entry["options"]}
+        self.assertEqual(options, {self.product.public_id: self.product.name})
+
     def test_product_is_addressed_by_public_id_not_pk(self):
         """Create and the ``?product=`` filter both take the product's public id.
 

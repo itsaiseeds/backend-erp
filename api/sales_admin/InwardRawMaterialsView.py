@@ -103,13 +103,28 @@ class InwardRawMaterialListPageSerializer(serializers.Serializer):
     available_sorts = SortCatalogueEntrySerializer(many=True)
 
 
+def _products_with_raw_material_lots(request: Request) -> list[dict]:
+    """Every distinct product that has an inward raw-material lot.
+
+    The eligible value set for the ``product`` filter: the picker only ever
+    needs to offer a product that actually has a lot behind it.
+    """
+    rows = (
+        InwardRawMaterial.objects.values_list("product__public_id", "product__name")
+        .distinct()
+        .order_by("product__name")
+    )
+    return [{"value": public_id, "label": name} for public_id, name in rows]
+
+
 _QUERYSET_FILTERS = (
     QuerysetFilter(
         "product",
         label="Product",
         lookup="product__public_id__in",
         parse=parse_str,
-        description="Product public id(s).",
+        description="Product public id(s) (see options).",
+        options=_products_with_raw_material_lots,
     ),
     QuerysetFilter(
         "party",
