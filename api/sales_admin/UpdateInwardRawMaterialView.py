@@ -7,9 +7,10 @@ Two jobs live here:
 * **Record the lifecycle.** ``PATCH`` fills in ``lab_sampling_date`` and moves
   a lot between ``Lab Testing`` and ``In Use`` (both ways; see
   ``InwardOperations.ALLOWED_RAW_STATUS_TRANSITIONS``). Flipping to ``In Use``
-  stamps ``effective_date`` with today; reverting to ``Lab Testing`` clears the
-  date. Together the stamp + status are what start and stop the lot counting
-  toward ``raw-material-stock``.
+  stamps ``effective_date`` with today; reverting to ``Lab Testing`` clears
+  that date and re-stamps ``lab_sampling_date`` with today, as the lot is back
+  with the lab as of today. Together the stamp + status are what start and
+  stop the lot counting toward ``raw-material-stock``.
 * **Correct a booking.** ``product`` / ``party`` / ``quantity_kg`` are
   immutable once a lot exists; a wrong amount is removed with ``DELETE``
   (soft) and re-booked. ``DELETE`` is the only corrective verb.
@@ -32,6 +33,8 @@ from aggregator.InwardOperations import (
     assert_raw_lot_removable,
     assert_raw_status_transition,
     inward_raw_material_payload,
+    raw_status_of,
+    status_row_for,
     today,
 )
 from aggregator.models import InwardRawMaterial, InwardRawMaterialStatus
@@ -58,28 +61,34 @@ class UpdateInwardRawMaterialSerializer(serializers.Serializer):
         if self.instance is None:
             return attrs
 
-        requested_status = attrs.get("status", self.instance.status)
+        current_status = raw_status_of(self.instance)
+        requested_status = (
+            InwardRawMaterialStatus(attrs["status"]) if "status" in attrs else current_status
+        )
 
         # A status flip may only follow the allowed transitions; sending the
         # current status again is a no-op.
-        if requested_status != self.instance.status:
+        if requested_status != current_status:
             try:
-                assert_raw_status_transition(self.instance.status, requested_status)
+                assert_raw_status_transition(current_status, requested_status)
             except ValueError as exc:
                 raise serializers.ValidationError({"status": str(exc)}) from None
 
         # Flipping into ``In Use`` stamps the effective date with today -- the
         # user never types it, and stamped + In Use is what stock reads count.
         # Reverting to ``Lab Testing`` clears the date so the lot drops back
-        # out of stock. Both keys are undeclared (never user input): the view
-        # below applies them from validated_data like any declared field.
+        # out of stock, and re-stamps lab_sampling_date with today -- the lot
+        # is back with the lab as of today, same as a fresh lot. Both keys
+        # override whatever the request sent for them (undeclared/declared
+        # alike): the view below applies them from validated_data like any
+        # other field.
         if (
-            self.instance.status != InwardRawMaterialStatus.IN_USE
+            current_status != InwardRawMaterialStatus.IN_USE
             and requested_status == InwardRawMaterialStatus.IN_USE
         ):
             attrs["effective_date"] = today()
         elif (
-            self.instance.status == InwardRawMaterialStatus.IN_USE
+            current_status == InwardRawMaterialStatus.IN_USE
             and requested_status != InwardRawMaterialStatus.IN_USE
         ):
             # Reverting out of In Use removes this lot's kilograms from the
@@ -90,6 +99,10 @@ class UpdateInwardRawMaterialSerializer(serializers.Serializer):
             except ValueError as exc:
                 raise serializers.ValidationError({"status": str(exc)}) from None
             attrs["effective_date"] = None
+            attrs["lab_sampling_date"] = today()
+
+        if "status" in attrs:
+            attrs["status"] = status_row_for(requested_status)
         return attrs
 
 
@@ -105,7 +118,10 @@ class UpdateInwardRawMaterialView(AdminApiView):
         responses={200: InwardRawMaterialPayloadSerializer},
     )
     def patch(self, request, public_id: str):
-        entry = get_object_or_404(InwardRawMaterial.objects.all(), public_id=public_id)
+        entry = get_object_or_404(
+            InwardRawMaterial.objects.select_related("product", "party", "status"),
+            public_id=public_id,
+        )
 
         serializer = UpdateInwardRawMaterialSerializer(
             instance=entry, data=request.data, partial=True
@@ -122,7 +138,9 @@ class UpdateInwardRawMaterialView(AdminApiView):
         responses={204: None},
     )
     def delete(self, request, public_id: str):
-        entry = get_object_or_404(InwardRawMaterial.objects.all(), public_id=public_id)
+        entry = get_object_or_404(
+            InwardRawMaterial.objects.select_related("status"), public_id=public_id
+        )
         try:
             assert_raw_lot_removable(entry)
         except ValueError as exc:
