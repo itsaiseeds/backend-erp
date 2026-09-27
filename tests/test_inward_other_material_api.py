@@ -200,6 +200,24 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
         self.assertEqual(listing.data["total_count"], 1)
         self.assertEqual(listing.data["results"][0]["public_id"], created.data["public_id"])
 
+    def test_product_and_material_type_filters_offer_options(self):
+        """Both filters list only the products/material types that have a lot.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_product_and_material_type_filters_offer_options
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot()
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+
+        available_filters = self.client.get(LOTS_URL).data["available_filters"]
+        by_name = {entry["filter"]: entry for entry in available_filters}
+
+        product_options = {opt["value"]: opt["label"] for opt in by_name["product"]["options"]}
+        self.assertEqual(product_options, {self.product.public_id: self.product.name})
+
+        type_options = {opt["value"]: opt["label"] for opt in by_name["material_type"]["options"]}
+        self.assertEqual(type_options, {self.packet_cover.id: self.packet_cover.name})
+
     def test_product_filter_takes_a_public_id(self):
         """``?product=`` (via the recipe's product) takes the product's public id.
 
