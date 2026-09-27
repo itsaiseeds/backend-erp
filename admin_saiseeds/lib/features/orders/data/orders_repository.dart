@@ -55,6 +55,16 @@ class OrdersRepository {
   Future<void> revertDispatch(String publicId) =>
       _apiClient.post(OrdersEndpoints.revertDispatch(publicId));
 
+  Future<void> uploadLrNumber({
+    required String publicId,
+    required String lrNumber,
+  }) {
+    return _apiClient.post(
+      OrdersEndpoints.uploadLrNumber(publicId),
+      body: {'lr_number': lrNumber},
+    );
+  }
+
   Future<void> dispatchOrder({
     required String publicId,
     required DispatchRequestModel request,

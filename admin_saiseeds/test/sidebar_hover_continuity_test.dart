@@ -51,20 +51,21 @@ Future<void> _pumpSidebar(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Color? _fillOf(WidgetTester tester, String label) {
-  final AnimatedContainer container = tester.widget<AnimatedContainer>(
-    find
-        .ancestor(
-          of: find.text(label),
-          matching: find.byType(AnimatedContainer),
-        )
-        .last,
-  );
-  return (container.decoration as BoxDecoration?)?.color;
-}
 
-bool _isHovered(WidgetTester tester, String label) =>
-    _fillOf(tester, label) == AppColors.SIDEBAR_ITEM_HOVER;
+// Hover is signalled by the label colour, not a background fill: the row
+// stays flat and only its text and icon brighten.
+bool _isHovered(WidgetTester tester, String label) {
+  final AnimatedDefaultTextStyle styled = tester
+      .widget<AnimatedDefaultTextStyle>(
+        find
+            .ancestor(
+              of: find.text(label),
+              matching: find.byType(AnimatedDefaultTextStyle),
+            )
+            .first,
+      );
+  return styled.style.color == AppColors.SIDEBAR_TEXT_ACTIVE;
+}
 
 void main() {
   testWidgets('hovering an item tints it', (tester) async {

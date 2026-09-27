@@ -231,6 +231,8 @@ class OrderModel {
 
   bool get canRevertDispatch => OrderStatusX.canRevertDispatch(status);
 
+  bool get canUploadLr => OrderStatusX.canUploadLr(status);
+
   bool get canEdit => OrderStatusX.canEdit(status);
 
   static DateTime? _parseInstant(dynamic value) {

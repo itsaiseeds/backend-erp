@@ -46,6 +46,12 @@ class OrderStatusX {
   // Dispatch records goods leaving, so only a verified order qualifies.
   static const Set<OrderStatus> DISPATCHABLE = {OrderStatus.confirmed};
 
+  // An LR is the transporter's receipt for goods already on the road.
+  static const Set<OrderStatus> DISPATCH_REQUIRED = {
+    OrderStatus.dispatched,
+    OrderStatus.delivered,
+  };
+
   // Revert undoes a dispatch, so it only applies once already dispatched.
   static const Set<OrderStatus> REVERTABLE_DISPATCH = {
     OrderStatus.dispatched,
@@ -135,6 +141,9 @@ class OrderStatusX {
 
   static bool canRevertDispatch(OrderStatus status) =>
       REVERTABLE_DISPATCH.contains(status);
+
+  static bool canUploadLr(OrderStatus status) =>
+      DISPATCH_REQUIRED.contains(status);
 
   static bool canEdit(OrderStatus status) => EDITABLE.contains(status);
 }

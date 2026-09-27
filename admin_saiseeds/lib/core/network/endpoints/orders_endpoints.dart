@@ -22,4 +22,9 @@ class OrdersEndpoints {
 
   static String revertDispatch(String publicId) =>
       '$_base/revert-dispatch/$publicId';
+
+  static const String dispatchChallans = '$_base/dispatch-challans/';
+
+  static String uploadLrNumber(String publicId) =>
+      '$_base/upload-lr-number/$publicId';
 }

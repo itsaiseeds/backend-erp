@@ -56,12 +56,14 @@ class AppSizes {
   static const double iconXl = 24.0;
   static const double iconXxl = 40.0;
 
-  static const double sidebarExpandedWidth = 260.0;
+  static const double sidebarExpandedWidth = 300.0;
   static const double sidebarCollapsedWidth = 72.0;
   static const double sidebarBrandingHeight = 72.0;
   static const double sidebarItemHeight = 44.0;
-  static const double sidebarGroupHeaderHeight = 36.0;
-  static const double sidebarGroupIndent = 12.0;
+  static const double challanItemsHeight = 420.0;
+  static const double sidebarGroupHeaderHeight = 34.0;
+  static const double sidebarGroupHeaderTopGap = 10.0;
+  static const double sidebarGroupIndent = 9.0;
   static const double sidebarGroupSpineWidth = 1.0;
   static const double sidebarGroupGap = 10.0;
   static const double sidebarGroupChevron = 16.0;
@@ -132,6 +134,9 @@ class AppSizes {
   static const double searchOptionHeight = 44.0;
   static const double tableFilterValueMinWidth = 60.0;
   static const double tableFilterValueMaxWidth = 160.0;
+  // A date range prints two full dates and an arrow, so it needs more
+  // room than a single-value filter.
+  static const double tableFilterRangeMaxWidth = 360.0;
   static const double tableSearchFieldMinWidth = 160.0;
   static const double tableEmptyStateMinHeight = 200.0;
   static const double dividerThin = 0.5;
@@ -145,6 +150,8 @@ class AppSizes {
   static const double confirmDialogWidth = 420.0;
   static const double dialogHeaderIconBox = 36.0;
   static const double formDialogWidth = 900.0;
+  // For dialogs holding a single field, where the full width reads empty.
+  static const double formDialogCompactWidth = 440.0;
   static const double stepDotSize = 28.0;
   static const double productImagePreview = 200.0;
   static const double dateRangePopoverWidth = 640.0;

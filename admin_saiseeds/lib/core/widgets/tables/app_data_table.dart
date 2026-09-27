@@ -95,6 +95,10 @@ class AppDataTable<T> extends StatefulWidget {
   final bool requireExpandableColumnWidth;
   final bool requireColumnSettings;
 
+  /// Hides the whole search / filter row, for embedded tables whose rows
+  /// are already a short fixed list.
+  final bool requireSearchBar;
+
   final String Function(T item)? selectionIdExtractor;
   final String Function(T item)? selectionLabelExtractor;
   final void Function(Map<String, String> selection)? onSelectionChanged;
@@ -147,6 +151,7 @@ class AppDataTable<T> extends StatefulWidget {
     this.requirePin = true,
     this.requireExpandableColumnWidth = true,
     this.requireColumnSettings = true,
+    this.requireSearchBar = true,
     this.selectionIdExtractor,
     this.selectionLabelExtractor,
     this.onSelectionChanged,
@@ -468,58 +473,59 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: AppFilterSearchBar(
-                  controller: _searchController,
-                  hintText: widget.searchHintText,
-                  sortByOptions: widget.sortByOptions,
-                  filterByOptions: widget.filterByOptions,
-                  lockedFilters: widget.lockedFilters,
-                  filterValueOptions: widget.filterValueOptions,
-                  getFilterValueLabel: widget.getFilterValueLabel,
-                  isDateRangeFilter: widget.isDateRangeFilter,
-                  getFilterDescription: widget.getFilterDescription,
-                  getSortDescription: widget.getSortDescription,
-                  initialSortBy: widget.currentSortBy,
-                  initialSortOrder: widget.currentSortOrder,
-                  initialFilters: widget.currentFilters,
-                  getHumanReadableFilterName:
-                      widget.getHumanReadableFilterName ?? (value) => value,
-                  getHumanReadableSortName:
-                      widget.getHumanReadableSortName ?? (value) => value,
-                  onSearch: _onSearch,
-                  minHeight: widget.searchBarHeight,
-                ),
-              ),
-              if (widget.searchBarTrailing != null) ...[
-                const SizedBox(width: AppSpacing.smd),
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(
-                    height: widget.searchBarHeight,
-                    child: widget.searchBarTrailing,
+        if (widget.requireSearchBar)
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: AppFilterSearchBar(
+                    controller: _searchController,
+                    hintText: widget.searchHintText,
+                    sortByOptions: widget.sortByOptions,
+                    filterByOptions: widget.filterByOptions,
+                    lockedFilters: widget.lockedFilters,
+                    filterValueOptions: widget.filterValueOptions,
+                    getFilterValueLabel: widget.getFilterValueLabel,
+                    isDateRangeFilter: widget.isDateRangeFilter,
+                    getFilterDescription: widget.getFilterDescription,
+                    getSortDescription: widget.getSortDescription,
+                    initialSortBy: widget.currentSortBy,
+                    initialSortOrder: widget.currentSortOrder,
+                    initialFilters: widget.currentFilters,
+                    getHumanReadableFilterName:
+                        widget.getHumanReadableFilterName ?? (value) => value,
+                    getHumanReadableSortName:
+                        widget.getHumanReadableSortName ?? (value) => value,
+                    onSearch: _onSearch,
+                    minHeight: widget.searchBarHeight,
                   ),
                 ),
-              ],
-              for (final action in widget.searchBarActions) ...[
-                const SizedBox(width: AppSpacing.smd),
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(
-                    width: widget.searchBarHeight,
-                    height: widget.searchBarHeight,
-                    child: action,
+                if (widget.searchBarTrailing != null) ...[
+                  const SizedBox(width: AppSpacing.smd),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      height: widget.searchBarHeight,
+                      child: widget.searchBarTrailing,
+                    ),
                   ),
-                ),
+                ],
+                for (final action in widget.searchBarActions) ...[
+                  const SizedBox(width: AppSpacing.smd),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      width: widget.searchBarHeight,
+                      height: widget.searchBarHeight,
+                      child: action,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.smd),
+        if (widget.requireSearchBar) const SizedBox(height: AppSpacing.smd),
         Expanded(
           child: Stack(
             children: [

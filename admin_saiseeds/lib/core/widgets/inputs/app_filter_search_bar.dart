@@ -78,6 +78,12 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
   late final TextEditingController _inlineEditingController;
   late Map<String, String> _localFilters;
   String? _activeFilterField;
+
+  bool get _isEditingDateRange {
+    final String? key = _activeFilterField;
+    if (key == null) return false;
+    return widget.isDateRangeFilter?.call(key) ?? false;
+  }
   String _editingPreviousValue = '';
 
   @override
@@ -241,6 +247,7 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
 
       return _FilterChip(
         label: widget.getHumanReadableFilterName(entry.key),
+        isWide: widget.isDateRangeFilter?.call(entry.key) ?? false,
         value: widget.getFilterValueLabel == null
             ? entry.value
             : widget.getFilterValueLabel!(entry.key, entry.value),
@@ -293,9 +300,11 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
           ),
           const SizedBox(width: AppSpacing.xs),
           ConstrainedBox(
-            constraints: const BoxConstraints(
+            constraints: BoxConstraints(
               minWidth: AppSizes.tableFilterValueMinWidth,
-              maxWidth: AppSizes.tableFilterValueMaxWidth,
+              maxWidth: _isEditingDateRange
+                  ? AppSizes.tableFilterRangeMaxWidth
+                  : AppSizes.tableFilterValueMaxWidth,
             ),
             child: IntrinsicWidth(child: _buildFilterValueInput()),
           ),
@@ -610,6 +619,7 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
 class _FilterChip extends StatelessWidget {
   final String label;
   final String value;
+  final bool isWide;
   final VoidCallback onEdit;
   final VoidCallback? onRemove;
 
@@ -618,6 +628,7 @@ class _FilterChip extends StatelessWidget {
     required this.value,
     required this.onEdit,
     required this.onRemove,
+    this.isWide = false,
   });
 
   @override
@@ -640,8 +651,10 @@ class _FilterChip extends StatelessWidget {
               Text(label, style: AppTypography.labelSmall),
               const SizedBox(width: AppSpacing.xs),
               ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppSizes.tableFilterValueMaxWidth,
+                constraints: BoxConstraints(
+                  maxWidth: isWide
+                      ? AppSizes.tableFilterRangeMaxWidth
+                      : AppSizes.tableFilterValueMaxWidth,
                 ),
                 child: Text(
                   value,

@@ -499,7 +499,7 @@ class AppStrings {
   static const String CROP_CREATED_TITLE = 'Crop created';
   static const String CROP_CREATE_FAILED_TITLE = 'Could not create crop';
 
-  static const String PRODUCT_PACKAGINGS = 'Product Packagings';
+  static const String PRODUCT_PACKAGINGS = 'Packagings';
   static const String PRODUCT_PACKAGINGS_TABLE_SEARCH_HINT =
       'Search packagings...';
   static const String PRODUCT_PACKAGINGS_LOAD_FAILED_TITLE =
@@ -710,14 +710,68 @@ class AppStrings {
   static const String ORDER_NO_ITEMS = 'This order has no lines.';
   static const String TIMEZONE_IST = 'IST';
 
+  static const String GROUP_ORDERS = 'Order Management';
+  static const String DISPATCH_CHALLANS = 'Dispatch Orders';
+  static const String COLUMN_DISPATCH_ID = 'Dispatch ID';
+  static const String COLUMN_LR_NUMBER = 'LR Number';
+  static const String COLUMN_DISPATCH_DATE = 'Dispatch Date';
+  static const String COLUMN_TRANSPORT_TYPE = 'Transport';
+  static const String COLUMN_VEHICLE_NUMBER = 'Vehicle';
+  static const String COLUMN_DRIVER = 'Driver';
+  static const String COLUMN_FROM_CITY = 'From City';
+  static const String COLUMN_TO_CITY = 'To City';
+  static const String COLUMN_RECEIVER = 'Receiver';
+  static const String COLUMN_RECEIVER_ADDRESS = 'Delivery Address';
+  static const String COLUMN_CONTACT_PERSON = 'Contact Person';
+  static const String COLUMN_HSN_CODE = 'HSN Code';
+  static const String COLUMN_FINANCIAL_YEAR = 'Financial Year';
+  static const String COLUMN_ITEM_COUNT = 'Items';
+  static const String COLUMN_TOTAL_PACKETS = 'Packets';
+  static const String COLUMN_TOTAL_AMOUNT = 'Total Amount';
+  static const String TRANSPORT_PRIVATE = 'Private';
+  static const String TRANSPORT_AGENCY = 'Agency';
+  static const String DOWNLOAD = 'Download';
+  static const String CHALLAN_EDIT_LR = 'Edit LR';
+  static const String CHALLAN_LR_TITLE = 'LR number';
+  static const String ORDER_LR_ACTION = 'Add LR number';
+  static const String ORDER_LR_SUBTITLE =
+      'Record the transporter LR against this dispatched order.';
+  static const String ORDER_LR_BLOCKED =
+      'Only a dispatched order can carry an LR number.';
+  static const String CHALLAN_LR_SUBTITLE =
+      'Record the transporter LR against this dispatch.';
+  static const String CHALLAN_LR_SAVED = 'LR number saved';
+  static const String FIELD_LR_NUMBER_HINT = 'Transporter LR number';
+  static const String CHALLAN_DOWNLOAD = 'Download challan';
+  static const String CHALLAN_VIEW = 'View challan';
+  static const String CHALLAN_PREVIEW_TITLE = 'Delivery challan';
+  static const String CHALLAN_FILE_PREFIX = 'challan-';
+  static const String CHALLAN_DOWNLOAD_FAILED =
+      'Could not generate the challan PDF.';
+  static const String CHALLAN_DETAIL_TITLE = 'Dispatch challan';
+  static const String CHALLAN_DETAIL_SUBTITLE =
+      'Items and lot numbers on this dispatch.';
+  static const String CHALLAN_ITEMS_EMPTY = 'This challan has no items.';
+  static const String CHALLANS_TABLE_SEARCH_HINT = 'Search dispatches...';
+  static const String CHALLANS_EMPTY_STATE_TITLE = 'No dispatches';
+  static const String CHALLANS_EMPTY_STATE_BODY =
+      'No dispatch challans were recorded in this date range.';
+  static const String CHALLANS_LOAD_FAILED_TITLE = 'Could not load dispatches';
+  static const String COLUMN_LOT_NUMBER = 'Lot Number';
+  static const String FILTER_BY_DATE_RANGE = 'date_range';
+  static const String FILTER_LABEL_DATE_RANGE = 'Dispatch Window';
+  static const String FILTER_LABEL_CITY = 'Destination City';
+  static const String FILTER_LABEL_CLIENT = 'Client';
+  static const String SORT_LABEL_DISPATCH_DATE = 'Dispatch Date';
+  static const String SORT_LABEL_CREATED = 'Created';
+  static const String SORT_BY_DISPATCH_DATE = 'dispatch_date';
+
   static const String GROUP_USER_MANAGEMENT = 'User Management';
-  static const String GROUP_ONBOARDING = 'Client & Party Onboarding';
+  static const String GROUP_ONBOARDING = 'Client & Party';
   static const String GROUP_CATALOGUE = 'Product Configuration';
   static const String GROUP_INWARD = 'Inward Operations';
   static const String GROUP_DAILY_STOCK = 'Daily Stock Update';
   static const String GROUP_STOCK_ANALYSIS = 'Stock Analysis';
-  static const String SIDEBAR_GROUP_EXPAND = 'Expand group';
-  static const String SIDEBAR_GROUP_COLLAPSE = 'Collapse group';
 
   static const String ORDER_DISPATCH = 'Dispatch';
   static const String ORDER_DISPATCH_TITLE = 'Dispatch order';
@@ -752,10 +806,10 @@ class AppStrings {
   static const String VALIDATION_FROM_CITY_REQUIRED = 'From city is required.';
   static const String DISPATCH_SUMMARY_ITEMS = 'Bags';
 
-  static const String PRODUCT_STOCK = 'Product Stock Management';
-  static const String RAW_MATERIAL_STOCK = 'Raw Material Stock Management';
+  static const String PRODUCT_STOCK = 'Product Stock';
+  static const String RAW_MATERIAL_STOCK = 'Raw Material';
 
-  static const String OTHER_MATERIAL_STOCK = 'Other Material Stock';
+  static const String OTHER_MATERIAL_STOCK = 'Material Stock';
   static const String PACKETS_PER_BAG_SUFFIX = 'packets / bag';
   static const String FILTER_BY_TYPE = 'type';
   static const String FILTER_LABEL_PRODUCT = 'Product';
@@ -800,9 +854,9 @@ class AppStrings {
       'Could not load raw material stock';
   static const String STOCK_AS_OF_PREFIX = 'As of';
 
-  static const String INWARD_RAW_MATERIALS = 'Inward Raw Material';
-  static const String OTHER_RAW_MATERIALS = 'Other Material Recipes';
-  static const String OTHER_MATERIAL_INWARD = 'Other Material Inward';
+  static const String INWARD_RAW_MATERIALS = 'Raw Material';
+  static const String OTHER_RAW_MATERIALS = 'Material Recipes';
+  static const String OTHER_MATERIAL_INWARD = 'Material Inward';
 
   static const String COLUMN_RECIPE = 'Recipe';
 

@@ -46,6 +46,7 @@ class OrdersTable extends StatefulWidget {
   final void Function(OrderModel order)? onReject;
   final void Function(OrderModel order)? onDispatch;
   final void Function(OrderModel order)? onRevertDispatch;
+  final void Function(OrderModel order)? onUploadLr;
   final List<Widget> searchBarActions;
   final Widget? searchBarTrailing;
 
@@ -70,6 +71,7 @@ class OrdersTable extends StatefulWidget {
     this.onReject,
     this.onDispatch,
     this.onRevertDispatch,
+    this.onUploadLr,
     this.searchBarActions = const [],
     this.searchBarTrailing,
   });
@@ -319,6 +321,15 @@ class OrdersTableState extends State<OrdersTable> {
                     widget.onRevertDispatch == null
                 ? null
                 : () => widget.onRevertDispatch!(order),
+          ),
+          RowAction(
+            label: AppStrings.ORDER_LR_ACTION,
+            icon: Icons.receipt_long_outlined,
+            blockedHint: AppStrings.ORDER_LR_BLOCKED,
+            onSelected:
+                !order.canUploadLr || isBusy || widget.onUploadLr == null
+                ? null
+                : () => widget.onUploadLr!(order),
           ),
           RowAction(
             label: AppStrings.ORDER_REJECT,

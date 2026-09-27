@@ -168,6 +168,18 @@ class OrdersCubit extends SafeCubit<OrdersState> {
   Future<bool> revertDispatch(String publicId) =>
       _mutate(() => _repository.revertDispatch(publicId));
 
+  Future<bool> uploadLrNumber({
+    required String publicId,
+    required String lrNumber,
+  }) {
+    return _mutate(
+      () => _repository.uploadLrNumber(
+        publicId: publicId,
+        lrNumber: lrNumber,
+      ),
+    );
+  }
+
   Future<bool> dispatchOrder({
     required String publicId,
     required DispatchRequestModel request,

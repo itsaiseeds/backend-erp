@@ -13,6 +13,7 @@ import '../../../product_packagings/data/product_packagings_repository.dart';
 import '../bloc/orders_cubit.dart';
 import '../widgets/order_detail_dialog.dart';
 import '../widgets/order_dispatch_dialog.dart';
+import '../widgets/order_lr_dialog.dart';
 import '../widgets/orders_table.dart';
 
 class OrdersView extends StatelessWidget {
@@ -148,6 +149,10 @@ class _OrdersContentState extends State<_OrdersContent> {
     );
   }
 
+  void _onUploadLr(OrderModel order) {
+    OrderLrDialog.show(context, order, cubit: context.read<OrdersCubit>());
+  }
+
   void _onDispatch(OrderModel order) {
     OrderDispatchDialog.show(
       context,
@@ -207,6 +212,7 @@ class _OrdersContentState extends State<_OrdersContent> {
             onReject: _onReject,
             onDispatch: _onDispatch,
             onRevertDispatch: _onRevertDispatch,
+            onUploadLr: _onUploadLr,
             searchBarTrailing: StockStatusChip(
               isComplete: state.isTodaysStockComplete,
             ),

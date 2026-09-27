@@ -35,6 +35,11 @@ class SidebarItems {
       icon: Icons.receipt_long_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.DISPATCH_CHALLANS,
+      label: AppStrings.DISPATCH_CHALLANS,
+      icon: Icons.local_shipping_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.PRODUCTS,
       label: AppStrings.PRODUCTS,
       icon: Icons.inventory_2_outlined,
@@ -105,20 +110,10 @@ class SidebarItems {
       itemIds: [TabIds.CLIENTS, TabIds.PARTIES],
     ),
     SidebarGroupModel(
-      id: 'catalogue',
-      label: AppStrings.GROUP_CATALOGUE,
-      icon: Icons.inventory_2_outlined,
-      itemIds: [TabIds.PRODUCTS, TabIds.PRODUCT_PACKAGINGS],
-    ),
-    SidebarGroupModel(
-      id: 'inward',
-      label: AppStrings.GROUP_INWARD,
-      icon: Icons.local_shipping_outlined,
-      itemIds: [
-        TabIds.INWARD_RAW_MATERIALS,
-        TabIds.OTHER_RAW_MATERIALS,
-        TabIds.OTHER_MATERIAL_INWARD,
-      ],
+      id: 'orders',
+      label: AppStrings.GROUP_ORDERS,
+      icon: Icons.receipt_long_outlined,
+      itemIds: [TabIds.ORDERS, TabIds.DISPATCH_CHALLANS],
     ),
     SidebarGroupModel(
       id: 'daily-stock',
@@ -134,6 +129,22 @@ class SidebarItems {
         TabIds.PRODUCT_STOCK,
         TabIds.RAW_MATERIAL_STOCK,
         TabIds.OTHER_MATERIAL_STOCK,
+      ],
+    ),
+    SidebarGroupModel(
+      id: 'catalogue',
+      label: AppStrings.GROUP_CATALOGUE,
+      icon: Icons.inventory_2_outlined,
+      itemIds: [TabIds.PRODUCTS, TabIds.PRODUCT_PACKAGINGS],
+    ),
+    SidebarGroupModel(
+      id: 'inward',
+      label: AppStrings.GROUP_INWARD,
+      icon: Icons.local_shipping_outlined,
+      itemIds: [
+        TabIds.INWARD_RAW_MATERIALS,
+        TabIds.OTHER_RAW_MATERIALS,
+        TabIds.OTHER_MATERIAL_INWARD,
       ],
     ),
   ];
