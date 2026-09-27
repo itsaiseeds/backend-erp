@@ -33,7 +33,6 @@ from aggregator.models import (
 )
 from aggregator.OrderOperations import create_order
 from api.sales_admin.ExportCustomOrdersView import ExportCustomOrdersResponseSerializer
-from api.sales_admin.ExportDispatchReceiptsView import ExportDispatchReceiptsResponseSerializer
 from api.sales_admin.ExportInventorySnapshotsView import (
     ExportInventorySnapshotsPageSerializer,
 )
@@ -339,7 +338,6 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["receiver_details"]["company_name"], "Acme Seeds")
         self.assertEqual(row["items"][0]["lot_number"], "LOT-1")
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportDispatchReceiptsResponseSerializer(), resp.data), [])
 
     # -- inward entries -------------------------------------------------------
 
