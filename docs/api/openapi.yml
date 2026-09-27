@@ -6602,19 +6602,13 @@ components:
           maxLength: 10
     PatchedUpdateProductPackagingRequest:
       type: object
-      description: Request validation for updating a ``ProductPackaging`` (all fields
-        optional).
+      description: |-
+        Request validation for updating a ``ProductPackaging``: its selling price only.
+
+        A packaging's product, packet weight and packet count are fixed once it is
+        created; a request carrying them is ignored. To change them, create a new
+        packaging.
       properties:
-        product:
-          type: string
-          minLength: 1
-        packet_weight:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
-        packets:
-          type: integer
-          minimum: 1
         selling_price:
           type: string
           format: decimal

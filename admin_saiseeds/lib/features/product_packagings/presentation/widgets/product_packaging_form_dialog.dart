@@ -152,11 +152,9 @@ class _ProductPackagingFormDialogState
     final ProductPackagingsCubit cubit = context.read<ProductPackagingsCubit>();
 
     final bool succeeded = _isEditing
+        // An existing packaging's shape is fixed; only its price is sent.
         ? await cubit.updateProductPackaging(
             publicId: widget.packaging!.publicId,
-            productPublicId: _selectedProduct!.publicId,
-            packetWeight: _packetWeightController.text.trim(),
-            packets: _packetsController.text.trim(),
             sellingPrice: _sellingPriceController.text.trim(),
           )
         : await cubit.createProductPackaging(
