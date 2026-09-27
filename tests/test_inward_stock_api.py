@@ -18,11 +18,11 @@ from aggregator import InwardOperations
 from aggregator.models import (
     InwardOtherMaterial,
     InwardRawMaterial,
-    InwardRawMaterialStatus,
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
     Product,
+    StatusIds,
 )
 from authentication.models import Admin
 from tests.common import WebApiTestCase
@@ -93,7 +93,7 @@ class InwardStockApiTest(WebApiTestCase):
             party=self.party,
             quantity_kg=Decimal("100"),
             effective_date=self.today,
-            status=InwardRawMaterialStatus.IN_USE,
+            status_id=StatusIds.IN_USE.value,
             created_by=self.seed_admin,
         )
         InwardRawMaterial.objects.create(
@@ -101,7 +101,7 @@ class InwardStockApiTest(WebApiTestCase):
             party=self.party,
             quantity_kg=Decimal("20"),
             effective_date=self.today,
-            status=InwardRawMaterialStatus.LAB_TESTING,  # not cleared by the lab
+            status_id=StatusIds.LAB_TESTING.value,  # not cleared by the lab
             created_by=self.seed_admin,
         )
         InwardRawMaterial.objects.create(
@@ -109,7 +109,7 @@ class InwardStockApiTest(WebApiTestCase):
             party=self.party,
             quantity_kg=Decimal("50"),
             effective_date=self.tomorrow,  # dated, but not reached yet
-            status=InwardRawMaterialStatus.IN_USE,
+            status_id=StatusIds.IN_USE.value,
             created_by=self.seed_admin,
         )
         InwardRawMaterial.objects.create(
@@ -117,7 +117,7 @@ class InwardStockApiTest(WebApiTestCase):
             party=self.party,
             quantity_kg=Decimal("30"),
             effective_date=None,  # never dated
-            status=InwardRawMaterialStatus.IN_USE,
+            status_id=StatusIds.IN_USE.value,
             created_by=self.seed_admin,
         )
         deleted_dated = InwardRawMaterial.objects.create(
@@ -125,7 +125,7 @@ class InwardStockApiTest(WebApiTestCase):
             party=self.party,
             quantity_kg=Decimal("10"),
             effective_date=self.today,
-            status=InwardRawMaterialStatus.IN_USE,
+            status_id=StatusIds.IN_USE.value,
             created_by=self.seed_admin,
         )
         deleted_dated.mark_deleted(self.seed_admin)
@@ -196,7 +196,7 @@ class InwardStockApiTest(WebApiTestCase):
             party=self.party,
             quantity_kg=Decimal("7"),
             effective_date=self.today,
-            status=InwardRawMaterialStatus.IN_USE,
+            status_id=StatusIds.IN_USE.value,
             created_by=self.seed_admin,
         )
 

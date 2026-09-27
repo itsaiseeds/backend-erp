@@ -12,6 +12,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
+from aggregator import InventoryOperations as inv
 from aggregator.ClientOperations import create_client_with_details
 from aggregator.models import (
     City,
@@ -28,9 +29,10 @@ from aggregator.OrderOperations import (
     attach_private_dispatch_details,
     create_order,
     update_order_status,
+    verify_order,
 )
 from authentication.models import Admin, SalesPerson
-from tests.common import WebApiTestCase
+from tests.common import WebApiTestCase, book_raw_material_for_every_product
 
 User = get_user_model()
 
@@ -78,6 +80,9 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
 
         cls.alpha_bag = cls._bag("Alpha Seed", Decimal("1000.00"), packets=10)
         cls.beta_bag = cls._bag("Beta Seed", Decimal("500.00"), packets=5)
+        # _count_stock counts every packaging, and every count is checked
+        # against raw material.
+        book_raw_material_for_every_product(actor=cls.superuser)
 
     @classmethod
     def _client(cls, company_name, gst):
@@ -413,6 +418,97 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn("Cannot edit an order that is DISPATCHED", response.data["detail"])
+
+    def test_only_booked_and_confirmed_orders_are_editable(self):
+        """Under review, on hold and rejected orders refuse every edit.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_only_booked_and_confirmed_orders_are_editable
+        """
+        for start in (StatusIds.UNDER_REVIEW, StatusIds.ON_HOLD, StatusIds.REJECTED):
+            with self.subTest(status=start.name):
+                self.order.status_id = start
+                self.order.save(update_fields=["status", "updated_at"])
+
+                response = self._patch({"special_comments": "not now"})
+
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+                )
+                self.assertIn(
+                    f"Cannot edit an order that is {start.name}", response.data["detail"]
+                )
+
+    # -- confirmed orders re-check stock ----------------------------------------
+
+    def test_a_confirmed_order_can_grow_into_its_own_reservation(self):
+        """The bags the order already holds count towards the new quantity.
+
+        5 on hand, this order reserves 2, so 3 are available -- growing the
+        line to 5 needs exactly the 3 free bags plus its own 2.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_confirmed_order_can_grow_into_its_own_reservation
+        """
+        self._confirm(bags=5)
+
+        response = self._patch({"items": [self._line(self.alpha_bag, 5)]})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["items"][0]["quantity"], 5)
+        self.assertEqual(inv.available_bags(self.alpha_bag), 0)
+
+    def test_a_confirmed_order_cannot_grow_past_the_stock(self):
+        """A shortfall is a 400 and nothing is written.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_confirmed_order_cannot_grow_past_the_stock
+        """
+        self._confirm(bags=5)
+
+        response = self._patch(
+            {"items": [self._line(self.alpha_bag, 6), self._line(self.beta_bag, 1)]}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("Not enough stock to edit this order", response.data["detail"])
+        self.assertIn(f"{self.alpha_bag.public_id}: need 6, have 5", response.data["detail"])
+        self.assertEqual(
+            list(self.order.items.values_list("product_packaging", "quantity")),
+            [(self.alpha_bag.id, 2)],
+        )
+
+    def test_shrinking_a_confirmed_order_is_never_refused(self):
+        """A line that shrinks asks for no new bags, even when stock has since run short.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_shrinking_a_confirmed_order_is_never_refused
+        """
+        self._confirm(bags=5)
+        self._count_stock(bags=0)
+
+        response = self._patch({"items": [self._line(self.alpha_bag, 1)]})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["items"][0]["quantity"], 1)
+
+    def test_a_booked_order_is_not_checked_against_stock(self):
+        """Nothing is reserved until verification, which does its own check.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_booked_order_is_not_checked_against_stock
+        """
+        response = self._patch({"items": [self._line(self.alpha_bag, 50)]})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def _count_stock(self, bags):
+        """Count every packaging, including the dml.sql seed rows."""
+        inv.record_stock_counts(
+            counts=dict.fromkeys(ProductPackaging.objects.all(), bags),
+            actor=self.superuser,
+        )
+
+    def _confirm(self, bags):
+        """Count ``bags`` of everything and verify ``self.order`` against it."""
+        self._count_stock(bags)
+        verify_order(self.order, self.admin_user)
+        self.order.refresh_from_db()
 
     def _dispatch(self, order):
         """Move ``order`` to DISPATCHED through the domain layer.

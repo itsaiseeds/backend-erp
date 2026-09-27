@@ -1114,7 +1114,9 @@ CREATE INDEX IF NOT EXISTS aggregator_party_deleted_by_id_idx ON public.aggregat
 -- Inward movement of raw material (product replenishment). The entry's date is
 -- created_at; flipping status to 'In Use' stamps effective_date with today and,
 -- once that date has come, the lot counts toward stock. status='Lab Testing'
--- rows are held back until the lab signs off.
+-- rows are held back until the lab signs off. status_id references the same
+-- aggregator_status lookup table as aggregator_order / aggregator_client (see
+-- StatusIds.raw_material_statuses, ids 10-11).
 CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1129,15 +1131,14 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	product_id int8 NOT NULL,
 	party_id int8 NOT NULL,
 	quantity_kg numeric(10, 3) NOT NULL,
-	status varchar(16) NOT NULL,
+	status_id int8 NOT NULL,
 	CONSTRAINT aggregator_inwardrawmaterial_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_inwardrawmaterial_public_id_key UNIQUE (public_id),
-	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0),
-	CONSTRAINT aggregator_inwardrawmaterial_status_check CHECK (status IN ('Lab Testing', 'In Use'))
+	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0)
 );
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_public_id_like ON public.aggregator_inwardrawmaterial USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_effective_date_idx ON public.aggregator_inwardrawmaterial USING btree (effective_date);
-CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_status_idx ON public.aggregator_inwardrawmaterial USING btree (status);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_status_id_idx ON public.aggregator_inwardrawmaterial USING btree (status_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_product_id_idx ON public.aggregator_inwardrawmaterial USING btree (product_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_party_id_idx ON public.aggregator_inwardrawmaterial USING btree (party_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_is_deleted_idx ON public.aggregator_inwardrawmaterial USING btree (is_deleted);
@@ -1227,6 +1228,120 @@ CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_recipe_id_idx ON publi
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_is_deleted_idx ON public.aggregator_inwardothermaterial USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_created_by_id_idx ON public.aggregator_inwardothermaterial USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_deleted_by_id_idx ON public.aggregator_inwardothermaterial USING btree (deleted_by_id);
+
+-- aggregator_fieldtrip --------------------------------------------------------
+-- A sales person's trip to one village, planned by them (created_by) and
+-- approved by a sales admin (approved_by / approved_at) before it may start.
+-- Lifecycle via status_id: PLANNED -> APPROVED -> IN_PROGRESS -> COMPLETED
+-- (aggregator_status ids 10-13). started_at / ended_at are server times. Only a
+-- PLANNED or APPROVED trip may be deleted (FieldTrip.mark_deleted); the partial
+-- unique index keeps each sales person to one IN_PROGRESS trip at a time.
+CREATE TABLE IF NOT EXISTS public.aggregator_fieldtrip (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	city_id int8 NOT NULL,
+	village varchar(255) NOT NULL,
+	status_id int8 NOT NULL,
+	expected_start_at timestamptz NOT NULL,
+	expected_end_at timestamptz NOT NULL,
+	started_at timestamptz NULL,
+	ended_at timestamptz NULL,
+	approved_by_id int8 NULL,
+	approved_at timestamptz NULL,
+	CONSTRAINT aggregator_fieldtrip_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_fieldtrip_public_id_key UNIQUE (public_id),
+	CONSTRAINT ck_fieldtrip_expected_window CHECK (expected_end_at > expected_start_at),
+	CONSTRAINT ck_fieldtrip_actual_window CHECK (ended_at IS NULL OR ended_at >= started_at)
+);
+CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_public_id_like ON public.aggregator_fieldtrip USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_city_id_idx ON public.aggregator_fieldtrip USING btree (city_id);
+CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_status_id_idx ON public.aggregator_fieldtrip USING btree (status_id);
+CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_approved_by_id_idx ON public.aggregator_fieldtrip USING btree (approved_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_is_deleted_idx ON public.aggregator_fieldtrip USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_created_by_id_idx ON public.aggregator_fieldtrip USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_fieldtrip_deleted_by_id_idx ON public.aggregator_fieldtrip USING btree (deleted_by_id);
+-- 14 = aggregator_status IN_PROGRESS (StatusIds.IN_PROGRESS).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_fieldtrip_one_in_progress_per_sales_person ON public.aggregator_fieldtrip USING btree (created_by_id) WHERE (status_id = 14 AND NOT is_deleted);
+
+-- aggregator_farmervisit ------------------------------------------------------
+-- One farmer met on a field trip: a visit, not a farmer master record, so the
+-- same farmer met on two trips is two rows. village is stored resolved (the
+-- trip's village when none was given). Crops grown and our products used are
+-- the two link tables below; no product rows means "doesn't use our products".
+CREATE TABLE IF NOT EXISTS public.aggregator_farmervisit (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	field_trip_id int8 NOT NULL,
+	farmer_name varchar(255) NOT NULL,
+	contact_number varchar(10) NOT NULL,
+	village varchar(255) NOT NULL,
+	land_area_bigha numeric(12, 4) NOT NULL,
+	CONSTRAINT aggregator_farmervisit_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_farmervisit_public_id_key UNIQUE (public_id),
+	CONSTRAINT uniq_farmervisit_trip_contact UNIQUE (field_trip_id, contact_number),
+	CONSTRAINT ck_farmervisit_land_area_non_negative CHECK (land_area_bigha >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisit_public_id_like ON public.aggregator_farmervisit USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisit_field_trip_id_idx ON public.aggregator_farmervisit USING btree (field_trip_id);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisit_is_deleted_idx ON public.aggregator_farmervisit USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisit_created_by_id_idx ON public.aggregator_farmervisit USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisit_deleted_by_id_idx ON public.aggregator_farmervisit USING btree (deleted_by_id);
+
+-- aggregator_farmervisitcrop --------------------------------------------------
+-- A crop the visited farmer grows. At least one per visit (enforced in
+-- aggregator/FieldTripOperations.py).
+CREATE TABLE IF NOT EXISTS public.aggregator_farmervisitcrop (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	farmer_visit_id int8 NOT NULL,
+	crop_id int8 NOT NULL,
+	CONSTRAINT aggregator_farmervisitcrop_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_farmervisitcrop_visit_crop UNIQUE (farmer_visit_id, crop_id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitcrop_farmer_visit_id_idx ON public.aggregator_farmervisitcrop USING btree (farmer_visit_id);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitcrop_crop_id_idx ON public.aggregator_farmervisitcrop USING btree (crop_id);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitcrop_is_deleted_idx ON public.aggregator_farmervisitcrop USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitcrop_created_by_id_idx ON public.aggregator_farmervisitcrop USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitcrop_deleted_by_id_idx ON public.aggregator_farmervisitcrop USING btree (deleted_by_id);
+
+-- aggregator_farmervisitproduct -----------------------------------------------
+-- A product of ours the visited farmer uses. Zero rows for a visit means the
+-- farmer does not use our products.
+CREATE TABLE IF NOT EXISTS public.aggregator_farmervisitproduct (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	farmer_visit_id int8 NOT NULL,
+	product_id int8 NOT NULL,
+	CONSTRAINT aggregator_farmervisitproduct_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_farmervisitproduct_visit_product UNIQUE (farmer_visit_id, product_id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitproduct_farmer_visit_id_idx ON public.aggregator_farmervisitproduct USING btree (farmer_visit_id);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitproduct_product_id_idx ON public.aggregator_farmervisitproduct USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitproduct_is_deleted_idx ON public.aggregator_farmervisitproduct USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitproduct_created_by_id_idx ON public.aggregator_farmervisitproduct USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_farmervisitproduct_deleted_by_id_idx ON public.aggregator_farmervisitproduct USING btree (deleted_by_id);
 
 -- Foreign keys for the sales-domain tables ------------------------------------
 ALTER TABLE public.aggregator_status ADD CONSTRAINT aggregator_status_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
@@ -1330,6 +1445,7 @@ ALTER TABLE public.aggregator_party ADD CONSTRAINT aggregator_party_deleted_by_i
 
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_party_id_fk FOREIGN KEY (party_id) REFERENCES public.aggregator_party(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
@@ -1345,6 +1461,26 @@ ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwa
 ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_recipe_id_fk FOREIGN KEY (recipe_id) REFERENCES public.aggregator_othermaterialrecipe(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_city_id_fk FOREIGN KEY (city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_approved_by_id_fk FOREIGN KEY (approved_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_farmervisit ADD CONSTRAINT aggregator_farmervisit_field_trip_id_fk FOREIGN KEY (field_trip_id) REFERENCES public.aggregator_fieldtrip(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisit ADD CONSTRAINT aggregator_farmervisit_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisit ADD CONSTRAINT aggregator_farmervisit_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_farmervisitcrop ADD CONSTRAINT aggregator_farmervisitcrop_farmer_visit_id_fk FOREIGN KEY (farmer_visit_id) REFERENCES public.aggregator_farmervisit(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisitcrop ADD CONSTRAINT aggregator_farmervisitcrop_crop_id_fk FOREIGN KEY (crop_id) REFERENCES public.aggregator_crop(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisitcrop ADD CONSTRAINT aggregator_farmervisitcrop_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisitcrop ADD CONSTRAINT aggregator_farmervisitcrop_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_farmervisitproduct ADD CONSTRAINT aggregator_farmervisitproduct_farmer_visit_id_fk FOREIGN KEY (farmer_visit_id) REFERENCES public.aggregator_farmervisit(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisitproduct ADD CONSTRAINT aggregator_farmervisitproduct_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisitproduct ADD CONSTRAINT aggregator_farmervisitproduct_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisitproduct ADD CONSTRAINT aggregator_farmervisitproduct_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 
 -- =============================================================================

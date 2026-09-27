@@ -73,10 +73,10 @@ class InwardRawMaterialApiTest(WebApiTestCase):
 
     # -- creation -------------------------------------------------------------
 
-    def test_a_new_lot_starts_lab_testing_undated(self):
-        """Created lots default to lab_testing and carry no effective date.
+    def test_a_new_lot_starts_lab_testing_sampled_today_and_undated(self):
+        """Created lots default to lab_testing, sampled today, no effective date.
 
-        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_a_new_lot_starts_lab_testing_undated
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_a_new_lot_starts_lab_testing_sampled_today_and_undated
         """
         self.login_as(self.seed_admin)
         response = self._create_lot()
@@ -88,18 +88,19 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(lot["party"], {"id": self.party.id, "name": "ABC Traders"})
         self.assertEqual(lot["quantity_kg"], "150.500")
         self.assertEqual(lot["status"], "Lab Testing")
-        self.assertIsNone(lot["lab_sampling_date"])
+        self.assertEqual(lot["lab_sampling_date"], InwardOperations.today().isoformat())
         self.assertIsNone(lot["effective_date"])  # never in stock by accident
 
         created = InwardRawMaterial.all_objects.get(public_id=lot["public_id"])
-        self.assertEqual(created.status, "Lab Testing")
+        self.assertEqual(created.status.name, "Lab Testing")
+        self.assertEqual(created.lab_sampling_date, InwardOperations.today())
         self.assertIsNone(created.effective_date)
         self.assertEqual(created.created_by_id, self.seed_admin.id)
 
-    def test_lab_sampling_date_is_accepted_but_effective_date_is_ignored_on_create(self):
-        """Sampling may be recorded at booking; dating is only ever a PATCH.
+    def test_lab_sampling_date_may_be_given_explicitly_at_create(self):
+        """An explicit lab_sampling_date wins over today's default.
 
-        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_lab_sampling_date_is_accepted_but_effective_date_is_ignored_on_create
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_lab_sampling_date_may_be_given_explicitly_at_create
         """
         self.login_as(self.seed_admin)
         response = self._create_lot(lab_sampling_date="2026-09-10", effective_date="2026-09-15")
@@ -131,12 +132,13 @@ class InwardRawMaterialApiTest(WebApiTestCase):
     # -- the lifecycle --------------------------------------------------------
 
     def test_flipping_to_in_use_stamps_today_and_reverting_clears_it(self):
-        """in_use stamps today; reverting to lab_testing clears the date.
+        """in_use stamps today; reverting to lab_testing clears the effective
+        date and re-stamps lab_sampling_date with today.
 
         tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_flipping_to_in_use_stamps_today_and_reverting_clears_it
         """
         self.login_as(self.seed_admin)
-        created = self._create_lot()
+        created = self._create_lot(lab_sampling_date="2026-01-01")
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
         url = self._url(created.data)
 
@@ -145,19 +147,24 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(flipped.status_code, status.HTTP_200_OK, flipped.content)
         self.assertEqual(flipped.data["status"], "In Use")
         self.assertEqual(flipped.data["effective_date"], InwardOperations.today().isoformat())
+        self.assertEqual(flipped.data["lab_sampling_date"], "2026-01-01")
 
         in_db = InwardRawMaterial.all_objects.get(public_id=created.data["public_id"])
         self.assertEqual(in_db.effective_date, InwardOperations.today())
 
-        # Reverting is allowed and clears the date, dropping the lot out of stock.
+        # Reverting is allowed: it clears the effective date, dropping the lot
+        # out of stock, and re-stamps lab_sampling_date with today -- the lot
+        # is back with the lab as of today.
         reverted = self.client.patch(url, {"status": "Lab Testing"}, format="json")
         self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)
         self.assertEqual(reverted.data["status"], "Lab Testing")
         self.assertIsNone(reverted.data["effective_date"])
+        self.assertEqual(reverted.data["lab_sampling_date"], InwardOperations.today().isoformat())
 
         in_db.refresh_from_db()
-        self.assertEqual(in_db.status, "Lab Testing")
+        self.assertEqual(in_db.status.name, "Lab Testing")
         self.assertIsNone(in_db.effective_date)
+        self.assertEqual(in_db.lab_sampling_date, InwardOperations.today())
 
         # And the lot can be flipped into stock again later, re-stamped fresh.
         reflipped = self.client.patch(url, {"status": "In Use"}, format="json")
@@ -193,7 +200,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(reverted.status_code, status.HTTP_400_BAD_REQUEST, reverted.content)
 
         in_db = InwardRawMaterial.all_objects.get(public_id=created.data["public_id"])
-        self.assertEqual(in_db.status, "In Use")
+        self.assertEqual(in_db.status.name, "In Use")
 
     def test_deleting_a_lot_with_packed_stock_is_rejected(self):
         """A lot cannot be deleted once its kilograms are packed into a bag
@@ -239,6 +246,27 @@ class InwardRawMaterialApiTest(WebApiTestCase):
                 response = self.client.patch(url, body, format="json")
                 self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
                 self.assertEqual(response.data["effective_date"], stamped)
+
+    def test_reverting_overrides_any_lab_sampling_date_sent_with_it(self):
+        """The revert's lab_sampling_date stamp wins over one sent in the same request.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_reverting_overrides_any_lab_sampling_date_sent_with_it
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot(lab_sampling_date="2026-01-01")
+        url = self._url(created.data)
+        self.client.patch(url, {"status": "In Use"}, format="json")
+
+        reverted = self.client.patch(
+            url,
+            {"status": "Lab Testing", "lab_sampling_date": "2026-02-02"},
+            format="json",
+        )
+        self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)
+        self.assertEqual(
+            reverted.data["lab_sampling_date"], InwardOperations.today().isoformat()
+        )
+        self.assertIsNone(reverted.data["effective_date"])
 
     def test_product_party_and_quantity_are_immutable(self):
         """Sneaking a new booking into a PATCH changes nothing.

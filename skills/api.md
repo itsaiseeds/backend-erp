@@ -379,10 +379,14 @@ or rejecting a CONFIRMED order releases the bags it reserved, with no
 bookkeeping — reserved and consumed are derived from `Order.status`, never stored.
 
 `PATCH /api/sales-admin/edit-order/<public_id>` corrects everything else, with
-`items` as a declarative list (see below). It is **refused outright once the
-order is DISPATCHED or DELIVERED**: the goods have left, so the order is
-history. `verified_by` / `verified_at` / `created_by` / `created_at` are not
-fields on it at all.
+`items` as a declarative list (see below). It is **accepted only while the
+order is BOOKED or CONFIRMED** and refused outright in every other status
+(UNDER_REVIEW, ON_HOLD, REJECTED, DISPATCHED, DELIVERED). Editing a CONFIRMED
+order's items **re-checks stock** with the same gates as `verify-order` (today's
+count complete, enough available bags): the bags the order already reserves
+are credited back, and only a line that grows or is new is checked, so
+shrinking an order is never refused. `verified_by` / `verified_at` /
+`created_by` / `created_at` are not fields on it at all.
 
 Two rules that are not merely conventions there:
 
@@ -432,6 +436,61 @@ Two traps that constraint sets, both handled in `sync_order_items`:
   `delete_<model>` permission no app admin holds. `SoftDeletedModel.mark_deleted(actor)`
   is the shared bypass for every API-maintained table -- it still records
   `deleted_by`, and skips only the permission gate.
+
+## Field trips
+
+A sales person plans a trip to one village (`city` + free-text `village`,
+planned `expected_start_at` / `expected_end_at`), a sales admin approves it,
+and the sales person starts it, records the farmers they meet, and ends it.
+The status rules live beside each verb in `aggregator/FieldTripOperations.py`
+(status sets derived from `StatusIds.field_trip_statuses()`, ids 10–13); the
+views are only the HTTP shape.
+
+| Verb | Who | From | To |
+|---|---|---|---|
+| `POST create-field-trip` | sales person | — | PLANNED |
+| `POST approve-field-trip/<public_id>` | sales admin | PLANNED | APPROVED |
+| `POST unapprove-field-trip/<public_id>` | sales admin | APPROVED | PLANNED |
+| `POST start-field-trip/<public_id>` | owner | APPROVED | IN_PROGRESS |
+| `POST end-field-trip/<public_id>` | owner | IN_PROGRESS | COMPLETED |
+| `PATCH edit-field-trip/<public_id>` (admin) | sales admin | PLANNED | unchanged |
+| `PATCH edit-field-trip/<public_id>` (app) | owner | PLANNED, APPROVED | PLANNED |
+| `DELETE field-trip/<public_id>` / `delete-field-trip/<public_id>` | admin / owner | PLANNED, APPROVED | soft deleted |
+
+Rules that are not merely conventions:
+
+- **An owner's edit withdraws the approval.** Editing an APPROVED trip from
+  the app sends it back to PLANNED and clears `approved_by` / `approved_at`,
+  so no admin approval stands on a plan the admin did not see. The admin's own
+  edit is allowed only while PLANNED.
+- **A started trip is history.** `FieldTrip.delete()` and `mark_deleted()`
+  both refuse anything but PLANNED / APPROVED, so the rule holds in the Django
+  admin too. Farmer visits can only exist on started trips, so a delete never
+  leaves visits behind.
+- **One trip at a time.** Starting is refused while the sales person has
+  another IN_PROGRESS trip; the partial unique index
+  `uniq_fieldtrip_one_in_progress_per_sales_person` is the backstop.
+- `started_at` / `ended_at` are **server time** -- the start / end requests
+  have an empty body.
+
+**Scoping.** Every Android lookup starts from the caller's own trips
+(`android/api/field_trips.py::own_field_trips`), so another sales person's
+trip is a **404** on every route, including `create-farmer-visit`.
+
+**Farmer visits** (`FarmerVisit`, `FV-…`) are recorded with
+`POST /android/api/v1/create-farmer-visit` only while the trip is
+IN_PROGRESS: `farmer_name`, a 10-digit `contact_number` (unique per trip, to
+absorb resubmissions), `village` (defaults to the trip's), `land_area_bigha`,
+`crop_ids` (at least one, from `utilities/crops`) and `product_public_ids`
+(from `utilities/products`; empty means the farmer uses none of ours --
+`uses_our_products` is derived from these rows, never stored). Both sides list
+a trip's visits at `field-trip-farmer-visits/<public_id>`.
+
+The two lists share one filter / sort contract (`api/field_trip_lists.py`):
+`?status=`, `?city_id=`, `?village=` (substring), `?expected_start_gte=` /
+`?expected_start_lte=`, sorted by `expected_start_at` (default, latest first)
+or `created_at`. The admin list adds `?created_by=` (the sales person); each
+side's option lists come from its own scope.
 
 ## The pre-auth TOTP login POST needs no X-CSRFToken
 

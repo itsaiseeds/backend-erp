@@ -13,6 +13,10 @@ from .CustomOrderItem import CustomOrderItem
 from .DispatchDetails import DispatchDetails
 from .DispatchEntry import DispatchEntry
 from .DispatchEntryItem import DispatchEntryItem
+from .FarmerVisit import FarmerVisit
+from .FarmerVisitCrop import FarmerVisitCrop
+from .FarmerVisitProduct import FarmerVisitProduct
+from .FieldTrip import FieldTrip
 from .InwardEntryMixin import InwardEntryMixin
 from .InwardOtherMaterial import InwardOtherMaterial
 from .InwardRawMaterial import InwardRawMaterial, InwardRawMaterialStatus
@@ -70,4 +74,8 @@ __all__ = [
     "OtherMaterialUnitType",
     "OtherMaterialRecipe",
     "InwardOtherMaterial",
+    "FieldTrip",
+    "FarmerVisit",
+    "FarmerVisitCrop",
+    "FarmerVisitProduct",
 ]
