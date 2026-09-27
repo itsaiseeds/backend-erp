@@ -469,7 +469,7 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn("Not enough stock to edit this order", response.data["detail"])
-        self.assertIn(f"{self.alpha_bag.public_id}: need 6, have 5", response.data["detail"])
+        self.assertIn(f"{self.alpha_bag}: need 6, have 5", response.data["detail"])
         self.assertEqual(
             list(self.order.items.values_list("product_packaging", "quantity")),
             [(self.alpha_bag.id, 2)],
