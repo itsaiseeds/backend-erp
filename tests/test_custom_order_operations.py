@@ -16,7 +16,11 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 
 from aggregator import InventoryOperations as inv
-from aggregator.ClientOperations import add_client_address, create_client
+from aggregator.ClientOperations import (
+    add_client_address,
+    create_client,
+    sync_client_addresses,
+)
 from aggregator.CustomOrderOperations import (
     add_custom_order_item,
     attach_dispatch_details,
@@ -213,6 +217,37 @@ class CustomOrderOperationsTest(DMLTestCase):
                 client=self.client_obj, delivery_address=self.addr_other, actor=self.stock_admin,
                 items=[{"product": self.product, "packet_weight": self.w1, "packets": 5}],
             )
+
+    def test_a_custom_order_keeps_moving_after_its_address_is_unlinked(self):
+        """Create, drop the address from the client, then dispatch and revert.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_custom_order_keeps_moving_after_its_address_is_unlinked
+        """
+        self._count()
+        order = self._custom_order(packets=5)
+        sync_client_addresses(
+            self.client_obj,
+            [
+                {
+                    "line_1": "5 Fresh Rd",
+                    "line_2": "",
+                    "pincode": "411003",
+                    "city": self.city,
+                    "state": self.state,
+                    "country": self.country,
+                    "is_primary": True,
+                }
+            ],
+            self.stock_admin,
+        )
+        assert not self.client_obj.client_addresses.filter(address=self.addr).exists()
+
+        self._dispatch(order)
+        revert_dispatch(order)
+
+        order.refresh_from_db()
+        assert order.status.code == "CONFIRMED"
+        assert order.delivery_address == self.addr
 
     def test_one_line_per_product_and_weight(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_one_line_per_product_and_weight"""

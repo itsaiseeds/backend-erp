@@ -10,10 +10,15 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from rest_framework import status
 
 from aggregator import InventoryOperations as inv
-from aggregator.ClientOperations import create_client_with_details
+from aggregator.ClientOperations import (
+    create_client_with_details,
+    sync_client_addresses,
+    sync_client_transport_agencies,
+)
 from aggregator.models import (
     City,
     Country,
@@ -28,6 +33,7 @@ from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import (
     attach_private_dispatch_details,
     create_order,
+    hold_order,
     update_order_core,
     update_order_status,
     verify_order,
@@ -539,6 +545,111 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
                 self.assertEqual(self.order.status.code, "CONFIRMED")
                 self.assertIsNone(self.order.dispatch_details_id)
                 self.assertIsNone(self.order.private_dispatch_details_id)
+
+    # -- a client's lists changing under its open orders ------------------------
+
+    def _replace_addresses(self, client):
+        """Replace ``client``'s addresses with a new one, unlinking the old."""
+        sync_client_addresses(
+            client,
+            [
+                {
+                    "line_1": "2 Ring Road",
+                    "line_2": "",
+                    "pincode": "395007",
+                    "city": self.city,
+                    "state": self.state,
+                    "country": self.country,
+                    "label": "New warehouse",
+                    "is_primary": True,
+                }
+            ],
+            self.sales_person,
+        )
+
+    def test_an_order_keeps_moving_after_its_address_is_unlinked(self):
+        """Book, drop the address from the client, then verify / edit / hold / dispatch.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_order_keeps_moving_after_its_address_is_unlinked
+        """
+        booked_to = self.order.delivery_address
+        on_hold = create_order(
+            client=self.acme,
+            delivery_address=booked_to,
+            actor=self.sales_person,
+            items=[{"product_packaging": self.alpha_bag, "quantity": 1}],
+        )
+        self._replace_addresses(self.acme)
+        self.assertFalse(self.acme.client_addresses.filter(address=booked_to).exists())
+
+        self._confirm(bags=5)
+        edited = self._patch({"special_comments": "address was unlinked"})
+        self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
+        hold_order(on_hold)
+        self._dispatch(self.order)
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status.code, "DISPATCHED")
+        self.assertEqual(self.order.delivery_address, booked_to)
+
+    def test_an_order_keeps_moving_after_its_agency_is_unlinked(self):
+        """Book by an agency, drop it from the client, then verify / edit / hold.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_order_keeps_moving_after_its_agency_is_unlinked
+        """
+        agency = self.acme.client_transport_agencies.first().transport_agency
+        order = create_order(
+            client=self.acme,
+            delivery_address=self.acme.client_addresses.first().address,
+            actor=self.sales_person,
+            items=[{"product_packaging": self.alpha_bag, "quantity": 1}],
+            transport_agency=agency,
+        )
+        sync_client_transport_agencies(
+            self.acme, [{"name": "Replacement Transport"}], self.sales_person
+        )
+
+        self._count_stock(bags=5)
+        verify_order(order, self.admin_user)
+        edited = self._patch({"special_comments": "agency was unlinked"}, order=order)
+        self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
+        hold_order(order)
+
+        order.refresh_from_db()
+        self.assertEqual(order.status.code, "ON_HOLD")
+        self.assertEqual(order.transport_agency, agency)
+
+    def test_an_unlinked_address_cannot_be_newly_chosen(self):
+        """The link is still checked whenever the address is *set*.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_unlinked_address_cannot_be_newly_chosen
+        """
+        old_address = self.order.delivery_address
+        self._replace_addresses(self.acme)
+        new_address = self.acme.client_addresses.get().address
+
+        with self.assertRaisesMessage(ValidationError, "must belong to the selected client"):
+            create_order(
+                client=self.acme,
+                delivery_address=old_address,
+                actor=self.sales_person,
+                items=[{"product_packaging": self.alpha_bag, "quantity": 1}],
+            )
+
+        # Moved to the live address, the order cannot then be moved back.
+        update_order_core(self.order, delivery_address=new_address)
+        with self.assertRaisesMessage(ValidationError, "must belong to the selected client"):
+            update_order_core(self.order, delivery_address=old_address)
+
+    def test_an_unlinked_agency_cannot_be_newly_chosen(self):
+        """tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_unlinked_agency_cannot_be_newly_chosen"""
+        agency = self.acme.client_transport_agencies.first().transport_agency
+        sync_client_transport_agencies(
+            self.acme, [{"name": "Replacement Transport"}], self.sales_person
+        )
+
+        with self.assertRaisesMessage(ValidationError, "must belong to the selected client"):
+            update_order_core(self.order, transport_agency=agency)
 
     def test_a_booked_order_is_not_checked_against_stock(self):
         """Nothing is reserved until verification, which does its own check.
