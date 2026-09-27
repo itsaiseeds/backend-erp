@@ -45,7 +45,7 @@ from rest_framework.request import Request
 from aggregator.DispatchOperations import dispatch_challan_payload
 from aggregator.models import DispatchEntryItem, Order
 from aggregator.models.Order import DISPATCH_REQUIRED_STATUS_CODES
-from api.order_serializers import ProductRefSerializer
+from api.order_serializers import ProductRefSerializer, TransportAgencyRefSerializer
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
@@ -91,6 +91,7 @@ def challan_queryset() -> QuerySet:
     or the client's. Shared by the challan list and the dispatch-receipt export.
     """
     return challan_orders().select_related(
+        "transport_agency",
         "dispatch_details",
         "dispatch_entry",
         "dispatch_entry__client",
@@ -155,6 +156,9 @@ class ChallanDispatchSerializer(serializers.Serializer):
     driver_number = serializers.CharField()
     from_city = serializers.CharField()
     to_city = serializers.CharField()
+    transport_agency = TransportAgencyRefSerializer(
+        allow_null=True, help_text="The carrier; null on a private dispatch."
+    )
 
 
 class ChallanLineSerializer(serializers.Serializer):
