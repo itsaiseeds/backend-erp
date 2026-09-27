@@ -115,6 +115,19 @@ EXPECTED_CONTRACTS = {
     ),
     "android/api/v1/utilities/countries": ("CountriesView", TOKEN_SALESPERSON),
     "android/api/v1/utilities/states": ("StatesView", TOKEN_SALESPERSON),
+    "android/api/v1/utilities/crops": ("CropsView", TOKEN_SALESPERSON),
+    "android/api/v1/utilities/products": ("ProductsView", TOKEN_SALESPERSON),
+    "android/api/v1/create-field-trip": ("CreateFieldTripView", TOKEN_SALESPERSON),
+    "android/api/v1/get-field-trips": ("GetFieldTripsView", TOKEN_SALESPERSON),
+    "android/api/v1/edit-field-trip/<public_id>": ("UpdateFieldTripView", TOKEN_SALESPERSON),
+    "android/api/v1/start-field-trip/<public_id>": ("StartFieldTripView", TOKEN_SALESPERSON),
+    "android/api/v1/end-field-trip/<public_id>": ("EndFieldTripView", TOKEN_SALESPERSON),
+    "android/api/v1/delete-field-trip/<public_id>": ("DeleteFieldTripView", TOKEN_SALESPERSON),
+    "android/api/v1/field-trip-farmer-visits/<public_id>": (
+        "GetFieldTripFarmerVisitsView",
+        TOKEN_SALESPERSON,
+    ),
+    "android/api/v1/create-farmer-visit": ("CreateFarmerVisitView", TOKEN_SALESPERSON),
     # -- Sales-admin website (session-only) ----------------------------------
     "api/sales-admin/admins": ("AdminsView", SESSION_SUPERUSER),
     "api/sales-admin/admins/<int:id>": ("UpdateAdminView", SESSION_SUPERUSER),
@@ -147,6 +160,21 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/unverify-order/<str:public_id>": ("UnverifyOrderView", SESSION_ADMIN),
     "api/sales-admin/upload-lr-number/<str:public_id>": ("UploadLRNumberView", SESSION_ADMIN),
     "api/sales-admin/verify-order/<str:public_id>": ("VerifyOrderView", SESSION_ADMIN),
+    "api/sales-admin/field-trips/": ("GetFieldTripsView", SESSION_ADMIN),
+    "api/sales-admin/field-trip/<str:public_id>": ("FieldTripView", SESSION_ADMIN),
+    "api/sales-admin/field-trip-farmer-visits/<str:public_id>": (
+        "GetFieldTripFarmerVisitsView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/edit-field-trip/<str:public_id>": ("UpdateFieldTripView", SESSION_ADMIN),
+    "api/sales-admin/approve-field-trip/<str:public_id>": (
+        "ApproveFieldTripView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/unapprove-field-trip/<str:public_id>": (
+        "UnapproveFieldTripView",
+        SESSION_ADMIN,
+    ),
     "api/sales-admin/get-stock/<str:public_id>": ("StockView", SESSION_ADMIN),
     "api/sales-admin/inward-other-material/<str:public_id>": (
         "UpdateInwardOtherMaterialView",

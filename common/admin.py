@@ -12,7 +12,7 @@ instead of hard-deleting (or exploding with ``PermissionDenied``).
 """
 
 from django.contrib import admin, messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 
 AUDIT_FIELDS = ("created_at", "updated_at", "is_deleted", "deleted_at", "deleted_by")
 
@@ -75,8 +75,9 @@ class SoftDeleteModelAdmin(AuditFieldsAdminMixin, admin.ModelAdmin):
     """ModelAdmin for ``SoftDeletedModel`` models.
 
     Deletions pass the current user as ``deleted_by`` (the soft-delete
-    implementation requires it) and surface ``PermissionDenied`` as an admin
-    message instead of a 500. Audit fields are shown read-only.
+    implementation requires it) and surface ``PermissionDenied`` -- or a
+    ``ValidationError`` from a model that refuses deletion in its current state
+    -- as an admin message instead of a 500. Audit fields are shown read-only.
     """
 
     def get_deleted_objects(self, objs, request):
@@ -92,17 +93,19 @@ class SoftDeleteModelAdmin(AuditFieldsAdminMixin, admin.ModelAdmin):
             obj.delete(deleted_by=request.user)
         except PermissionDenied as exc:
             self.message_user(request, str(exc), level=messages.ERROR)
+        except ValidationError as exc:
+            self.message_user(request, " ".join(exc.messages), level=messages.ERROR)
 
     def delete_queryset(self, request, queryset):
         skipped = 0
         for obj in queryset:
             try:
                 obj.delete(deleted_by=request.user)
-            except PermissionDenied:
+            except (PermissionDenied, ValidationError):
                 skipped += 1
         if skipped:
             self.message_user(
                 request,
-                f"Skipped {skipped} item(s) the current user cannot delete.",
+                f"Skipped {skipped} item(s) that cannot be deleted.",
                 level=messages.ERROR,
             )

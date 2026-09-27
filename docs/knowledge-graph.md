@@ -244,8 +244,8 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `Status` | `aggregator/models/Status.py` | Generic enum-like status rows (ids 1–9, seeded in `sql/dml.sql`); hosts `StatusIds` and the `Status.by_id()` resolver. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Order.status`, `Client.status`, `OrderOperations`, `ClientOperations` |
-| `StatusIds` | `aggregator/models/Status.py` | `enum.IntEnum` — the single source of truth for the status CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`StatusIds.BOOKED.name == "BOOKED"`, `int(StatusIds.BOOKED) == 1`). `order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9. | derives → `Order.ORDER_STATUS_CODES`, `Client.CLIENT_STATUS_CODES`; used by → `OrderOperations`, `ClientOperations`, tests |
+| `Status` | `aggregator/models/Status.py` | Generic enum-like status rows (ids 1–13, seeded in `sql/dml.sql`); hosts `StatusIds` and the `Status.by_id()` resolver. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Order.status`, `Client.status`, `FieldTrip.status`, `OrderOperations`, `ClientOperations` |
+| `StatusIds` | `aggregator/models/Status.py` | `enum.IntEnum` — the single source of truth for the status CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`StatusIds.BOOKED.name == "BOOKED"`, `int(StatusIds.BOOKED) == 1`). `order_statuses()` = ids 1–7, `client_statuses()` = ids 8–9, `field_trip_statuses()` = ids 10–13. | derives → `Order.ORDER_STATUS_CODES`, `Client.CLIENT_STATUS_CODES`; used by → `OrderOperations`, `ClientOperations`, tests |
 | `Stage` | `aggregator/models/Stage.py` | Seeded, enum-like seed classification of a product (ids 1–4 in `sql/dml.sql`: `BREEDER`, `FOUNDATION`, `RESEARCH`, `CERTIFIED`); hosts `StageIds` and the `Stage.by_id()` resolver. Same shape as `Status`. **No migrations — the enum values mirror `dml.sql` rows and must be kept in sync.** | referenced by → `Product.stage` |
 | `StageIds` | `aggregator/models/Stage.py` | `enum.IntEnum` — the single source of truth for the stage CODE→id mapping: member **name** == seeded `code`, member **value** == row `id` (`int(StageIds.BREEDER) == 1`). | used by → `ProductsView`, `UpdateProductView`, tests |
 | `Order` | `aggregator/models/Order.py` | Booked order exposed by `public_id` (`ORD-…`); `verified_by`/`verified_at` record the verifying sales admin (required once the status is `CONFIRMED`); lifecycle statuses limited to `StatusIds.order_statuses()`. No stored total — `total_amount` and `total_bags` are `@property`s summed from `items` | FK → `Client`, `Address`, `Status`; 1:N → `OrderItem` |
@@ -258,6 +258,9 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `LooseStockSnapshot` | `aggregator/models/LooseStockSnapshot.py` | Loose stock — stock **in a packet but not in a bag** — one row per (`snapshot_date`, `product`, `packet_weight`) (`LS-…`). Deliberately **no packaging FK**: that pair is all the identity a loose packet has, so a product packed as both 1kg × 20 and 1kg × 30 has **one** pool of loose 1kg packets. Consumed only by `CustomOrder`. **Optional** — excluded from `is_stock_count_complete`, kept as history on its **own** date lifecycle independently of `InventorySnapshot`, and read at `InventoryOperations.loose_date()` (the latest loose date) rather than today | FK → `Product`, `User` (`created_by`) |
 | `CustomOrder` | `aggregator/models/CustomOrder.py` | Loose-packet order (`CORD-…`), the **admin-only** counterpart of `Order`. Mirrors `Order`'s fields but is **standalone — no FK to `Order`**. **No verification step**: `create_custom_order` auto-confirms it (born `CONFIRMED`, `verified_by`/`verified_at` set), and creation is **blocked unless enough loose packets are in stock**. `created_by` must be an admin. `total_packets` sums line packets directly | FK → `Client`, `Address`, `Status`, `DispatchDetails`; 1:N → `CustomOrderItem` |
 | `CustomOrderItem` | `aggregator/models/CustomOrderItem.py` | One custom-order line: a `Product` at a `packet_weight`, a `packets` count and a **per-packet** `negotiated_selling_price` (defaults to `product.price_for_weight(packet_weight)`, so a 500g line prefills at half a 1kg line). Deliberately has **no `ProductPackaging`** — it names the same (`product`, `packet_weight`) pair `LooseStockSnapshot` is keyed by. Unique per (`custom_order`, `product`, `packet_weight`), so one order may carry a 1kg line and a 500g line of the same product; `line_total = negotiated_selling_price * packets` | FK → `CustomOrder`, `Product` |
+| `FieldTrip` | `aggregator/models/FieldTrip.py` | A sales person's trip to one village (`FT-…`): `city` + free-text `village`, a planned `expected_start_at`/`expected_end_at` window and the server-stamped `started_at`/`ended_at`. Lifecycle PLANNED → APPROVED → IN_PROGRESS → COMPLETED (`StatusIds.field_trip_statuses()`); `approved_by`/`approved_at` record the sales admin (required from APPROVED on). `created_by` is the sales person. Only PLANNED/APPROVED trips can be deleted — `delete()` and `mark_deleted()` both refuse otherwise. A partial unique index keeps one IN_PROGRESS trip per sales person. Transitions live in `aggregator/FieldTripOperations.py` | FK → `City`, `Status`, `User` (`created_by`, `approved_by`); 1:N → `FarmerVisit` |
+| `FarmerVisit` | `aggregator/models/FarmerVisit.py` | One farmer met on a `FieldTrip` (`FV-…`): name, 10-digit `contact_number` (unique per trip), `village` (defaults to the trip's), `land_area_bigha`. A visit, not a farmer master record. Recorded only while the trip is IN_PROGRESS. `uses_our_products` is derived from its `FarmerVisitProduct` rows, never stored | FK → `FieldTrip`; 1:N → `FarmerVisitCrop`, `FarmerVisitProduct` |
+| `FarmerVisitCrop` / `FarmerVisitProduct` | `aggregator/models/FarmerVisitCrop.py`, `FarmerVisitProduct.py` | Link rows: the crops a visited farmer grows (at least one) and our products they use (none = does not use ours) | FK → `FarmerVisit`, `Crop` / `Product` |
 | `Client` | `aggregator/models/Client.py` | Customer company (`C-…`); verification statuses limited to `StatusIds.client_statuses()`. Created by a sales person as `VERIFICATION_PENDING`, approved by an admin through `/api/sales-admin/verify-client/`. Always carries at least one address, contact and transport agency, each list with exactly one primary | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
 
 ### Reusable bases — common
@@ -394,7 +397,13 @@ erDiagram
 │   ├── dispatch-order/<public_id>  POST  DispatchOrderView    (IsAdminUser → CONFIRMED → DISPATCHED; kind follows the order's transport agency, LR optional)
 │   ├── revert-dispatch/<public_id> POST  RevertDispatchView   (IsAdminUser → DISPATCHED → CONFIRMED)
 │   ├── hold-order/<public_id>      POST  HoldOrderView        (IsAdminUser → ON_HOLD; releases reserved bags)
-│   └── reject-order/<public_id>    POST  RejectOrderView      (IsAdminUser → REJECTED; terminal)
+│   ├── reject-order/<public_id>    POST  RejectOrderView      (IsAdminUser → REJECTED; terminal)
+│   ├── field-trips/                GET   GetFieldTripsView    (IsAdminUser → every trip; paginated; ?created_by / ?status / ?city_id / ?village / ?expected_start_gte|lte + ?sort=expected_start_at|created_at)
+│   ├── field-trip/<public_id>      GET/DELETE FieldTripView  (IsAdminUser → full trip; DELETE only PLANNED/APPROVED)
+│   ├── field-trip-farmer-visits/<public_id> GET GetFieldTripFarmerVisitsView (IsAdminUser → farmers on the trip; ?crop / ?product / ?uses_our_products)
+│   ├── edit-field-trip/<public_id> PATCH UpdateFieldTripView  (IsAdminUser → city/village/expected window; PLANNED only)
+│   ├── approve-field-trip/<public_id>   POST ApproveFieldTripView   (IsAdminUser → PLANNED → APPROVED, sets approved_by/at)
+│   └── unapprove-field-trip/<public_id> POST UnapproveFieldTripView (IsAdminUser → APPROVED → PLANNED, clears approved_by/at)
 ├── utilities/
 │   ├── reauthenticate       GET   ReauthenticateView      (IsAuthenticated)
 │   ├── cities               GET   CitiesView              (IsAdminUser)
@@ -416,7 +425,17 @@ erDiagram
         ├── get-orders         GET   GetOrdersView         (IsSalesPerson -> own orders; paginated; ?client / ?product / ?city_id / ?status filters + ?sort=created_at|price; catalogues in available_filters/available_sorts)
         ├── client/<public_id> GET   GetClientView         (IsSalesPerson → own client, full detail: core + all addresses/contacts/agencies)
         ├── create-client      POST  CreateClientView      (IsSalesPerson → born VERIFICATION_PENDING)
-        └── update-client      POST  UpdateClientView      (IsSalesPerson → own client's three lists only)
+        ├── update-client      POST  UpdateClientView      (IsSalesPerson → own client's three lists only)
+        ├── utilities/crops    GET   CropsView             (IsSalesPerson → every crop, unpaginated)
+        ├── utilities/products GET   ProductsView          (IsSalesPerson → every product with crop_id, unpaginated)
+        ├── create-field-trip  POST  CreateFieldTripView   (IsSalesPerson → born PLANNED)
+        ├── get-field-trips    GET   GetFieldTripsView     (IsSalesPerson → own trips; paginated; ?status / ?city_id / ?village / ?expected_start_gte|lte)
+        ├── edit-field-trip/<public_id>   PATCH UpdateFieldTripView (IsSalesPerson → own PLANNED/APPROVED trip; APPROVED → PLANNED)
+        ├── start-field-trip/<public_id>  POST  StartFieldTripView  (IsSalesPerson → APPROVED → IN_PROGRESS; one at a time)
+        ├── end-field-trip/<public_id>    POST  EndFieldTripView    (IsSalesPerson → IN_PROGRESS → COMPLETED)
+        ├── delete-field-trip/<public_id> DELETE DeleteFieldTripView (IsSalesPerson → own PLANNED/APPROVED trip)
+        ├── field-trip-farmer-visits/<public_id> GET GetFieldTripFarmerVisitsView (IsSalesPerson → farmers on own trip)
+        └── create-farmer-visit POST CreateFarmerVisitView (IsSalesPerson → own IN_PROGRESS trip only)
 /sales-admin[/...]   -> Flutter build  (config/views.py catch-all)
 ```
 
