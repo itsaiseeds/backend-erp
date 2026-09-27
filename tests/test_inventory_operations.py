@@ -11,13 +11,18 @@ from decimal import Decimal
 from django.core.exceptions import PermissionDenied, ValidationError
 
 from aggregator import InventoryOperations as inv
+from aggregator import InwardOperations
 from aggregator.ClientOperations import add_client_address, create_client
 from aggregator.models import (
     Address,
     City,
     Country,
     InventorySnapshot,
+    InwardOtherMaterial,
     InwardRawMaterial,
+    OtherMaterialRecipe,
+    OtherMaterialType,
+    OtherMaterialUnitType,
     Party,
     Pincode,
     ProductPackaging,
@@ -499,6 +504,131 @@ class InventoryOperationsTest(DMLTestCase):
 
         assert inv.reserved_bags(self.pack) == 5
         assert inv.raw_available_kg(self.product) == before
+
+    # -- packing (other) material backing -----------------------------------------
+    #
+    # A recipe charges ``quantity`` units of its material per packet of its
+    # product at its packet weight. self.pack is 40 x 1kg packets per bag.
+
+    def _material(self, name="Test leaflets"):
+        return OtherMaterialType.objects.create(
+            name=name, unit_type=OtherMaterialUnitType.COUNT, created_by=self.su
+        )
+
+    def _recipe(self, material, *, product=None, packet_weight=None, per_packet="2"):
+        return OtherMaterialRecipe.objects.create(
+            product=product or self.product,
+            material_type=material,
+            packet_weight=packet_weight or self.pack.packet_weight,
+            quantity=Decimal(per_packet),
+            created_by=self.su,
+        )
+
+    def _receive(self, recipe, quantity):
+        party, _ = Party.objects.get_or_create(
+            name="Packing Supplier", city=self.city, defaults={"created_by": self.su}
+        )
+        return InwardOtherMaterial.objects.create(
+            recipe=recipe,
+            party=party,
+            quantity=Decimal(quantity),
+            effective_date=self.today,
+            created_by=self.su,
+        )
+
+    def _on_hand(self, material):
+        lines = {
+            line["material_type_id"]: line["on_hand"]
+            for line in InwardOperations.other_material_on_hand()
+        }
+        return lines[material.id]
+
+    def test_counted_bags_and_loose_packets_use_packing_material(self):
+        """3 bags x 40 packets + 10 loose, at 2 leaflets a packet = 260 used.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_counted_bags_and_loose_packets_use_packing_material
+        """
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets), 1000)
+
+        inv.record_stock_count(product_packaging=self.pack, bags=3, actor=self.stock_admin)
+        inv.record_loose_stock(
+            product=self.product, packet_weight=self.weight, packets=10, actor=self.stock_admin
+        )
+
+        assert inv.other_material_used([leaflets.id]) == {leaflets.id: Decimal("260")}
+        assert self._on_hand(leaflets) == Decimal("740")
+
+    def test_bags_dispatched_before_the_count_stay_used(self):
+        """Gone from the floor, but they were packed -- their leaflets stay spent.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_bags_dispatched_before_the_count_stay_used
+        """
+        self._count_everything(bags=400, loose_packets=0)
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets, per_packet="1"), 100000)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        attach_dispatch_details(
+            order, dispatched_by=self.stock_admin,
+            dispatch_date=self.today - datetime.timedelta(days=3),
+            from_city=self.city, to_city=self.city2, lr_number="LR901",
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+
+        # 400 on the floor + 5 dispatched before the count, 40 packets a bag.
+        assert inv.other_material_used([leaflets.id]) == {leaflets.id: Decimal(405 * 40)}
+
+    def test_a_recipe_charges_only_its_own_weight_and_products_share_a_material(self):
+        """A 2kg recipe ignores 1kg packets; two products' recipes draw one pool.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_recipe_charges_only_its_own_weight_and_products_share_a_material
+        """
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets, packet_weight=Decimal("2.000")), 1000)
+        other_product, other_pack = self._raw_pack(name="Leaflet Sharer", packets=10)
+        book_raw_material(other_product, Decimal("1000"), actor=self.su)
+        self._recipe(leaflets, product=other_product, packet_weight=other_pack.packet_weight,
+                     per_packet="3")
+
+        inv.record_stock_count(product_packaging=self.pack, bags=3, actor=self.stock_admin)
+        inv.record_stock_count(product_packaging=other_pack, bags=2, actor=self.stock_admin)
+
+        # self.pack is 1kg, which the 2kg recipe does not cover: only the
+        # other product's 2 bags x 10 packets x 3 leaflets are charged.
+        assert self._on_hand(leaflets) == Decimal("940")
+
+    def test_a_count_that_outruns_packing_material_is_rolled_back(self):
+        """tests/test_inventory_operations.py::InventoryOperationsTest::test_a_count_that_outruns_packing_material_is_rolled_back"""
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets), 160)  # exactly 2 bags' worth
+        inv.record_stock_count(product_packaging=self.pack, bags=2, actor=self.stock_admin)
+
+        with self.assertRaisesMessage(ValueError, "'Test leaflets' short by 80"):
+            inv.record_stock_counts(counts={self.pack: 3}, actor=self.stock_admin)
+
+        assert inv.on_hand_bags(self.pack) == 2
+        assert self._on_hand(leaflets) == Decimal("0")
+
+    def test_a_material_already_short_only_blocks_counts_that_use_more(self):
+        """Inward lagging behind the counts: lowering is allowed, raising is not.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_material_already_short_only_blocks_counts_that_use_more
+        """
+        inv.record_stock_count(product_packaging=self.pack, bags=5, actor=self.stock_admin)
+        leaflets = self._material()
+        self._receive(self._recipe(leaflets), 100)  # 5 bags need 400
+        assert self._on_hand(leaflets) == Decimal("-300")
+
+        inv.record_stock_count(product_packaging=self.pack, bags=4, actor=self.stock_admin)
+        inv.record_stock_count(product_packaging=self.pack, bags=4, actor=self.stock_admin)
+        assert self._on_hand(leaflets) == Decimal("-220")
+
+        with self.assertRaisesMessage(ValueError, "Not enough packing material"):
+            inv.record_stock_count(product_packaging=self.pack, bags=6, actor=self.stock_admin)
+        assert inv.on_hand_bags(self.pack) == 4
 
     def test_uncounted_packaging_has_no_stock(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_uncounted_packaging_has_no_stock"""

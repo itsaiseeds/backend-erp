@@ -60,10 +60,13 @@ from common.models import indian_now
 from .models import (
     CustomOrderItem,
     InventorySnapshot,
+    InwardOtherMaterial,
     InwardRawMaterial,
     LooseStockSnapshot,
     Order,
     OrderItem,
+    OtherMaterialRecipe,
+    OtherMaterialType,
     Product,
     ProductPackaging,
     StatusIds,
@@ -117,10 +120,11 @@ def record_stock_count(
 
     Re-recording the same ``(snapshot_date, product_packaging)`` overwrites the
     earlier figures rather than adding a second row. Rejected (and rolled back)
-    when the product's raw material cannot cover the bags.
+    when the product's raw material or packing material cannot cover the bags.
     """
     _assert_can_update_stock_count(actor)
     lock_raw_pools([product_packaging.product_id])
+    materials_before = _material_guard([product_packaging.product_id])
     snapshot = _write_stock_count(
         product_packaging=product_packaging,
         bags=bags,
@@ -128,6 +132,7 @@ def record_stock_count(
         snapshot_date=snapshot_date or today(),
     )
     _assert_raw_available([product_packaging.product_id])
+    _assert_material_available(materials_before)
     return snapshot
 
 
@@ -183,7 +188,8 @@ def record_stock_counts(
 
     The raw-material check runs once, after every line is written, so one
     upload may raise one packaging of a product and lower another: only the
-    net kilograms per product must fit its raw pool. Any shortfall rolls the
+    net kilograms per product must fit its raw pool. The packing-material
+    check works the same way, per material type. Any shortfall rolls the
     whole upload back.
     """
     _assert_can_update_stock_count(actor)
@@ -192,6 +198,7 @@ def record_stock_counts(
     lock_raw_pools(product_ids)
     # All up front and in pk order; _write_stock_count re-takes each as a no-op.
     lock_bag_pools(counts)
+    materials_before = _material_guard(product_ids)
 
     snapshots = [
         _write_stock_count(
@@ -203,6 +210,7 @@ def record_stock_counts(
         for product_packaging, bags in counts.items()
     ]
     _assert_raw_available(product_ids)
+    _assert_material_available(materials_before)
     return snapshots
 
 
@@ -443,10 +451,12 @@ def record_loose_stock(
 
     Re-recording the same ``(snapshot_date, product, packet_weight)`` overwrites
     the earlier figure rather than adding a second row. Rejected (and rolled
-    back) when the product's raw material cannot cover the packets.
+    back) when the product's raw material or packing material cannot cover
+    the packets.
     """
     _assert_can_update_stock_count(actor)
     lock_raw_pools([product.id])
+    materials_before = _material_guard([product.id])
     snapshot = _write_loose_stock(
         product=product,
         packet_weight=packet_weight,
@@ -455,6 +465,7 @@ def record_loose_stock(
         snapshot_date=snapshot_date or today(),
     )
     _assert_raw_available([product.id])
+    _assert_material_available(materials_before)
     return snapshot
 
 
@@ -507,7 +518,8 @@ def record_loose_stocks(
 
     Unlike the bag count this is **optional** -- nothing requires it to be
     written daily, or at all. Like the bag count, the net kilograms per product
-    must fit its raw pool or the whole upload rolls back.
+    must fit its raw pool, and the net units per packing material its
+    material pool, or the whole upload rolls back.
     """
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
@@ -515,6 +527,7 @@ def record_loose_stocks(
     lock_raw_pools(product_ids)
     # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
     lock_loose_pools(product_ids)
+    materials_before = _material_guard(product_ids)
 
     snapshots = [
         _write_loose_stock(
@@ -527,6 +540,7 @@ def record_loose_stocks(
         for (product, packet_weight), packets in counts.items()
     ]
     _assert_raw_available(product_ids)
+    _assert_material_available(materials_before)
     return snapshots
 
 
@@ -817,6 +831,149 @@ def _assert_raw_available(product_ids) -> None:
                 f"Not enough raw material for '{product.name}': short by "
                 f"{-available} kg."
             )
+
+
+# -- Packing (other) material backing -----------------------------------------
+#
+# Every packet also uses packing material -- leaflets, covers -- per the
+# product's ``OtherMaterialRecipe`` for its packet weight: ``recipe.quantity``
+# units of the material type per packet. The pool is the **material type**:
+# inward lots are booked against a recipe but any recipe of a type draws on
+# the same stock. Spent material is derived exactly like raw kilograms, from
+# the packets currently packed (latest bag and loose counts, plus what was
+# dispatched before them), valued at each product's *current* recipe.
+
+
+def packed_packets(product: Product) -> dict[Decimal, int]:
+    """Packets of ``product`` currently packed, per packet weight.
+
+    The packet counterpart of ``raw_bagged_kg`` + ``raw_loose_kg``, with the
+    same terms: each packaging's latest bag count plus bags dispatched before
+    it (times packets per bag), and each loose pool's latest count plus loose
+    packets dispatched before it.
+    """
+    packed: dict[Decimal, int] = {}
+    snapshot_date = latest_snapshot_date()
+    for packaging in ProductPackaging.objects.filter(product=product):
+        bags = on_hand_bags(packaging, snapshot_date) + _bags_dispatched_before(
+            packaging, snapshot_date
+        )
+        weight = packaging.packet_weight
+        packed[weight] = packed.get(weight, 0) + bags * packaging.packets
+    loose_snapshot_date = latest_loose_snapshot_date()
+    for weight in product_loose_weights(product):
+        packets = on_hand_loose_packets(
+            product, weight, loose_snapshot_date
+        ) + _loose_dispatched_before(product, weight, loose_snapshot_date)
+        packed[weight] = packed.get(weight, 0) + packets
+    return packed
+
+
+def other_material_inward(
+    material_type_ids: Iterable[int] | None = None, as_of: date | None = None
+) -> dict[int, Decimal]:
+    """Units received per material type, over lots with a reached effective date.
+
+    Lots booked against a since-replaced recipe still count: the stock is the
+    material type's, whichever recipe version brought it in.
+    """
+    as_of = as_of or today()
+    query = InwardOtherMaterial.objects.filter(
+        effective_date__isnull=False, effective_date__lte=as_of
+    )
+    if material_type_ids is not None:
+        query = query.filter(recipe__material_type_id__in=list(material_type_ids))
+    rows = query.values("recipe__material_type_id").annotate(total=Sum("quantity"))
+    return {row["recipe__material_type_id"]: row["total"] for row in rows}
+
+
+def other_material_used(
+    material_type_ids: Iterable[int] | None = None,
+) -> dict[int, Decimal]:
+    """Units per material type spent on the packets currently packed.
+
+    Each live recipe charges ``quantity`` per packed packet of its product at
+    its packet weight; packets of a weight with no recipe for the type use none.
+    """
+    recipes = OtherMaterialRecipe.objects.all()
+    if material_type_ids is not None:
+        recipes = recipes.filter(material_type_id__in=list(material_type_ids))
+    used: dict[int, Decimal] = {}
+    packed_by_product: dict[int, dict[Decimal, int]] = {}
+    for recipe in recipes.select_related("product"):
+        if recipe.product_id not in packed_by_product:
+            packed_by_product[recipe.product_id] = packed_packets(recipe.product)
+        packets = packed_by_product[recipe.product_id].get(recipe.packet_weight, 0)
+        used[recipe.material_type_id] = (
+            used.get(recipe.material_type_id, Decimal("0")) + recipe.quantity * packets
+        )
+    return used
+
+
+def other_material_available(material_type_ids: Iterable[int]) -> dict[int, Decimal]:
+    """``inward - used`` for each of ``material_type_ids``."""
+    material_type_ids = list(material_type_ids)
+    inward = other_material_inward(material_type_ids)
+    used = other_material_used(material_type_ids)
+    return {
+        material_type_id: inward.get(material_type_id, Decimal("0"))
+        - used.get(material_type_id, Decimal("0"))
+        for material_type_id in material_type_ids
+    }
+
+
+def _material_guard(product_ids) -> dict[int, Decimal]:
+    """Lock the packing materials ``product_ids`` use; return their availability.
+
+    Called before a count write, inside its transaction. The material type rows
+    are locked in pk order, so two uploads for different products sharing a
+    material cannot both spend its last units. The returned figures are what
+    :func:`_assert_material_available` compares the write against.
+    """
+    material_type_ids = sorted(
+        set(
+            OtherMaterialRecipe.objects.filter(product_id__in=product_ids).values_list(
+                "material_type_id", flat=True
+            )
+        )
+    )
+    list(
+        OtherMaterialType.all_objects.select_for_update()
+        .filter(pk__in=material_type_ids)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+    return other_material_available(material_type_ids)
+
+
+def _assert_material_available(before: Mapping[int, Decimal]) -> None:
+    """Raise if the count just written took a packing material below zero.
+
+    Only a write that *spends more* of a material and leaves it negative is
+    refused. A material already short before this write -- inward entries
+    lagging behind the counts -- does not block a count that uses no more of
+    it, so lowering a count is never refused. Same ``ValueError`` convention
+    as ``_assert_raw_available``: the whole write rolls back and the view
+    answers 400.
+    """
+    after = other_material_available(before)
+    short = [
+        material_type_id
+        for material_type_id, available in after.items()
+        if available < 0 and available < before[material_type_id]
+    ]
+    if not short:
+        return
+    names = {
+        material.id: material
+        for material in OtherMaterialType.all_objects.filter(id__in=short)
+    }
+    details = "; ".join(
+        f"'{names[material_type_id].name}' short by "
+        f"{-after[material_type_id]} {names[material_type_id].unit_type}"
+        for material_type_id in short
+    )
+    raise ValueError(f"Not enough packing material: {details}.")
 
 
 # -- Shared -------------------------------------------------------------------

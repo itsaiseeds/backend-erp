@@ -6310,7 +6310,9 @@ components:
           $ref: '#/components/schemas/OtherMaterialTypeRef'
         on_hand:
           type: string
-          description: Sum of units with a reached effective date.
+          description: Units received (reached effective date) minus units used by
+            the packets currently packed. Negative when the counts outrun the recorded
+            inward lots.
       required:
       - material_type
       - on_hand
