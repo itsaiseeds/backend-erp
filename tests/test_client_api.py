@@ -11,7 +11,16 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 
 from aggregator.ClientOperations import create_client_with_details, verify_client
-from aggregator.models import City, Country, State
+from aggregator.models import (
+    Address,
+    City,
+    ClientAddress,
+    ClientContact,
+    ClientTransportAgency,
+    Country,
+    State,
+    TransportAgency,
+)
 from authentication.models import Admin, SalesPerson
 from tests.common import WebApiTestCase
 
@@ -213,6 +222,106 @@ class SalesAdminClientApiTest(WebApiTestCase):
             format="json",
         )
         self.assertEqual(emptied.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # -- removing an entry and sending it again ---------------------------------
+
+    def _update_lists(self, **lists):
+        response = self.client.post(
+            UPDATE_CLIENT_URL,
+            {"public_id": self.pending.public_id, **lists},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        return response.data
+
+    def _address_item(self, line_1):
+        return {
+            "line_1": line_1,
+            "pincode": "395007",
+            "city": self.city.id,
+            "state": self.state.id,
+            "country": self.country.id,
+        }
+
+    def test_a_removed_contact_can_be_added_back(self):
+        """[A, B] -> [A] -> [A, B] restores B's link instead of a 500.
+
+        tests/test_client_api.py::SalesAdminClientApiTest::test_a_removed_contact_can_be_added_back
+        """
+        self.login_as(self.admin_user)
+        ramesh = {"name": "Ramesh", "phone_number": "9876500001"}
+        suresh = {"name": "Suresh", "phone_number": "9876500002", "role": "Owner"}
+
+        self._update_lists(contacts=[ramesh, suresh])
+        self._update_lists(contacts=[ramesh])
+        data = self._update_lists(contacts=[ramesh, {**suresh, "role": "Manager"}])
+
+        self.assertEqual(
+            {c["name"]: c["role"] for c in data["contacts"]},
+            {"Ramesh": "", "Suresh": "Manager"},
+        )
+        self.assertEqual(
+            ClientContact.all_objects.filter(client=self.pending).count(), 2
+        )
+
+    def test_a_removed_primary_contact_comes_back_demoted(self):
+        """The link was primary when removed; restoring it must not make two primaries.
+
+        tests/test_client_api.py::SalesAdminClientApiTest::test_a_removed_primary_contact_comes_back_demoted
+        """
+        self.login_as(self.admin_user)
+        ramesh = {"name": "Ramesh", "phone_number": "9876500001"}
+        suresh = {"name": "Suresh", "phone_number": "9876500002"}
+
+        self._update_lists(contacts=[suresh])  # Ramesh, the primary, is removed
+        data = self._update_lists(contacts=[ramesh, {**suresh, "is_primary": True}])
+
+        self.assertEqual(
+            {c["name"]: c["is_primary"] for c in data["contacts"]},
+            {"Ramesh": False, "Suresh": True},
+        )
+
+    def test_a_removed_address_comes_back_as_the_same_row(self):
+        """No duplicate address: the old link and ``Address`` row are restored.
+
+        tests/test_client_api.py::SalesAdminClientApiTest::test_a_removed_address_comes_back_as_the_same_row
+        """
+        self.login_as(self.admin_user)
+        original = self.pending.client_addresses.get()
+        addresses_before = Address.all_objects.count()
+
+        self._update_lists(addresses=[self._address_item("2 Ring Road")])
+        data = self._update_lists(
+            addresses=[self._address_item("1 Ring Road"), self._address_item("2 Ring Road")]
+        )
+
+        restored = next(a for a in data["addresses"] if a["id"] == original.id)
+        self.assertTrue(restored["is_primary"])
+        # Only "2 Ring Road" is new; "1 Ring Road" did not get a second row.
+        self.assertEqual(Address.all_objects.count(), addresses_before + 1)
+        self.assertEqual(
+            ClientAddress.all_objects.filter(client=self.pending).count(), 2
+        )
+
+    def test_a_removed_agency_comes_back_as_the_same_row(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_a_removed_agency_comes_back_as_the_same_row"""
+        self.login_as(self.admin_user)
+        original = self.pending.client_transport_agencies.get()
+        agencies_before = TransportAgency.all_objects.count()
+
+        self._update_lists(transport_agencies=[{"name": "XYZ Transport"}])
+        data = self._update_lists(
+            transport_agencies=[{"name": "ABC Transport"}, {"name": "XYZ Transport"}]
+        )
+
+        self.assertIn(
+            original.id,
+            [a["id"] for a in data["transport_agencies"] if a["name"] == "ABC Transport"],
+        )
+        self.assertEqual(TransportAgency.all_objects.count(), agencies_before + 1)
+        self.assertEqual(
+            ClientTransportAgency.all_objects.filter(client=self.pending).count(), 2
+        )
 
     # -- the client list ----------------------------------------------------
 
