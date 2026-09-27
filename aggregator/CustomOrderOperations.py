@@ -67,11 +67,15 @@ def create_custom_order(
     filled from 500g stock. The packets requested must not exceed what is
     currently available (`available_loose_packets`); otherwise the order is not
     created. Because the order confirms immediately, availability is checked
-    *before* it reserves.
+    *before* it reserves -- under the pools' locks
+    (:func:`InventoryOperations.lock_loose_pools`), held until this
+    transaction commits, so two orders created at once cannot both spend the
+    same packets.
     """
     from . import InventoryOperations
 
     items = list(items)
+    InventoryOperations.lock_loose_pools(item["product"].id for item in items)
 
     shortages = []
     for item in items:

@@ -46,7 +46,7 @@ payloads never include the internal primary key.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -120,7 +120,7 @@ def record_stock_count(
     when the product's raw material cannot cover the bags.
     """
     _assert_can_update_stock_count(actor)
-    _lock_products([product_packaging.product_id])
+    lock_raw_pools([product_packaging.product_id])
     snapshot = _write_stock_count(
         product_packaging=product_packaging,
         bags=bags,
@@ -138,7 +138,12 @@ def _write_stock_count(
     actor: User,
     snapshot_date: date,
 ) -> InventorySnapshot:
-    """Upsert one bag line. No permission or raw-material check -- callers do both."""
+    """Upsert one bag line. No permission or raw-material check -- callers do both.
+
+    Takes the packaging's bag-pool lock, so a count cannot land between an
+    order's availability read and its reservation.
+    """
+    lock_bag_pools([product_packaging])
     snapshot = InventorySnapshot.all_objects.filter(
         snapshot_date=snapshot_date, product_packaging=product_packaging
     ).first()
@@ -183,7 +188,9 @@ def record_stock_counts(
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
     product_ids = {packaging.product_id for packaging in counts}
-    _lock_products(product_ids)
+    lock_raw_pools(product_ids)
+    # All up front and in pk order; _write_stock_count re-takes each as a no-op.
+    lock_bag_pools(counts)
 
     snapshots = [
         _write_stock_count(
@@ -376,7 +383,7 @@ def record_loose_stock(
     back) when the product's raw material cannot cover the packets.
     """
     _assert_can_update_stock_count(actor)
-    _lock_products([product.id])
+    lock_raw_pools([product.id])
     snapshot = _write_loose_stock(
         product=product,
         packet_weight=packet_weight,
@@ -396,7 +403,12 @@ def _write_loose_stock(
     actor: User,
     snapshot_date: date,
 ) -> LooseStockSnapshot:
-    """Upsert one loose line. No permission or raw-material check -- callers do both."""
+    """Upsert one loose line. No permission or raw-material check -- callers do both.
+
+    Takes the product's loose-pool lock, so a count cannot land between a
+    custom order's availability read and its reservation.
+    """
+    lock_loose_pools([product.id])
     snapshot = LooseStockSnapshot.all_objects.filter(
         snapshot_date=snapshot_date, product=product, packet_weight=packet_weight
     ).first()
@@ -436,7 +448,9 @@ def record_loose_stocks(
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
     product_ids = {product.id for product, _ in counts}
-    _lock_products(product_ids)
+    lock_raw_pools(product_ids)
+    # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
+    lock_loose_pools(product_ids)
 
     snapshots = [
         _write_loose_stock(
@@ -565,7 +579,7 @@ def raw_inward_kg(product: Product, as_of: date | None = None) -> Decimal:
     return total or Decimal("0")
 
 
-def _lock_products(product_ids) -> None:
+def lock_raw_pools(product_ids) -> None:
     """Lock ``product_ids``' in-use raw lots for the rest of this transaction.
 
     Must run inside ``@transaction.atomic``, before a count is written, so two
@@ -574,10 +588,58 @@ def _lock_products(product_ids) -> None:
     """
     if not product_ids:
         return
+    # Ordered, so every caller acquires the same rows in the same order and two
+    # of them can never each hold a lot the other is waiting for.
     list(
-        InwardRawMaterial.objects.select_for_update().filter(
-            product_id__in=product_ids, status_id=StatusIds.IN_USE.value
-        )
+        InwardRawMaterial.objects.select_for_update()
+        .filter(product_id__in=product_ids, status_id=StatusIds.IN_USE.value)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+
+
+def lock_bag_pools(packagings: Iterable[ProductPackaging]) -> None:
+    """Lock ``packagings``' rows for the rest of this transaction.
+
+    Bag availability is derived at read time (counted - reserved - consumed),
+    so there is no stock row to lock. The ``ProductPackaging`` row stands in as
+    the per-bag mutex instead: every writer that reads a bag pool and then
+    changes it -- verifying or editing a confirmed order, writing a count --
+    takes this lock first, so two of them can never both read the same
+    "available" figure and together spend more bags than exist.
+
+    Must run inside ``@transaction.atomic``. Rows are locked in pk order so two
+    callers needing overlapping packagings cannot deadlock. Re-locking a row
+    this transaction already holds is a no-op.
+    """
+    ids = sorted({packaging.pk for packaging in packagings})
+    if not ids:
+        return
+    list(
+        ProductPackaging.all_objects.select_for_update()
+        .filter(pk__in=ids)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+
+
+def lock_loose_pools(product_ids: Iterable[int]) -> None:
+    """Lock the ``Product`` rows whose loose pools this transaction will spend.
+
+    The loose-packet counterpart of :func:`lock_bag_pools`. A loose pool is
+    keyed by ``(product, packet_weight)`` and has no row of its own, so the
+    product row is the mutex: coarser than one pool, but every weight of a
+    product is counted and spent by the same few writers, so it costs nothing
+    in practice. Same contract: inside ``@transaction.atomic``, pk order.
+    """
+    ids = sorted(set(product_ids))
+    if not ids:
+        return
+    list(
+        Product.all_objects.select_for_update()
+        .filter(pk__in=ids)
+        .order_by("pk")
+        .values_list("pk", flat=True)
     )
 
 

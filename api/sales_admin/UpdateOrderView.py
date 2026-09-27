@@ -50,7 +50,6 @@ satisfied by construction.
 from __future__ import annotations
 
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.request import Request
@@ -68,7 +67,7 @@ from aggregator.OrderOperations import (
 from api.admin import AdminApiView
 from api.order_serializers import OrderDetailPayloadSerializer
 
-from .GetOrderView import ORDER_PUBLIC_ID_PARAMETER, order_detail_queryset
+from .GetOrderView import ORDER_PUBLIC_ID_PARAMETER, get_locked_order
 
 # Upper bound on distinct bags in one order -- an editing screen, not a bulk import.
 MAX_ORDER_ITEMS = 100
@@ -224,16 +223,19 @@ class UpdateOrderView(AdminApiView):
         responses={200: OrderDetailPayloadSerializer},
     )
     def patch(self, request: Request, public_id: str) -> Response:
-        order = get_object_or_404(order_detail_queryset(), public_id=public_id)
-        assert_order_status(order, EDITABLE_STATUS_CODES, "edit")
-
-        serializer = UpdateOrderSerializer(
-            data=request.data, context={"order": order}
-        )
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
+        # Locked for the whole edit, so a concurrent verify / dispatch cannot
+        # move the order out of an editable status between the guard and the
+        # write (see OrderTransitionView).
         with transaction.atomic():
+            order = get_locked_order(public_id)
+            assert_order_status(order, EDITABLE_STATUS_CODES, "edit")
+
+            serializer = UpdateOrderSerializer(
+                data=request.data, context={"order": order}
+            )
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+
             core = {field: data[field] for field in ORDER_CORE_FIELDS if field in data}
             if core:
                 update_order_core(order, **core)

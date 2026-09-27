@@ -261,6 +261,13 @@ def assert_stock_covers(
     Two gates, the same ones verification applies: today's stock count must be
     complete, and every packaging must have the bags. Raises
     ``ValidationError``, which the API turns into a 400.
+
+    **The packagings being grown are locked before availability is read**
+    (:func:`InventoryOperations.lock_bag_pools`) and stay locked until the
+    caller's transaction commits the reservation. Without it two orders
+    verified at the same moment would both read the same available figure and
+    together reserve more bags than exist. Callers must therefore be inside
+    ``transaction.atomic`` and write their reservation in that same block.
     """
     from . import InventoryOperations
 
@@ -272,6 +279,8 @@ def assert_stock_covers(
     }
     if not increases:
         return
+
+    InventoryOperations.lock_bag_pools(increases)
 
     if not InventoryOperations.is_stock_count_complete():
         missing = [

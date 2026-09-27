@@ -14,6 +14,7 @@ order endpoint, the way ``ProductsView.products_queryset`` is reused by
 from __future__ import annotations
 
 from django.db.models import Prefetch, QuerySet
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -69,6 +70,30 @@ def order_detail_queryset() -> QuerySet:
             queryset=ClientTransportAgency.objects.select_related("transport_agency"),
         ),
     )
+
+
+def get_locked_order(public_id: str) -> Order:
+    """Lock the order row ``FOR UPDATE``, then load it through :func:`order_detail_queryset`.
+
+    Two queries on purpose. The lock is taken on the bare row: a caller that
+    waited on it wakes to a row another transaction has just changed, and
+    Postgres re-checks a locking query's joins against that new version -- so
+    a joined lock (``status`` is joined) would find the old status row no
+    longer matching and return *nothing*, a 404 instead of the guard's 400.
+    The detail load then runs with the lock already held, so it reads the
+    committed state the guard must see.
+
+    Must be called inside ``transaction.atomic``.
+    """
+    pk = (
+        Order.objects.select_for_update()
+        .filter(public_id=public_id)
+        .values_list("pk", flat=True)
+        .first()
+    )
+    if pk is None:
+        raise Http404("No Order matches the given query.")
+    return order_detail_queryset().get(pk=pk)
 
 
 class GetOrderView(AdminApiView):
