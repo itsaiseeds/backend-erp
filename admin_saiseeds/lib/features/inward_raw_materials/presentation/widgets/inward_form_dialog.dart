@@ -46,7 +46,14 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
 
   ProductModel? _product;
   PartyModel? _party;
-  DateTime? _labSamplingDate;
+  // A lot is almost always recorded the day it is sampled, so today is the
+  // sensible default; the picker still allows any other date.
+  DateTime? _labSamplingDate = _todayOnly();
+
+  static DateTime _todayOnly() {
+    final DateTime now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
 
   bool _isSubmitting = false;
   String? _productError;

@@ -79,6 +79,10 @@ class AdminSaiseedsApp extends StatelessWidget {
           ),
         ],
         child: ToastificationWrapper(
+          config: const ToastificationConfig(
+            maxTitleLines: 3,
+            maxDescriptionLines: 8,
+          ),
           child: MaterialApp.router(
             title: AppStrings.APP_NAME,
             routerConfig: AppRouter.router,

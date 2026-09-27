@@ -123,10 +123,18 @@ void main() {
           field.label!: field.isMuted,
     };
 
-    expect(mutedByLabel[AppStrings.FIELD_PACKET_WEIGHT], isFalse);
-    expect(mutedByLabel[AppStrings.FIELD_PACKETS], isFalse);
     expect(mutedByLabel[AppStrings.FIELD_BAG_SELLING_PRICE], isFalse);
 
+    expect(
+      mutedByLabel[AppStrings.FIELD_PACKET_WEIGHT],
+      isTrue,
+      reason: 'packet weight defines the packaging and is fixed once created',
+    );
+    expect(
+      mutedByLabel[AppStrings.FIELD_PACKETS],
+      isTrue,
+      reason: 'packet count defines the packaging and is fixed once created',
+    );
     expect(
       mutedByLabel[AppStrings.COLUMN_TOTAL_WEIGHT],
       isTrue,
@@ -190,33 +198,6 @@ void main() {
       tester.getRect(find.text(AppStrings.SELECTED_PRODUCT_SUMMARY_TITLE)),
       before,
     );
-  });
-
-  testWidgets('total weight recomputes when packets change', (tester) async {
-    await _pump(tester, RecordDialogMode.edit);
-
-    final Finder totalWeight = find.ancestor(
-      of: find.text(AppStrings.COLUMN_TOTAL_WEIGHT),
-      matching: find.byType(Column),
-    );
-    expect(totalWeight, findsWidgets);
-
-    // Seeded: 1 kg x 20 packets = 20.
-    expect(find.text('20'), findsWidgets);
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '20').first,
-      '30',
-    );
-    await tester.pumpAndSettle();
-
-    // 1 kg x 30 packets = 30; the fetched 20 must not survive.
-    final Iterable<TextFormField> fields = tester
-        .widgetList<TextFormField>(find.byType(TextFormField));
-    final List<String> values = [
-      for (final field in fields) field.controller?.text ?? '',
-    ];
-    expect(values, contains('30'));
   });
 
   testWidgets('cancelling returns to a read-only view', (tester) async {

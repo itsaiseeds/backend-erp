@@ -54,10 +54,8 @@ class ProductPackagingRecordDialog extends StatefulWidget {
 
 class _ProductPackagingRecordDialogState
     extends State<ProductPackagingRecordDialog> {
-  static final RegExp _weightPattern = RegExp(r'^\d*\.?\d{0,3}$');
   static final RegExp _pricePattern = RegExp(r'^\d*\.?\d{0,2}$');
   static final RegExp _decimalCharacters = RegExp(r'[0-9.]');
-  static final RegExp _digitCharacters = RegExp(r'[0-9]');
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final SellingPriceAutofill _autofill = SellingPriceAutofill();
@@ -253,10 +251,6 @@ class _ProductPackagingRecordDialogState
     ),
   ];
 
-  List<TextInputFormatter> get _countFormatters => [
-    FilteringTextInputFormatter.allow(_digitCharacters),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return AppRecordDialog(
@@ -299,11 +293,8 @@ class _ProductPackagingRecordDialogState
           right: RecordField(
             controller: _packetWeightController,
             label: AppStrings.FIELD_PACKET_WEIGHT,
-            hint: AppStrings.FIELD_PACKET_WEIGHT_HINT,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            isEditable: _canEdit,
-            inputFormatters: _decimalFormatters(_weightPattern),
-            validator: FormValidators.positiveAmount,
+            isEditable: false,
+            isLocked: true,
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -311,11 +302,8 @@ class _ProductPackagingRecordDialogState
           left: RecordField(
             controller: _packetsController,
             label: AppStrings.FIELD_PACKETS,
-            hint: AppStrings.FIELD_PACKETS_HINT,
-            keyboardType: TextInputType.number,
-            isEditable: _canEdit,
-            inputFormatters: _countFormatters,
-            validator: FormValidators.positiveCount,
+            isEditable: false,
+            isLocked: true,
           ),
           right: RecordField(
             controller: _sellingPriceController,
