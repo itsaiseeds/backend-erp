@@ -12,7 +12,6 @@ from unittest import mock
 from django.core.exceptions import PermissionDenied, ValidationError
 
 from aggregator import InventoryOperations as inv
-from aggregator import InwardOperations
 from aggregator.ClientOperations import add_client_address, create_client
 from aggregator.DispatchOperations import sync_dispatch_entry
 from aggregator.models import (
@@ -20,12 +19,7 @@ from aggregator.models import (
     City,
     Country,
     InventorySnapshot,
-    InwardOtherMaterial,
     InwardRawMaterial,
-    Order,
-    OtherMaterialRecipe,
-    OtherMaterialType,
-    OtherMaterialUnitType,
     Party,
     Pincode,
     ProductPackaging,
@@ -37,7 +31,6 @@ from aggregator.models import (
 from aggregator.OrderOperations import (
     attach_dispatch_details,
     create_order,
-    mark_delivered,
     revert_dispatch,
     unverify_order,
     update_order_status,
@@ -45,6 +38,7 @@ from aggregator.OrderOperations import (
 )
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, SalesPerson, User
+from common.models import indian_now
 from tests.common import DMLTestCase, book_raw_material, book_raw_material_for_every_product
 
 
@@ -143,6 +137,17 @@ class InventoryOperationsTest(DMLTestCase):
         flip (as these tests used to do) leaves no record of what shipped.
         """
         packaging = packaging or self.pack
+        # A same-day dispatch needs a real, precise timestamp -- InventoryOperations
+        # compares it against a count's ``counted_at`` to decide which side of that
+        # count it falls on (see ``_dispatch_conditions``). A backdated dispatch
+        # (a different calendar day) only needs *a* time on that day.
+        dispatched_at = (
+            indian_now()
+            if dispatch_date == self.today
+            else datetime.datetime.combine(
+                dispatch_date, datetime.time(), tzinfo=indian_now().tzinfo
+            )
+        )
         attach_dispatch_details(
             order, dispatched_by=self.stock_admin, dispatch_date=dispatch_date,
             from_city=self.city, to_city=self.city2, lr_number=lr_number,
@@ -151,7 +156,7 @@ class InventoryOperationsTest(DMLTestCase):
         )
         sync_dispatch_entry(
             order, actor=self.stock_admin,
-            dispatched_at=datetime.datetime.combine(dispatch_date, datetime.time()),
+            dispatched_at=dispatched_at,
             from_city=self.city, to_city=self.city2,
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
@@ -365,12 +370,7 @@ class InventoryOperationsTest(DMLTestCase):
         assert inv.available_bags(self.pack) == 400
 
     def _dispatch_today(self, order):
-        attach_dispatch_details(
-            order, dispatched_by=self.stock_admin, dispatch_date=self.today,
-            from_city=self.city, to_city=self.city2, lr_number="LR779",
-            driver_name="Ramesh Driver", driver_number="9876500009",
-            vehicle_number="GJ05AB1234",
-        )
+        self._dispatch(order, dispatch_date=self.today, lr_number="LR779")
         update_order_status(order, StatusIds.DISPATCHED)
 
     def test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice(self):

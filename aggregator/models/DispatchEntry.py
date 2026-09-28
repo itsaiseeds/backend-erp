@@ -183,17 +183,15 @@ class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
         if source is not None and self.client_id and source.client_id != self.client_id:
             errors["client"] = "A dispatch entry must name the order's own client."
 
-        if self.client_id and self.client_address_id:
-            from .ClientAddress import ClientAddress
-
-            belongs = ClientAddress.objects.filter(
-                client_id=self.client_id,
-                address_id=self.client_address_id,
-            ).exists()
-            if not belongs:
-                errors["client_address"] = (
-                    "Client address must belong to the selected client."
-                )
+        # No independent "belongs to the client" check for ``client_address``:
+        # it is always copied from the order's own ``delivery_address``
+        # (``DispatchOperations._upsert_entry``), which was already validated
+        # against the client's addresses when the order itself was booked (see
+        # ``Order.client_link_changed`` / ``CustomOrder.clean``). Re-checking
+        # it here against the client's *current* address list would break the
+        # same "an order keeps moving after its address is unlinked" guarantee
+        # those checks are gated to preserve -- a dispatch may happen long
+        # after the client's saved addresses have since changed.
 
         if (
             source is not None

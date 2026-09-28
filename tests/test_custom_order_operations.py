@@ -29,6 +29,7 @@ from aggregator.CustomOrderOperations import (
     revert_dispatch,
     update_custom_order_status,
 )
+from aggregator.DispatchOperations import sync_custom_dispatch_entry
 from aggregator.models import (
     Address,
     City,
@@ -43,6 +44,7 @@ from aggregator.models import (
 )
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, SalesPerson, User
+from common.models import indian_now
 from tests.common import DMLTestCase, book_raw_material_for_every_product
 
 
@@ -165,11 +167,37 @@ class CustomOrderOperationsTest(DMLTestCase):
         )
 
     def _dispatch(self, order, *, date=None):
+        """Attach dispatch details and write the challan, then move to DISPATCHED.
+
+        Mirrors ``CustomOrderOperations.dispatch_custom_order``.
+        ``consumed_loose_packets``/``reserved_loose_packets`` read the challan's
+        ``DispatchEntryItem`` (and its ``DispatchEntry.dispatched_at``, for
+        same-day ordering against a count) -- a bare status flip leaves no
+        record of what shipped or when.
+        """
+        dispatch_date = date or self.today
+        dispatched_at = (
+            indian_now()
+            if dispatch_date == self.today
+            else datetime.datetime.combine(
+                dispatch_date, datetime.time(), tzinfo=indian_now().tzinfo
+            )
+        )
         attach_dispatch_details(
-            order, dispatched_by=self.stock_admin, dispatch_date=date or self.today,
+            order, dispatched_by=self.stock_admin, dispatch_date=dispatch_date,
             from_city=self.city, to_city=self.city2, lr_number="LR-CO",
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+        )
+        sync_custom_dispatch_entry(
+            order, actor=self.stock_admin, dispatched_at=dispatched_at,
+            from_city=self.city, to_city=self.city2,
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+            lot_numbers={
+                (item.product.public_id, item.packet_weight): "LOT-CO"
+                for item in order.items.select_related("product")
+            },
         )
         update_custom_order_status(order, StatusIds.DISPATCHED)
 

@@ -144,7 +144,7 @@ def sync_dispatch_entry(
         driver_number=driver_number,
         vehicle_number=vehicle_number,
     )
-    _sync_entry_items(entry, order, lot_numbers, actor)
+    _sync_entry_items(entry, order, lot_numbers, quantities, actor)
     return entry
 
 
@@ -190,8 +190,6 @@ def _upsert_entry(
             setattr(entry, field, values[field])
     entry.full_clean()
     entry.save()
-
-    _sync_entry_items(entry, order, lot_numbers, quantities, actor)
     return entry
 
 

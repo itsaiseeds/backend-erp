@@ -289,7 +289,9 @@ def _bag_demand(
     return total or 0
 
 
-def _dispatched_bag_demand(product_packaging: ProductPackaging, order_filter: dict) -> int:
+def _dispatched_bag_demand(
+    product_packaging: ProductPackaging, order_filter: dict, *conditions: Q
+) -> int:
     """Sum ``DispatchEntryItem.quantity`` -- what actually shipped -- for matching orders.
 
     Unlike ``_bag_demand``, this is the truth for what left the warehouse: a
@@ -297,10 +299,63 @@ def _dispatched_bag_demand(product_packaging: ProductPackaging, order_filter: di
     so ``OrderItem.quantity`` alone would overstate it.
     """
     total = DispatchEntryItem.objects.filter(
+        *conditions,
         product_packaging=product_packaging,
         **{f"dispatch_entry__{key}": value for key, value in order_filter.items()},
     ).aggregate(total=Sum("quantity"))["total"]
     return total or 0
+
+
+def _bag_counted_at(
+    product_packaging: ProductPackaging, snapshot_date: date
+) -> datetime | None:
+    """When one packaging's line for ``snapshot_date`` was counted, if it was."""
+    return (
+        InventorySnapshot.objects.filter(
+            snapshot_date=snapshot_date, product_packaging=product_packaging
+        )
+        .values_list("counted_at", flat=True)
+        .first()
+    )
+
+
+def _dispatch_conditions(
+    prefix: str, snapshot_date: date, counted_at: datetime | None, *, after_count: bool
+) -> list[Q]:
+    """Q condition(s) selecting dispatches on the correct side of one count.
+
+    Every dispatch -- bag or loose, agency or private -- writes exactly one
+    ``DispatchEntry``, so its ``dispatched_at`` is the single source of truth
+    for when it happened; ``prefix`` is how far the summed model (an
+    ``OrderItem``-like line) is from that entry (``""`` for ``DispatchEntryItem``
+    itself, ``"custom_order"`` from a ``CustomOrderItem``).
+
+    A dispatch on any other day is decided by the day alone. The count's *own*
+    day is the ambiguous one: a dispatch recorded before ``counted_at`` is
+    already missing from the figure just written and must not be subtracted a
+    second time; one recorded after it is still baked into that stale figure
+    and must be. When ``counted_at`` is unknown (no snapshot for this exact
+    line on this date), the whole day falls on the ``after_count`` side --
+    the old, coarser assumption that a stale count predates its day's
+    dispatches unless a precise count says otherwise.
+    """
+    field = (
+        f"{prefix}__dispatch_entry__dispatched_at" if prefix else "dispatch_entry__dispatched_at"
+    )
+    if after_count:
+        conditions = [Q(**{f"{field}__date__gt": snapshot_date})]
+        same_day = Q(**{f"{field}__date": snapshot_date})
+        if counted_at is not None:
+            same_day &= Q(**{f"{field}__gte": counted_at})
+        conditions.append(same_day)
+        return conditions
+
+    conditions = [Q(**{f"{field}__date__lt": snapshot_date})]
+    if counted_at is not None:
+        conditions.append(
+            Q(**{f"{field}__date": snapshot_date, f"{field}__lt": counted_at})
+        )
+    return conditions
 
 
 def reserved_bags(product_packaging: ProductPackaging) -> int:
@@ -326,23 +381,23 @@ def reserved_bags(product_packaging: ProductPackaging) -> int:
 def consumed_bags(
     product_packaging: ProductPackaging, snapshot_date: date | None = None
 ) -> int:
-    """Bags actually shipped on or after ``snapshot_date``.
+    """Bags dispatched after ``snapshot_date``'s count was taken.
 
     Dispatches predating the count already left the warehouse before it was
     taken, so they are absent from the counted figure and must not be
-    subtracted a second time. Reads ``DispatchEntryItem.quantity``, not the
+    subtracted a second time -- including earlier on the count's own day (see
+    ``_dispatch_conditions``). Reads ``DispatchEntryItem.quantity``, not the
     order line's quantity, so a partial dispatch is not overcounted here (its
     unshipped remainder is reserved instead -- see ``reserved_bags``).
     """
     snapshot_date = snapshot_date or today()
     counted_at = _bag_counted_at(product_packaging, snapshot_date)
     base = {"order__status_id__in": CONSUMING_STATUS_IDS}
-    return _dispatched_bag_demand(
-        product_packaging,
-        {**base, "order__dispatch_details__dispatch_date__gte": snapshot_date},
-    ) + _dispatched_bag_demand(
-        product_packaging,
-        {**base, "order__private_dispatch_details__dispatch_date__gte": snapshot_date},
+    return sum(
+        _dispatched_bag_demand(product_packaging, base, condition)
+        for condition in _dispatch_conditions(
+            "", snapshot_date, counted_at, after_count=True
+        )
     )
 
 
@@ -738,12 +793,10 @@ def _bags_dispatched_before(
     base = {"order__status_id__in": CONSUMING_STATUS_IDS}
     if before is None:
         return _dispatched_bag_demand(product_packaging, base)
-    return _dispatched_bag_demand(
-        product_packaging,
-        {**base, "order__dispatch_details__dispatch_date__lt": before},
-    ) + _dispatched_bag_demand(
-        product_packaging,
-        {**base, "order__private_dispatch_details__dispatch_date__lt": before},
+    counted_at = _bag_counted_at(product_packaging, before)
+    return sum(
+        _dispatched_bag_demand(product_packaging, base, condition)
+        for condition in _dispatch_conditions("", before, counted_at, after_count=False)
     )
 
 
