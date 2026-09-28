@@ -26,10 +26,14 @@ excluded from that gate, and read at *its* own latest date.
 Because a loose count may be days old and still correct, loose figures are read
 at ``loose_date(...)`` -- the latest loose snapshot date -- rather than today.
 
-Reserved and consumed quantities are **derived from ``Order.status``**, never
-stored. That makes verification and dispatch inherently reversible (flip the
-status back and the numbers correct themselves) and means outstanding
-reservations carry across days, which a stored counter would not.
+Reserved and consumed quantities are **derived from ``Order.status`` and
+``DispatchEntryItem.quantity``**, never stored as their own counter. That makes
+verification and dispatch inherently reversible (flip the status back and the
+numbers correct themselves) and means outstanding reservations carry across
+days, which a stored counter would not. A dispatch that ships less than a line
+ordered leaves the gap reserved against that same order -- dispatch is
+one-shot, so nothing will ship the rest later; the gap only closes when
+someone corrects the order or the dispatch by hand.
 
 **Counts are backed by raw material.** Bags and loose packets are packed out
 of a product's inward raw kilograms (``InwardRawMaterial`` lots that are
@@ -59,6 +63,7 @@ from common.models import indian_now
 
 from .models import (
     CustomOrderItem,
+    DispatchEntryItem,
     InventorySnapshot,
     InwardOtherMaterial,
     InwardRawMaterial,
@@ -284,56 +289,27 @@ def _bag_demand(
     return total or 0
 
 
-# Where each kind of dispatch record hangs off an order or a custom order.
-_DISPATCH_RECORDS = ("dispatch_details", "private_dispatch_details")
+def _dispatched_bag_demand(
+    product_packaging: ProductPackaging, order_filter: dict, *conditions: Q
+) -> int:
+    """Sum ``DispatchEntryItem.quantity`` -- what actually shipped -- for matching orders.
 
-
-def _dispatch_conditions(
-    order_path: str,
-    snapshot_date: date,
-    counted_at: datetime | None,
-    *,
-    after_count: bool,
-) -> list[Q]:
-    """One filter per dispatch record kind: dispatched after (or before) the count.
-
-    A count is taken at a moment of its day, not at midnight, so the dispatch
-    *date* alone cannot place a dispatch relative to it:
-
-    * a different day is decided by the date -- ``dispatch_date`` may be
-      backdated, and a count describes the floor as of its own day;
-    * the count's own day is decided by time: a dispatch recorded (its
-      record's ``created_at``) before the line's ``counted_at`` had already
-      left the floor when it was counted.
-
-    Every consuming dispatch lands on exactly one side, so what the count
-    already excludes is never subtracted a second time, and is never left out
-    of the raw material spent. With no count line (``counted_at`` is ``None``)
-    the whole day falls after the count, since nothing was counted.
+    Unlike ``_bag_demand``, this is the truth for what left the warehouse: a
+    dispatch may ship fewer bags than a line ordered (see ``DispatchEntryItem``),
+    so ``OrderItem.quantity`` alone would overstate it.
     """
-    conditions = []
-    for record in _DISPATCH_RECORDS:
-        dispatch_date = f"{order_path}__{record}__dispatch_date"
-        recorded_at = f"{order_path}__{record}__created_at"
-        if after_count:
-            same_day = Q(**{dispatch_date: snapshot_date})
-            if counted_at is not None:
-                same_day &= Q(**{f"{recorded_at}__gte": counted_at})
-            conditions.append(Q(**{f"{dispatch_date}__gt": snapshot_date}) | same_day)
-        else:
-            earlier = Q(**{f"{dispatch_date}__lt": snapshot_date})
-            if counted_at is not None:
-                earlier |= Q(
-                    **{dispatch_date: snapshot_date, f"{recorded_at}__lt": counted_at}
-                )
-            conditions.append(earlier)
-    return conditions
+    total = DispatchEntryItem.objects.filter(
+        *conditions,
+        product_packaging=product_packaging,
+        **{f"dispatch_entry__{key}": value for key, value in order_filter.items()},
+    ).aggregate(total=Sum("quantity"))["total"]
+    return total or 0
 
 
 def _bag_counted_at(
     product_packaging: ProductPackaging, snapshot_date: date
 ) -> datetime | None:
-    """When ``product_packaging``'s line for ``snapshot_date`` was counted, if it was."""
+    """When one packaging's line for ``snapshot_date`` was counted, if it was."""
     return (
         InventorySnapshot.objects.filter(
             snapshot_date=snapshot_date, product_packaging=product_packaging
@@ -343,11 +319,63 @@ def _bag_counted_at(
     )
 
 
+def _dispatch_conditions(
+    prefix: str, snapshot_date: date, counted_at: datetime | None, *, after_count: bool
+) -> list[Q]:
+    """Q condition(s) selecting dispatches on the correct side of one count.
+
+    Every dispatch -- bag or loose, agency or private -- writes exactly one
+    ``DispatchEntry``, so its ``dispatched_at`` is the single source of truth
+    for when it happened; ``prefix`` is how far the summed model (an
+    ``OrderItem``-like line) is from that entry (``""`` for ``DispatchEntryItem``
+    itself, ``"custom_order"`` from a ``CustomOrderItem``).
+
+    A dispatch on any other day is decided by the day alone. The count's *own*
+    day is the ambiguous one: a dispatch recorded before ``counted_at`` is
+    already missing from the figure just written and must not be subtracted a
+    second time; one recorded after it is still baked into that stale figure
+    and must be. When ``counted_at`` is unknown (no snapshot for this exact
+    line on this date), the whole day falls on the ``after_count`` side --
+    the old, coarser assumption that a stale count predates its day's
+    dispatches unless a precise count says otherwise.
+    """
+    field = (
+        f"{prefix}__dispatch_entry__dispatched_at" if prefix else "dispatch_entry__dispatched_at"
+    )
+    if after_count:
+        conditions = [Q(**{f"{field}__date__gt": snapshot_date})]
+        same_day = Q(**{f"{field}__date": snapshot_date})
+        if counted_at is not None:
+            same_day &= Q(**{f"{field}__gte": counted_at})
+        conditions.append(same_day)
+        return conditions
+
+    conditions = [Q(**{f"{field}__date__lt": snapshot_date})]
+    if counted_at is not None:
+        conditions.append(
+            Q(**{f"{field}__date": snapshot_date, f"{field}__lt": counted_at})
+        )
+    return conditions
+
+
 def reserved_bags(product_packaging: ProductPackaging) -> int:
-    """Bags spoken for by verified orders that have not yet been dispatched."""
-    return _bag_demand(
+    """Bags spoken for: verified orders not yet dispatched, plus shortfalls on ones that are.
+
+    A dispatched order's line still counts here for whatever it ordered but
+    did not ship -- dispatch is one-shot, so that gap has no later shipment to
+    close it and stays reserved against the order until someone corrects it by
+    hand (edit the line down, or revert and re-record the dispatch).
+    """
+    held_by_confirmed = _bag_demand(
         product_packaging, {"order__status_id__in": RESERVING_STATUS_IDS}
     )
+    ordered_on_dispatched = _bag_demand(
+        product_packaging, {"order__status_id__in": CONSUMING_STATUS_IDS}
+    )
+    shipped = _dispatched_bag_demand(
+        product_packaging, {"order__status_id__in": CONSUMING_STATUS_IDS}
+    )
+    return held_by_confirmed + (ordered_on_dispatched - shipped)
 
 
 def consumed_bags(
@@ -358,15 +386,17 @@ def consumed_bags(
     Dispatches predating the count already left the warehouse before it was
     taken, so they are absent from the counted figure and must not be
     subtracted a second time -- including earlier on the count's own day (see
-    ``_dispatch_conditions``).
+    ``_dispatch_conditions``). Reads ``DispatchEntryItem.quantity``, not the
+    order line's quantity, so a partial dispatch is not overcounted here (its
+    unshipped remainder is reserved instead -- see ``reserved_bags``).
     """
     snapshot_date = snapshot_date or today()
     counted_at = _bag_counted_at(product_packaging, snapshot_date)
     base = {"order__status_id__in": CONSUMING_STATUS_IDS}
     return sum(
-        _bag_demand(product_packaging, base, condition)
+        _dispatched_bag_demand(product_packaging, base, condition)
         for condition in _dispatch_conditions(
-            "order", snapshot_date, counted_at, after_count=True
+            "", snapshot_date, counted_at, after_count=True
         )
     )
 
@@ -751,23 +781,22 @@ def lock_loose_pools(product_ids: Iterable[int]) -> None:
 def _bags_dispatched_before(
     product_packaging: ProductPackaging, before: date | None
 ) -> int:
-    """Bags of ``product_packaging`` dispatched before ``before``'s count was taken.
+    """Bags of ``product_packaging`` actually shipped strictly before ``before``.
 
     Those bags already left the floor before the count ``before`` names, so
     they carry no on-hand figure any more -- but they were packed from raw
-    material and must still count as spent. That includes a dispatch earlier
-    on the count's own day (see ``_dispatch_conditions``). ``before=None`` (no
+    material and must still count as spent. Reads ``DispatchEntryItem.quantity``
+    so an unshipped remainder of a partial dispatch (still sitting on the floor,
+    still reserved) is not mistaken for spent raw material. ``before=None`` (no
     bag count has ever been taken) counts every dispatch ever made.
     """
     base = {"order__status_id__in": CONSUMING_STATUS_IDS}
     if before is None:
-        return _bag_demand(product_packaging, base)
+        return _dispatched_bag_demand(product_packaging, base)
     counted_at = _bag_counted_at(product_packaging, before)
     return sum(
-        _bag_demand(product_packaging, base, condition)
-        for condition in _dispatch_conditions(
-            "order", before, counted_at, after_count=False
-        )
+        _dispatched_bag_demand(product_packaging, base, condition)
+        for condition in _dispatch_conditions("", before, counted_at, after_count=False)
     )
 
 

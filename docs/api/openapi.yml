@@ -5431,7 +5431,8 @@ components:
       - vehicle_number
     DispatchItemLotRequest:
       type: object
-      description: The lot number for one line of the order being dispatched.
+      description: The lot number -- and, if it falls short, the quantity -- for
+        one order line.
       properties:
         product_packaging_public_id:
           type: string
@@ -5441,6 +5442,11 @@ components:
           type: string
           minLength: 1
           maxLength: 64
+        quantity:
+          type: integer
+          minimum: 1
+          description: How many actually shipped on this line, if fewer than ordered.
+            Omit to dispatch the line in full.
       required:
       - lot_number
       - product_packaging_public_id

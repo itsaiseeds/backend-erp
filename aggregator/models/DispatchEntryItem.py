@@ -12,11 +12,20 @@ class DispatchEntryItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
     packets, price per packet). Exactly one of the two shapes
     (``ck_dispatchentryitem_one_kind``).
 
-    The packaging, the quantity and the negotiated price are copied from the
-    order line rather than read through it, for the same reason the receiver is
+    The packaging and the negotiated price are copied from the order line
+    rather than read through it, for the same reason the receiver is
     snapshotted on ``DispatchEntry``: the challan states what physically went
     out, and a later edit to the order must not rewrite a challan already in the
     driver's hand.
+
+    ``quantity`` is **what actually shipped**, not the order line's quantity --
+    the two may differ when a dispatch does not fully cover a line (fewer bags
+    were on the floor than were ordered). ``InventoryOperations`` reads this
+    figure as the truth for consumed bags, and treats the gap against the order
+    line's quantity as still reserved (see ``reserved_bags``). Fixing that gap
+    is a manual step -- edit the order's line down to what actually shipped, or
+    revert the dispatch and re-record it -- there is no automatic follow-up
+    shipment.
 
     The lot number is the one field that exists nowhere else -- it identifies
     the production batch the bags came from, and it is captured when the
