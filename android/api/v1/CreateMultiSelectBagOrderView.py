@@ -210,10 +210,14 @@ class CreateMultiSelectBagOrderSerializer(serializers.Serializer):
             agency = agency_link.transport_agency
 
         # One query for every line, so a 100-item order does not become 100.
+        # A deleted product's bags are not bookable: the catalogue hides them,
+        # and they answer here exactly like a bag that does not exist.
         wanted = [item["product_packaging_public_id"] for item in attrs["items"]]
         packagings = {
             packaging.public_id: packaging
-            for packaging in ProductPackaging.objects.filter(public_id__in=wanted)
+            for packaging in ProductPackaging.objects.filter(
+                public_id__in=wanted, product__is_deleted=False
+            )
         }
         missing = [public_id for public_id in wanted if public_id not in packagings]
         if missing:

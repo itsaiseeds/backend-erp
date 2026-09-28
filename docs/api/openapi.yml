@@ -640,8 +640,8 @@ paths:
         name: product
         schema:
           type: string
-        description: Product public id(s), e.g. P-E79QA0E2OIHF. Comma-separated (any
-          match); AND-ed with the other filters.
+        description: Product public id(s), e.g. P-E79QA0E2OIHF (see options). Comma-separated
+          (any match); AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -880,9 +880,8 @@ paths:
   /api/execute-code/:
     post:
       operationId: execute_code
-      description: Execute Python on the server (``execute_python_code`` permission
-        only).
-      summary: Execute Python code on the server (permission-gated)
+      description: Execute Python on the server (superuser with ``execute_python_code``).
+      summary: Execute Python code on the server (superuser; off unless enabled)
       tags:
       - Developer tools
       requestBody:
@@ -1141,6 +1140,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClientPayload'
           description: ''
+  /api/sales-admin/create-custom-order:
+    post:
+      operationId: api_sales_admin_create_custom_order_create
+      description: Book a loose-packet custom order for any verified client (app admin
+        only).
+      summary: Book a custom (loose-packet) order
+      tags:
+      - Admin · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateCustomOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateCustomOrderRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
+          description: ''
   /api/sales-admin/crops:
     get:
       operationId: api_sales_admin_crops_list
@@ -1236,10 +1264,123 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/custom-order/{public_id}:
+    get:
+      operationId: api_sales_admin_custom_order_retrieve
+      description: Get (GET) or delete (DELETE) one custom order (app admin only).
+      summary: Get a custom order in full (order + items + the client's full details)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_custom_order_destroy
+      description: Get (GET) or delete (DELETE) one custom order (app admin only).
+      summary: Delete a custom order that has not been dispatched (CONFIRMED)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/custom-orders/:
+    get:
+      operationId: sales_admin_get_custom_orders_list
+      description: 'List every custom order: filter by admin / client / product /
+        city / status.'
+      summary: List custom orders (filter by sales admin / client / product / city
+        / status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the custom order is delivered to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client id(s) the custom order was booked for (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: created_by
+        schema:
+          type: string
+        description: User id(s) of the sales admin who booked the custom order (see
+          options). Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product id(s) the custom order contains (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, price); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Order lifecycle status. Comma-separated (any match); AND-ed with
+          the other filters.
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderListPage'
+          description: ''
   /api/sales-admin/dispatch-challans/:
     get:
       operationId: sales_admin_get_dispatch_challans
-      description: List the delivery challans of dispatched orders whose LR is recorded.
+      description: List the delivery challans of dispatched orders and custom orders.
       summary: List dispatch challans (filter by client / destination city, sortable)
       parameters:
       - in: query
@@ -1302,6 +1443,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/DispatchChallanPage'
           description: ''
+  /api/sales-admin/dispatch-custom-order/{public_id}:
+    post:
+      operationId: api_sales_admin_dispatch_custom_order_create
+      description: Record an own-vehicle dispatch against a CONFIRMED custom order
+        (app admin only).
+      summary: Dispatch a custom order (always own vehicle)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Dispatch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispatchCustomOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DispatchCustomOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DispatchCustomOrderRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
+          description: ''
   /api/sales-admin/dispatch-order/{public_id}:
     post:
       operationId: api_sales_admin_dispatch_order_create
@@ -1336,6 +1513,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/edit-custom-order/{public_id}:
+    patch:
+      operationId: api_sales_admin_edit_custom_order_partial_update
+      description: Update a custom order, including its lines (app admin only).
+      summary: Update a custom order (including its items)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCustomOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCustomOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCustomOrderRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
           description: ''
   /api/sales-admin/edit-field-trip/{public_id}:
     patch:
@@ -1441,7 +1652,8 @@ paths:
   /api/sales-admin/export/dispatch-receipts:
     get:
       operationId: sales_admin_export_dispatch_receipts
-      description: Export the complete challans of orders booked in a date window.
+      description: Export the complete challans of orders and custom orders booked
+        in a date window.
       summary: Export dispatch receipts (challans) of orders booked in a date range
       parameters:
       - in: query
@@ -1965,8 +2177,8 @@ paths:
         name: material_type
         schema:
           type: string
-        description: Material type id(s) (see the recipe). Comma-separated (any match);
-          AND-ed with the other filters.
+        description: Material type id(s) (see the recipe; see options). Comma-separated
+          (any match); AND-ed with the other filters.
       - in: query
         name: page
         schema:
@@ -1987,8 +2199,8 @@ paths:
         name: product
         schema:
           type: string
-        description: Product public id(s) (see the recipe). Comma-separated (any match);
-          AND-ed with the other filters.
+        description: Product public id(s) (see the recipe; see options). Comma-separated
+          (any match); AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -2121,8 +2333,8 @@ paths:
         name: product
         schema:
           type: string
-        description: Product public id(s). Comma-separated (any match); AND-ed with
-          the other filters.
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -2304,8 +2516,8 @@ paths:
         name: material_type
         schema:
           type: string
-        description: Material type id(s). Comma-separated (any match); AND-ed with
-          the other filters.
+        description: Material type id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
       - in: query
         name: page
         schema:
@@ -2320,8 +2532,8 @@ paths:
         name: product
         schema:
           type: string
-        description: Product public id(s). Comma-separated (any match); AND-ed with
-          the other filters.
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -2834,6 +3046,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/revert-custom-order-dispatch/{public_id}:
+    post:
+      operationId: api_sales_admin_revert_custom_order_dispatch_create
+      description: Undo a custom order's dispatch, returning it to CONFIRMED.
+      summary: Revert a custom order's dispatch (DISPATCHED -> CONFIRMED)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Dispatch
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
           description: ''
   /api/sales-admin/revert-dispatch/{public_id}:
     post:
@@ -3887,6 +4122,11 @@ components:
           type: string
         to_city:
           type: string
+        transport_agency:
+          allOf:
+          - $ref: '#/components/schemas/TransportAgencyRef'
+          nullable: true
+          description: The carrier; null on a private dispatch.
       required:
       - dispatch_date
       - driver_name
@@ -3896,6 +4136,7 @@ components:
       - lr_number
       - public_id
       - to_city
+      - transport_agency
       - vehicle_number
     ChallanLine:
       type: object
@@ -4424,6 +4665,33 @@ components:
           maxLength: 255
       required:
       - name
+    CreateCustomOrderRequest:
+      type: object
+      description: Request validation for booking a custom order.
+      properties:
+        client_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id belonging to the client.
+        special_comments:
+          type: string
+          default: ''
+        expected_delivery_date:
+          type: string
+          format: date
+          nullable: true
+          description: Defaults to the day after booking.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomOrderItemWriteRequest'
+      required:
+      - client_address_id
+      - client_public_id
+      - items
     CreateFarmerVisitRequest:
       type: object
       description: |-
@@ -4500,7 +4768,10 @@ components:
 
         ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
         ``In Use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
-        that flip and is deliberately absent here.
+        that flip and is deliberately absent here. ``lab_sampling_date`` may be
+        given explicitly; left out, it defaults to today -- a lot never starts
+        with no sampling date, since it arrives for lab testing the day it's
+        booked.
       properties:
         product:
           type: string
@@ -4724,6 +4995,330 @@ components:
       required:
       - id
       - name
+    CustomChallanLine:
+      type: object
+      description: 'Output shape for one custom-order challan line: loose packets,
+        a lot, money.'
+      properties:
+        product:
+          $ref: '#/components/schemas/ProductRef'
+        packet_weight:
+          type: string
+          description: Weight of one packet, in kg.
+        packets:
+          type: integer
+        lot_number:
+          type: string
+        negotiated_selling_price:
+          type: string
+          description: Per packet.
+        line_total:
+          type: string
+      required:
+      - line_total
+      - lot_number
+      - negotiated_selling_price
+      - packet_weight
+      - packets
+      - product
+    CustomDispatchChallanItem:
+      type: object
+      description: Output shape for one custom order's challan (schema only).
+      properties:
+        order_public_id:
+          type: string
+          description: The custom order's CORD-… id.
+        order_type:
+          $ref: '#/components/schemas/OrderTypeEnum'
+        our_details:
+          $ref: '#/components/schemas/ChallanParty'
+        receiver_details:
+          $ref: '#/components/schemas/ChallanReceiver'
+        hsn_code:
+          type: string
+        financial_year:
+          type: string
+          description: Indian FY, e.g. "2026-2027".
+        dispatch:
+          $ref: '#/components/schemas/ChallanDispatch'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomChallanLine'
+        item_count:
+          type: integer
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+      required:
+      - dispatch
+      - financial_year
+      - hsn_code
+      - item_count
+      - items
+      - order_public_id
+      - order_type
+      - our_details
+      - receiver_details
+      - total_amount
+      - total_packets
+    CustomDispatchItemLotRequest:
+      type: object
+      description: The lot number for one loose line of the custom order being dispatched.
+      properties:
+        product_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        lot_number:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+      - lot_number
+      - packet_weight
+      - product_public_id
+    CustomOrderCardItem:
+      type: object
+      description: Output shape for one line on a custom-order card.
+      properties:
+        product:
+          $ref: '#/components/schemas/OrderCardProduct'
+        packet_weight:
+          type: string
+          description: Weight of one packet, in kg.
+        negotiated_selling_price:
+          type: string
+          description: Per packet.
+        packets:
+          type: integer
+      required:
+      - negotiated_selling_price
+      - packet_weight
+      - packets
+      - product
+    CustomOrderDetailPayload:
+      type: object
+      description: |-
+        Output shape for one custom order in full (``custom_order_detail_payload``).
+
+        ``client`` carries the whole client -- every address with its link id -- so
+        the edit screen's address picker needs no second call.
+      properties:
+        public_id:
+          type: string
+        client:
+          $ref: '#/components/schemas/ClientPayload'
+        delivery_address:
+          type: string
+        status:
+          type: string
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomOrderItemPayload'
+      required:
+      - actual_delivery_date
+      - client
+      - delivery_address
+      - expected_delivery_date
+      - items
+      - public_id
+      - special_comments
+      - status
+      - total_amount
+      - total_packets
+      - verified_at
+    CustomOrderItemPayload:
+      type: object
+      description: Output shape for one loose-packet line of a custom order.
+      properties:
+        product:
+          $ref: '#/components/schemas/ProductRef'
+        packet_weight:
+          type: string
+          description: Weight of one packet, in kg.
+        negotiated_selling_price:
+          type: string
+          description: Per packet.
+        packets:
+          type: integer
+        line_total:
+          type: string
+      required:
+      - line_total
+      - negotiated_selling_price
+      - packet_weight
+      - packets
+      - product
+    CustomOrderItemWriteRequest:
+      type: object
+      description: 'One line of a custom order: loose packets of one product at one
+        weight.'
+      properties:
+        product_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+          description: 'Weight of one packet, in kg. Selects the loose pool the line
+            draws from: 1kg and 0.5kg packets are separate stock.'
+        packets:
+          type: integer
+          minimum: 1
+        negotiated_selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Per-packet rate for this line. Omit it to leave an existing
+            line's price alone, or to charge a new line the product's rate for this
+            packet weight.
+      required:
+      - packet_weight
+      - packets
+      - product_public_id
+    CustomOrderListCity:
+      type: object
+      description: Output shape for the ``city`` reference on a custom-order card.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    CustomOrderListClient:
+      type: object
+      description: Output shape for the ``client`` reference on a custom-order card.
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+      required:
+      - company_name
+      - public_id
+    CustomOrderListItem:
+      type: object
+      description: Output shape for one custom-order card (schema only).
+      properties:
+        public_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          nullable: true
+        client:
+          $ref: '#/components/schemas/CustomOrderListClient'
+        client_created_by:
+          type: string
+          nullable: true
+          description: Sales person who onboarded the client.
+        created_by:
+          type: string
+          nullable: true
+          description: Sales admin who booked the custom order.
+        verified_by:
+          type: string
+          nullable: true
+          description: Sales admin who confirmed it -- the booking admin, by construction.
+        delivery_address:
+          type: string
+        city:
+          allOf:
+          - $ref: '#/components/schemas/CustomOrderListCity'
+          nullable: true
+        expected_delivery_date:
+          type: string
+          format: date
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        item_count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomOrderCardItem'
+      required:
+      - city
+      - client
+      - client_created_by
+      - created_at
+      - created_by
+      - delivery_address
+      - expected_delivery_date
+      - item_count
+      - items
+      - public_id
+      - status
+      - total_amount
+      - total_packets
+      - verified_by
+    CustomOrderListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomOrderListItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
     DispatchChallanItem:
       type: object
       description: Output shape for one challan (schema only).
@@ -4779,7 +5374,8 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/DispatchChallanItem'
+            $ref: '#/components/schemas/DispatchChallanRow'
+          readOnly: true
         available_filters:
           type: array
           items:
@@ -4796,6 +5392,43 @@ components:
       - results
       - total_count
       - total_pages
+    DispatchChallanRow:
+      oneOf:
+      - $ref: '#/components/schemas/DispatchChallanItem'
+      - $ref: '#/components/schemas/CustomDispatchChallanItem'
+    DispatchCustomOrderRequest:
+      type: object
+      description: '``dispatch-order``''s request, with lot numbers keyed by loose
+        line.'
+      properties:
+        from_city_id:
+          type: integer
+          description: Where the goods left from. An input until a warehouse can default
+            it.
+        driver_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        driver_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        vehicle_number:
+          type: string
+          minLength: 1
+          maxLength: 32
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomDispatchItemLotRequest'
+          description: One lot number per line of the custom order; every line must
+            appear.
+      required:
+      - driver_name
+      - driver_number
+      - from_city_id
+      - items
+      - vehicle_number
     DispatchItemLotRequest:
       type: object
       description: The lot number -- and, if it falls short, the quantity -- for
@@ -4952,6 +5585,58 @@ components:
       - company_name
       - gst_number
       - public_id
+    ExportCustomDispatchReceipt:
+      type: object
+      description: A custom order's row of ``export/dispatch-receipts``.
+      properties:
+        order_public_id:
+          type: string
+          description: The custom order's CORD-… id.
+        order_type:
+          $ref: '#/components/schemas/OrderTypeEnum'
+        our_details:
+          $ref: '#/components/schemas/ChallanParty'
+        receiver_details:
+          $ref: '#/components/schemas/ChallanReceiver'
+        hsn_code:
+          type: string
+        financial_year:
+          type: string
+          description: Indian FY, e.g. "2026-2027".
+        dispatch:
+          $ref: '#/components/schemas/ChallanDispatch'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomChallanLine'
+        item_count:
+          type: integer
+        total_amount:
+          type: string
+        total_packets:
+          type: integer
+        order_created_at:
+          type: string
+          format: date-time
+        city:
+          allOf:
+          - $ref: '#/components/schemas/ExportCity'
+          nullable: true
+          description: custom order -> delivery address -> city.
+      required:
+      - city
+      - dispatch
+      - financial_year
+      - hsn_code
+      - item_count
+      - items
+      - order_created_at
+      - order_public_id
+      - order_type
+      - our_details
+      - receiver_details
+      - total_amount
+      - total_packets
     ExportCustomOrder:
       type: object
       description: One row of ``export/custom-orders`` (``custom_order_export_payload``).
@@ -5117,12 +5802,17 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/ExportDispatchReceipt'
+            $ref: '#/components/schemas/ExportDispatchReceiptsResponseRow'
+          readOnly: true
       required:
       - count
       - end_date
       - results
       - start_date
+    ExportDispatchReceiptsResponseRow:
+      oneOf:
+      - $ref: '#/components/schemas/ExportDispatchReceipt'
+      - $ref: '#/components/schemas/ExportCustomDispatchReceipt'
     ExportInventorySnapshotRow:
       oneOf:
       - $ref: '#/components/schemas/ExportBagSnapshot'
@@ -5718,15 +6408,30 @@ components:
       properties:
         public_id:
           type: string
+        material_type:
+          $ref: '#/components/schemas/InwardOtherMaterialTypeRef'
         product:
           $ref: '#/components/schemas/InwardOtherMaterialProductRef'
         packet_weight:
           type: string
           description: Weight of the covered packet, in kg.
       required:
+      - material_type
       - packet_weight
       - product
       - public_id
+    InwardOtherMaterialTypeRef:
+      type: object
+      description: Output shape for the ``material_type`` reference inside a recipe
+        ref.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     InwardRawMaterialListPage:
       type: object
       description: Output shape for the paginated envelope (schema only).
@@ -6293,6 +6998,11 @@ components:
       - total_packets
       - transport_agency
       - verified_at
+    OrderTypeEnum:
+      enum:
+      - CUSTOM_ORDER
+      type: string
+      description: '* `CUSTOM_ORDER` - CUSTOM_ORDER'
     OtherMaterialStock:
       type: object
       description: Output shape for the whole other-material position.
@@ -6316,7 +7026,9 @@ components:
           $ref: '#/components/schemas/OtherMaterialTypeRef'
         on_hand:
           type: string
-          description: Sum of units with a reached effective date.
+          description: Units received (reached effective date) minus units used by
+            the packets currently packed. Negative when the counts outrun the recorded
+            inward lots.
       required:
       - material_type
       - on_hand
@@ -6524,6 +7236,33 @@ components:
           type: string
           minLength: 1
           maxLength: 255
+    PatchedUpdateCustomOrderRequest:
+      type: object
+      description: |-
+        Request validation for an admin's custom-order update -- every field optional.
+
+        No field may declare a ``default``: the view applies a field only when the
+        key is present in ``validated_data``, and DRF injects a declared default
+        even for an absent key, which would silently rewrite an untouched column.
+      properties:
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id belonging to the custom order's client.
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+          description: A remark to add to the custom order. Appended as a new line
+            -- it never replaces what is already there.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomOrderItemWriteRequest'
     PatchedUpdateInwardRawMaterialRequest:
       type: object
       description: |-
@@ -6577,8 +7316,6 @@ components:
           type: string
           description: A remark to add to the order. Appended as a new line -- it
             never replaces what is already there.
-        status:
-          $ref: '#/components/schemas/UpdateOrderStatusEnum'
         items:
           type: array
           items:
@@ -6610,19 +7347,13 @@ components:
           maxLength: 10
     PatchedUpdateProductPackagingRequest:
       type: object
-      description: Request validation for updating a ``ProductPackaging`` (all fields
-        optional).
+      description: |-
+        Request validation for updating a ``ProductPackaging``: its selling price only.
+
+        A packaging's product, packet weight and packet count are fixed once it is
+        created; a request carrying them is ignored. To change them, create a new
+        packaging.
       properties:
-        product:
-          type: string
-          minLength: 1
-        packet_weight:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
-        packets:
-          type: integer
-          minimum: 1
         selling_price:
           type: string
           format: decimal
@@ -7200,24 +7931,6 @@ components:
           description: Loose lines, one per (product, packet_weight) pair.
       required:
       - counts
-    UpdateOrderStatusEnum:
-      enum:
-      - BOOKED
-      - UNDER_REVIEW
-      - CONFIRMED
-      - DISPATCHED
-      - DELIVERED
-      - ON_HOLD
-      - REJECTED
-      type: string
-      description: |-
-        * `BOOKED` - BOOKED
-        * `UNDER_REVIEW` - UNDER_REVIEW
-        * `CONFIRMED` - CONFIRMED
-        * `DISPATCHED` - DISPATCHED
-        * `DELIVERED` - DELIVERED
-        * `ON_HOLD` - ON_HOLD
-        * `REJECTED` - REJECTED
     UpdateTodaysInventoryRequest:
       type: object
       description: |-

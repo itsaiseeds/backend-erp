@@ -1,7 +1,10 @@
 """Other-material stock endpoint: ``GET`` ``/api/sales-admin/other-material-stock``.
 
 Read-time, aggregate, never stored: the on-hand position of every material type,
-computed from ``InwardOtherMaterial`` lots on the fly.
+computed on the fly as the ``InwardOtherMaterial`` lots received minus what the
+packets currently packed have used per their ``OtherMaterialRecipe`` (the same
+derivation raw material uses -- see ``InventoryOperations.other_material_used``).
+A negative figure means more packets were counted than the recorded lots cover.
 
 Other material needs no lab gate, so a lot counts once its ``effective_date``
 has come -- ``effective_date <= today`` -- and is no longer soft-deleted.
@@ -35,7 +38,13 @@ class OtherMaterialStockLineSerializer(serializers.Serializer):
     """Output shape for one material type's on-hand position."""
 
     material_type = OtherMaterialTypeRefSerializer()
-    on_hand = serializers.CharField(help_text="Sum of units with a reached effective date.")
+    on_hand = serializers.CharField(
+        help_text=(
+            "Units received (reached effective date) minus units used by the "
+            "packets currently packed. Negative when the counts outrun the "
+            "recorded inward lots."
+        )
+    )
 
 
 class OtherMaterialStockSerializer(serializers.Serializer):

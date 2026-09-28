@@ -1,9 +1,17 @@
 """Challan list endpoint: ``GET /api/sales-admin/dispatch-challans/``.
 
-Every dispatched order whose challan is complete, each row carrying that
-challan in full: our own consignor block, the consignee as it stood at dispatch
-time, the HSN code, the financial year, the journey, and every line with its lot
-number.
+Every dispatched order **and custom order** whose challan is complete, each row
+carrying that challan in full: our own consignor block, the consignee as it
+stood at dispatch time, the HSN code, the financial year, the journey, and every
+line with its lot number.
+
+The two kinds are one list, paged and sorted together, because both challans
+live in ``DispatchEntry`` -- the list pages over entries rather than orders. An
+order's row is exactly what it always was. A custom order's row has the same
+envelope (``order_public_id`` is its ``CORD-…`` id) plus ``order_type:
+"CUSTOM_ORDER"``, and its lines are loose packets: a product, a packet weight
+and a packet count instead of a bag. A custom order always goes on our own
+vehicle, so it is listed as soon as it is dispatched.
 
 What makes a challan complete depends on **who carried the goods**, and it is the
 one rule worth stating plainly:
@@ -38,12 +46,17 @@ newest first) or by when the order was booked.
 from __future__ import annotations
 
 from django.db.models import Prefetch, Q, QuerySet
-from drf_spectacular.utils import extend_schema
+from django.db.models.functions import Coalesce
+from drf_spectacular.utils import (
+    PolymorphicProxySerializer,
+    extend_schema,
+    extend_schema_field,
+)
 from rest_framework import serializers
 from rest_framework.request import Request
 
-from aggregator.DispatchOperations import dispatch_challan_payload
-from aggregator.models import DispatchEntryItem, Order
+from aggregator.DispatchOperations import challan_entry_payload
+from aggregator.models import DispatchEntry, DispatchEntryItem
 from aggregator.models.Order import DISPATCH_REQUIRED_STATUS_CODES
 from api.order_serializers import ProductRefSerializer, TransportAgencyRefSerializer
 from api.paginated_views import AdminPaginatedDateRangeListView
@@ -56,56 +69,74 @@ from common.views.paginated_date_range import (
     parse_int,
 )
 
-# What makes an order's challan complete. Declared once: the list view filters on
-# it and the option providers below reuse it, so a picker can never offer a
-# client or a city with nothing behind it.
+# What makes a challan complete, per kind of order. Declared once: the list view
+# filters on it and the option providers below reuse it, so a picker can never
+# offer a client or a city with nothing behind it.
 #
 # The status codes come from ``DISPATCH_REQUIRED_STATUS_CODES`` rather than being
 # spelled out, so this list follows the enum if the lifecycle ever gains a
 # post-dispatch status.
 #
 # ``dispatch_details`` null means a private dispatch -- an order that has been
-# dispatched went one way or the other, so there is no third case to cover.
-# ``is_deleted`` is explicit because a lookup spanning the relation does not pick
-# up ``DispatchEntry``'s soft-delete manager.
-CHALLAN_Q = Q(
-    status__code__in=DISPATCH_REQUIRED_STATUS_CODES,
-    dispatch_entry__isnull=False,
-    dispatch_entry__is_deleted=False,
-) & (
-    Q(dispatch_details__isnull=True)  # private: no transporter, nothing to wait for
-    | Q(dispatch_details__lr_number__gt="")  # agency: the LR has been recorded
-)
+# dispatched went one way or the other, so there is no third case to cover. It
+# is read off the order, not the entry: the order's is the live dispatch.
+# ``is_deleted`` is explicit on the order because a lookup spanning the relation
+# does not pick up its soft-delete manager.
 
 
-def challan_orders() -> QuerySet:
-    """Every order that currently has a complete challan."""
-    return Order.objects.filter(CHALLAN_Q)
+def _complete_challan_q(path: str) -> Q:
+    """A complete challan whose order sits at ``path`` (``order`` / ``custom_order``)."""
+    return Q(
+        **{
+            f"{path}__isnull": False,
+            f"{path}__is_deleted": False,
+            f"{path}__status__code__in": DISPATCH_REQUIRED_STATUS_CODES,
+        }
+    ) & (
+        # private: no transporter, nothing to wait for
+        Q(**{f"{path}__dispatch_details__isnull": True})
+        # agency: the LR has been recorded
+        | Q(**{f"{path}__dispatch_details__lr_number__gt": ""})
+    )
+
+
+CHALLAN_Q = _complete_challan_q("order") | _complete_challan_q("custom_order")
+
+
+def challan_entries() -> QuerySet:
+    """Every live challan that is currently complete, for either kind of order.
+
+    ``order_created_at`` is when the order (or custom order) was booked -- the
+    ``created_at`` sort and the dispatch-receipt export's window read it.
+    """
+    return DispatchEntry.objects.filter(CHALLAN_Q).annotate(
+        order_created_at=Coalesce("order__created_at", "custom_order__created_at")
+    )
 
 
 def challan_queryset() -> QuerySet:
-    """:func:`challan_orders` with every join ``dispatch_challan_payload`` walks.
+    """:func:`challan_entries` with every join the challan payloads walk.
 
-    The payload reads the receiver off the ``DispatchEntry`` snapshot, so it is
+    The payloads read the receiver off the ``DispatchEntry`` snapshot, so it is
     the entry's own address and cities that are selected here, not the order's
     or the client's. Shared by the challan list and the dispatch-receipt export.
     """
-    return challan_orders().select_related(
-        "transport_agency",
+    return challan_entries().select_related(
+        "order__transport_agency",
+        "custom_order",
         "dispatch_details",
-        "dispatch_entry",
-        "dispatch_entry__client",
-        "dispatch_entry__client_address__pincode",
-        "dispatch_entry__client_address__city",
-        "dispatch_entry__client_address__state",
-        "dispatch_entry__client_address__country",
-        "dispatch_entry__from_city",
-        "dispatch_entry__to_city",
+        "client",
+        "client_address__pincode",
+        "client_address__city",
+        "client_address__state",
+        "client_address__country",
+        "from_city",
+        "to_city",
     ).prefetch_related(
         Prefetch(
-            "dispatch_entry__items",
+            "items",
             queryset=DispatchEntryItem.objects.select_related(
-                "product_packaging__product"
+                "product_packaging__product", "product"
             ),
         ),
     )
@@ -191,6 +222,33 @@ class DispatchChallanItemSerializer(serializers.Serializer):
     total_packets = serializers.IntegerField()
 
 
+class CustomChallanLineSerializer(serializers.Serializer):
+    """Output shape for one custom-order challan line: loose packets, a lot, money."""
+
+    product = ProductRefSerializer()
+    packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
+    packets = serializers.IntegerField()
+    lot_number = serializers.CharField()
+    negotiated_selling_price = serializers.CharField(help_text="Per packet.")
+    line_total = serializers.CharField()
+
+
+class CustomDispatchChallanItemSerializer(serializers.Serializer):
+    """Output shape for one custom order's challan (schema only)."""
+
+    order_public_id = serializers.CharField(help_text="The custom order's CORD-… id.")
+    order_type = serializers.ChoiceField(choices=["CUSTOM_ORDER"])
+    our_details = ChallanPartySerializer()
+    receiver_details = ChallanReceiverSerializer()
+    hsn_code = serializers.CharField()
+    financial_year = serializers.CharField(help_text='Indian FY, e.g. "2026-2027".')
+    dispatch = ChallanDispatchSerializer()
+    items = CustomChallanLineSerializer(many=True)
+    item_count = serializers.IntegerField()
+    total_amount = serializers.CharField()
+    total_packets = serializers.IntegerField()
+
+
 class DispatchChallanPageSerializer(serializers.Serializer):
     """Output shape for the paginated envelope (schema only)."""
 
@@ -198,15 +256,28 @@ class DispatchChallanPageSerializer(serializers.Serializer):
     total_pages = serializers.IntegerField()
     next_page_number = serializers.IntegerField(allow_null=True)
     previous_page_number = serializers.IntegerField(allow_null=True)
-    results = DispatchChallanItemSerializer(many=True)
+    results = serializers.SerializerMethodField()
     available_filters = FilterCatalogueEntrySerializer(many=True)
     available_sorts = SortCatalogueEntrySerializer(many=True)
+
+    @extend_schema_field(
+        # ``resource_type_field_name=None``: an order row carries no type field
+        # (its contract predates custom orders), so there is no discriminator.
+        PolymorphicProxySerializer(
+            component_name="DispatchChallanRow",
+            serializers=[DispatchChallanItemSerializer, CustomDispatchChallanItemSerializer],
+            resource_type_field_name=None,
+            many=True,
+        )
+    )
+    def get_results(self, obj: dict) -> list[dict]:
+        return obj["results"]
 
 
 def _clients_with_challans(request: Request) -> list[dict]:
     """Every distinct client that has a challan -- the client picker's options."""
     rows = (
-        challan_orders()
+        challan_entries()
         .values_list("client_id", "client__company_name")
         .distinct()
         .order_by("client__company_name")
@@ -217,10 +288,10 @@ def _clients_with_challans(request: Request) -> list[dict]:
 def _challan_destination_cities(request: Request) -> list[dict]:
     """Every distinct city a challan was sent to."""
     rows = (
-        challan_orders()
-        .values_list("dispatch_entry__to_city_id", "dispatch_entry__to_city__name")
+        challan_entries()
+        .values_list("to_city_id", "to_city__name")
         .distinct()
-        .order_by("dispatch_entry__to_city__name")
+        .order_by("to_city__name")
     )
     return [{"value": city_id, "label": name} for city_id, name in rows]
 
@@ -237,7 +308,7 @@ _QUERYSET_FILTERS = (
     QuerysetFilter(
         "city_id",
         label="Destination City",
-        lookup="dispatch_entry__to_city_id__in",
+        lookup="to_city_id__in",
         parse=parse_int,
         description="City id(s) the goods were sent to (see options).",
         options=_challan_destination_cities,
@@ -247,23 +318,24 @@ _SORT_OPTIONS = (
     SortOption(
         "dispatch_date",
         label="Dispatch Date",
-        fields=("dispatch_entry__dispatched_at",),
+        fields=("dispatched_at",),
         description="When the goods left (default: newest first).",
     ),
     SortOption(
         "created_at",
         label="Order Created",
-        description="When the order was booked.",
+        fields=("order_created_at",),
+        description="When the order (or custom order) was booked.",
     ),
 )
 
 
 class GetDispatchChallansView(AdminPaginatedDateRangeListView):
-    """List the delivery challans of dispatched orders whose LR is recorded."""
+    """List the delivery challans of dispatched orders and custom orders."""
 
-    date_field = "dispatch_entry__dispatched_at"
-    # An ORM ordering, not a ``?sort`` token -- hence the spelled-out span.
-    default_sort = "-dispatch_entry__dispatched_at"
+    date_field = "dispatched_at"
+    # An ORM ordering, not a ``?sort`` token.
+    default_sort = "-dispatched_at"
     queryset_filters = _QUERYSET_FILTERS
     sort_options = _SORT_OPTIONS
 
@@ -283,5 +355,7 @@ class GetDispatchChallansView(AdminPaginatedDateRangeListView):
     def get_queryset(self, request: Request) -> QuerySet:
         return challan_queryset()
 
-    def serialize_page(self, page_items: list[Order], request: Request) -> list[dict]:
-        return [dispatch_challan_payload(order) for order in page_items]
+    def serialize_page(
+        self, page_items: list[DispatchEntry], request: Request
+    ) -> list[dict]:
+        return [challan_entry_payload(entry) for entry in page_items]

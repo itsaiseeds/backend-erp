@@ -10,10 +10,15 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from rest_framework import status
 
 from aggregator import InventoryOperations as inv
-from aggregator.ClientOperations import create_client_with_details
+from aggregator.ClientOperations import (
+    create_client_with_details,
+    sync_client_addresses,
+    sync_client_transport_agencies,
+)
 from aggregator.models import (
     City,
     Country,
@@ -28,6 +33,8 @@ from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import (
     attach_private_dispatch_details,
     create_order,
+    hold_order,
+    update_order_core,
     update_order_status,
     verify_order,
 )
@@ -174,13 +181,29 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
         self.assertEqual(self.order.items.count(), 1)
         self.assertIsNone(self.order.transport_agency_id)
 
-    def test_the_status_can_be_changed(self):
-        """tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_the_status_can_be_changed"""
-        response = self._patch({"status": "ON_HOLD"})
+    def test_a_status_key_is_ignored(self):
+        """Status moves only through the lifecycle endpoints, never through an edit.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_status_key_is_ignored
+        """
+        response = self._patch({"status": "ON_HOLD", "special_comments": "noted"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["status"], "BOOKED")
+        self.assertEqual(response.data["special_comments"], "noted")
         self.order.refresh_from_db()
-        self.assertEqual(self.order.status.code, "ON_HOLD")
+        self.assertEqual(self.order.status.code, "BOOKED")
+
+    def test_update_order_core_refuses_a_status(self):
+        """The domain function fails loudly rather than quietly dropping a status.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_update_order_core_refuses_a_status
+        """
+        with self.assertRaises(TypeError):
+            update_order_core(self.order, status=StatusIds.CONFIRMED)
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status.code, "BOOKED")
 
     def test_the_transport_agency_can_be_set_and_cleared(self):
         """Setting an agency makes it an AGENCY dispatch; null returns it to PRIVATE.
@@ -382,16 +405,6 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
                 {"client_transport_agency_id": other_agency.id},
                 "No such transport agency for this client",
             ),
-            (
-                "confirming without verifying",
-                {"status": "CONFIRMED"},
-                "must record who verified it",
-            ),
-            (
-                "dispatching without dispatch details",
-                {"status": "DISPATCHED"},
-                "Dispatch details are required",
-            ),
         ]
         for label, body, fragment in cases:
             with self.subTest(case=label):
@@ -487,6 +500,183 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["items"][0]["quantity"], 1)
+
+    def test_a_confirmed_order_cannot_dodge_the_stock_check_via_status(self):
+        """The oversell chain: CONFIRMED -> BOOKED, grow unchecked, -> CONFIRMED.
+
+        The status key is ignored, so the order stays CONFIRMED and the grown
+        lines are checked against stock like any other confirmed edit.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_confirmed_order_cannot_dodge_the_stock_check_via_status
+        """
+        self._confirm(bags=5)
+
+        demoted = self._patch({"status": "BOOKED"})
+        self.assertEqual(demoted.status_code, status.HTTP_200_OK, demoted.data)
+        self.assertEqual(demoted.data["status"], "CONFIRMED")
+
+        grown = self._patch(
+            {"status": "BOOKED", "items": [self._line(self.alpha_bag, 50)]}
+        )
+
+        self.assertEqual(grown.status_code, status.HTTP_400_BAD_REQUEST, grown.data)
+        self.assertIn("Not enough stock to edit this order", grown.data["detail"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status.code, "CONFIRMED")
+        self.assertEqual(self.order.verified_by, self.admin_user)
+        self.assertEqual(
+            list(self.order.items.values_list("product_packaging", "quantity")),
+            [(self.alpha_bag.id, 2)],
+        )
+
+    def test_an_edit_cannot_move_a_confirmed_order_anywhere(self):
+        """Dispatch, delivery, hold, review and rejection each have their own verb.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_edit_cannot_move_a_confirmed_order_anywhere
+        """
+        self._confirm(bags=5)
+
+        for target in StatusIds:
+            with self.subTest(target=target.name):
+                response = self._patch({"status": target.name})
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                self.order.refresh_from_db()
+                self.assertEqual(self.order.status.code, "CONFIRMED")
+                self.assertIsNone(self.order.dispatch_details_id)
+                self.assertIsNone(self.order.private_dispatch_details_id)
+
+    # -- a client's lists changing under its open orders ------------------------
+
+    def _replace_addresses(self, client):
+        """Replace ``client``'s addresses with a new one, unlinking the old."""
+        sync_client_addresses(
+            client,
+            [
+                {
+                    "line_1": "2 Ring Road",
+                    "line_2": "",
+                    "pincode": "395007",
+                    "city": self.city,
+                    "state": self.state,
+                    "country": self.country,
+                    "label": "New warehouse",
+                    "is_primary": True,
+                }
+            ],
+            self.sales_person,
+        )
+
+    def test_an_order_keeps_moving_after_its_address_is_unlinked(self):
+        """Book, drop the address from the client, then verify / edit / hold / dispatch.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_order_keeps_moving_after_its_address_is_unlinked
+        """
+        booked_to = self.order.delivery_address
+        on_hold = create_order(
+            client=self.acme,
+            delivery_address=booked_to,
+            actor=self.sales_person,
+            items=[{"product_packaging": self.alpha_bag, "quantity": 1}],
+        )
+        self._replace_addresses(self.acme)
+        self.assertFalse(self.acme.client_addresses.filter(address=booked_to).exists())
+
+        self._confirm(bags=5)
+        edited = self._patch({"special_comments": "address was unlinked"})
+        self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
+        hold_order(on_hold)
+        self._dispatch(self.order)
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status.code, "DISPATCHED")
+        self.assertEqual(self.order.delivery_address, booked_to)
+
+    def test_an_order_keeps_moving_after_its_agency_is_unlinked(self):
+        """Book by an agency, drop it from the client, then verify / edit / hold.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_order_keeps_moving_after_its_agency_is_unlinked
+        """
+        agency = self.acme.client_transport_agencies.first().transport_agency
+        order = create_order(
+            client=self.acme,
+            delivery_address=self.acme.client_addresses.first().address,
+            actor=self.sales_person,
+            items=[{"product_packaging": self.alpha_bag, "quantity": 1}],
+            transport_agency=agency,
+        )
+        sync_client_transport_agencies(
+            self.acme, [{"name": "Replacement Transport"}], self.sales_person
+        )
+
+        self._count_stock(bags=5)
+        verify_order(order, self.admin_user)
+        edited = self._patch({"special_comments": "agency was unlinked"}, order=order)
+        self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
+        hold_order(order)
+
+        order.refresh_from_db()
+        self.assertEqual(order.status.code, "ON_HOLD")
+        self.assertEqual(order.transport_agency, agency)
+
+    def test_an_unlinked_address_cannot_be_newly_chosen(self):
+        """The link is still checked whenever the address is *set*.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_unlinked_address_cannot_be_newly_chosen
+        """
+        old_address = self.order.delivery_address
+        self._replace_addresses(self.acme)
+        new_address = self.acme.client_addresses.get().address
+
+        with self.assertRaisesMessage(ValidationError, "must belong to the selected client"):
+            create_order(
+                client=self.acme,
+                delivery_address=old_address,
+                actor=self.sales_person,
+                items=[{"product_packaging": self.alpha_bag, "quantity": 1}],
+            )
+
+        # Moved to the live address, the order cannot then be moved back.
+        update_order_core(self.order, delivery_address=new_address)
+        with self.assertRaisesMessage(ValidationError, "must belong to the selected client"):
+            update_order_core(self.order, delivery_address=old_address)
+
+    def test_an_unlinked_agency_cannot_be_newly_chosen(self):
+        """tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_an_unlinked_agency_cannot_be_newly_chosen"""
+        agency = self.acme.client_transport_agencies.first().transport_agency
+        sync_client_transport_agencies(
+            self.acme, [{"name": "Replacement Transport"}], self.sales_person
+        )
+
+        with self.assertRaisesMessage(ValidationError, "must belong to the selected client"):
+            update_order_core(self.order, transport_agency=agency)
+
+    # -- deleted products ---------------------------------------------------------
+
+    def test_a_deleted_products_bag_cannot_be_added(self):
+        """tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_deleted_products_bag_cannot_be_added"""
+        self.beta_bag.product.mark_deleted(self.superuser)
+
+        response = self._patch(
+            {"items": [self._line(self.alpha_bag, 2), self._line(self.beta_bag, 1)]}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn(
+            f"Unknown product packaging: {self.beta_bag.public_id}", response.data["detail"]
+        )
+
+    def test_a_line_already_on_the_order_survives_its_product_being_deleted(self):
+        """``items`` is a full replacement, so the existing line must stay sendable.
+
+        tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_a_line_already_on_the_order_survives_its_product_being_deleted
+        """
+        self.alpha_bag.product.mark_deleted(self.superuser)
+
+        response = self._patch({"items": [self._line(self.alpha_bag, 4)]})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["items"][0]["quantity"], 4)
 
     def test_a_booked_order_is_not_checked_against_stock(self):
         """Nothing is reserved until verification, which does its own check.

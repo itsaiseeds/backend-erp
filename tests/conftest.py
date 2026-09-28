@@ -35,15 +35,18 @@ def pytest_collection_modifyitems(items):
 
     The split is derived from the base class rather than declared per file, so
     it cannot drift: anything deriving from :class:`tests.common.DMLTestCase`
-    touches the seeded database and is ``dml``; everything else (a
+    or :class:`tests.common.DMLTransactionTestCase` touches the seeded
+    database and is ``dml``; everything else (a
     ``SimpleTestCase`` or a bare pytest function) needs no database and is
     ``unit``. ``bash scripts/run.sh test-unit`` / ``test-dml`` select on these.
     """
-    from tests.common import DMLTestCase
+    from tests.common import DMLTestCase, DMLTransactionTestCase
 
     for item in items:
         owner = getattr(item, "cls", None)
-        needs_db = owner is not None and issubclass(owner, DMLTestCase)
+        needs_db = owner is not None and issubclass(
+            owner, (DMLTestCase, DMLTransactionTestCase)
+        )
         item.add_marker("dml" if needs_db else "unit")
 
 
@@ -55,9 +58,10 @@ def django_db_setup(django_db_setup, django_db_blocker):  # noqa: PT004
     :class:`tests.common.DMLTestCase`, which is a Django ``TestCase``: each test
     *and* each class's ``setUpTestData`` runs inside a transaction that is
     rolled back afterwards, so nothing a test writes can ever reach this
-    baseline. Loading it once here instead of once per test class removes one
-    ~0.5s SQL replay per class, and under ``pytest-xdist`` it runs once per
-    worker database.
+    baseline. (The one exception, :class:`tests.common.DMLTransactionTestCase`,
+    commits for real and re-seeds this baseline after each test.) Loading it
+    once here instead of once per test class removes one ~0.5s SQL replay per
+    class, and under ``pytest-xdist`` it runs once per worker database.
     """
     with django_db_blocker.unblock(), connection.cursor() as cursor:
         # ``--reuse-db`` hands back a database that already holds the baseline,

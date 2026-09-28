@@ -170,17 +170,11 @@ class ProductPackagingsCubit extends SafeCubit<ProductPackagingsState> {
 
   Future<bool> updateProductPackaging({
     required String publicId,
-    required String productPublicId,
-    required String packetWeight,
-    required String packets,
     required String sellingPrice,
   }) {
     return _mutate(
       () => _repository.updateProductPackaging(
         publicId: publicId,
-        productPublicId: productPublicId,
-        packetWeight: packetWeight,
-        packets: packets,
         sellingPrice: sellingPrice,
       ),
     );

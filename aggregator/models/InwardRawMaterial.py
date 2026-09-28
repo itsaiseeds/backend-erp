@@ -82,5 +82,23 @@ class InwardRawMaterial(
             ),
         ]
 
+    def guard_soft_delete(self, perform):
+        """Refuse removing kilograms already packed into bags or loose packets.
+
+        ``InwardOperations.assert_raw_lot_removable`` is the rule (and its
+        message is what the API has always answered), checked under the
+        product's raw-pool lock so a concurrent count cannot slip between.
+        """
+        from django.core.exceptions import ValidationError
+
+        from aggregator import InventoryOperations, InwardOperations
+
+        InventoryOperations.lock_raw_pools([self.product_id])
+        try:
+            InwardOperations.assert_raw_lot_removable(self)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from None
+        perform()
+
     def __str__(self):
         return f"{self.public_id}: {self.product} {self.quantity_kg} kg"

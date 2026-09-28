@@ -1,13 +1,17 @@
 """``POST /api/execute-code/`` and its ``/execute-code/`` UI page.
 
-Who may call it (the ``execute_python_code`` permission, whatever the role) is
-proven once in ``tests/test_view_contracts.py``.
+Who may call it (a superuser holding ``execute_python_code``) and that it is a
+404 unless ``ENABLE_EXECUTE_CODE`` is set are proven once in
+``tests/test_view_contracts.py``.
 """
 
 from __future__ import annotations
 
+import hashlib
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.test import override_settings
 from rest_framework import status
 
 from aggregator.models import Party
@@ -21,22 +25,14 @@ EXECUTE_URL = "/api/execute-code/"
 PAGE_URL = "/execute-code/"
 
 
+@override_settings(ENABLE_EXECUTE_CODE=True)
 class ExecuteCodeApiTest(WebApiTestCase):
     """tests/test_execute_code_api.py::ExecuteCodeApiTest"""
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
-        cls.runner = User.objects.create_user(
-            phone_number="9000000901",
-            name="Code Runner",
-            is_verified=True,
-            created_by=superuser,
-            verified_by=superuser,
-        )
-        Admin.objects.create(user=cls.runner, created_by=superuser)
-        cls.runner.user_permissions.add(Permission.objects.get(codename="execute_python_code"))
+        cls.runner = User.objects.get(phone_number=SUPERUSER_PHONE)
 
     def setUp(self):
         super().setUp()
@@ -93,6 +89,17 @@ class ExecuteCodeApiTest(WebApiTestCase):
         self.assertIsNone(data["result"])
         self.assertFalse(Party.objects.filter(name="Doomed Party").exists())
 
+    def test_the_code_is_logged_only_as_its_hash(self):
+        """tests/test_execute_code_api.py::ExecuteCodeApiTest::test_the_code_is_logged_only_as_its_hash"""
+        code = "secret = 'hunter2'"
+        with self.assertLogs(level="INFO") as logs:
+            self._run(code)
+
+        output = "\n".join(logs.output)
+        self.assertNotIn("hunter2", output)
+        self.assertNotIn(self.runner.phone_number, output)
+        self.assertIn(hashlib.sha256(code.encode()).hexdigest(), output)
+
     def test_blank_code_is_refused(self):
         """tests/test_execute_code_api.py::ExecuteCodeApiTest::test_blank_code_is_refused"""
         resp = self.client.post(EXECUTE_URL, {"code": ""}, format="json")
@@ -100,7 +107,7 @@ class ExecuteCodeApiTest(WebApiTestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_the_ui_page_is_served_only_to_permission_holders(self):
-        """Logged out -> sent to the sales-admin login; no permission -> 403.
+        """Logged out -> sent to the sales-admin login; not a superuser -> 403.
 
         tests/test_execute_code_api.py::ExecuteCodeApiTest::test_the_ui_page_is_served_only_to_permission_holders
         """
@@ -119,12 +126,15 @@ class ExecuteCodeApiTest(WebApiTestCase):
             self.client.get(PAGE_URL), "/sales-admin/", fetch_redirect_response=False
         )
 
+        # An admin holding the permission is still not a superuser.
         outsider = User.objects.create_user(
             phone_number="9000000902",
-            name="No Permission",
+            name="Admin With Permission",
             is_verified=True,
             created_by=self.runner,
             verified_by=self.runner,
         )
+        Admin.objects.create(user=outsider, created_by=self.runner)
+        outsider.user_permissions.add(Permission.objects.get(codename="execute_python_code"))
         self.login_as(outsider)
         self.assertEqual(self.client.get(PAGE_URL).status_code, status.HTTP_403_FORBIDDEN)

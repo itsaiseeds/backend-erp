@@ -149,17 +149,10 @@ class ProductPackagingApiTest(WebApiTestCase):
                     status.HTTP_400_BAD_REQUEST,
                 )
 
-        ProductPackaging.objects.create(
-            product=self.product,
-            packet_weight=50,
-            packets=2,
-            selling_price=3000,
-            created_by=self.seed_admin,
-        )
-        with self.subTest(verb="PATCH", case="duplicate weight+packets"):
+        with self.subTest(verb="PATCH", case="negative selling price"):
             self.assertEqual(
                 self.client.patch(
-                    self._url(self.packaging), {"packet_weight": 50, "packets": 2}, format="json"
+                    self._url(self.packaging), {"selling_price": "-1.00"}, format="json"
                 ).status_code,
                 status.HTTP_400_BAD_REQUEST,
             )
@@ -196,7 +189,7 @@ class ProductPackagingApiTest(WebApiTestCase):
 
     def test_admin_update_packaging(self):
         """A price change persists, and re-sending the row's own weight/packets is
-        not treated as a duplicate of itself.
+        harmless.
 
         tests/test_product_packaging_api.py::ProductPackagingApiTest::test_admin_update_packaging
         """
@@ -216,6 +209,42 @@ class ProductPackagingApiTest(WebApiTestCase):
             ).status_code,
             status.HTTP_200_OK,
         )
+
+    def test_the_shape_of_a_packaging_cannot_be_edited(self):
+        """Product, weight and packets are ignored; only the price is applied.
+
+        Everything that uses a packaging reads its shape live, so an edit would
+        rewrite existing orders, challans and the raw-material ledger.
+
+        tests/test_product_packaging_api.py::ProductPackagingApiTest::test_the_shape_of_a_packaging_cannot_be_edited
+        """
+        other_product = Product.objects.create(
+            name="Other Seed",
+            crop=self.crop,
+            stage=Stage.by_id(StageIds.CERTIFIED),
+            selling_price=100,
+            created_by=self.seed_admin,
+        )
+        self.login_as(self.seed_admin)
+
+        response = self.client.patch(
+            self._url(self.packaging),
+            {
+                "product": other_product.public_id,
+                "packet_weight": 50,
+                "packets": 9,
+                "selling_price": "7100.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.packaging.refresh_from_db()
+        self.assertEqual(self.packaging.product, self.product)
+        self.assertEqual(self.packaging.packet_weight, 25)
+        self.assertEqual(self.packaging.packets, 5)
+        self.assertEqual(self.packaging.selling_price, 7100)
+        self.assertEqual(response.data["packets"], 5)
 
     # -- deletion -------------------------------------------------------------
 

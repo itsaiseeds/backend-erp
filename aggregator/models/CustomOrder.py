@@ -12,7 +12,9 @@ from common.models import (
 from .Order import (
     DISPATCH_REQUIRED_STATUS_CODES,
     ORDER_STATUS_CODES,
+    client_link_changed,
     default_expected_delivery_date,
+    refuse_deleting_stock_holder,
 )
 from .Status import StatusIds
 
@@ -105,6 +107,11 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
             ),
         ]
 
+    def guard_soft_delete(self, perform):
+        """See ``Order.refuse_deleting_stock_holder``."""
+        refuse_deleting_stock_holder(self)
+        perform()
+
     def __str__(self):
         return self.public_id or "Custom order"
 
@@ -152,7 +159,12 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         ):
             errors["verified_by"] = "Custom orders can only be verified by a sales admin."
 
-        if self.client_id and self.delivery_address_id:
+        # Only when set -- see ``Order.client_link_changed``.
+        if (
+            self.client_id
+            and self.delivery_address_id
+            and client_link_changed(self, "client_id", "delivery_address_id")
+        ):
             from .ClientAddress import ClientAddress
 
             belongs = ClientAddress.objects.filter(

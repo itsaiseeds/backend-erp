@@ -4,7 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/formatters/date_formatter.dart';
-import '../../../../core/widgets/buttons/outlined_action_button.dart';
+import '../../../../core/widgets/buttons/row_actions_menu.dart';
 import '../../../../core/widgets/feedback/app_badge.dart';
 import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
@@ -34,6 +34,8 @@ class InwardRawMaterialsTable extends StatefulWidget {
   final List<ClientSortModel> availableSorts;
   final void Function(InwardRawMaterialModel lot)? onView;
   final void Function(InwardRawMaterialModel lot)? onDelete;
+  final void Function(InwardRawMaterialModel lot)? onMarkInUse;
+  final bool isMutating;
   final bool hasMore;
   final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
@@ -55,6 +57,8 @@ class InwardRawMaterialsTable extends StatefulWidget {
     this.availableSorts = const [],
     this.onView,
     this.onDelete,
+    this.onMarkInUse,
+    this.isMutating = false,
     this.hasMore = false,
     this.onLoadMore,
     this.searchBarActions = const [],
@@ -219,19 +223,33 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
       case InwardRawMaterialsTable.COLUMN_EFFECTIVE_DATE:
         return _textCell(DateFormatter.dayLabel(lot.effectiveDateTime));
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            OutlinedActionButton(
-              label: AppStrings.DELETE,
-              icon: Icons.delete_outline_rounded,
-              tone: OutlinedActionTone.error,
-              onPressed: widget.onDelete == null
-                  ? null
-                  : () => widget.onDelete!(lot),
-            ),
-          ],
+        return Align(
+          alignment: Alignment.center,
+          child: RowActionsMenu(
+            enabled: !widget.isMutating,
+            actions: [
+              RowAction(
+                label: AppStrings.INWARD_MARK_IN_USE,
+                icon: Icons.play_circle_outline_rounded,
+                tone: RowActionTone.success,
+                blockedHint: AppStrings.INWARD_MARK_IN_USE_BLOCKED,
+                onSelected:
+                    lot.isInUse ||
+                        widget.isMutating ||
+                        widget.onMarkInUse == null
+                    ? null
+                    : () => widget.onMarkInUse!(lot),
+              ),
+              RowAction(
+                label: AppStrings.DELETE,
+                icon: Icons.delete_outline_rounded,
+                tone: RowActionTone.error,
+                onSelected: widget.isMutating || widget.onDelete == null
+                    ? null
+                    : () => widget.onDelete!(lot),
+              ),
+            ],
+          ),
         );
       default:
         return _textCell(AppStrings.TABLE_VALUE_UNAVAILABLE);

@@ -24,7 +24,11 @@ from datetime import date, datetime, time, timedelta
 from django.db.models import QuerySet
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    PolymorphicProxySerializer,
+    extend_schema_field,
+)
 from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -80,15 +84,39 @@ class _ExportEnvelopeSerializer(serializers.Serializer):
 
 
 def export_response_serializer(
-    name: str, row: type[serializers.Serializer]
+    name: str,
+    row: type[serializers.Serializer],
+    *other_rows: type[serializers.Serializer],
 ) -> type[serializers.Serializer]:
     """The response envelope for one export, with ``results`` typed as ``row``.
 
     Each export gets its own named class (and so its own OpenAPI component), so
     the doc shows every key of every row down to plain fields instead of a
     generic ``additionalProp`` map.
+
+    An export whose rows come in several shapes names each in ``other_rows``;
+    ``results`` is then documented as ``oneOf`` those shapes (the rows carry no
+    shared discriminator, hence ``resource_type_field_name=None``).
     """
-    return type(name, (_ExportEnvelopeSerializer,), {"results": row(many=True)})
+    if not other_rows:
+        return type(name, (_ExportEnvelopeSerializer,), {"results": row(many=True)})
+
+    @extend_schema_field(
+        PolymorphicProxySerializer(
+            component_name=f"{name.removesuffix('Serializer')}Row",
+            serializers=[row, *other_rows],
+            resource_type_field_name=None,
+            many=True,
+        )
+    )
+    def get_results(self: serializers.Serializer, obj: dict) -> list[dict]:
+        return obj["results"]
+
+    return type(
+        name,
+        (_ExportEnvelopeSerializer,),
+        {"results": serializers.SerializerMethodField(), "get_results": get_results},
+    )
 
 
 @dataclass(frozen=True)

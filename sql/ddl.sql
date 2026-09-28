@@ -865,7 +865,9 @@ CREATE TABLE IF NOT EXISTS public.aggregator_orderitem (
 	deleted_by_id int8 NULL,
 	created_by_id int8 NULL,
 	order_id int8 NOT NULL,
-	product_packaging_id int8 NOT NULL,
+	product_packaging_id int8 NULL,
+	product_id int8 NULL,
+	packet_weight numeric(8, 3) NULL,
 	negotiated_selling_price numeric(12, 2) NOT NULL,
 	quantity int8 NOT NULL,
 	CONSTRAINT aggregator_orderitem_pkey PRIMARY KEY (id),
@@ -887,6 +889,8 @@ CREATE INDEX IF NOT EXISTS aggregator_orderitem_deleted_by_id_idx ON public.aggr
 -- There is no lr_number column -- it lives on aggregator_dispatchdetails, which
 -- dispatch_details_id points at; NULL there means a private (own-vehicle)
 -- dispatch, which has no transporter and so no LR.
+-- Exactly one of order_id / custom_order_id is set: a custom order's challan
+-- lives here too, so the challan list is one table.
 CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -895,7 +899,8 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	deleted_at timestamptz NULL,
 	deleted_by_id int8 NULL,
 	public_id varchar(20) NOT NULL,
-	order_id int8 NOT NULL,
+	order_id int8 NULL,
+	custom_order_id int8 NULL,
 	dispatch_details_id int8 NULL,
 	client_id int8 NOT NULL,
 	client_address_id int8 NOT NULL,
@@ -909,9 +914,15 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	driver_number varchar(10) NOT NULL,
 	CONSTRAINT aggregator_dispatchentry_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_dispatchentry_public_id_key UNIQUE (public_id),
-	CONSTRAINT aggregator_dispatchentry_order_id_key UNIQUE (order_id)
+	CONSTRAINT aggregator_dispatchentry_order_id_key UNIQUE (order_id),
+	CONSTRAINT aggregator_dispatchentry_custom_order_id_key UNIQUE (custom_order_id),
+	CONSTRAINT ck_dispatchentry_one_order CHECK (
+		(order_id IS NOT NULL AND custom_order_id IS NULL)
+		OR (order_id IS NULL AND custom_order_id IS NOT NULL)
+	)
 );
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_public_id_like ON public.aggregator_dispatchentry USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_custom_order_id_idx ON public.aggregator_dispatchentry USING btree (custom_order_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_dispatch_details_id_idx ON public.aggregator_dispatchentry USING btree (dispatch_details_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_client_id_idx ON public.aggregator_dispatchentry USING btree (client_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_client_address_id_idx ON public.aggregator_dispatchentry USING btree (client_address_id);
@@ -925,6 +936,8 @@ CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_deleted_by_id_idx ON public.
 -- One challan line: an aggregator_orderitem copied at dispatch time, plus the
 -- lot number those bags came from. Copied rather than joined so a later edit to
 -- the order cannot rewrite a challan already in the driver's hand.
+-- A custom order's loose line sets product_id + packet_weight instead of
+-- product_packaging_id (quantity is then packets, the price per packet).
 CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentryitem (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -940,11 +953,17 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentryitem (
 	lot_number varchar(64) NOT NULL,
 	CONSTRAINT aggregator_dispatchentryitem_pkey PRIMARY KEY (id),
 	CONSTRAINT uniq_dispatchentryitem_entry_packaging UNIQUE (dispatch_entry_id, product_packaging_id),
+	CONSTRAINT uniq_dispatchentryitem_entry_product_weight UNIQUE (dispatch_entry_id, product_id, packet_weight),
+	CONSTRAINT ck_dispatchentryitem_one_kind CHECK (
+		(product_packaging_id IS NOT NULL AND product_id IS NULL AND packet_weight IS NULL)
+		OR (product_packaging_id IS NULL AND product_id IS NOT NULL AND packet_weight IS NOT NULL)
+	),
 	CONSTRAINT ck_dispatchentryitem_positive CHECK (negotiated_selling_price >= 0 AND quantity > 0),
 	CONSTRAINT aggregator_dispatchentryitem_quantity_check CHECK (quantity >= 0)
 );
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_dispatch_entry_id_idx ON public.aggregator_dispatchentryitem USING btree (dispatch_entry_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_product_packaging_id_idx ON public.aggregator_dispatchentryitem USING btree (product_packaging_id);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_product_id_idx ON public.aggregator_dispatchentryitem USING btree (product_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_is_deleted_idx ON public.aggregator_dispatchentryitem USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_created_by_id_idx ON public.aggregator_dispatchentryitem USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_deleted_by_id_idx ON public.aggregator_dispatchentryitem USING btree (deleted_by_id);
@@ -970,6 +989,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inventorysnapshot (
 	snapshot_date date NOT NULL,
 	product_packaging_id int8 NOT NULL,
 	bags int8 NOT NULL,
+	counted_at timestamptz NOT NULL,
 	CONSTRAINT aggregator_inventorysnapshot_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_inventorysnapshot_public_id_key UNIQUE (public_id),
 	CONSTRAINT uniq_inventorysnapshot_date_packaging UNIQUE (snapshot_date, product_packaging_id),
@@ -1006,6 +1026,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_loosestocksnapshot (
 	product_id int8 NOT NULL,
 	packet_weight numeric(8,3) NOT NULL,
 	packets int8 NOT NULL,
+	counted_at timestamptz NOT NULL,
 	CONSTRAINT aggregator_loosestocksnapshot_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_loosestocksnapshot_public_id_key UNIQUE (public_id),
 	CONSTRAINT uniq_loosestocksnapshot_date_product_weight UNIQUE (snapshot_date, product_id, packet_weight),

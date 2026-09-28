@@ -12,7 +12,8 @@ its effective date has come, so nothing surprises the books mid-day.
 Read-time derivation (no stored counters, no cron): the raw-material stock of a
 product is the sum of its ``quantity_kg`` over lots with ``status=In Use`` and
 ``effective_date <= today``; the on-hand of a material type is the sum of its
-``InwardOtherMaterial.quantity`` over entries with ``effective_date <= today``.
+``InwardOtherMaterial.quantity`` over entries with ``effective_date <= today``,
+less what the packets currently packed have used per their recipes.
 A freshly recorded other-material lot is therefore in stock the day it arrives;
 a raw lot counts only while its status is ``In Use`` -- flipping stamps today,
 reverting clears the date and drops it back out of stock.
@@ -30,6 +31,7 @@ Everything here is derived or shape-only: nothing in this module writes rows.
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.db.models import Sum
@@ -263,34 +265,36 @@ def other_material_on_hand(
 ) -> list[dict]:
     """Per-material-type on-hand position as of ``as_of`` (default today).
 
-    Only entries with ``effective_date <= as_of`` count; the unit is the
+    ``on_hand`` is what has come in (entries with ``effective_date <= as_of``)
+    minus what the packets currently packed have used, per the products'
+    recipes -- see ``InventoryOperations.other_material_used``. The unit is the
     material type's own ``unit_type`` (count / kg / litre), so each line tells
     the reader how to read its ``on_hand`` number.
-    ``material_type_ids`` narrows the report to those material types.
+
+    Every material type that has come in or been used is listed, including
+    one whose figure is zero or negative: a negative line means packets were
+    counted that the recorded inward lots cannot cover, which is exactly what
+    this report must not hide. ``material_type_ids`` narrows the report to
+    those material types.
     """
     as_of = as_of or today()
-    query = InwardOtherMaterial.objects.filter(
-        effective_date__isnull=False,
-        effective_date__lte=as_of,
-    )
-    if material_type_ids:
-        query = query.filter(recipe__material_type_id__in=material_type_ids)
-    rows = (
-        query.values(
-            "recipe__material_type_id",
-            "recipe__material_type__name",
-            "recipe__material_type__unit_type",
-        )
-        .annotate(on_hand=Sum("quantity"))
-        .filter(on_hand__gt=0)
-        .order_by("recipe__material_type__name")
-    )
+    inward = InventoryOperations.other_material_inward(material_type_ids or None, as_of)
+    used = InventoryOperations.other_material_used(material_type_ids or None)
+    active = {
+        material_type_id
+        for figures in (inward, used)
+        for material_type_id, amount in figures.items()
+        if amount > 0
+    }
     return [
         {
-            "material_type_id": row["recipe__material_type_id"],
-            "name": row["recipe__material_type__name"],
-            "unit_type": row["recipe__material_type__unit_type"],
-            "on_hand": row["on_hand"],
+            "material_type_id": material_type.id,
+            "name": material_type.name,
+            "unit_type": material_type.unit_type,
+            "on_hand": inward.get(material_type.id, Decimal("0"))
+            - used.get(material_type.id, Decimal("0")),
         }
-        for row in rows
+        for material_type in OtherMaterialType.all_objects.filter(
+            id__in=active
+        ).order_by("name")
     ]

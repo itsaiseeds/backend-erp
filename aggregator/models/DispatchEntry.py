@@ -11,7 +11,12 @@ from common.models import (
 
 
 class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
-    """The challan record for one order: what left, to whom, on what.
+    """The challan record for one order or custom order: what left, to whom, on what.
+
+    Exactly one of ``order`` / ``custom_order`` is set
+    (``ck_dispatchentry_one_order``). A custom order's lines are loose packets,
+    so its ``DispatchEntryItem`` rows name a product and packet weight instead of
+    a packaging; everything else about the challan is the same.
 
     Created by ``dispatch-order`` alongside the ``DispatchDetails`` /
     ``PrivateDispatchDetails`` row, one per order. Where those two tables record
@@ -43,6 +48,16 @@ class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
         "aggregator.Order",
         verbose_name="order",
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="dispatch_entry",
+    )
+    custom_order = models.OneToOneField(
+        "aggregator.CustomOrder",
+        verbose_name="custom order",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="dispatch_entry",
     )
     dispatch_details = models.ForeignKey(
@@ -108,6 +123,15 @@ class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
         verbose_name = "dispatch entry"
         verbose_name_plural = "dispatch entries"
         ordering = ["-dispatched_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(order__isnull=False, custom_order__isnull=True)
+                    | models.Q(order__isnull=True, custom_order__isnull=False)
+                ),
+                name="ck_dispatchentry_one_order",
+            ),
+        ]
 
     def __str__(self):
         return self.public_id or "Dispatch entry"
@@ -140,20 +164,23 @@ class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
         return sum((item.line_total for item in self.items.all()), 0)
 
     @property
+    def source_order(self):
+        """Whichever order this challan belongs to -- an Order or a CustomOrder."""
+        return self.order if self.order_id else self.custom_order
+
+    @property
     def total_packets(self):
-        return sum(
-            (
-                item.quantity * item.product_packaging.packets
-                for item in self.items.all()
-            ),
-            0,
-        )
+        return sum((item.total_packets for item in self.items.all()), 0)
 
     def clean(self):
         super().clean()
         errors = {}
 
-        if self.order_id and self.client_id and self.order.client_id != self.client_id:
+        if bool(self.order_id) == bool(self.custom_order_id):
+            errors["order"] = "A dispatch entry names exactly one order or custom order."
+
+        source = self.source_order if (self.order_id or self.custom_order_id) else None
+        if source is not None and self.client_id and source.client_id != self.client_id:
             errors["client"] = "A dispatch entry must name the order's own client."
 
         if self.client_id and self.client_address_id:
@@ -169,9 +196,9 @@ class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
                 )
 
         if (
-            self.order_id
+            source is not None
             and self.dispatch_details_id
-            and self.order.dispatch_details_id != self.dispatch_details_id
+            and source.dispatch_details_id != self.dispatch_details_id
         ):
             errors["dispatch_details"] = (
                 "Dispatch details belong to a different order."

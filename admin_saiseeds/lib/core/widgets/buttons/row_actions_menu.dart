@@ -73,7 +73,35 @@ class _RowActionsMenuState extends State<RowActionsMenu> {
     action.onSelected?.call();
   }
 
+  /// Rough height of the popup: enough to decide which way it should open
+  /// without laying it out first. Item height is the tallest realistic case
+  /// (label plus a blocked-reason line).
+  double get _estimatedHeight {
+    final int blocked = widget.actions
+        .where((action) => action.onSelected == null)
+        .length;
+    return (widget.actions.length * AppSizes.rowActionItemHeight) +
+        (blocked * AppSizes.rowActionHintHeight) +
+        (AppSpacing.xs * 2);
+  }
+
+  /// A row near the foot of the table has no room below it, so the menu
+  /// opens upward instead of being clipped by the table's edge.
+  bool _opensUpward(BuildContext overlayContext) {
+    final RenderObject? box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return false;
+
+    final double top = box.localToGlobal(Offset.zero).dy;
+    final double bottom = top + box.size.height;
+    final double below = MediaQuery.sizeOf(overlayContext).height - bottom;
+
+    if (below >= _estimatedHeight + AppSpacing.xs) return false;
+    return top > below;
+  }
+
   Widget _buildOverlay(BuildContext overlayContext) {
+    final bool opensUpward = _opensUpward(overlayContext);
+
     return Stack(
       children: [
         Positioned.fill(
@@ -87,9 +115,13 @@ class _RowActionsMenuState extends State<RowActionsMenu> {
           child: CompositedTransformFollower(
             link: _layerLink,
             showWhenUnlinked: false,
-            targetAnchor: Alignment.bottomRight,
-            followerAnchor: Alignment.topRight,
-            offset: const Offset(0, AppSpacing.xs),
+            targetAnchor: opensUpward
+                ? Alignment.topRight
+                : Alignment.bottomRight,
+            followerAnchor: opensUpward
+                ? Alignment.bottomRight
+                : Alignment.topRight,
+            offset: Offset(0, opensUpward ? -AppSpacing.xs : AppSpacing.xs),
             child: Material(
               color: AppColors.TRANSPARENT,
               child: Container(

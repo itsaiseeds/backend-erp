@@ -142,14 +142,16 @@ def set_or_update_primary_address(
     client.client_addresses.filter(is_primary=True).exclude(address=address).update(
         is_primary=False
     )
-    link, _ = ClientAddress.objects.get_or_create(
-        client=client,
-        address=address,
-        defaults={"created_by": actor},
-    )
+    # ``all_objects``: the (client, address) unique constraint covers removed
+    # links too, so a removed one is restored rather than inserted again.
+    link = ClientAddress.all_objects.filter(client=client, address=address).first()
+    if link is None:
+        link = ClientAddress(client=client, address=address, created_by=actor)
+    else:
+        link.restore()
     link.is_primary = True
     link.full_clean()
-    link.save(update_fields=["is_primary", "updated_at"])
+    link.save()
     return link
 
 
@@ -172,6 +174,20 @@ def _unlink(link: LinkT, actor: User) -> None:
     is that bypass, shared with every other API-maintained table.
     """
     link.mark_deleted(actor)
+
+
+def _relink(link: LinkT) -> None:
+    """Restore a soft-deleted link, demoted.
+
+    A link may have been primary when it was removed, and restoring it with the
+    flag still set would give the client two primaries -- which the
+    ``uniq_*_one_primary`` partial indexes reject. It comes back demoted and
+    ``_apply_primary`` then points the flag wherever the caller asked.
+    """
+    if link.is_primary:
+        link.is_primary = False
+        link.save(update_fields=["is_primary", "updated_at"])
+    link.restore()
 
 
 def _primary_index(items: list[dict], label: str) -> int:
@@ -215,7 +231,17 @@ def _sync_links(
     create: Callable[[dict], LinkT],
     update: Callable[[LinkT, dict], None],
 ) -> list[LinkT]:
-    """Reconcile ``links`` against the submitted ``items`` (full replacement)."""
+    """Reconcile ``links`` against the submitted ``items`` (full replacement).
+
+    ``links`` must include the client's **soft-deleted** links (read through
+    ``all_objects``). The ``(client, target)`` unique constraints are not
+    soft-delete aware, so an entry that was removed and is now sent again must
+    bring its old link back: inserting a second one is an ``IntegrityError``
+    (a contact reuses its global row, so it collides), and for addresses and
+    agencies -- which would otherwise get fresh rows -- it would strand the
+    orders still pointing at the old one. When several links share a key a
+    live one wins, then the newest removed one.
+    """
     if not items:
         raise ValidationError(f"At least one {label} is required.")
 
@@ -223,13 +249,20 @@ def _sync_links(
     if len(set(keys)) != len(keys):
         raise ValidationError(f"The same {label} is listed twice.")
 
-    existing = {link_key(link): link for link in links}
+    existing: dict[Hashable, LinkT] = {}
+    for link in sorted(links, key=lambda link: link.pk):
+        current = existing.get(link_key(link))
+        if current is None or current.is_deleted or not link.is_deleted:
+            existing[link_key(link)] = link
+
     ordered = []
     for key, item in zip(keys, items, strict=True):
-        link = existing.pop(key, None)
-        if link is None:
+        if key not in existing:
             link = create(item)
         else:
+            link = existing.pop(key)
+            if link.is_deleted:
+                _relink(link)
             update(link, item)
         ordered.append(link)
 
@@ -322,7 +355,11 @@ def sync_client_addresses(client: Client, items: list[dict], actor: User) -> lis
 
     return _sync_links(
         items,
-        list(client.client_addresses.select_related("address", "address__pincode").all()),
+        list(
+            ClientAddress.all_objects.filter(client=client).select_related(
+                "address", "address__pincode"
+            )
+        ),
         actor,
         label="address",
         link_key=_address_link_key,
@@ -332,6 +369,7 @@ def sync_client_addresses(client: Client, items: list[dict], actor: User) -> lis
     )
 
 
+@transaction.atomic
 @transaction.atomic
 def sync_client_contacts(client: Client, items: list[dict], actor: User) -> list[ClientContact]:
     """Replace the client's contact people with ``items`` (at least one required)."""
@@ -352,7 +390,7 @@ def sync_client_contacts(client: Client, items: list[dict], actor: User) -> list
 
     return _sync_links(
         items,
-        list(client.client_contacts.select_related("contact").all()),
+        list(ClientContact.all_objects.filter(client=client).select_related("contact")),
         actor,
         label="contact person",
         link_key=lambda link: (link.contact.name, link.contact.phone_number),
@@ -383,7 +421,11 @@ def sync_client_transport_agencies(
 
     return _sync_links(
         items,
-        list(client.client_transport_agencies.select_related("transport_agency").all()),
+        list(
+            ClientTransportAgency.all_objects.filter(client=client).select_related(
+                "transport_agency"
+            )
+        ),
         actor,
         label="transport agency",
         link_key=lambda link: link.transport_agency.name,

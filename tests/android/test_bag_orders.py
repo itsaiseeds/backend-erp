@@ -371,6 +371,15 @@ class AndroidBagOrderApiTest(AndroidApiTestCase):
             fragment="at least 1",
         )
 
+    def test_a_deleted_products_bag_is_rejected_like_an_unknown_one(self):
+        """The catalogue hides a deleted product; booking must refuse it too.
+
+        tests/android/test_bag_orders.py::AndroidBagOrderApiTest::test_a_deleted_products_bag_is_rejected_like_an_unknown_one
+        """
+        self.bag.product.mark_deleted(self.superuser)
+
+        self._assert_rejected(self._post(), fragment="Unknown product packaging")
+
     def test_an_unknown_bag_is_rejected(self):
         self._assert_rejected(
             self._post(
