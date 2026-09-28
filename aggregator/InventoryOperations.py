@@ -26,10 +26,14 @@ excluded from that gate, and read at *its* own latest date.
 Because a loose count may be days old and still correct, loose figures are read
 at ``loose_date(...)`` -- the latest loose snapshot date -- rather than today.
 
-Reserved and consumed quantities are **derived from ``Order.status``**, never
-stored. That makes verification and dispatch inherently reversible (flip the
-status back and the numbers correct themselves) and means outstanding
-reservations carry across days, which a stored counter would not.
+Reserved and consumed quantities are **derived from ``Order.status`` and
+``DispatchEntryItem.quantity``**, never stored as their own counter. That makes
+verification and dispatch inherently reversible (flip the status back and the
+numbers correct themselves) and means outstanding reservations carry across
+days, which a stored counter would not. A dispatch that ships less than a line
+ordered leaves the gap reserved against that same order -- dispatch is
+one-shot, so nothing will ship the rest later; the gap only closes when
+someone corrects the order or the dispatch by hand.
 
 **Counts are backed by raw material.** Bags and loose packets are packed out
 of a product's inward raw kilograms (``InwardRawMaterial`` lots that are
@@ -59,6 +63,7 @@ from common.models import indian_now
 
 from .models import (
     CustomOrderItem,
+    DispatchEntryItem,
     InventorySnapshot,
     InwardRawMaterial,
     LooseStockSnapshot,
@@ -257,28 +262,57 @@ def _bag_demand(product_packaging: ProductPackaging, order_filter: dict) -> int:
     return total or 0
 
 
+def _dispatched_bag_demand(product_packaging: ProductPackaging, order_filter: dict) -> int:
+    """Sum ``DispatchEntryItem.quantity`` -- what actually shipped -- for matching orders.
+
+    Unlike ``_bag_demand``, this is the truth for what left the warehouse: a
+    dispatch may ship fewer bags than a line ordered (see ``DispatchEntryItem``),
+    so ``OrderItem.quantity`` alone would overstate it.
+    """
+    total = DispatchEntryItem.objects.filter(
+        product_packaging=product_packaging,
+        **{f"dispatch_entry__{key}": value for key, value in order_filter.items()},
+    ).aggregate(total=Sum("quantity"))["total"]
+    return total or 0
+
+
 def reserved_bags(product_packaging: ProductPackaging) -> int:
-    """Bags spoken for by verified orders that have not yet been dispatched."""
-    return _bag_demand(
+    """Bags spoken for: verified orders not yet dispatched, plus shortfalls on ones that are.
+
+    A dispatched order's line still counts here for whatever it ordered but
+    did not ship -- dispatch is one-shot, so that gap has no later shipment to
+    close it and stays reserved against the order until someone corrects it by
+    hand (edit the line down, or revert and re-record the dispatch).
+    """
+    held_by_confirmed = _bag_demand(
         product_packaging, {"order__status_id__in": RESERVING_STATUS_IDS}
     )
+    ordered_on_dispatched = _bag_demand(
+        product_packaging, {"order__status_id__in": CONSUMING_STATUS_IDS}
+    )
+    shipped = _dispatched_bag_demand(
+        product_packaging, {"order__status_id__in": CONSUMING_STATUS_IDS}
+    )
+    return held_by_confirmed + (ordered_on_dispatched - shipped)
 
 
 def consumed_bags(
     product_packaging: ProductPackaging, snapshot_date: date | None = None
 ) -> int:
-    """Bags dispatched on or after ``snapshot_date``.
+    """Bags actually shipped on or after ``snapshot_date``.
 
     Dispatches predating the count already left the warehouse before it was
     taken, so they are absent from the counted figure and must not be
-    subtracted a second time.
+    subtracted a second time. Reads ``DispatchEntryItem.quantity``, not the
+    order line's quantity, so a partial dispatch is not overcounted here (its
+    unshipped remainder is reserved instead -- see ``reserved_bags``).
     """
     snapshot_date = snapshot_date or today()
     base = {"order__status_id__in": CONSUMING_STATUS_IDS}
-    return _bag_demand(
+    return _dispatched_bag_demand(
         product_packaging,
         {**base, "order__dispatch_details__dispatch_date__gte": snapshot_date},
-    ) + _bag_demand(
+    ) + _dispatched_bag_demand(
         product_packaging,
         {**base, "order__private_dispatch_details__dispatch_date__gte": snapshot_date},
     )
@@ -584,20 +618,22 @@ def _lock_products(product_ids) -> None:
 def _bags_dispatched_before(
     product_packaging: ProductPackaging, before: date | None
 ) -> int:
-    """Bags of ``product_packaging`` dispatched strictly before ``before``.
+    """Bags of ``product_packaging`` actually shipped strictly before ``before``.
 
     Those bags already left the floor before the count ``before`` names, so
     they carry no on-hand figure any more -- but they were packed from raw
-    material and must still count as spent. ``before=None`` (no bag count has
-    ever been taken) counts every dispatch ever made.
+    material and must still count as spent. Reads ``DispatchEntryItem.quantity``
+    so an unshipped remainder of a partial dispatch (still sitting on the floor,
+    still reserved) is not mistaken for spent raw material. ``before=None`` (no
+    bag count has ever been taken) counts every dispatch ever made.
     """
     base = {"order__status_id__in": CONSUMING_STATUS_IDS}
     if before is None:
-        return _bag_demand(product_packaging, base)
-    return _bag_demand(
+        return _dispatched_bag_demand(product_packaging, base)
+    return _dispatched_bag_demand(
         product_packaging,
         {**base, "order__dispatch_details__dispatch_date__lt": before},
-    ) + _bag_demand(
+    ) + _dispatched_bag_demand(
         product_packaging,
         {**base, "order__private_dispatch_details__dispatch_date__lt": before},
     )

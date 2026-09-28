@@ -64,6 +64,38 @@ def validated_lot_numbers(order: Order, lot_numbers: dict[str, str]) -> dict[str
     return lot_numbers
 
 
+def validated_quantities(
+    order: Order, quantities: dict[str, int] | None
+) -> dict[str, int]:
+    """Check ``quantities`` names a subset of ``order``'s lines, each within bounds.
+
+    Keyed the same way as ``lot_numbers``. A line missing from ``quantities``
+    (or ``quantities`` being ``None`` entirely) dispatches in full -- most
+    dispatches ship everything ordered, so nothing has to be repeated back for
+    the common case. A named quantity must be more than zero and no more than
+    that line's ordered quantity: a dispatch can fall short of an order, never
+    exceed it.
+    """
+    quantities = quantities or {}
+    on_order = {item.product_packaging.public_id: item.quantity for item in order.items.all()}
+    unknown = sorted(quantities.keys() - on_order.keys())
+    if unknown:
+        raise ValidationError({"items": f"Not on this order: {', '.join(unknown)}."})
+
+    errors = []
+    for public_id, quantity in quantities.items():
+        ordered = on_order[public_id]
+        if quantity <= 0 or quantity > ordered:
+            errors.append(
+                f"{public_id}: dispatched quantity must be between 1 and {ordered}, "
+                f"got {quantity}."
+            )
+    if errors:
+        raise ValidationError({"items": " ".join(errors)})
+
+    return quantities
+
+
 @transaction.atomic
 def sync_dispatch_entry(
     order: Order,
@@ -76,6 +108,7 @@ def sync_dispatch_entry(
     driver_number: str,
     vehicle_number: str,
     lot_numbers: dict[str, str],
+    quantities: dict[str, int] | None = None,
 ) -> DispatchEntry:
     """Write (or rewrite) ``order``'s challan and its lot-numbered lines.
 
@@ -83,11 +116,16 @@ def sync_dispatch_entry(
     dispatched again keeps its ``DE-...``, because it is the same order's challan
     and nothing outside has a reason to learn a new id for it.
 
+    ``quantities`` names, per line, how many actually shipped -- a line left out
+    ships in full. See ``validated_quantities`` and ``DispatchEntryItem`` for
+    what a partial figure means for stock.
+
     Call this **after** the dispatch details are attached -- the entry links
     ``order.dispatch_details``, and ``DispatchEntry.clean`` checks it is the
     order's own.
     """
     validated_lot_numbers(order, lot_numbers)
+    quantities = validated_quantities(order, quantities)
 
     contact = order.client.primary_contact
     values = {
@@ -116,7 +154,7 @@ def sync_dispatch_entry(
     entry.full_clean()
     entry.save()
 
-    _sync_entry_items(entry, order, lot_numbers, actor)
+    _sync_entry_items(entry, order, lot_numbers, quantities, actor)
     return entry
 
 
@@ -124,6 +162,7 @@ def _sync_entry_items(
     entry: DispatchEntry,
     order: Order,
     lot_numbers: dict[str, str],
+    quantities: dict[str, int],
     actor,
 ) -> list[DispatchEntryItem]:
     """Mirror ``order``'s lines onto ``entry``, stamping each with its lot number.
@@ -151,7 +190,7 @@ def _sync_entry_items(
         else:
             line.restore()
         line.negotiated_selling_price = item.negotiated_selling_price
-        line.quantity = item.quantity
+        line.quantity = quantities.get(packaging.public_id, item.quantity)
         line.lot_number = lot_numbers[packaging.public_id]
         line.full_clean()
         line.save()

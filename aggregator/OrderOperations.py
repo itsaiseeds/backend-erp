@@ -323,6 +323,7 @@ def dispatch_order(
     driver_number: str,
     vehicle_number: str,
     lot_numbers: dict[str, str],
+    quantities: dict[str, int] | None = None,
 ) -> Order:
     """Record a dispatch against a verified order and move it to DISPATCHED.
 
@@ -356,17 +357,29 @@ def dispatch_order(
     challan is written from: the dispatch itself is one journey, but the goods
     on it are traced batch by batch.
 
+    ``quantities`` maps a line to how many bags actually shipped, when that
+    falls short of what was ordered; a line left out ships in full. A shortfall
+    does not vanish -- it stays reserved against this same order (see
+    ``InventoryOperations.reserved_bags``) until someone corrects it by hand,
+    since dispatch is a one-shot action and there is no later shipment to
+    finish the line.
+
     The details are attached *before* the status moves: ``Order.clean`` rejects
     a DISPATCHED order that carries no dispatch record, so the other order would
     fail validation. No stock is written -- CONFIRMED to DISPATCHED moves the
     bags from reserved to consumed on its own.
     """
-    from .DispatchOperations import sync_dispatch_entry, validated_lot_numbers
+    from .DispatchOperations import (
+        sync_dispatch_entry,
+        validated_lot_numbers,
+        validated_quantities,
+    )
 
     assert_order_status(order, DISPATCHABLE_STATUS_CODES, "dispatch")
 
     # Validated before anything is written, so a bad lot number costs nothing.
     validated_lot_numbers(order, lot_numbers)
+    validated_quantities(order, quantities)
 
     dispatched_at = indian_now()
     to_city = order.delivery_address.city
@@ -396,6 +409,7 @@ def dispatch_order(
         driver_number=driver_number,
         vehicle_number=vehicle_number,
         lot_numbers=lot_numbers,
+        quantities=quantities,
     )
     return update_order_status(order, StatusIds.DISPATCHED)
 

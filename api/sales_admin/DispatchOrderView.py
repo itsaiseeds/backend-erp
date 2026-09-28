@@ -29,6 +29,11 @@ each line). It must name every line of the order exactly once -- the dispatch
 writes the order's challan, and a challan that cannot say which batch a bag came
 from is not a challan. Which packaging is which is checked against the order
 itself, in ``DispatchOperations``.
+
+Each line may also carry a **quantity**, when fewer bags shipped than were
+ordered. Omitting it dispatches the line in full, which is the common case. A
+shortfall stays reserved against the order -- dispatch is one-shot, so there is
+no later shipment to make up the difference; someone corrects it by hand.
 """
 
 from __future__ import annotations
@@ -48,7 +53,7 @@ from .OrderTransitionView import OrderTransitionView
 
 
 class DispatchItemLotSerializer(serializers.Serializer):
-    """The lot number for one line of the order being dispatched."""
+    """The lot number -- and, if it falls short, the quantity -- for one order line."""
 
     product_packaging_public_id = serializers.CharField(
         max_length=20,
@@ -63,6 +68,14 @@ class DispatchItemLotSerializer(serializers.Serializer):
             "blank": "lot_number is required.",
             "required": "lot_number is required.",
         },
+    )
+    quantity = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        help_text=(
+            "How many actually shipped on this line, if fewer than ordered. "
+            "Omit to dispatch the line in full."
+        ),
     )
 
 
@@ -151,5 +164,10 @@ class DispatchOrderView(OrderTransitionView):
             lot_numbers={
                 item["product_packaging_public_id"]: item["lot_number"]
                 for item in data["items"]
+            },
+            quantities={
+                item["product_packaging_public_id"]: item["quantity"]
+                for item in data["items"]
+                if "quantity" in item
             },
         )
