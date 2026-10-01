@@ -245,6 +245,50 @@ def assert_order_status(order: Order, allowed: frozenset[str], action: str) -> N
         )
 
 
+def assert_dispatched_today(order) -> None:
+    """Raise unless ``order``'s dispatch was recorded today (IST).
+
+    A revert is a correction of something just recorded, not a time machine.
+    Rewinding an older dispatch moves its bags from consumed back to reserved
+    against *today's* stock position, and the re-dispatch that follows re-stamps
+    ``dispatched_at`` with today -- so a consignment that physically left on the
+    1st would silently become one that left today, challan number and all.
+
+    Shared by ``revert_dispatch`` here and its ``CustomOrderOperations``
+    counterpart, and called **after** each one's status check so the existing
+    "an order that is CONFIRMED" refusal still comes first. It takes no
+    ``action`` word, unlike ``assert_order_status``: revert is the only verb
+    this rule applies to, and threading one through only made the message say
+    "dispatch" twice.
+
+    The day is read off the challan, which is the timestamp a re-dispatch
+    re-stamps. A DISPATCHED order with no challan is reachable (dispatch rows
+    attached and the status moved directly, as some tests do), so the dispatch
+    record itself is the fallback -- ``Order.clean`` guarantees one of the two
+    is there once the order is DISPATCHED.
+
+    Raises ``ValidationError``, which the API's exception handler turns into a
+    400, the same convention as ``assert_order_status``.
+    """
+    entry = getattr(order, "dispatch_entry", None)
+    dispatch = entry if entry is not None else order.active_dispatch
+    if dispatch is None:
+        return
+    day = dispatch.dispatch_date
+    # ``indian_now().date()`` rather than ``InventoryOperations.today()``: the
+    # same value, without the local import that module needs here (and the same
+    # call ``mark_delivered`` below already makes).
+    if day != indian_now().date():
+        raise ValidationError(
+            {
+                "status": (
+                    f"This dispatch was recorded on {day:%Y-%m-%d}: only a "
+                    "dispatch recorded today can be reverted."
+                )
+            }
+        )
+
+
 # The refusal an own-vehicle dispatch gets per blank field. Declared here, with
 # the rule, and reused by ``DispatchCustomOrderView`` so the serializer that
 # re-requires these fields answers in exactly the same words.
@@ -539,8 +583,13 @@ def revert_dispatch(order: Order) -> Order:
 
     The dispatch record stays attached -- it is what actually happened, and a
     re-dispatch overwrites it. Only the status is rewound.
+
+    Only today's dispatch can be reverted (``assert_dispatched_today``). Note
+    the knock-on: because a re-dispatch needs a revert first, re-dispatching is
+    same-day only too.
     """
     assert_order_status(order, REVERTIBLE_DISPATCH_STATUS_CODES, "revert the dispatch of")
+    assert_dispatched_today(order)
     order.status = Status.by_id(StatusIds.CONFIRMED)
     order.actual_delivery_date = None
     order.full_clean()

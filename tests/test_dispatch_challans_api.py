@@ -173,6 +173,11 @@ class DispatchChallansApiTest(WebApiTestCase):
     def _upload_lr(self, order, lr_number="LR-12345"):
         return self._post(LR_URL, order, {"lr_number": lr_number})
 
+    @property
+    def today_prefix(self):
+        """The ``YYYYMMDD-`` today's challan numbers start with."""
+        return indian_now().date().strftime("%Y%m%d-")
+
     def _challans(self, **params):
         """The challan list over a window wide enough to hold today."""
         now = indian_now()
@@ -334,6 +339,38 @@ class DispatchChallansApiTest(WebApiTestCase):
         self.assertEqual(challan["dispatch"]["lr_number"], "")
         self.assertIsNone(challan["dispatch"]["transport_agency"])
 
+    def test_the_challan_carries_a_dated_serial_restarting_each_day(self):
+        """What the client quotes: YYYYMMDD-XXXX, 0001 first, counting up.
+
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_the_challan_carries_a_dated_serial_restarting_each_day
+        """
+        today = indian_now().date().strftime("%Y%m%d")
+
+        self._dispatched_order()
+        self._dispatched_order(by_agency=False)
+
+        rows = self._challans().data["results"]
+        self.assertEqual(
+            sorted(row["dispatch"]["challan_number"] for row in rows),
+            [f"{today}-0001", f"{today}-0002"],
+        )
+
+    def test_the_list_can_be_looked_up_by_challan_number(self):
+        """The point of the number: a client reads it out and it is found.
+
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_the_list_can_be_looked_up_by_challan_number
+        """
+        wanted = self._dispatched_order()
+        self._dispatched_order(by_agency=False)
+        number = wanted.dispatch_entry.challan_number
+
+        response = self._challans(challan_number=number)
+
+        self.assertEqual(response.data["total_count"], 1)
+        self.assertEqual(
+            response.data["results"][0]["order_public_id"], wanted.public_id
+        )
+
     def test_a_dispatch_outside_the_window_is_excluded(self):
         """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_dispatch_outside_the_window_is_excluded"""
         order = self._dispatched_order()
@@ -462,6 +499,10 @@ class DispatchChallansApiTest(WebApiTestCase):
         challan = listed.data["results"][0]
         self.assertEqual(challan["dispatch"]["lr_number"], "")
         self.assertEqual(challan["items"][0]["lot_number"], "LOT-2026-02")
+        # Same day, so the challan number the client was already given stands.
+        self.assertEqual(
+            challan["dispatch"]["challan_number"], f"{self.today_prefix}0001"
+        )
 
     def test_the_catalogues_offer_only_clients_and_cities_with_challans(self):
         """A picker offers a client from the dispatch on, not from the LR on.

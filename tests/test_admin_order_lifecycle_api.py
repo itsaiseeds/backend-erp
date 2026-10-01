@@ -13,6 +13,7 @@ Authentication and role gating are proven once in ``tests/test_view_contracts.py
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -587,6 +588,28 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         self.assertEqual(response.data["status"], "CONFIRMED")
         order.refresh_from_db()
         self.assertIsNone(order.actual_delivery_date)
+
+    def test_a_dispatch_from_an_earlier_day_cannot_be_reverted(self):
+        """A revert corrects what was just recorded; it is not a time machine.
+
+        Rewinding an older dispatch would move its bags back to reserved against
+        *today's* position, and the re-dispatch that follows would re-stamp the
+        day -- so a consignment that left on the 1st would read as today's.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_dispatch_from_an_earlier_day_cannot_be_reverted
+        """
+        order = self._dispatched_order()
+        entry = order.dispatch_entry
+        yesterday = indian_now() - timedelta(days=1)
+        entry.dispatched_at = yesterday
+        entry.save()
+
+        self._assert_refused(
+            self._post(REVERT_URL, order),
+            f"This dispatch was recorded on {yesterday.date():%Y-%m-%d}",
+        )
+        order.refresh_from_db()
+        self.assertEqual(order.status.code, "DISPATCHED")
 
     def test_reverting_a_dispatch_that_never_happened_is_refused(self):
         """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_reverting_a_dispatch_that_never_happened_is_refused"""

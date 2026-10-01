@@ -427,6 +427,7 @@ class DispatchEntryItemInline(CreatedByStampInlineMixin, admin.TabularInline):
 class DispatchEntryAdmin(SoftDeleteParentAdmin):
     list_display = (
         "public_id",
+        "challan_number",
         "order",
         "client",
         "lr_number",
@@ -437,6 +438,7 @@ class DispatchEntryAdmin(SoftDeleteParentAdmin):
     )
     search_fields = (
         "public_id",
+        "challan_number",
         "order__public_id",
         "client__company_name",
         "dispatch_details__lr_number",

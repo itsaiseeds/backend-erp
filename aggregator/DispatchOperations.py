@@ -371,6 +371,7 @@ def dispatch_entry_payload(entry: DispatchEntry) -> dict:
     """The journey block of a challan: who carried it, in what, when and where."""
     return {
         "public_id": entry.public_id,
+        "challan_number": entry.challan_number,
         "lr_number": entry.lr_number,
         "dispatch_date": entry.dispatch_date.isoformat(),
         "is_private": entry.is_private,

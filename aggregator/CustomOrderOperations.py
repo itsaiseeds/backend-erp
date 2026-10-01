@@ -381,8 +381,14 @@ def revert_dispatch(order: CustomOrder) -> CustomOrder:
     The dispatch record and the challan stay attached, as for an order: they
     are what actually happened, a re-dispatch overwrites them, and the challan
     list leaves a non-dispatched order out by its status.
+
+    Only today's dispatch can be reverted, the same rule an order follows --
+    see ``OrderOperations.assert_dispatched_today``.
     """
+    from .OrderOperations import assert_dispatched_today
+
     _assert_dispatched(order, "revert the dispatch of")
+    assert_dispatched_today(order)
     order.status = Status.by_id(StatusIds.CONFIRMED)
     order.actual_delivery_date = None
     order.full_clean()

@@ -64,6 +64,7 @@ from common.views.paginated_date_range import (
     SortOption,
     list_query_parameters,
     parse_int,
+    parse_str,
 )
 
 # What makes a challan listable, per kind of order. Declared once: the list view
@@ -174,6 +175,9 @@ class ChallanDispatchSerializer(serializers.Serializer):
     """Output shape for the journey block (schema only)."""
 
     public_id = serializers.CharField()
+    challan_number = serializers.CharField(
+        help_text="The dated serial on the challan: YYYYMMDD-XXXX."
+    )
     lr_number = serializers.CharField()
     dispatch_date = serializers.DateField()
     is_private = serializers.BooleanField()
@@ -307,6 +311,19 @@ _QUERYSET_FILTERS = (
         parse=parse_int,
         description="City id(s) the goods were sent to (see options).",
         options=_challan_destination_cities,
+    ),
+    # Free text rather than a picker: the point is to look up the number a
+    # client read off their copy, and there is no useful option list for it.
+    QuerysetFilter(
+        "challan_number",
+        label="Challan Number",
+        lookup="challan_number__icontains",
+        parse=parse_str,
+        multi=False,
+        description=(
+            "Case-insensitive substring of the challan number (YYYYMMDD-XXXX). "
+            "The date window still applies -- the number carries its own date."
+        ),
     ),
 )
 _SORT_OPTIONS = (

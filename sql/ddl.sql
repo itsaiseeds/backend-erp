@@ -909,6 +909,12 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	deleted_at timestamptz NULL,
 	deleted_by_id int8 NULL,
 	public_id varchar(20) NOT NULL,
+	-- The dated serial a client quotes: YYYYMMDD-XXXX, restarting at 0001 each
+	-- IST day. Derived from dispatched_at in DispatchEntry.save(); the UNIQUE
+	-- below is what actually guarantees no two challans share one, and it also
+	-- serves the per-day prefix scan that picks the next number. Soft-deleted
+	-- rows keep their number reserved, so the constraint is plain, not partial.
+	challan_number varchar(13) NOT NULL,
 	order_id int8 NULL,
 	custom_order_id int8 NULL,
 	dispatch_details_id int8 NULL,
@@ -924,6 +930,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	driver_number varchar(10) NOT NULL,
 	CONSTRAINT aggregator_dispatchentry_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_dispatchentry_public_id_key UNIQUE (public_id),
+	CONSTRAINT aggregator_dispatchentry_challan_number_key UNIQUE (challan_number),
 	CONSTRAINT aggregator_dispatchentry_order_id_key UNIQUE (order_id),
 	CONSTRAINT aggregator_dispatchentry_custom_order_id_key UNIQUE (custom_order_id),
 	CONSTRAINT ck_dispatchentry_one_order CHECK (
@@ -932,6 +939,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	)
 );
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_public_id_like ON public.aggregator_dispatchentry USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_challan_number_like ON public.aggregator_dispatchentry USING btree (challan_number varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_custom_order_id_idx ON public.aggregator_dispatchentry USING btree (custom_order_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_dispatch_details_id_idx ON public.aggregator_dispatchentry USING btree (dispatch_details_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_client_id_idx ON public.aggregator_dispatchentry USING btree (client_id);

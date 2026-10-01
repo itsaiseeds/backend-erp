@@ -1391,6 +1391,13 @@ paths:
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
       - in: query
+        name: challan_number
+        schema:
+          type: string
+        description: Case-insensitive substring of the challan number (YYYYMMDD-XXXX).
+          The date window still applies -- the number carries its own date. Single
+          value; AND-ed with the other filters.
+      - in: query
         name: city_id
         schema:
           type: string
@@ -4105,6 +4112,9 @@ components:
       properties:
         public_id:
           type: string
+        challan_number:
+          type: string
+          description: 'The dated serial on the challan: YYYYMMDD-XXXX.'
         lr_number:
           type: string
         dispatch_date:
@@ -4128,6 +4138,7 @@ components:
           nullable: true
           description: The carrier; null on a private dispatch.
       required:
+      - challan_number
       - dispatch_date
       - driver_name
       - driver_number
@@ -5408,7 +5419,8 @@ components:
       description: |-
         ``dispatch-order``'s request, with lot numbers keyed by loose line.
 
-        The driver and vehicle are required again here -- see :func:`_required_here`.
+        The driver and vehicle are required again here -- see
+        :func:`_own_vehicle_field`.
       properties:
         from_city_id:
           type: integer
