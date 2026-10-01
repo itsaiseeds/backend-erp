@@ -177,6 +177,7 @@ def book_raw_material(product, quantity_kg, *, actor, effective_date=None, booke
     lot = InwardRawMaterial.objects.create(
         product=product,
         party=party,
+        lot_no="TEST-LOT",
         quantity_kg=quantity_kg,
         status_id=StatusIds.IN_USE.value,
         effective_date=effective_date or date.today(),

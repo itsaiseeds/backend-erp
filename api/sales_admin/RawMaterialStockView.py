@@ -3,15 +3,20 @@
 Read-time, aggregate, never stored: the incoming raw-material position of every
 product, computed from ``InwardRawMaterial`` lots on the fly.
 
-A lot counts toward the total only once it is **dated and usable** -- both an
-``effective_date`` that has come ("tomorrow is not incoming yet") and
+A lot counts toward ``incoming_kg`` only once it is **dated and usable** --
+both an ``effective_date`` that has come ("tomorrow is not incoming yet") and
 ``status='In Use'`` (a ``Lab Testing`` lot is held back until the lab signs
-off). Soft-deleted lots never count.
+off). ``rejected_kg`` is the same dated-and-reached gate applied to
+``status='Rejected'`` lots instead. Soft-deleted lots never count.
 
 ``incoming_kg`` is everything that has come in. ``packed_kg`` is what has
 since been packed into bags or sample packets via ``update-bag-stock`` /
 ``update-sample-packet-stock``, and ``available_kg`` is what is left to pack
 (``incoming_kg - packed_kg``) -- see ``InventoryOperations.raw_available_kg``.
+``rejected_kg`` is reported only, never spendable: nothing in the packing path
+can consume it, and a product is listed whenever ``incoming_kg > 0`` or
+``rejected_kg > 0``, so a product whose entire intake was rejected still
+appears.
 
 Optional ``?product=<P-...,...>`` narrows the report to those products.
 """
@@ -39,6 +44,9 @@ class RawMaterialStockLineSerializer(serializers.Serializer):
     )
     available_kg = serializers.CharField(
         help_text="KG left to pack: incoming_kg minus packed_kg."
+    )
+    rejected_kg = serializers.CharField(
+        help_text="Rejected KG with a reached effective date. Reported only, never spendable."
     )
 
 
@@ -71,6 +79,7 @@ class RawMaterialStockView(AdminApiView):
                 "incoming_kg": str(line["incoming_kg"]),
                 "packed_kg": str(line["packed_kg"]),
                 "available_kg": str(line["available_kg"]),
+                "rejected_kg": str(line["rejected_kg"]),
             }
             for line in InwardOperations.raw_incoming_stock(
                 as_of, product_public_ids=product_public_ids

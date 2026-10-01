@@ -427,6 +427,7 @@ class DispatchEntryItemInline(CreatedByStampInlineMixin, admin.TabularInline):
 class DispatchEntryAdmin(SoftDeleteParentAdmin):
     list_display = (
         "public_id",
+        "challan_number",
         "order",
         "client",
         "lr_number",
@@ -437,6 +438,7 @@ class DispatchEntryAdmin(SoftDeleteParentAdmin):
     )
     search_fields = (
         "public_id",
+        "challan_number",
         "order__public_id",
         "client__company_name",
         "dispatch_details__lr_number",
@@ -757,6 +759,7 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
         "public_id",
         "product",
         "party",
+        "lot_no",
         "quantity_kg",
         "status",
         "effective_date",
@@ -769,6 +772,7 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
         "product__name",
         "product__crop__name",
         "party__name",
+        "lot_no",
     )
     list_filter = ("status", "effective_date")
     autocomplete_fields = ("product", "party", "status")

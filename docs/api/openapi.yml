@@ -1391,6 +1391,13 @@ paths:
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
       - in: query
+        name: challan_number
+        schema:
+          type: string
+        description: Case-insensitive substring of the challan number (YYYYMMDD-XXXX).
+          The date window still applies -- the number carries its own date. Single
+          value; AND-ed with the other filters.
+      - in: query
         name: city_id
         schema:
           type: string
@@ -1652,8 +1659,8 @@ paths:
   /api/sales-admin/export/dispatch-receipts:
     get:
       operationId: sales_admin_export_dispatch_receipts
-      description: Export the complete challans of orders and custom orders booked
-        in a date window.
+      description: Export the challans of orders and custom orders booked in a date
+        window.
       summary: Export dispatch receipts (challans) of orders booked in a date range
       parameters:
       - in: query
@@ -2345,8 +2352,8 @@ paths:
         name: status
         schema:
           type: string
-        description: Lot status (Lab Testing / In Use). Comma-separated (any match);
-          AND-ed with the other filters.
+        description: Lot status (Lab Testing / In Use / Rejected). Comma-separated
+          (any match); AND-ed with the other filters.
       tags:
       - Admin · Inward
       security:
@@ -4105,6 +4112,9 @@ components:
       properties:
         public_id:
           type: string
+        challan_number:
+          type: string
+          description: 'The dated serial on the challan: YYYYMMDD-XXXX.'
         lr_number:
           type: string
         dispatch_date:
@@ -4128,6 +4138,7 @@ components:
           nullable: true
           description: The carrier; null on a private dispatch.
       required:
+      - challan_number
       - dispatch_date
       - driver_name
       - driver_number
@@ -4767,17 +4778,23 @@ components:
         Request validation for booking a new raw-material lot.
 
         ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
-        ``In Use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
-        that flip and is deliberately absent here. ``lab_sampling_date`` may be
-        given explicitly; left out, it defaults to today -- a lot never starts
-        with no sampling date, since it arrives for lab testing the day it's
-        booked.
+        ``In Use`` or ``Rejected`` later with ``PATCH``. ``effective_date`` is
+        stamped (today) at that flip and is deliberately absent here.
+        ``lab_sampling_date`` may be given explicitly; left out, it defaults to
+        today -- a lot never starts with no sampling date, since it arrives for
+        lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
+        number on the consignment -- is required.
       properties:
         product:
           type: string
           minLength: 1
         party:
           type: integer
+        lot_no:
+          type: string
+          minLength: 1
+          description: The supplier's own batch number for this consignment.
+          maxLength: 64
         quantity_kg:
           type: string
           format: decimal
@@ -4788,6 +4805,7 @@ components:
           format: date
           nullable: true
       required:
+      - lot_no
       - party
       - product
       - quantity_kg
@@ -5398,8 +5416,11 @@ components:
       - $ref: '#/components/schemas/CustomDispatchChallanItem'
     DispatchCustomOrderRequest:
       type: object
-      description: '``dispatch-order``''s request, with lot numbers keyed by loose
-        line.'
+      description: |-
+        ``dispatch-order``'s request, with lot numbers keyed by loose line.
+
+        The driver and vehicle are required again here -- see
+        :func:`_own_vehicle_field`.
       properties:
         from_city_id:
           type: integer
@@ -5431,8 +5452,8 @@ components:
       - vehicle_number
     DispatchItemLotRequest:
       type: object
-      description: The lot number -- and, if it falls short, the quantity -- for
-        one order line.
+      description: The lot number -- and, if it falls short, the quantity -- for one
+        order line.
       properties:
         product_packaging_public_id:
           type: string
@@ -5463,9 +5484,17 @@ components:
       description: |-
         Request validation for recording a dispatch.
 
-        Every field is required. There is no per-kind branching: an agency dispatch
-        and an own-vehicle one carry exactly the same details, and which table they
-        land in is the order's business, not the request's.
+        One shape for both kinds of dispatch: an agency dispatch and an own-vehicle
+        one carry exactly the same details, and which table they land in is the
+        order's business, not the request's.
+
+        The driver and vehicle are accepted as blank **here** because this
+        serializer cannot tell the two kinds apart -- that comes from
+        ``order.transport_agency``, which it never sees, and
+        ``DispatchCustomOrderView`` inherits this class for a custom order that is
+        always own-vehicle. Whether a blank is allowed is therefore decided one
+        layer down, by ``OrderOperations.assert_driver_details``, which has the
+        order. ``from_city_id`` and ``items`` are required of everyone.
       properties:
         from_city_id:
           type: integer
@@ -5473,15 +5502,21 @@ components:
             it.
         driver_name:
           type: string
-          minLength: 1
+          default: ''
+          description: Optional on an agency dispatch; required on an own-vehicle
+            one.
           maxLength: 255
         driver_number:
           type: string
-          minLength: 1
+          default: ''
+          description: Optional on an agency dispatch; required on an own-vehicle
+            one.
           maxLength: 10
         vehicle_number:
           type: string
-          minLength: 1
+          default: ''
+          description: Optional on an agency dispatch; required on an own-vehicle
+            one.
           maxLength: 32
         items:
           type: array
@@ -5489,11 +5524,8 @@ components:
             $ref: '#/components/schemas/DispatchItemLotRequest'
           description: One lot number per line of the order; every line must appear.
       required:
-      - driver_name
-      - driver_number
       - from_city_id
       - items
-      - vehicle_number
     ExecuteCodeRequestRequest:
       type: object
       properties:
@@ -5921,6 +5953,9 @@ components:
           $ref: '#/components/schemas/InwardRawMaterialProductRef'
         party:
           $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        lot_no:
+          type: string
+          description: The supplier's own batch number.
         quantity_kg:
           type: string
           description: Kilograms received.
@@ -5941,6 +5976,7 @@ components:
       - created_at
       - effective_date
       - lab_sampling_date
+      - lot_no
       - party
       - product
       - public_id
@@ -6487,6 +6523,9 @@ components:
           $ref: '#/components/schemas/InwardRawMaterialProductRef'
         party:
           $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        lot_no:
+          type: string
+          description: The supplier's own batch number.
         quantity_kg:
           type: string
           description: Kilograms received.
@@ -6503,6 +6542,7 @@ components:
       required:
       - effective_date
       - lab_sampling_date
+      - lot_no
       - party
       - product
       - public_id
@@ -7583,12 +7623,17 @@ components:
         available_kg:
           type: string
           description: 'KG left to pack: incoming_kg minus packed_kg.'
+        rejected_kg:
+          type: string
+          description: Rejected KG with a reached effective date. Reported only, never
+            spendable.
       required:
       - available_kg
       - incoming_kg
       - name
       - packed_kg
       - product
+      - rejected_kg
     ReauthenticateResponse:
       type: object
       description: |-
@@ -7916,10 +7961,12 @@ components:
       enum:
       - Lab Testing
       - In Use
+      - Rejected
       type: string
       description: |-
         * `Lab Testing` - Lab Testing
         * `In Use` - In Use
+        * `Rejected` - Rejected
     UpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'

@@ -5,19 +5,24 @@ Path: ``/api/sales-admin/inward-raw-material/<public_id>``.
 Two jobs live here:
 
 * **Record the lifecycle.** ``PATCH`` fills in ``lab_sampling_date`` and moves
-  a lot between ``Lab Testing`` and ``In Use`` (both ways; see
-  ``InwardOperations.ALLOWED_RAW_STATUS_TRANSITIONS``). Flipping to ``In Use``
-  stamps ``effective_date`` with today; reverting to ``Lab Testing`` clears
+  a lot between ``Lab Testing`` and either ``In Use`` or ``Rejected`` (both
+  ways; see ``InwardOperations.ALLOWED_RAW_STATUS_TRANSITIONS``).
+  ``Lab Testing`` is the hub: ``In Use`` and ``Rejected`` are never a direct
+  move between each other. Flipping into either dated status stamps
+  ``effective_date`` with today; reverting either to ``Lab Testing`` clears
   that date and re-stamps ``lab_sampling_date`` with today, as the lot is back
   with the lab as of today. Together the stamp + status are what start and
-  stop the lot counting toward ``raw-material-stock``.
-* **Correct a booking.** ``product`` / ``party`` / ``quantity_kg`` are
-  immutable once a lot exists; a wrong amount is removed with ``DELETE``
+  stop the lot counting toward ``raw-material-stock``'s ``incoming_kg`` or
+  ``rejected_kg``.
+* **Correct a booking.** ``product`` / ``party`` / ``lot_no`` / ``quantity_kg``
+  are immutable once a lot exists; a wrong amount is removed with ``DELETE``
   (soft) and re-booked. ``DELETE`` is the only corrective verb.
 
-Both a revert to ``Lab Testing`` and a ``DELETE`` are refused (400) when the
-lot's kilograms are already packed into a bag or sample-packet count --
-see ``InwardOperations.assert_raw_lot_removable``.
+A revert from ``In Use`` to ``Lab Testing`` and a ``DELETE`` of an ``In Use``
+lot are refused (400) when the lot's kilograms are already packed into a bag
+or sample-packet count -- see ``InwardOperations.assert_raw_lot_removable``.
+A ``Rejected`` lot was never packable, so reverting or deleting one is never
+refused on those grounds.
 
 Soft-deleted lots are never found (404).
 """
@@ -33,6 +38,7 @@ from rest_framework.response import Response
 
 from aggregator.InventoryOperations import lock_raw_pools
 from aggregator.InwardOperations import (
+    DATED_RAW_STATUSES,
     assert_raw_lot_removable,
     assert_raw_status_transition,
     inward_raw_material_payload,
@@ -77,26 +83,28 @@ class UpdateInwardRawMaterialSerializer(serializers.Serializer):
             except ValueError as exc:
                 raise serializers.ValidationError({"status": str(exc)}) from None
 
-        # Flipping into ``In Use`` stamps the effective date with today -- the
-        # user never types it, and stamped + In Use is what stock reads count.
-        # Reverting to ``Lab Testing`` clears the date so the lot drops back
-        # out of stock, and re-stamps lab_sampling_date with today -- the lot
-        # is back with the lab as of today, same as a fresh lot. Both keys
-        # override whatever the request sent for them (undeclared/declared
-        # alike): the view below applies them from validated_data like any
-        # other field.
+        # Flipping into a dated status (In Use or Rejected) stamps the
+        # effective date with today -- the user never types it, and stamped +
+        # that status is what the stock read counts (incoming_kg / rejected_kg
+        # respectively). Reverting out of one to Lab Testing clears the date
+        # so the lot drops back out of stock, and re-stamps lab_sampling_date
+        # with today -- the lot is back with the lab as of today, same as a
+        # fresh lot. Both keys override whatever the request sent for them
+        # (undeclared/declared alike): the view below applies them from
+        # validated_data like any other field.
         if (
-            current_status != InwardRawMaterialStatus.IN_USE
-            and requested_status == InwardRawMaterialStatus.IN_USE
+            current_status not in DATED_RAW_STATUSES
+            and requested_status in DATED_RAW_STATUSES
         ):
             attrs["effective_date"] = today()
         elif (
-            current_status == InwardRawMaterialStatus.IN_USE
-            and requested_status != InwardRawMaterialStatus.IN_USE
+            current_status in DATED_RAW_STATUSES
+            and requested_status not in DATED_RAW_STATUSES
         ):
             # Reverting out of In Use removes this lot's kilograms from the
             # raw pool -- refuse it if bags or sample packets are already
-            # packed from them.
+            # packed from them. A Rejected lot was never in that pool, so this
+            # is always a no-op for it (never refused).
             try:
                 assert_raw_lot_removable(self.instance)
             except ValueError as exc:

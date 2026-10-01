@@ -222,6 +222,51 @@ class StockConcurrencyTest(DMLTransactionTestCase):
         self.assertEqual(order.status.code, "DISPATCHED")
         self.assertEqual(DispatchEntry.objects.filter(order=order).count(), 1)
 
+    def test_two_dispatches_at_once_get_different_challan_numbers(self):
+        """The race the per-day advisory lock exists for.
+
+        A challan number is the day's highest plus one, so two dispatches that
+        read that maximum together would both pick it. There is no row to lock
+        on the first dispatch of a day, so ``select_for_update`` cannot help --
+        ``DispatchEntry._lock_challan_day`` serialises them instead.
+
+        tests/test_stock_concurrency.py::StockConcurrencyTest::test_two_dispatches_at_once_get_different_challan_numbers
+        """
+        self._count_bags(10)
+        first, second = self._book(2), self._book(2)
+        for order in (first, second):
+            verify_order(order, self.admin_user)
+        body = {
+            "from_city_id": self.city.id,
+            "driver_name": "Ramesh Driver",
+            "driver_number": "9876500002",
+            "vehicle_number": "GJ05AB1234",
+            "items": [
+                {"product_packaging_public_id": self.bag.public_id, "lot_number": "LOT-1"}
+            ],
+        }
+
+        def dispatch(order: Order) -> int:
+            client = APIClient()
+            client.force_login(self.admin_user)
+            url = DISPATCH_URL.format(public_id=order.public_id)
+            return client.post(url, body, format="json").status_code
+
+        results = self._race(lambda: dispatch(first), lambda: dispatch(second))
+
+        self.assertEqual(results, [status.HTTP_200_OK, status.HTTP_200_OK])
+        numbers = sorted(
+            DispatchEntry.objects.filter(order__in=[first, second]).values_list(
+                "challan_number", flat=True
+            )
+        )
+        self.assertEqual(len(set(numbers)), 2, numbers)
+        # Consecutive, not merely distinct: the loser read the winner's number.
+        self.assertEqual(
+            [int(number.split("-")[1]) for number in numbers],
+            [1, 2],
+        )
+
     def test_two_custom_orders_cannot_spend_the_same_loose_packets(self):
         """5 loose packets counted, two custom orders of 3: only one is created.
 

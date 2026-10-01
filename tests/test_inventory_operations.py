@@ -470,7 +470,7 @@ class InventoryOperationsTest(DMLTestCase):
             name="Raw Ops Test Party", city=self.city, defaults={"created_by": self.su}
         )
         InwardRawMaterial.objects.create(
-            product=product, party=party, quantity_kg=Decimal("10.000"),
+            product=product, party=party, lot_no="LOT-1", quantity_kg=Decimal("10.000"),
             created_by=self.su,
         )  # default status=lab_testing, effective_date=None
 

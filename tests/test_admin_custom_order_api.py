@@ -710,6 +710,34 @@ class SalesAdminCustomOrderApiTest(WebApiTestCase):
         self.assertEqual(order.status.code, "CONFIRMED")
         self.assertIsNone(order.private_dispatch_details_id)
 
+    def test_dispatch_still_needs_a_driver_and_a_vehicle(self):
+        """Optional on an agency dispatch -- and a custom order is never one.
+
+        tests/test_admin_custom_order_api.py::SalesAdminCustomOrderApiTest::test_dispatch_still_needs_a_driver_and_a_vehicle
+        """
+        for field in ("driver_name", "driver_number", "vehicle_number"):
+            with self.subTest(missing=field):
+                order = self._book([(self.cotton, W1, 1)])
+                body = self._dispatch_body([(self.cotton, W1, "LOT-1")])
+                del body[field]
+
+                response = self.client.post(
+                    DISPATCH_URL.format(public_id=order.public_id),
+                    body,
+                    format="json",
+                )
+
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+                )
+                self.assertIn(
+                    f"{field} is required on an own-vehicle dispatch.",
+                    str(response.data),
+                )
+                order.refresh_from_db()
+                self.assertEqual(order.status.code, "CONFIRMED")
+                self.assertIsNone(order.private_dispatch_details_id)
+
     def test_a_dispatched_custom_order_cannot_be_dispatched_again(self):
         """tests/test_admin_custom_order_api.py::SalesAdminCustomOrderApiTest::test_a_dispatched_custom_order_cannot_be_dispatched_again"""
         order = self._book([(self.cotton, W1, 1)])
@@ -746,6 +774,31 @@ class SalesAdminCustomOrderApiTest(WebApiTestCase):
         self.assertEqual(row["dispatch"]["public_id"], entry_id)
         self.assertEqual(row["items"][0]["lot_number"], "LOT-B")
         self.assertEqual(row["items"][0]["packets"], 6)
+
+    def test_revert_refuses_a_custom_order_dispatched_on_an_earlier_day(self):
+        """The same same-day rule an order follows -- see assert_dispatched_today.
+
+        tests/test_admin_custom_order_api.py::SalesAdminCustomOrderApiTest::test_revert_refuses_a_custom_order_dispatched_on_an_earlier_day
+        """
+        order = self._book([(self.cotton, W1, 1)])
+        self._post_dispatch(order, [(self.cotton, W1, "LOT-1")])
+        order.refresh_from_db()
+        entry = order.dispatch_entry
+        yesterday = indian_now() - timedelta(days=1)
+        entry.dispatched_at = yesterday
+        entry.save()
+
+        response = self.client.post(REVERT_URL.format(public_id=order.public_id))
+
+        self.assertEqual(
+            response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+        )
+        self.assertIn(
+            f"This dispatch was recorded on {yesterday.date():%Y-%m-%d}",
+            str(response.data),
+        )
+        order.refresh_from_db()
+        self.assertEqual(order.status.code, "DISPATCHED")
 
     def test_revert_refuses_an_undispatched_custom_order(self):
         """tests/test_admin_custom_order_api.py::SalesAdminCustomOrderApiTest::test_revert_refuses_an_undispatched_custom_order"""

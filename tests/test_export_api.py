@@ -315,10 +315,13 @@ class ExportApiTest(WebApiTestCase):
 
     # -- dispatch receipts ----------------------------------------------------
 
-    def test_dispatch_receipts_export_only_complete_challans(self):
-        """A private dispatch is complete; an agency dispatch awaiting its LR is not.
+    def test_dispatch_receipts_export_covers_every_dispatched_order(self):
+        """Dispatched is the whole rule: a pending LR no longer withholds a receipt.
 
-        tests/test_export_api.py::ExportApiTest::test_dispatch_receipts_export_only_complete_challans
+        A receipt is exportable the moment the goods leave, however they went.
+        An order that was never dispatched has no challan and so no row.
+
+        tests/test_export_api.py::ExportApiTest::test_dispatch_receipts_export_covers_every_dispatched_order
         """
         agency = self.client_row.client_transport_agencies.first().transport_agency
         private = self._order()
@@ -331,8 +334,10 @@ class ExportApiTest(WebApiTestCase):
 
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         self.assertEqual(
-            [row["order_public_id"] for row in resp.data["results"]], [private.public_id]
+            [row["order_public_id"] for row in resp.data["results"]],
+            [private.public_id, awaiting_lr.public_id],
         )
+        self.assertEqual(resp.data["results"][1]["dispatch"]["lr_number"], "")
         row = resp.data["results"][0]
         self.assertEqual(row["city"]["name"], "Surat")
         self.assertEqual(row["receiver_details"]["company_name"], "Acme Seeds")
@@ -354,6 +359,7 @@ class ExportApiTest(WebApiTestCase):
         raw_old = InwardRawMaterial.objects.create(
             product=self.product,
             party=self.party,
+            lot_no="LOT-OLD",
             quantity_kg=Decimal("100.000"),
             created_by=self.admin_user,
         )
@@ -361,6 +367,7 @@ class ExportApiTest(WebApiTestCase):
         raw_new = InwardRawMaterial.objects.create(
             product=self.product,
             party=self.party,
+            lot_no="LOT-NEW",
             quantity_kg=Decimal("50.000"),
             created_by=self.admin_user,
         )

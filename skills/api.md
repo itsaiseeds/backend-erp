@@ -320,7 +320,7 @@ derived from `StatusIds`), so the rule holds however the function is reached —
 | `POST verify-order/<public_id>` | BOOKED, UNDER_REVIEW, ON_HOLD | CONFIRMED |
 | `POST unverify-order/<public_id>` | CONFIRMED | UNDER_REVIEW |
 | `POST dispatch-order/<public_id>` | CONFIRMED | DISPATCHED |
-| `POST revert-dispatch/<public_id>` | DISPATCHED | CONFIRMED |
+| `POST revert-dispatch/<public_id>` | DISPATCHED, dispatched **today** | CONFIRMED |
 | `POST hold-order/<public_id>` | BOOKED, UNDER_REVIEW, CONFIRMED | ON_HOLD |
 | `POST reject-order/<public_id>` | BOOKED, UNDER_REVIEW, CONFIRMED, ON_HOLD | REJECTED |
 
@@ -360,17 +360,26 @@ is complete, each row being the printable challan itself: our consignor block
 (`aggregator/CompanyDetails.py` � placeholder values until the real registration
 details land), the snapshotted consignee, a hard-coded HSN code, the Indian
 financial year (April�March, so `2026-2027`), the journey and every lot-numbered
-line. What "complete" means depends on who carried the goods: an **agency**
-dispatch appears only once its LR is recorded, while a **private** one appears
-straight away � there is no note to wait for. Either way the order must still
-**be** dispatched (DISPATCHED or DELIVERED): `revert-dispatch` rewinds the status
-but leaves the dispatch rows attached, so the status is what takes a reverted
-order off the list.
+line. Every dispatched order is listed, whichever way the goods went: an **agency**
+dispatch is no longer held back until its LR is recorded, because the carrier
+issues the note after collection -- a blank `lr_number` is a pending detail, and
+`upload-lr-number` fills it in on a row already there. What a row does need is
+for the order to still **be** dispatched (DISPATCHED or DELIVERED):
+`revert-dispatch` rewinds the status but leaves the dispatch rows attached, so
+the status is what takes a reverted order off the list.
+
+Each row also carries a `challan_number` -- `YYYYMMDD-XXXX`, restarting at 0001
+each IST day -- which is the reference a client quotes, since the `DE-...` public
+id is unreadable aloud. It follows the dispatch day: a re-dispatch on the same
+day keeps it, one on another day earns that day's next number, and a number is
+never reused (so a day's sequence may have gaps). Derived in
+`DispatchEntry.save`, so an admin edit of `dispatched_at` cannot leave the two
+disagreeing.
 
 Unlike `orders/`, its **date window is required**, and it filters on
 `dispatch_entry.dispatched_at` � a challan belongs to the period the goods left
 in, not the period the order was booked in. Filter by `?client=` / `?city_id=`
-(destination), sort by `dispatch_date` (default, newest first) or `created_at`.
+(destination) / `?challan_number=` (substring), sort by `dispatch_date` (default, newest first) or `created_at`.
 
 `verify-order` is gated on **today's** stock count being complete and on every
 bag having enough available stock; the check and the status change are one

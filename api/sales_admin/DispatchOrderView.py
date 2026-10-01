@@ -5,7 +5,12 @@ CONFIRMED order can be dispatched**: an unverified order has not been checked
 against stock, so shipping it would consume bags nobody confirmed were there.
 
 The request is the same four fields whichever kind of dispatch it is: where it
-left from, and who drove it in what.
+left from, and who drove it in what. Only ``from_city_id`` is always required --
+the driver and vehicle are optional on an **agency** dispatch, where the agency
+assigns the vehicle and often only tells us which one after collection. They stay
+required on an own-vehicle dispatch, enforced by
+``OrderOperations.assert_driver_details``, because our own vehicle always has a
+known driver.
 
 **Which kind it is comes from the order, not the request.** An order carrying a
 ``transport_agency`` is recorded against ``DispatchDetails``; one without it
@@ -82,9 +87,17 @@ class DispatchItemLotSerializer(serializers.Serializer):
 class DispatchOrderSerializer(serializers.Serializer):
     """Request validation for recording a dispatch.
 
-    Every field is required. There is no per-kind branching: an agency dispatch
-    and an own-vehicle one carry exactly the same details, and which table they
-    land in is the order's business, not the request's.
+    One shape for both kinds of dispatch: an agency dispatch and an own-vehicle
+    one carry exactly the same details, and which table they land in is the
+    order's business, not the request's.
+
+    The driver and vehicle are accepted as blank **here** because this
+    serializer cannot tell the two kinds apart -- that comes from
+    ``order.transport_agency``, which it never sees, and
+    ``DispatchCustomOrderView`` inherits this class for a custom order that is
+    always own-vehicle. Whether a blank is allowed is therefore decided one
+    layer down, by ``OrderOperations.assert_driver_details``, which has the
+    order. ``from_city_id`` and ``items`` are required of everyone.
     """
 
     from_city_id = serializers.PrimaryKeyRelatedField(
@@ -94,26 +107,36 @@ class DispatchOrderSerializer(serializers.Serializer):
     )
     driver_name = serializers.CharField(
         max_length=255,
-        error_messages={
-            "required": "driver_name is required.",
-            "blank": "driver_name is required.",
-        },
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Optional on an agency dispatch; required on an own-vehicle one.",
     )
     driver_number = serializers.CharField(
         max_length=10,
-        validators=[validate_phone_number],
-        error_messages={
-            "required": "driver_number is required.",
-            "blank": "driver_number is required.",
-        },
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Optional on an agency dispatch; required on an own-vehicle one.",
     )
     vehicle_number = serializers.CharField(
         max_length=32,
-        error_messages={
-            "required": "vehicle_number is required.",
-            "blank": "vehicle_number is required.",
-        },
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Optional on an agency dispatch; required on an own-vehicle one.",
     )
+
+    def validate_driver_number(self, value: str) -> str:
+        """Check the phone number only when one was actually given.
+
+        ``validate_phone_number`` as a field-level validator would reject the
+        blank this field now allows, so it runs here instead. A number that *is*
+        supplied is held to exactly the same rule as before.
+        """
+        if value:
+            validate_phone_number(value)
+        return value
     items = DispatchItemLotSerializer(
         many=True,
         allow_empty=False,
