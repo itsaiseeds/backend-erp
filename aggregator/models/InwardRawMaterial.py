@@ -15,14 +15,27 @@ class InwardRawMaterialStatus(models.TextChoices):
     """Lifecycle of an inward raw-material lot.
 
     ``LAB_TESTING`` rows are held back from stock until the lab signs off;
-    the user flips the status to ``IN_USE`` when the material is usable. This
-    is a display-only enum: the ``status`` field itself is a foreign key to
-    ``aggregator.Status``, and each member's ``name`` here is exactly the
-    ``code`` of its seeded row (see ``StatusIds.raw_material_statuses``).
+    the user flips the status to ``IN_USE`` when the material is usable, or to
+    ``REJECTED`` when the lab fails it. ``LAB_TESTING`` is the hub: both other
+    statuses are only ever reached from it, and only ever revert back to it
+    (see ``InwardOperations.ALLOWED_RAW_STATUS_TRANSITIONS`` --
+    ``IN_USE <-> REJECTED`` is never a direct move). This is a display-only
+    enum: the ``status`` field itself is a foreign key to ``aggregator.Status``,
+    and each member's ``name`` here is exactly the ``code`` of its seeded row
+    (see ``StatusIds.raw_material_statuses``) -- note ``REJECTED`` here seeds
+    under the distinct code ``RAW_MATERIAL_REJECTED``, not the unrelated
+    order-lifecycle ``REJECTED`` status.
     """
 
     LAB_TESTING = "Lab Testing", "Lab Testing"
     IN_USE = "In Use", "In Use"
+    # Member name is RAW_MATERIAL_REJECTED (not REJECTED) because
+    # raw_status_of()/status_row_for() resolve a Status row by this enum's
+    # .name as the seeded `code` -- and `code` is unique, so this cannot
+    # collide with the unrelated order-lifecycle Status row seeded under the
+    # code 'REJECTED' (StatusIds.REJECTED = 7). The *value* (what the API
+    # sends/receives) and the label are still plain "Rejected".
+    RAW_MATERIAL_REJECTED = "Rejected", "Rejected"
 
 
 class InwardRawMaterial(
@@ -35,12 +48,18 @@ class InwardRawMaterial(
     """Inward movement of raw material (product replenishment).
 
     A new stock lot for a ``Product``: how many kilograms came in, from which
-    ``Party``, when it was sampled for the lab, and its ``status``. The entry's
-    date is ``created_at``; flipping ``status`` to ``IN_USE`` stamps
-    ``effective_date`` with today, and once reached the lot counts toward stock.
-    Reverting to ``LAB_TESTING`` clears ``effective_date`` and re-stamps
+    ``Party``, under which supplier batch number (``lot_no``), when it was
+    sampled for the lab, and its ``status``. The entry's date is
+    ``created_at``; flipping ``status`` to ``IN_USE`` or ``REJECTED`` stamps
+    ``effective_date`` with today, and once reached the lot counts toward
+    usable or rejected stock respectively. Reverting either to
+    ``LAB_TESTING`` clears ``effective_date`` and re-stamps
     ``lab_sampling_date`` with today, as if the lot were freshly back with the
     lab.
+
+    ``lot_no`` is the supplier's own batch number printed on the consignment --
+    free text, required at booking, unrelated to the per-line lot number
+    captured at dispatch.
 
     Exposed to the frontend by its ``public_id`` (``IR-…``).
     """
@@ -62,6 +81,11 @@ class InwardRawMaterial(
         "quantity in kg",
         max_digits=10,
         decimal_places=3,
+    )
+    lot_no = models.CharField(
+        "lot number",
+        max_length=64,
+        help_text="The supplier's own batch number for this consignment.",
     )
     status = models.ForeignKey(
         "aggregator.Status",

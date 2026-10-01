@@ -5,7 +5,9 @@
 > then dive into [`skills/`](../skills.md) for workflow-level detail.
 >
 > See also: [skills.md](../skills.md) (index of domain docs), `docs/api/openapi.yml`
-> (auto-generated API reference).
+> (auto-generated API reference), [`docs/prd/`](prd/) (product requirements for
+> work that is approved but not yet built — read the relevant PRD before
+> trusting a section below to still describe the intended behaviour).
 
 ## 1. Architecture at a glance
 

@@ -947,7 +947,9 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentryitem (
 	deleted_by_id int8 NULL,
 	created_by_id int8 NULL,
 	dispatch_entry_id int8 NOT NULL,
-	product_packaging_id int8 NOT NULL,
+	product_packaging_id int8 NULL,
+	product_id int8 NULL,
+	packet_weight numeric(8, 3) NULL,
 	negotiated_selling_price numeric(12, 2) NOT NULL,
 	quantity int8 NOT NULL,
 	lot_number varchar(64) NOT NULL,
@@ -1133,11 +1135,14 @@ CREATE INDEX IF NOT EXISTS aggregator_party_deleted_by_id_idx ON public.aggregat
 
 -- aggregator_inwardrawmaterial ------------------------------------------------
 -- Inward movement of raw material (product replenishment). The entry's date is
--- created_at; flipping status to 'In Use' stamps effective_date with today and,
--- once that date has come, the lot counts toward stock. status='Lab Testing'
--- rows are held back until the lab signs off. status_id references the same
--- aggregator_status lookup table as aggregator_order / aggregator_client (see
--- StatusIds.raw_material_statuses, ids 10-11).
+-- created_at; flipping status to 'In Use' or 'Rejected' stamps effective_date
+-- with today and, once that date has come, the lot counts toward usable or
+-- rejected stock respectively. status='Lab Testing' rows are held back until
+-- the lab signs off; it is the hub every dated status is reached from and
+-- reverts back to. status_id references the same aggregator_status lookup
+-- table as aggregator_order / aggregator_client (see
+-- StatusIds.raw_material_statuses, ids 10-11 and 16). lot_no is the supplier's
+-- own batch number for the consignment, required at booking.
 CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1151,6 +1156,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	lab_sampling_date date NULL,
 	product_id int8 NOT NULL,
 	party_id int8 NOT NULL,
+	lot_no varchar(64) NOT NULL,
 	quantity_kg numeric(10, 3) NOT NULL,
 	status_id int8 NOT NULL,
 	CONSTRAINT aggregator_inwardrawmaterial_pkey PRIMARY KEY (id),

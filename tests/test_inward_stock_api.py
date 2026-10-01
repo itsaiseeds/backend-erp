@@ -14,7 +14,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
-from aggregator import InwardOperations
+from aggregator import InventoryOperations, InwardOperations
 from aggregator.models import (
     InwardOtherMaterial,
     InwardRawMaterial,
@@ -22,6 +22,7 @@ from aggregator.models import (
     OtherMaterialType,
     Party,
     Product,
+    ProductPackaging,
     StatusIds,
 )
 from authentication.models import Admin
@@ -91,6 +92,7 @@ class InwardStockApiTest(WebApiTestCase):
         self._counting_raw = InwardRawMaterial.objects.create(
             product=self.product1,
             party=self.party,
+            lot_no="LOT-COUNTING",
             quantity_kg=Decimal("100"),
             effective_date=self.today,
             status_id=StatusIds.IN_USE.value,
@@ -99,6 +101,7 @@ class InwardStockApiTest(WebApiTestCase):
         InwardRawMaterial.objects.create(
             product=self.product1,
             party=self.party,
+            lot_no="LOT-LAB-TESTING",
             quantity_kg=Decimal("20"),
             effective_date=self.today,
             status_id=StatusIds.LAB_TESTING.value,  # not cleared by the lab
@@ -107,6 +110,7 @@ class InwardStockApiTest(WebApiTestCase):
         InwardRawMaterial.objects.create(
             product=self.product1,
             party=self.party,
+            lot_no="LOT-FUTURE",
             quantity_kg=Decimal("50"),
             effective_date=self.tomorrow,  # dated, but not reached yet
             status_id=StatusIds.IN_USE.value,
@@ -115,6 +119,7 @@ class InwardStockApiTest(WebApiTestCase):
         InwardRawMaterial.objects.create(
             product=self.product1,
             party=self.party,
+            lot_no="LOT-UNDATED",
             quantity_kg=Decimal("30"),
             effective_date=None,  # never dated
             status_id=StatusIds.IN_USE.value,
@@ -123,6 +128,7 @@ class InwardStockApiTest(WebApiTestCase):
         deleted_dated = InwardRawMaterial.objects.create(
             product=self.product1,
             party=self.party,
+            lot_no="LOT-DELETED",
             quantity_kg=Decimal("10"),
             effective_date=self.today,
             status_id=StatusIds.IN_USE.value,
@@ -182,6 +188,7 @@ class InwardStockApiTest(WebApiTestCase):
             "incoming_kg": "100.000",
             "packed_kg": "0.000",
             "available_kg": "100.000",
+            "rejected_kg": "0.000",
         })
 
     def test_raw_stock_sums_multiple_lots_and_supports_product_filtering(self):
@@ -194,6 +201,7 @@ class InwardStockApiTest(WebApiTestCase):
         InwardRawMaterial.objects.create(
             product=self.product2,
             party=self.party,
+            lot_no="LOT-P2",
             quantity_kg=Decimal("7"),
             effective_date=self.today,
             status_id=StatusIds.IN_USE.value,
@@ -224,6 +232,7 @@ class InwardStockApiTest(WebApiTestCase):
             {
                 "product": self.product1.public_id,
                 "party": self.party.id,
+                "lot_no": "LOT-FLIP",
                 "quantity_kg": "25",
                 "lab_sampling_date": self.today.isoformat(),
             },
@@ -249,6 +258,7 @@ class InwardStockApiTest(WebApiTestCase):
             "incoming_kg": "25.000",
             "packed_kg": "0.000",
             "available_kg": "25.000",
+            "rejected_kg": "0.000",
         }])
 
     def test_a_reverted_lot_stops_counting_against_the_stock_read(self):
@@ -262,6 +272,7 @@ class InwardStockApiTest(WebApiTestCase):
             {
                 "product": self.product1.public_id,
                 "party": self.party.id,
+                "lot_no": "LOT-REVERT",
                 "quantity_kg": "25",
             },
             format="json",
@@ -280,7 +291,128 @@ class InwardStockApiTest(WebApiTestCase):
             "incoming_kg": "25.000",
             "packed_kg": "0.000",
             "available_kg": "25.000",
+            "rejected_kg": "0.000",
         }])
+
+        reverted = self.client.patch(url, {"status": "Lab Testing"}, format="json")
+        self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)
+        self.assertIsNone(reverted.data["effective_date"])
+
+        empty = self.client.get(f"{RAW_STOCK_URL}?product={self.product1.public_id}")
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data["lines"], [])
+
+    # -- rejected stock ---------------------------------------------------
+
+    def test_rejected_kg_is_reported_but_never_packable(self):
+        """PRD acceptance scenario: three lots, one In Use, one Rejected, one
+        still Lab Testing -- rejected_kg is its own bucket, never folded into
+        incoming/available, and a bag count cannot spend it.
+
+        tests/test_inward_stock_api.py::InwardStockApiTest::test_rejected_kg_is_reported_but_never_packable
+        """
+        self.login_as(self.seed_admin)
+        InwardRawMaterial.objects.create(
+            product=self.product1,
+            party=self.party,
+            lot_no="SUP-2026-A1",
+            quantity_kg=Decimal("1000"),
+            effective_date=self.today,
+            status_id=StatusIds.IN_USE.value,
+            created_by=self.seed_admin,
+        )
+        InwardRawMaterial.objects.create(
+            product=self.product1,
+            party=self.party,
+            lot_no="SUP-2026-B7",
+            quantity_kg=Decimal("500"),
+            effective_date=self.today,
+            status_id=StatusIds.RAW_MATERIAL_REJECTED.value,
+            created_by=self.seed_admin,
+        )
+        InwardRawMaterial.objects.create(
+            product=self.product1,
+            party=self.party,
+            lot_no="SUP-2026-C3",
+            quantity_kg=Decimal("250"),
+            status_id=StatusIds.LAB_TESTING.value,  # stays Lab Testing, undated
+            created_by=self.seed_admin,
+        )
+
+        response = self.client.get(f"{RAW_STOCK_URL}?product={self.product1.public_id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["lines"], [{
+            "product": self.product1.public_id,
+            "name": "SAI-33",
+            "incoming_kg": "1000.000",
+            "packed_kg": "0.000",
+            "available_kg": "1000.000",
+            "rejected_kg": "500.000",
+        }])
+
+        # A bag count needing more than the 1000 kg In Use is refused -- the
+        # rejected 500 kg cannot be packed. SAI-33's packaging is 1kg x 40
+        # packets = 40kg/bag, so 26 bags (1040kg) is just over the limit.
+        pack = ProductPackaging.objects.get(product=self.product1)
+        with self.assertRaises(ValueError):
+            InventoryOperations.record_stock_count(
+                product_packaging=pack, bags=26, actor=self.seed_admin
+            )
+
+    def test_a_product_whose_entire_intake_is_rejected_still_appears(self):
+        """A product with no In Use lot at all is still listed, with 0/0/0
+        plus its rejected kilograms -- rejected stock is never silently
+        invisible.
+
+        tests/test_inward_stock_api.py::InwardStockApiTest::test_a_product_whose_entire_intake_is_rejected_still_appears
+        """
+        self.login_as(self.seed_admin)
+        InwardRawMaterial.objects.create(
+            product=self.product2,
+            party=self.party,
+            lot_no="SUP-REJ-ONLY",
+            quantity_kg=Decimal("80"),
+            effective_date=self.today,
+            status_id=StatusIds.RAW_MATERIAL_REJECTED.value,
+            created_by=self.seed_admin,
+        )
+
+        response = self.client.get(f"{RAW_STOCK_URL}?product={self.product2.public_id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["lines"], [{
+            "product": self.product2.public_id,
+            "name": "SAI-3353",
+            "incoming_kg": "0.000",
+            "packed_kg": "0.000",
+            "available_kg": "0.000",
+            "rejected_kg": "80.000",
+        }])
+
+    def test_sending_a_rejected_lot_back_to_lab_testing_drops_rejected_kg(self):
+        """Reverting a Rejected lot to Lab Testing clears its effective date
+        and the rejected bucket drops to 0, same as the in_use revert.
+
+        tests/test_inward_stock_api.py::InwardStockApiTest::test_sending_a_rejected_lot_back_to_lab_testing_drops_rejected_kg
+        """
+        self.login_as(self.seed_admin)
+        created = self.client.post(
+            "/api/sales-admin/inward-raw-materials",
+            {
+                "product": self.product1.public_id,
+                "party": self.party.id,
+                "lot_no": "SUP-2026-B7",
+                "quantity_kg": "500",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+        url = f"/api/sales-admin/inward-raw-material/{created.data['public_id']}"
+
+        rejected = self.client.patch(url, {"status": "Rejected"}, format="json")
+        self.assertEqual(rejected.status_code, status.HTTP_200_OK, rejected.content)
+
+        counting = self.client.get(f"{RAW_STOCK_URL}?product={self.product1.public_id}")
+        self.assertEqual(counting.data["lines"][0]["rejected_kg"], "500.000")
 
         reverted = self.client.patch(url, {"status": "Lab Testing"}, format="json")
         self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)

@@ -2345,8 +2345,8 @@ paths:
         name: status
         schema:
           type: string
-        description: Lot status (Lab Testing / In Use). Comma-separated (any match);
-          AND-ed with the other filters.
+        description: Lot status (Lab Testing / In Use / Rejected). Comma-separated
+          (any match); AND-ed with the other filters.
       tags:
       - Admin · Inward
       security:
@@ -4767,17 +4767,23 @@ components:
         Request validation for booking a new raw-material lot.
 
         ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
-        ``In Use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
-        that flip and is deliberately absent here. ``lab_sampling_date`` may be
-        given explicitly; left out, it defaults to today -- a lot never starts
-        with no sampling date, since it arrives for lab testing the day it's
-        booked.
+        ``In Use`` or ``Rejected`` later with ``PATCH``. ``effective_date`` is
+        stamped (today) at that flip and is deliberately absent here.
+        ``lab_sampling_date`` may be given explicitly; left out, it defaults to
+        today -- a lot never starts with no sampling date, since it arrives for
+        lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
+        number on the consignment -- is required.
       properties:
         product:
           type: string
           minLength: 1
         party:
           type: integer
+        lot_no:
+          type: string
+          minLength: 1
+          description: The supplier's own batch number for this consignment.
+          maxLength: 64
         quantity_kg:
           type: string
           format: decimal
@@ -4788,6 +4794,7 @@ components:
           format: date
           nullable: true
       required:
+      - lot_no
       - party
       - product
       - quantity_kg
@@ -5431,8 +5438,8 @@ components:
       - vehicle_number
     DispatchItemLotRequest:
       type: object
-      description: The lot number -- and, if it falls short, the quantity -- for
-        one order line.
+      description: The lot number -- and, if it falls short, the quantity -- for one
+        order line.
       properties:
         product_packaging_public_id:
           type: string
@@ -5921,6 +5928,9 @@ components:
           $ref: '#/components/schemas/InwardRawMaterialProductRef'
         party:
           $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        lot_no:
+          type: string
+          description: The supplier's own batch number.
         quantity_kg:
           type: string
           description: Kilograms received.
@@ -5941,6 +5951,7 @@ components:
       - created_at
       - effective_date
       - lab_sampling_date
+      - lot_no
       - party
       - product
       - public_id
@@ -6487,6 +6498,9 @@ components:
           $ref: '#/components/schemas/InwardRawMaterialProductRef'
         party:
           $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        lot_no:
+          type: string
+          description: The supplier's own batch number.
         quantity_kg:
           type: string
           description: Kilograms received.
@@ -6503,6 +6517,7 @@ components:
       required:
       - effective_date
       - lab_sampling_date
+      - lot_no
       - party
       - product
       - public_id
@@ -7583,12 +7598,17 @@ components:
         available_kg:
           type: string
           description: 'KG left to pack: incoming_kg minus packed_kg.'
+        rejected_kg:
+          type: string
+          description: Rejected KG with a reached effective date. Reported only, never
+            spendable.
       required:
       - available_kg
       - incoming_kg
       - name
       - packed_kg
       - product
+      - rejected_kg
     ReauthenticateResponse:
       type: object
       description: |-
@@ -7916,10 +7936,12 @@ components:
       enum:
       - Lab Testing
       - In Use
+      - Rejected
       type: string
       description: |-
         * `Lab Testing` - Lab Testing
         * `In Use` - In Use
+        * `Rejected` - Rejected
     UpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'

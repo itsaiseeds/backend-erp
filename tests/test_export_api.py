@@ -354,6 +354,7 @@ class ExportApiTest(WebApiTestCase):
         raw_old = InwardRawMaterial.objects.create(
             product=self.product,
             party=self.party,
+            lot_no="LOT-OLD",
             quantity_kg=Decimal("100.000"),
             created_by=self.admin_user,
         )
@@ -361,6 +362,7 @@ class ExportApiTest(WebApiTestCase):
         raw_new = InwardRawMaterial.objects.create(
             product=self.product,
             party=self.party,
+            lot_no="LOT-NEW",
             quantity_kg=Decimal("50.000"),
             created_by=self.admin_user,
         )

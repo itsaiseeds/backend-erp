@@ -757,6 +757,7 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
         "public_id",
         "product",
         "party",
+        "lot_no",
         "quantity_kg",
         "status",
         "effective_date",
@@ -769,6 +770,7 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
         "product__name",
         "product__crop__name",
         "party__name",
+        "lot_no",
     )
     list_filter = ("status", "effective_date")
     autocomplete_fields = ("product", "party", "status")
