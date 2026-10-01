@@ -10,6 +10,12 @@ class PrivateDispatchDetails(TimeStampedModel, SoftDeletedModel):
     """Dispatch on our own vehicle (carries vehicle and driver details).
 
     Recorded by a sales admin (``dispatched_by``); it has no ``created_by``.
+
+    The vehicle and driver are **required** here, unlike on
+    ``DispatchDetails``: our own vehicle always has a known driver, so a blank
+    is a mistake rather than a detail still to come from a transporter. The
+    rule is enforced before this row is built, by
+    ``OrderOperations.assert_driver_details``.
     """
 
     client = models.ForeignKey(

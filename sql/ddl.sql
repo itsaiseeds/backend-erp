@@ -768,6 +768,13 @@ CREATE INDEX IF NOT EXISTS aggregator_productdescriptionitem_created_by_id_idx O
 CREATE INDEX IF NOT EXISTS aggregator_productdescriptionitem_deleted_by_id_idx ON public.aggregator_productdescriptionitem USING btree (deleted_by_id);
 
 -- aggregator_dispatchdetails --------------------------------------------------
+-- Dispatch via a third-party transporter. lr_number, driver_name, driver_number
+-- and vehicle_number are all NOT NULL but may be the empty string: the LR is
+-- issued by the carrier after collection, and the agency assigns the vehicle, so
+-- all four are pending details rather than required facts (see
+-- aggregator/models/DispatchDetails.py). Do not add a CHECK (... <> '') here --
+-- they are required only on aggregator_privatedispatchdetails, enforced in
+-- OrderOperations.assert_driver_details.
 CREATE TABLE IF NOT EXISTS public.aggregator_dispatchdetails (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -891,6 +898,9 @@ CREATE INDEX IF NOT EXISTS aggregator_orderitem_deleted_by_id_idx ON public.aggr
 -- dispatch, which has no transporter and so no LR.
 -- Exactly one of order_id / custom_order_id is set: a custom order's challan
 -- lives here too, so the challan list is one table.
+-- driver_name, driver_number and vehicle_number are NOT NULL but may be empty:
+-- they are snapshotted from the dispatch, and an agency dispatch may leave them
+-- blank.
 CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,

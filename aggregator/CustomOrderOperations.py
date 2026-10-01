@@ -311,11 +311,16 @@ def dispatch_custom_order(
         sync_custom_dispatch_entry,
         validated_loose_lot_numbers,
     )
+    from .OrderOperations import assert_driver_details
 
     assert_custom_order_status(order, DISPATCHABLE_CUSTOM_ORDER_STATUS_CODES, "dispatch")
 
     # Validated before anything is written, so a bad lot number costs nothing.
     validated_loose_lot_numbers(order, lot_numbers)
+    # Unconditional, unlike ``OrderOperations.dispatch_order``: a custom order is
+    # always own-vehicle, so the driver and vehicle are never optional here even
+    # though the shared request serializer allows them to be omitted.
+    assert_driver_details(driver_name, driver_number, vehicle_number)
 
     dispatched_at = indian_now()
     to_city = order.delivery_address.city

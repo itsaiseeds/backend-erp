@@ -1,9 +1,8 @@
 """Challan list endpoint: ``GET /api/sales-admin/dispatch-challans/``.
 
-Every dispatched order **and custom order** whose challan is complete, each row
-carrying that challan in full: our own consignor block, the consignee as it
-stood at dispatch time, the HSN code, the financial year, the journey, and every
-line with its lot number.
+Every dispatched order **and custom order**, each row carrying its challan in
+full: our own consignor block, the consignee as it stood at dispatch time, the
+HSN code, the financial year, the journey, and every line with its lot number.
 
 The two kinds are one list, paged and sorted together, because both challans
 live in ``DispatchEntry`` -- the list pages over entries rather than orders. An
@@ -11,21 +10,19 @@ order's row is exactly what it always was. A custom order's row has the same
 envelope (``order_public_id`` is its ``CORD-…`` id) plus ``order_type:
 "CUSTOM_ORDER"``, and its lines are loose packets: a product, a packet weight
 and a packet count instead of a bag. A custom order always goes on our own
-vehicle, so it is listed as soon as it is dispatched.
+vehicle.
 
-What makes a challan complete depends on **who carried the goods**, and it is the
-one rule worth stating plainly:
+**A dispatch is listed as soon as it is recorded**, whichever way the goods went.
+An agency dispatch is no longer held back until its ``lr_number`` arrives: the
+transporter issues the consignment note *after* collection, so waiting for it hid
+a dispatch that had physically happened -- the order was DISPATCHED, the goods
+were on the road, and this list showed nothing. A blank LR is a pending detail,
+not an incomplete challan, and ``upload-lr-number`` fills it in on a row that is
+already here.
 
-* an **agency** dispatch is listed only once its ``lr_number`` is recorded. The
-  transporter's consignment note is part of that challan, and it is issued after
-  collection, so the challan is genuinely incomplete until it arrives.
-* a **private**, own-vehicle dispatch is listed straight away. There is no
-  transporter, so there is no note to wait for -- withholding it would be waiting
-  for something that will never come.
-
-Both also need the order to still **be** dispatched -- status DISPATCHED or
-DELIVERED -- and to have a live ``dispatch_entry``, the challan record written at
-dispatch. The two are not the same check: ``revert-dispatch`` rewinds the status
+What a row does need is for the order to still **be** dispatched -- status
+DISPATCHED or DELIVERED -- and to have a live ``dispatch_entry``, the challan
+record written at dispatch. The two are not the same check: ``revert-dispatch`` rewinds the status
 but deliberately leaves the dispatch rows attached, so without the status gate a
 reverted order would keep printing a challan for goods that are back on the
 shelf.
@@ -69,7 +66,7 @@ from common.views.paginated_date_range import (
     parse_int,
 )
 
-# What makes a challan complete, per kind of order. Declared once: the list view
+# What makes a challan listable, per kind of order. Declared once: the list view
 # filters on it and the option providers below reuse it, so a picker can never
 # offer a client or a city with nothing behind it.
 #
@@ -77,34 +74,32 @@ from common.views.paginated_date_range import (
 # spelled out, so this list follows the enum if the lifecycle ever gains a
 # post-dispatch status.
 #
-# ``dispatch_details`` null means a private dispatch -- an order that has been
-# dispatched went one way or the other, so there is no third case to cover. It
-# is read off the order, not the entry: the order's is the live dispatch.
-# ``is_deleted`` is explicit on the order because a lookup spanning the relation
-# does not pick up its soft-delete manager.
+# The status **is** the whole rule. There is deliberately no clause on the LR
+# number: an agency dispatch is listed with a blank one and ``upload-lr-number``
+# fills it in later (see the module docstring). ``is_deleted`` is explicit on the
+# order because a lookup spanning the relation does not pick up its soft-delete
+# manager.
 
 
-def _complete_challan_q(path: str) -> Q:
-    """A complete challan whose order sits at ``path`` (``order`` / ``custom_order``)."""
+def _dispatched_challan_q(path: str) -> Q:
+    """A live challan whose order at ``path`` is still dispatched.
+
+    ``path`` is ``order`` or ``custom_order`` -- an entry names exactly one.
+    """
     return Q(
         **{
             f"{path}__isnull": False,
             f"{path}__is_deleted": False,
             f"{path}__status__code__in": DISPATCH_REQUIRED_STATUS_CODES,
         }
-    ) & (
-        # private: no transporter, nothing to wait for
-        Q(**{f"{path}__dispatch_details__isnull": True})
-        # agency: the LR has been recorded
-        | Q(**{f"{path}__dispatch_details__lr_number__gt": ""})
     )
 
 
-CHALLAN_Q = _complete_challan_q("order") | _complete_challan_q("custom_order")
+CHALLAN_Q = _dispatched_challan_q("order") | _dispatched_challan_q("custom_order")
 
 
 def challan_entries() -> QuerySet:
-    """Every live challan that is currently complete, for either kind of order.
+    """Every live challan of a still-dispatched order, for either kind of order.
 
     ``order_created_at`` is when the order (or custom order) was booked -- the
     ``created_at`` sort and the dispatch-receipt export's window read it.

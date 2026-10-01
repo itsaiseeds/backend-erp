@@ -111,11 +111,15 @@ class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
         on_delete=models.PROTECT,
         related_name="dispatch_entries_to",
     )
-    vehicle_number = models.CharField("vehicle number", max_length=32)
-    driver_name = models.CharField("driver name", max_length=255)
+    # Blank whenever the dispatch they were snapshotted from left them blank,
+    # which an agency dispatch may (see ``DispatchDetails``). Required there
+    # would make the snapshot unwritable for a dispatch the API accepted.
+    vehicle_number = models.CharField("vehicle number", max_length=32, blank=True)
+    driver_name = models.CharField("driver name", max_length=255, blank=True)
     driver_number = models.CharField(
         "driver number",
         max_length=10,
+        blank=True,
         validators=[validate_phone_number],
     )
 

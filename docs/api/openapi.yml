@@ -1652,8 +1652,8 @@ paths:
   /api/sales-admin/export/dispatch-receipts:
     get:
       operationId: sales_admin_export_dispatch_receipts
-      description: Export the complete challans of orders and custom orders booked
-        in a date window.
+      description: Export the challans of orders and custom orders booked in a date
+        window.
       summary: Export dispatch receipts (challans) of orders booked in a date range
       parameters:
       - in: query
@@ -5405,8 +5405,10 @@ components:
       - $ref: '#/components/schemas/CustomDispatchChallanItem'
     DispatchCustomOrderRequest:
       type: object
-      description: '``dispatch-order``''s request, with lot numbers keyed by loose
-        line.'
+      description: |-
+        ``dispatch-order``'s request, with lot numbers keyed by loose line.
+
+        The driver and vehicle are required again here -- see :func:`_required_here`.
       properties:
         from_city_id:
           type: integer
@@ -5470,9 +5472,17 @@ components:
       description: |-
         Request validation for recording a dispatch.
 
-        Every field is required. There is no per-kind branching: an agency dispatch
-        and an own-vehicle one carry exactly the same details, and which table they
-        land in is the order's business, not the request's.
+        One shape for both kinds of dispatch: an agency dispatch and an own-vehicle
+        one carry exactly the same details, and which table they land in is the
+        order's business, not the request's.
+
+        The driver and vehicle are accepted as blank **here** because this
+        serializer cannot tell the two kinds apart -- that comes from
+        ``order.transport_agency``, which it never sees, and
+        ``DispatchCustomOrderView`` inherits this class for a custom order that is
+        always own-vehicle. Whether a blank is allowed is therefore decided one
+        layer down, by ``OrderOperations.assert_driver_details``, which has the
+        order. ``from_city_id`` and ``items`` are required of everyone.
       properties:
         from_city_id:
           type: integer
@@ -5480,15 +5490,21 @@ components:
             it.
         driver_name:
           type: string
-          minLength: 1
+          default: ''
+          description: Optional on an agency dispatch; required on an own-vehicle
+            one.
           maxLength: 255
         driver_number:
           type: string
-          minLength: 1
+          default: ''
+          description: Optional on an agency dispatch; required on an own-vehicle
+            one.
           maxLength: 10
         vehicle_number:
           type: string
-          minLength: 1
+          default: ''
+          description: Optional on an agency dispatch; required on an own-vehicle
+            one.
           maxLength: 32
         items:
           type: array
@@ -5496,11 +5512,8 @@ components:
             $ref: '#/components/schemas/DispatchItemLotRequest'
           description: One lot number per line of the order; every line must appear.
       required:
-      - driver_name
-      - driver_number
       - from_city_id
       - items
-      - vehicle_number
     ExecuteCodeRequestRequest:
       type: object
       properties:

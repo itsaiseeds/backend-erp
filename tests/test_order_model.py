@@ -35,6 +35,7 @@ from aggregator.models import (
 )
 from aggregator.OrderOperations import (
     attach_dispatch_details,
+    attach_private_dispatch_details,
     create_order,
     order_payload,
     unverify_order,
@@ -186,6 +187,37 @@ class OrderModelTest(DMLTestCase):
         update_order_status(order, StatusIds.DISPATCHED)
         assert order.status.code == "DISPATCHED"
         assert order.active_dispatch is not None
+
+    def test_an_agency_dispatch_may_be_recorded_without_a_driver(self):
+        """The agency assigns the vehicle, so all three may be blank here.
+
+        tests/test_order_model.py::OrderModelTest::test_an_agency_dispatch_may_be_recorded_without_a_driver
+        """
+        order = self._order()
+        dispatch = attach_dispatch_details(
+            order, dispatched_by=self.adm_user, dispatch_date=datetime.date.today(),
+            from_city=self.city, to_city=self.city2,
+            driver_name="", driver_number="", vehicle_number="",
+        )
+        # attach_dispatch_details full_cleans the row, so this passing is the
+        # model accepting the blanks -- including the phone validator, which
+        # Django skips for an empty value once the field is blank=True.
+        assert dispatch.driver_number == ""
+        assert dispatch.lr_number == ""
+
+    def test_an_own_vehicle_dispatch_cannot_be_recorded_without_a_driver(self):
+        """Our own vehicle always has a known driver, so a blank is refused.
+
+        tests/test_order_model.py::OrderModelTest::test_an_own_vehicle_dispatch_cannot_be_recorded_without_a_driver
+        """
+        order = self._order()
+        with self.assertRaises(ValidationError):
+            attach_private_dispatch_details(
+                order, dispatched_by=self.adm_user,
+                dispatch_date=datetime.date.today(),
+                from_city=self.city, to_city=self.city2,
+                driver_name="", driver_number="", vehicle_number="",
+            )
 
     def test_dispatch_by_non_admin_rejected(self):
         """tests/test_order_model.py::OrderModelTest::test_dispatch_by_non_admin_rejected"""

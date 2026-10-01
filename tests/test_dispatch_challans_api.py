@@ -1,8 +1,9 @@
-"""Recording an LR number, and the challan list it makes an order eligible for.
+"""Recording an LR number, and the challan list it fills a field on.
 
 Two endpoints, one story: ``upload-lr-number`` records the consignment note a
-transporter issues after collection, and ``dispatch-challans/`` lists exactly
-those orders whose challan is complete because of it.
+transporter issues after collection, and ``dispatch-challans/`` lists every
+still-dispatched order -- including, deliberately, one whose LR has not arrived
+yet, whose row simply carries a blank ``lr_number`` until it does.
 
 What the dispatch itself writes -- the ``DispatchEntry`` and its lot-numbered
 lines -- is proven in ``tests/test_admin_order_lifecycle_api.py``, where
@@ -46,7 +47,7 @@ CHALLANS_URL = "/api/sales-admin/dispatch-challans/"
 
 
 class DispatchChallansApiTest(WebApiTestCase):
-    """The LR endpoint and the challan list that depends on it.
+    """The LR endpoint and the challan list that reads it through.
 
     tests/test_dispatch_challans_api.py::DispatchChallansApiTest
     """
@@ -288,24 +289,34 @@ class DispatchChallansApiTest(WebApiTestCase):
             response.status_code, status.HTTP_400_BAD_REQUEST, response.data
         )
 
-    def test_an_agency_order_is_listed_only_once_its_lr_is_recorded(self):
-        """The transporter's note is part of that challan, so it waits for one.
+    def test_an_agency_order_is_listed_before_its_lr_is_recorded(self):
+        """The goods have left, so the challan shows -- blank LR and all.
 
-        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_an_agency_order_is_listed_only_once_its_lr_is_recorded
+        The carrier issues the note after collection, so waiting for it hid a
+        dispatch that had physically happened. Uploading the LR later fills it in
+        on this same row rather than conjuring one.
+
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_an_agency_order_is_listed_before_its_lr_is_recorded
         """
         order = self._dispatched_order()
 
         before = self._challans()
         self.assertEqual(before.status_code, status.HTTP_200_OK, before.data)
-        self.assertEqual(before.data["total_count"], 0)
+        self.assertEqual(before.data["total_count"], 1)
+        challan = before.data["results"][0]
+        self.assertEqual(challan["order_public_id"], order.public_id)
+        self.assertEqual(challan["dispatch"]["lr_number"], "")
+        self.assertFalse(challan["dispatch"]["is_private"])
 
         self._upload_lr(order)
 
         after = self._challans()
+        # The same row, not a second one.
         self.assertEqual(after.data["total_count"], 1)
         self.assertEqual(
             after.data["results"][0]["order_public_id"], order.public_id
         )
+        self.assertEqual(after.data["results"][0]["dispatch"]["lr_number"], "LR-12345")
 
     def test_a_private_dispatch_is_listed_without_any_lr(self):
         """No transporter means no note to wait for, so it is listed at once.
@@ -414,10 +425,14 @@ class DispatchChallansApiTest(WebApiTestCase):
 
         self.assertEqual(challan["financial_year"], f"{start}-{start + 1}")
 
-    def test_re_dispatching_drops_the_order_back_out_of_the_list(self):
-        """A new journey needs a new consignment note before it is a challan.
+    def test_re_dispatching_keeps_the_order_listed_with_a_blank_lr(self):
+        """A new journey is a new dispatch, so its LR starts blank -- and shows.
 
-        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_re_dispatching_drops_the_order_back_out_of_the_list
+        The second dispatch writes a fresh ``DispatchDetails``, so the LR of the
+        journey that was cancelled does not carry over. The row stays listed
+        throughout: the goods are on the road either way.
+
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_re_dispatching_keeps_the_order_listed_with_a_blank_lr
         """
         order = self._dispatched_order()
         self._upload_lr(order)
@@ -442,18 +457,23 @@ class DispatchChallansApiTest(WebApiTestCase):
             },
         )
 
-        self.assertEqual(self._challans().data["total_count"], 0)
+        listed = self._challans()
+        self.assertEqual(listed.data["total_count"], 1)
+        challan = listed.data["results"][0]
+        self.assertEqual(challan["dispatch"]["lr_number"], "")
+        self.assertEqual(challan["items"][0]["lot_number"], "LOT-2026-02")
 
     def test_the_catalogues_offer_only_clients_and_cities_with_challans(self):
-        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_the_catalogues_offer_only_clients_and_cities_with_challans"""
-        order = self._dispatched_order()
+        """A picker offers a client from the dispatch on, not from the LR on.
 
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_the_catalogues_offer_only_clients_and_cities_with_challans
+        """
         empty = {
             entry["filter"]: entry for entry in self._challans().data["available_filters"]
         }
         self.assertEqual(empty["client"]["options"], [])
 
-        self._upload_lr(order)
+        self._dispatched_order()
 
         filters = {
             entry["filter"]: entry for entry in self._challans().data["available_filters"]

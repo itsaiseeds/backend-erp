@@ -1,9 +1,10 @@
 """Dispatch-receipt export: ``GET /api/sales-admin/export/dispatch-receipts``.
 
-The complete challan of every order and custom order **booked** (``created_at``)
-inside the window, oldest first. "Complete" is exactly the challan list's rule
+The challan of every order and custom order **booked** (``created_at``) inside
+the window, oldest first. Which challans count is exactly the challan list's rule
 (:data:`~api.sales_admin.GetDispatchChallansView.CHALLAN_Q`): the order is still
-dispatched, and an agency dispatch has its LR number recorded.
+dispatched. An agency dispatch is included whether or not its LR number has been
+recorded yet, so a receipt is exportable the moment the goods leave.
 
 Each receipt is :func:`~aggregator.DispatchOperations.challan_entry_payload`
 (a custom order's is the challan list's custom row, loose lines and
@@ -43,7 +44,7 @@ ExportDispatchReceiptsResponseSerializer = export_response_serializer(
 
 
 class ExportDispatchReceiptsView(AdminDateRangeExportView):
-    """Export the complete challans of orders and custom orders booked in a date window."""
+    """Export the challans of orders and custom orders booked in a date window."""
 
     def export(self, window: DateWindow) -> list[dict]:
         entries = (

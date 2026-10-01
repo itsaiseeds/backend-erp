@@ -12,10 +12,16 @@ class DispatchDetails(TimeStampedModel, SoftDeletedModel):
     Recorded by a sales admin (``dispatched_by``); it has no ``created_by``.
 
     The vehicle and the driver are recorded here as well as on
-    ``PrivateDispatchDetails``: knowing who physically took the goods and in
-    what matters just as much when a transporter carries them -- it is what a
-    delivery query is chased with. The LR number is the one thing unique to
-    this kind of dispatch, and it is the one thing that may be pending.
+    ``PrivateDispatchDetails``, because knowing who physically took the goods
+    and in what is what a delivery query is chased with -- but here all three
+    are **optional**. The *agency* assigns the vehicle, and often only tells us
+    which one after collection; forcing the fields made the operator invent
+    values, which is worse than a blank, since an invented driver number reads
+    like a real one. On ``PrivateDispatchDetails`` they stay required: our own
+    vehicle always has a known driver.
+
+    So the LR number is no longer the only pending detail on this kind of
+    dispatch -- it is simply the one the transporter issues.
     """
 
     client = models.ForeignKey(
@@ -54,13 +60,17 @@ class DispatchDetails(TimeStampedModel, SoftDeletedModel):
             "so a dispatch is recorded without one and it is filled in later."
         ),
     )
-    driver_name = models.CharField("driver name", max_length=255)
+    # Blank until the agency says who is driving what (see the class docstring).
+    # ``blank=True`` also stops ``full_clean`` running ``validate_phone_number``
+    # on an empty ``driver_number``: Django skips validators for empty values.
+    driver_name = models.CharField("driver name", max_length=255, blank=True)
     driver_number = models.CharField(
         "driver number",
         max_length=10,
+        blank=True,
         validators=[validate_phone_number],
     )
-    vehicle_number = models.CharField("vehicle number", max_length=32)
+    vehicle_number = models.CharField("vehicle number", max_length=32, blank=True)
 
     class Meta:
         verbose_name = "dispatch details"

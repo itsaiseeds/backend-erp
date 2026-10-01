@@ -245,6 +245,45 @@ def assert_order_status(order: Order, allowed: frozenset[str], action: str) -> N
         )
 
 
+# The refusal an own-vehicle dispatch gets per blank field. Declared here, with
+# the rule, and reused by ``DispatchCustomOrderView`` so the serializer that
+# re-requires these fields answers in exactly the same words.
+OWN_VEHICLE_FIELD_REQUIRED = "{field} is required on an own-vehicle dispatch."
+
+
+def assert_driver_details(
+    driver_name: str, driver_number: str, vehicle_number: str
+) -> None:
+    """Raise unless an own-vehicle dispatch names its driver and vehicle.
+
+    All three are optional on an **agency** dispatch: the agency assigns the
+    vehicle and often only tells us which one after collection, so a blank there
+    is a detail still to come. Our own vehicle always has a known driver, so a
+    blank is a mistake, and recording one would put an unchaseable consignment
+    on the road.
+
+    This lives beside ``assert_order_status`` rather than in the serializer
+    because which kind of dispatch it is comes from the *order*
+    (``transport_agency``), not from the request -- the same reason
+    ``dispatch_order`` picks the ``attach`` function off the order. The custom
+    order path calls it unconditionally: a custom order is always own-vehicle.
+
+    Raises ``ValidationError``, which the API's exception handler turns into a
+    400, naming every field that was left blank.
+    """
+    blanks = {
+        field: OWN_VEHICLE_FIELD_REQUIRED.format(field=field)
+        for field, value in (
+            ("driver_name", driver_name),
+            ("driver_number", driver_number),
+            ("vehicle_number", vehicle_number),
+        )
+        if not value
+    }
+    if blanks:
+        raise ValidationError(blanks)
+
+
 def assert_stock_covers(
     needed: Mapping[ProductPackaging, int],
     action: str,
@@ -356,6 +395,12 @@ def dispatch_order(
     drove, on what number, in which vehicle -- so the caller supplies one shape
     either way.
 
+    **How strict those details are also comes from the order.** On an agency
+    dispatch all three may be blank: the agency assigns the vehicle, and often
+    only says which after collection. On an own-vehicle dispatch all three are
+    required (``assert_driver_details``), because our own vehicle always has a
+    known driver.
+
     Two things are **derived, not passed**: the dispatch date is today (the
     dispatch is being recorded as it happens), and the destination is the city
     of the order's own delivery address, which is where the goods are going by
@@ -396,6 +441,11 @@ def dispatch_order(
     # Validated before anything is written, so a bad lot number costs nothing.
     validated_lot_numbers(order, lot_numbers)
     validated_quantities(order, quantities)
+    # The order decides both which table the dispatch lands on and whether the
+    # driver details were optional, so the two reads of ``transport_agency_id``
+    # below can never disagree.
+    if not order.transport_agency_id:
+        assert_driver_details(driver_name, driver_number, vehicle_number)
 
     dispatched_at = indian_now()
     to_city = order.delivery_address.city

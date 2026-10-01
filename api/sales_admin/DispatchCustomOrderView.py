@@ -7,8 +7,13 @@ lot number per line.
 
 **A custom order always goes on our own vehicle.** It has no transport agency,
 so the dispatch is recorded against ``PrivateDispatchDetails`` and there is no
-LR number to record for it later; its challan appears in
-``dispatch-challans/`` straight away.
+LR number to record for it later.
+
+That also makes the driver and vehicle **required** here, even though the shared
+``DispatchOrderSerializer`` accepts them blank -- they are optional only on an
+agency dispatch, and a custom order never is. The rule is enforced by
+``OrderOperations.assert_driver_details``, called unconditionally from
+``dispatch_custom_order``.
 
 The date is today and the destination the custom order's own delivery city,
 exactly as for an order.
@@ -30,6 +35,7 @@ from rest_framework.response import Response
 
 from aggregator.CustomOrderOperations import dispatch_custom_order
 from aggregator.models import CustomOrder
+from aggregator.OrderOperations import OWN_VEHICLE_FIELD_REQUIRED
 from api.custom_order_serializers import CustomOrderDetailPayloadSerializer
 
 from .CustomOrderTransitionView import CustomOrderTransitionView
@@ -62,8 +68,31 @@ class CustomDispatchItemLotSerializer(serializers.Serializer):
     )
 
 
+def _own_vehicle_field(field: str, **kwargs) -> serializers.CharField:
+    """One driver/vehicle field, declared as an own-vehicle dispatch needs it.
+
+    ``dispatch_custom_order`` enforces this anyway (every caller goes through
+    ``assert_driver_details``), but re-declaring it here is what makes the
+    generated schema tell the truth: a client reading ``openapi.yml`` would
+    otherwise be told these are optional, which they are only on an *agency*
+    dispatch -- and a custom order never is one.
+    """
+    message = OWN_VEHICLE_FIELD_REQUIRED.format(field=field)
+    return serializers.CharField(
+        error_messages={"required": message, "blank": message}, **kwargs
+    )
+
+
 class DispatchCustomOrderSerializer(DispatchOrderSerializer):
-    """``dispatch-order``'s request, with lot numbers keyed by loose line."""
+    """``dispatch-order``'s request, with lot numbers keyed by loose line.
+
+    The driver and vehicle are required again here -- see
+    :func:`_own_vehicle_field`.
+    """
+
+    driver_name = _own_vehicle_field("driver_name", max_length=255)
+    driver_number = _own_vehicle_field("driver_number", max_length=10)
+    vehicle_number = _own_vehicle_field("vehicle_number", max_length=32)
 
     items = CustomDispatchItemLotSerializer(
         many=True,

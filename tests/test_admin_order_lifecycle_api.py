@@ -394,37 +394,84 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         order.refresh_from_db()
         self.assertIsNone(order.private_dispatch_details_id)
 
-    def test_every_dispatch_field_is_mandatory(self):
-        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_every_dispatch_field_is_mandatory"""
-        order = self._verified_order()
-        required = (
-            "from_city_id",
-            "driver_name",
-            "driver_number",
-            "vehicle_number",
-            "items",
-        )
+    def test_where_it_left_from_and_what_was_on_it_are_always_mandatory(self):
+        """The two fields neither kind of dispatch can do without.
 
-        for field in required:
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_where_it_left_from_and_what_was_on_it_are_always_mandatory
+        """
+        for by_agency in (True, False):
+            for field in ("from_city_id", "items"):
+                with self.subTest(by_agency=by_agency, missing=field):
+                    order = self._verified_order(by_agency=by_agency)
+                    body = self._dispatch_body()
+                    del body[field]
+
+                    self._assert_refused(
+                        self._post(DISPATCH_URL, order, body), f"{field} is required."
+                    )
+
+    def test_an_own_vehicle_dispatch_must_name_its_driver_and_vehicle(self):
+        """Our own vehicle always has a known driver, so a blank is a mistake.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_an_own_vehicle_dispatch_must_name_its_driver_and_vehicle
+        """
+        for field in ("driver_name", "driver_number", "vehicle_number"):
             with self.subTest(missing=field):
+                order = self._verified_order(by_agency=False)
                 body = self._dispatch_body()
                 del body[field]
 
                 self._assert_refused(
-                    self._post(DISPATCH_URL, order, body), f"{field} is required."
+                    self._post(DISPATCH_URL, order, body),
+                    f"{field} is required on an own-vehicle dispatch.",
                 )
 
+    def test_an_agency_dispatch_may_leave_the_driver_and_vehicle_blank(self):
+        """The agency assigns the vehicle, often telling us only after collection.
+
+        Forcing the fields made the operator invent values, which reads like a
+        real driver number. A blank is recorded as a blank.
+
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_an_agency_dispatch_may_leave_the_driver_and_vehicle_blank
+        """
+        order = self._verified_order(by_agency=True)
+        body = self._dispatch_body()
+        for field in ("driver_name", "driver_number", "vehicle_number"):
+            del body[field]
+
+        response = self._post(DISPATCH_URL, order, body)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["status"], "DISPATCHED")
+        order.refresh_from_db()
+        dispatch = order.dispatch_details
+        self.assertEqual(dispatch.driver_name, "")
+        self.assertEqual(dispatch.driver_number, "")
+        self.assertEqual(dispatch.vehicle_number, "")
+        # The challan snapshot has to be able to hold the blanks too.
+        entry = order.dispatch_entry
+        self.assertEqual(entry.driver_name, "")
+        self.assertEqual(entry.driver_number, "")
+        self.assertEqual(entry.vehicle_number, "")
+
     def test_a_malformed_driver_number_is_rejected(self):
-        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_malformed_driver_number_is_rejected"""
-        order = self._verified_order()
+        """A number that *is* given is still held to the 10-digit rule.
 
-        response = self._post(
-            DISPATCH_URL, order, self._dispatch_body(driver_number="12345")
-        )
+        Both kinds: the field is optional on an agency dispatch, not lax.
 
-        self.assertEqual(
-            response.status_code, status.HTTP_400_BAD_REQUEST, response.data
-        )
+        tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_malformed_driver_number_is_rejected
+        """
+        for by_agency in (True, False):
+            with self.subTest(by_agency=by_agency):
+                order = self._verified_order(by_agency=by_agency)
+
+                response = self._post(
+                    DISPATCH_URL, order, self._dispatch_body(driver_number="12345")
+                )
+
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+                )
 
     # -- the challan the dispatch writes --------------------------------------
 

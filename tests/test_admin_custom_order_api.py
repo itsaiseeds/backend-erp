@@ -710,6 +710,34 @@ class SalesAdminCustomOrderApiTest(WebApiTestCase):
         self.assertEqual(order.status.code, "CONFIRMED")
         self.assertIsNone(order.private_dispatch_details_id)
 
+    def test_dispatch_still_needs_a_driver_and_a_vehicle(self):
+        """Optional on an agency dispatch -- and a custom order is never one.
+
+        tests/test_admin_custom_order_api.py::SalesAdminCustomOrderApiTest::test_dispatch_still_needs_a_driver_and_a_vehicle
+        """
+        for field in ("driver_name", "driver_number", "vehicle_number"):
+            with self.subTest(missing=field):
+                order = self._book([(self.cotton, W1, 1)])
+                body = self._dispatch_body([(self.cotton, W1, "LOT-1")])
+                del body[field]
+
+                response = self.client.post(
+                    DISPATCH_URL.format(public_id=order.public_id),
+                    body,
+                    format="json",
+                )
+
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+                )
+                self.assertIn(
+                    f"{field} is required on an own-vehicle dispatch.",
+                    str(response.data),
+                )
+                order.refresh_from_db()
+                self.assertEqual(order.status.code, "CONFIRMED")
+                self.assertIsNone(order.private_dispatch_details_id)
+
     def test_a_dispatched_custom_order_cannot_be_dispatched_again(self):
         """tests/test_admin_custom_order_api.py::SalesAdminCustomOrderApiTest::test_a_dispatched_custom_order_cannot_be_dispatched_again"""
         order = self._book([(self.cotton, W1, 1)])
