@@ -437,6 +437,7 @@ erDiagram
         ├── utilities/countries GET  CountriesView         (IsSalesPerson → [{id,name,iso_code}])
         ├── utilities/states   GET   StatesView            (IsSalesPerson → [{id,name,code,country_id}], ?country_id=)
         ├── utilities/cities   GET   CitiesView            (IsSalesPerson → India state→city tree)
+        ├── analytics          GET   AnalyticsView         (IsSalesPerson → own order/client counts by status in ?start_date_time..?end_date_time; per-client order counts)
         ├── get-clients        GET   GetClientsView        (IsSalesPerson → own clients; paginated; ?city_id / ?status / ?company_name / ?address / ?created_gte / ?created_lte filters + ?sort; catalogues in available_filters/available_sorts)
         ├── get-orders         GET   GetOrdersView         (IsSalesPerson -> own orders; paginated; ?client / ?product / ?city_id / ?status filters + ?sort=created_at|price; catalogues in available_filters/available_sorts)
         ├── client/<public_id> GET   GetClientView         (IsSalesPerson → own client, full detail: core + all addresses/contacts/agencies)

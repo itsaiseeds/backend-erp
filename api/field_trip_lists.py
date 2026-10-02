@@ -29,6 +29,7 @@ from common.views.paginated_date_range import (
     parse_datetime,
     parse_int,
     parse_str,
+    public_id_filter,
 )
 
 FIELD_TRIP_STATUS_CODES = [status.name for status in StatusIds.field_trip_statuses()]
@@ -74,7 +75,7 @@ def field_trip_filters(scope: TripScope, *, by_sales_person: bool) -> tuple[List
         rows = scope(request).values_list("city_id", "city__name").distinct().order_by("city__name")
         return [{"value": city_id, "label": name} for city_id, name in rows]
 
-    filters: list[ListFilter] = []
+    filters: list[ListFilter] = [public_id_filter("FT-")]
     if by_sales_person:
         filters.append(
             QuerysetFilter(
@@ -193,6 +194,7 @@ def _by_product_use(queryset: QuerySet, values: list[bool]) -> QuerySet:
 
 
 FARMER_VISIT_FILTERS: tuple[ListFilter, ...] = (
+    public_id_filter("FV-"),
     QuerysetFilter(
         "crop",
         label="Crop",

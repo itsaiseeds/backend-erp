@@ -65,6 +65,7 @@ from common.views.paginated_date_range import (
     list_query_parameters,
     parse_int,
     parse_str,
+    public_id_filter,
 )
 
 # What makes a challan listable, per kind of order. Declared once: the list view
@@ -296,6 +297,7 @@ def _challan_destination_cities(request: Request) -> list[dict]:
 
 
 _QUERYSET_FILTERS = (
+    public_id_filter("DE-"),
     QuerysetFilter(
         "client",
         label="Client",

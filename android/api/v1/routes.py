@@ -7,6 +7,7 @@ declares the same key in its own ``ROUTES``.
 
 from __future__ import annotations
 
+from .AnalyticsView import AnalyticsView
 from .CitiesView import CitiesView
 from .ClientAddressesView import ClientAddressesView
 from .ClientTransportAgenciesView import ClientTransportAgenciesView
@@ -57,6 +58,7 @@ ROUTES: dict[str, type] = {
     "utilities/parties": PartiesView,
     "utilities/other-material-types": OtherMaterialTypesView,
     "utilities/sales-admins": SalesAdminsView,
+    "analytics": AnalyticsView,
     "get-clients": GetClientsView,
     "get-orders": GetOrdersView,
     "client/<public_id>": GetClientView,

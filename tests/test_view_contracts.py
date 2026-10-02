@@ -107,6 +107,7 @@ EXPECTED_CONTRACTS = {
     # -- Android app (token-only) --------------------------------------------
     # Logout deliberately does NOT require a SalesPerson profile: a token whose
     # profile was removed must still be revocable.
+    "android/api/v1/analytics": ("AnalyticsView", TOKEN_SALESPERSON),
     "android/api/v1/auth/logout": ("LogoutView", TOKEN_AUTH),
     "android/api/v1/auth/reauthenticate": ("ReauthenticateView", TOKEN_ANDROID),
     "android/api/v1/client/<public_id>": ("GetClientView", TOKEN_SALESPERSON),
