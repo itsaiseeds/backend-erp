@@ -20,6 +20,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late String _activeItemId;
+  String? _browsingWorkspaceId;
   bool _isCollapsedByUser = false;
   bool _hasUserSetCollapse = false;
 
@@ -62,9 +63,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _onItemSelected(String itemId) {
     if (_activeItemId == itemId) return;
-    setState(() => _activeItemId = itemId);
+    setState(() {
+      _activeItemId = itemId;
+      _browsingWorkspaceId = null;
+    });
     _syncUrl();
   }
+
+  // Switching workspace only changes which list is shown; the open tab stays
+  // put until the user picks one, so no content flickers underneath.
+  void _onWorkspaceSelected(String workspaceId) {
+    if (_resolveWorkspaceId() == workspaceId) return;
+    setState(() => _browsingWorkspaceId = workspaceId);
+  }
+
+  String _resolveWorkspaceId() =>
+      _browsingWorkspaceId ?? SidebarItems.workspaceIdFor(_activeItemId);
 
   void _onToggleCollapse() {
     final bool next = !_resolveIsCollapsed();
@@ -104,9 +118,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return AppShell(
           isCollapsed: isCollapsed,
           sidebar: DashboardSidebar(
-            groups: SidebarItems.visibleGroups(role: role),
+            workspaces: SidebarItems.visibleWorkspaces(role: role),
+            activeWorkspaceId: _resolveWorkspaceId(),
             activeItemId: activeId,
             onItemSelected: _onItemSelected,
+            onWorkspaceSelected: _onWorkspaceSelected,
             isCollapsed: isCollapsed,
             onToggleCollapse: _onToggleCollapse,
           ),

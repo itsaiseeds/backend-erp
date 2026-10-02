@@ -8,6 +8,7 @@ import '../../../../core/widgets/buttons/row_actions_menu.dart';
 import '../../../../core/widgets/feedback/app_badge.dart';
 import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
+import '../../../../core/widgets/inputs/date_range_field.dart';
 import '../../../../core/widgets/tables/app_data_table.dart';
 import '../../../clients/data/models/client_filter_model.dart';
 import '../../data/models/inward_raw_material_model.dart';
@@ -16,6 +17,7 @@ class InwardRawMaterialsTable extends StatefulWidget {
   static const String CONFIG_KEY = 'inward-raw-materials';
   static const String COLUMN_PRODUCT = 'product';
   static const String COLUMN_PARTY = 'party';
+  static const String COLUMN_LOT_NO = 'lot_no';
   static const String COLUMN_QUANTITY = 'quantity_kg';
   static const String COLUMN_STATUS = 'status';
   static const String COLUMN_LAB_DATE = 'lab_sampling_date';
@@ -34,7 +36,8 @@ class InwardRawMaterialsTable extends StatefulWidget {
   final List<ClientSortModel> availableSorts;
   final void Function(InwardRawMaterialModel lot)? onView;
   final void Function(InwardRawMaterialModel lot)? onDelete;
-  final void Function(InwardRawMaterialModel lot)? onMarkInUse;
+  final void Function(InwardRawMaterialModel lot, String nextStatus)?
+  onChangeStatus;
   final bool isMutating;
   final bool hasMore;
   final VoidCallback? onLoadMore;
@@ -57,7 +60,7 @@ class InwardRawMaterialsTable extends StatefulWidget {
     this.availableSorts = const [],
     this.onView,
     this.onDelete,
-    this.onMarkInUse,
+    this.onChangeStatus,
     this.isMutating = false,
     this.hasMore = false,
     this.onLoadMore,
@@ -81,6 +84,11 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
     AppDataColumn(
       id: InwardRawMaterialsTable.COLUMN_PARTY,
       label: AppStrings.COLUMN_PARTY,
+      width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: InwardRawMaterialsTable.COLUMN_LOT_NO,
+      label: AppStrings.COLUMN_LOT_NO,
       width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
@@ -144,8 +152,16 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
         .toList();
   }
 
-  String _valueLabelFor(String key, String value) =>
-      _filterFor(key)?.labelForValue(value) ?? value;
+  bool _isDateRange(String key) =>
+      _filterFor(key)?.kind == ClientFilterKind.datetimeRange;
+
+  String _valueLabelFor(String key, String value) {
+    if (_isDateRange(key)) {
+      final DateRangeValue parsed = DateRangeValue.parse(value);
+      return parsed.isEmpty ? value : parsed.displayValue;
+    }
+    return _filterFor(key)?.labelForValue(value) ?? value;
+  }
 
   String _filterLabel(String key) => _filterFor(key)?.displayLabel ?? key;
 
@@ -183,6 +199,7 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
       filterByOptions: _filterOptions,
       filterValueOptions: _valueOptionsFor,
       getFilterValueLabel: _valueLabelFor,
+      isDateRangeFilter: _isDateRange,
       currentSortBy: widget.currentSortBy,
       currentSortOrder: widget.currentSortOrder,
       currentFilters: widget.currentFilters,
@@ -207,6 +224,8 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
         return _textCell(lot.productName, isStrong: true);
       case InwardRawMaterialsTable.COLUMN_PARTY:
         return _textCell(lot.partyName);
+      case InwardRawMaterialsTable.COLUMN_LOT_NO:
+        return _textCell(lot.lotNo);
       case InwardRawMaterialsTable.COLUMN_QUANTITY:
         return _textCell(lot.quantityKg);
       case InwardRawMaterialsTable.COLUMN_STATUS:
@@ -216,7 +235,9 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
               : lot.statusLabel,
           variant: lot.isInUse
               ? AppBadgeVariant.success
-              : AppBadgeVariant.warning,
+              : (lot.isRejected
+                    ? AppBadgeVariant.error
+                    : AppBadgeVariant.warning),
         );
       case InwardRawMaterialsTable.COLUMN_LAB_DATE:
         return _textCell(DateFormatter.dayLabel(lot.labSamplingDateTime));
@@ -228,18 +249,16 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
           child: RowActionsMenu(
             enabled: !widget.isMutating,
             actions: [
-              RowAction(
-                label: AppStrings.INWARD_MARK_IN_USE,
-                icon: Icons.play_circle_outline_rounded,
-                tone: RowActionTone.success,
-                blockedHint: AppStrings.INWARD_MARK_IN_USE_BLOCKED,
-                onSelected:
-                    lot.isInUse ||
-                        widget.isMutating ||
-                        widget.onMarkInUse == null
-                    ? null
-                    : () => widget.onMarkInUse!(lot),
-              ),
+              for (final String next in lot.allowedNextStatuses)
+                RowAction(
+                  label: _statusActionLabel(next),
+                  icon: _statusActionIcon(next),
+                  tone: _statusActionTone(next),
+                  onSelected:
+                      widget.isMutating || widget.onChangeStatus == null
+                      ? null
+                      : () => widget.onChangeStatus!(lot, next),
+                ),
               RowAction(
                 label: AppStrings.DELETE,
                 icon: Icons.delete_outline_rounded,
@@ -254,6 +273,32 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
       default:
         return _textCell(AppStrings.TABLE_VALUE_UNAVAILABLE);
     }
+  }
+
+  static String _statusActionLabel(String status) {
+    if (status == InwardStatus.LAB_TESTING_WIRE) {
+      return AppStrings.INWARD_REVERT;
+    }
+    if (status == InwardStatus.REJECTED_WIRE) {
+      return AppStrings.INWARD_MARK_REJECTED;
+    }
+    return AppStrings.INWARD_MARK_IN_USE;
+  }
+
+  static IconData _statusActionIcon(String status) {
+    if (status == InwardStatus.LAB_TESTING_WIRE) {
+      return Icons.science_outlined;
+    }
+    if (status == InwardStatus.REJECTED_WIRE) {
+      return Icons.block_outlined;
+    }
+    return Icons.play_circle_outline_rounded;
+  }
+
+  static RowActionTone _statusActionTone(String status) {
+    if (status == InwardStatus.LAB_TESTING_WIRE) return RowActionTone.neutral;
+    if (status == InwardStatus.REJECTED_WIRE) return RowActionTone.error;
+    return RowActionTone.success;
   }
 
   Widget _textCell(String value, {bool isStrong = false}) {

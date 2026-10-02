@@ -55,6 +55,12 @@ class ApiClient {
         onError: (err, handler) async {
           if (err.response?.statusCode == _unauthorizedStatus &&
               !_isLoginRequest(err.requestOptions.path)) {
+            // TEMP DIAGNOSTIC - remove once the early-logout cause is found.
+            debugPrint(
+              '[SESSION-401] ${DateTime.now().toIso8601String()} '
+              '${err.requestOptions.method} ${err.requestOptions.path} '
+              'body=${err.response?.data}',
+            );
             await SessionGuard.endSession();
           }
           return handler.next(err);
@@ -152,6 +158,12 @@ class ApiClient {
     }
     if (statusCode == _unauthorizedStatus &&
         !_isLoginRequest(response.requestOptions.path)) {
+      // TEMP DIAGNOSTIC - remove once the early-logout cause is found.
+      debugPrint(
+        '[SESSION-401] ${DateTime.now().toIso8601String()} '
+        '${response.requestOptions.method} ${response.requestOptions.path} '
+        'body=${response.data}',
+      );
       unawaited(SessionGuard.endSession());
     }
     throw ApiException(

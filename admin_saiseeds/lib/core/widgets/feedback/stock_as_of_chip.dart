@@ -15,32 +15,37 @@ class StockAsOfChip extends StatelessWidget {
     final DateTime? parsed = DateTime.tryParse(isoDate.trim());
     if (parsed == null) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.SURFACE_VARIANT,
-        border: Border.all(color: AppColors.BORDER),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.event_available_outlined,
-            size: AppSizes.iconSm,
-            color: AppColors.TEXT_SECONDARY,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            '${AppStrings.STOCK_AS_OF_PREFIX} '
-            '${DateFormatter.dayLabel(parsed)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.button.copyWith(
+    // Centred rather than stretched: the chip is a label beside the search
+    // bar, so it keeps its own height instead of matching the row's.
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.SURFACE_VARIANT,
+          border: Border.all(color: AppColors.BORDER),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.event_available_outlined,
+              size: AppSizes.iconXs,
               color: AppColors.TEXT_SECONDARY,
             ),
-          ),
-        ],
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              '${AppStrings.STOCK_AS_OF_PREFIX} '
+              '${DateFormatter.dayLabel(parsed)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.caption,
+            ),
+          ],
+        ),
       ),
     );
   }

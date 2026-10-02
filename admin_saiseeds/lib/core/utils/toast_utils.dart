@@ -82,7 +82,7 @@ class ToastUtils {
       autoCloseDuration: autoCloseDuration,
       type: _resolveType(type),
       style: ToastificationStyle.flat,
-      alignment: Alignment.topRight,
+      alignment: Alignment.bottomRight,
       animationDuration: _animation,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       showProgressBar: true,

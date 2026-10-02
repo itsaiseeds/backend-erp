@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/tab_ids.dart';
 import '../../../core/constants/user_roles.dart';
-import '../../../core/models/sidebar_group_model.dart';
+import '../../../core/models/sidebar_workspace_model.dart';
 import '../../../core/models/sidebar_item_model.dart';
 
 class SidebarItems {
@@ -96,62 +96,77 @@ class SidebarItems {
     ),
   ];
 
-  static const List<SidebarGroupModel> GROUPS = [
-    SidebarGroupModel(
-      id: 'user-management',
-      label: AppStrings.GROUP_USER_MANAGEMENT,
-      icon: Icons.manage_accounts_outlined,
-      itemIds: [TabIds.ADMINS, TabIds.SALES_PEOPLE],
-    ),
-    SidebarGroupModel(
-      id: 'onboarding',
-      label: AppStrings.GROUP_ONBOARDING,
-      icon: Icons.handshake_outlined,
-      itemIds: [TabIds.CLIENTS, TabIds.PARTIES],
-    ),
-    SidebarGroupModel(
-      id: 'orders',
-      label: AppStrings.GROUP_ORDERS,
-      icon: Icons.receipt_long_outlined,
-      itemIds: [TabIds.ORDERS, TabIds.DISPATCH_CHALLANS],
-    ),
-    SidebarGroupModel(
-      id: 'daily-stock',
-      label: AppStrings.GROUP_DAILY_STOCK,
-      icon: Icons.edit_note_outlined,
-      itemIds: [TabIds.BAG_STOCK, TabIds.PACKET_STOCK],
-    ),
-    SidebarGroupModel(
-      id: 'stock-analysis',
-      label: AppStrings.GROUP_STOCK_ANALYSIS,
-      icon: Icons.query_stats_outlined,
-      itemIds: [
-        TabIds.PRODUCT_STOCK,
-        TabIds.RAW_MATERIAL_STOCK,
-        TabIds.OTHER_MATERIAL_STOCK,
-      ],
-    ),
-    SidebarGroupModel(
-      id: 'catalogue',
-      label: AppStrings.GROUP_CATALOGUE,
-      icon: Icons.inventory_2_outlined,
-      itemIds: [TabIds.PRODUCTS, TabIds.PRODUCT_PACKAGINGS],
-    ),
-    SidebarGroupModel(
-      id: 'inward',
-      label: AppStrings.GROUP_INWARD,
-      icon: Icons.local_shipping_outlined,
-      itemIds: [
-        TabIds.INWARD_RAW_MATERIALS,
-        TabIds.OTHER_RAW_MATERIALS,
-        TabIds.OTHER_MATERIAL_INWARD,
-      ],
-    ),
-  ];
+  static const SidebarWorkspaceModel OPERATIONS = SidebarWorkspaceModel(
+    id: 'operations',
+    label: AppStrings.WORKSPACE_OPERATIONS,
+    hint: AppStrings.WORKSPACE_OPERATIONS_HINT,
+    icon: Icons.bolt_outlined,
+    groups: [
+      SidebarGroupModel(id: 'ops-home', itemIds: [TabIds.DASHBOARD]),
+      SidebarGroupModel(
+        id: 'ops-orders',
+        label: AppStrings.GROUP_ORDERS,
+        itemIds: [TabIds.ORDERS, TabIds.DISPATCH_CHALLANS],
+      ),
+      SidebarGroupModel(
+        id: 'ops-daily-stock',
+        label: AppStrings.GROUP_DAILY_STOCK,
+        itemIds: [TabIds.BAG_STOCK, TabIds.PACKET_STOCK],
+      ),
+      SidebarGroupModel(
+        id: 'ops-stock-analysis',
+        label: AppStrings.GROUP_STOCK_ANALYSIS,
+        itemIds: [
+          TabIds.PRODUCT_STOCK,
+          TabIds.RAW_MATERIAL_STOCK,
+          TabIds.OTHER_MATERIAL_STOCK,
+        ],
+      ),
+      SidebarGroupModel(
+        id: 'ops-inward',
+        label: AppStrings.GROUP_INWARD,
+        itemIds: [TabIds.INWARD_RAW_MATERIALS, TabIds.OTHER_MATERIAL_INWARD],
+      ),
+    ],
+  );
 
-  /// Groups the permitted items, keeping ungrouped entries (Dashboard) as
-  /// standalone rows in their original order.
-  static List<ResolvedSidebarGroup> visibleGroups({required String? role}) {
+  static const SidebarWorkspaceModel SETUP = SidebarWorkspaceModel(
+    id: 'setup',
+    label: AppStrings.WORKSPACE_SETUP,
+    hint: AppStrings.WORKSPACE_SETUP_HINT,
+    icon: Icons.tune_outlined,
+    groups: [
+      SidebarGroupModel(
+        id: 'setup-catalogue',
+        label: AppStrings.GROUP_CATALOGUE,
+        itemIds: [
+          TabIds.PRODUCTS,
+          TabIds.PRODUCT_PACKAGINGS,
+          TabIds.OTHER_RAW_MATERIALS,
+        ],
+      ),
+      SidebarGroupModel(
+        id: 'setup-onboarding',
+        label: AppStrings.GROUP_ONBOARDING,
+        itemIds: [TabIds.CLIENTS, TabIds.PARTIES],
+      ),
+      SidebarGroupModel(
+        id: 'setup-users',
+        label: AppStrings.GROUP_USER_MANAGEMENT,
+        itemIds: [TabIds.SALES_PEOPLE, TabIds.ADMINS],
+      ),
+    ],
+  );
+
+  static const List<SidebarWorkspaceModel> WORKSPACES = [OPERATIONS, SETUP];
+
+  static const String DEFAULT_WORKSPACE_ID = 'operations';
+
+  /// Resolves both workspaces against the role, dropping any group - or
+  /// whole workspace - the role cannot see a single tab in.
+  static List<ResolvedSidebarWorkspace> visibleWorkspaces({
+    required String? role,
+  }) {
     final List<SidebarItemModel> permitted = visibleItems(role: role);
     if (permitted.isEmpty) return const [];
 
@@ -159,27 +174,37 @@ class SidebarItems {
       for (final SidebarItemModel item in permitted) item.id: item,
     };
 
-    final Set<String> grouped = {
-      for (final SidebarGroupModel group in GROUPS) ...group.itemIds,
-    };
+    final List<ResolvedSidebarWorkspace> resolved = [];
 
-    final List<ResolvedSidebarGroup> resolved = [];
+    for (final SidebarWorkspaceModel workspace in WORKSPACES) {
+      final List<ResolvedSidebarGroup> groups = [];
 
-    for (final SidebarItemModel item in permitted) {
-      if (grouped.contains(item.id)) continue;
-      resolved.add(ResolvedSidebarGroup(items: [item]));
-    }
+      for (final SidebarGroupModel group in workspace.groups) {
+        final List<SidebarItemModel> items = [
+          for (final String id in group.itemIds)
+            if (byId.containsKey(id)) byId[id]!,
+        ];
+        if (items.isEmpty) continue;
+        groups.add(ResolvedSidebarGroup(group: group, items: items));
+      }
 
-    for (final SidebarGroupModel group in GROUPS) {
-      final List<SidebarItemModel> items = [
-        for (final String id in group.itemIds)
-          if (byId.containsKey(id)) byId[id]!,
-      ];
-      if (items.isEmpty) continue;
-      resolved.add(ResolvedSidebarGroup(group: group, items: items));
+      if (groups.isEmpty) continue;
+      resolved.add(
+        ResolvedSidebarWorkspace(workspace: workspace, groups: groups),
+      );
     }
 
     return resolved;
+  }
+
+  /// The workspace that owns [itemId], so selecting a tab by URL opens the
+  /// side of the app it lives in.
+  static String workspaceIdFor(String? itemId) {
+    if (itemId == null) return DEFAULT_WORKSPACE_ID;
+    for (final SidebarWorkspaceModel workspace in WORKSPACES) {
+      if (workspace.itemIds.contains(itemId)) return workspace.id;
+    }
+    return DEFAULT_WORKSPACE_ID;
   }
 
   static const String DEFAULT_ITEM_ID = TabIds.DASHBOARD;

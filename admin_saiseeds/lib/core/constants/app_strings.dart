@@ -50,12 +50,6 @@ class AppStrings {
   static const String SIDEBAR_COLLAPSE = 'Collapse sidebar';
   static const String SIDEBAR_EXPAND = 'Expand sidebar';
 
-  static const String SENTRY_TEST_BUTTON = 'Send test error';
-  static const String SENTRY_TEST_SENT_TITLE = 'Test error sent';
-  static const String SENTRY_TEST_SENT_BODY =
-      'A sample error was reported. Check GlitchTip to confirm it arrived.';
-  static const String SENTRY_TEST_EXCEPTION =
-      'Saiseeds admin test error: triggered from the dashboard.';
   static const String DASHBOARD_LAUNCHING_SOON_TITLE = 'Launching soon';
   static const String DASHBOARD_LAUNCHING_SOON_BODY =
       'The overview dashboard is being built. Live metrics for administrators, '
@@ -711,9 +705,9 @@ class AppStrings {
   static const String ORDER_NO_ITEMS = 'This order has no lines.';
   static const String TIMEZONE_IST = 'IST';
 
-  static const String GROUP_ORDERS = 'Order Management';
   static const String DISPATCH_CHALLANS = 'Dispatch Orders';
   static const String COLUMN_DISPATCH_ID = 'Dispatch ID';
+  static const String COLUMN_CHALLAN_NUMBER = 'Challan Number';
   static const String COLUMN_LR_NUMBER = 'LR Number';
   static const String COLUMN_DISPATCH_DATE = 'Dispatch Date';
   static const String COLUMN_TRANSPORT_TYPE = 'Transport';
@@ -747,6 +741,9 @@ class AppStrings {
   static const String CHALLAN_VIEW = 'View challan';
   static const String CHALLAN_PREVIEW_TITLE = 'Delivery challan';
   static const String CHALLAN_FILE_PREFIX = 'challan-';
+  static const String PRINT = 'Print';
+  static const String CHALLAN_PRINT_FAILED =
+      'Could not open the print dialog.';
   static const String CHALLAN_DOWNLOAD_FAILED =
       'Could not generate the challan PDF.';
   static const String CHALLAN_DETAIL_TITLE = 'Dispatch challan';
@@ -767,12 +764,18 @@ class AppStrings {
   static const String SORT_LABEL_CREATED = 'Created';
   static const String SORT_BY_DISPATCH_DATE = 'dispatch_date';
 
-  static const String GROUP_USER_MANAGEMENT = 'User Management';
-  static const String GROUP_ONBOARDING = 'Client & Party';
-  static const String GROUP_CATALOGUE = 'Product Configuration';
-  static const String GROUP_INWARD = 'Inward Operations';
+  static const String WORKSPACE_OPERATIONS = 'Operations';
+  static const String WORKSPACE_OPERATIONS_HINT = 'Day-to-day work';
+  static const String WORKSPACE_SETUP = 'Setup';
+  static const String WORKSPACE_SETUP_HINT = 'Configuration & masters';
+  static const String WORKSPACE_SWITCH_LABEL = 'Workspace';
+  static const String GROUP_ORDERS = 'Order Management';
   static const String GROUP_DAILY_STOCK = 'Daily Stock Update';
   static const String GROUP_STOCK_ANALYSIS = 'Stock Analysis';
+  static const String GROUP_INWARD = 'Inward Operations';
+  static const String GROUP_CATALOGUE = 'Product Configuration';
+  static const String GROUP_ONBOARDING = 'Client & Party';
+  static const String GROUP_USER_MANAGEMENT = 'User Management';
 
   static const String ORDER_DISPATCH = 'Dispatch';
   static const String ORDER_DISPATCH_TITLE = 'Dispatch order';
@@ -794,7 +797,7 @@ class AppStrings {
       'Record the lot number for each bag.';
   static const String DISPATCH_STEP_SUMMARY_CAPTION =
       'Check the details, then dispatch.';
-  static const String FIELD_FROM_CITY = 'From city';
+  static const String FIELD_FROM_CITY = 'From City';
   static const String FIELD_DRIVER_NAME = 'Driver name';
   static const String FIELD_DRIVER_NAME_HINT = 'Name of the driver';
   static const String FIELD_DRIVER_NUMBER = 'Driver number';
@@ -808,7 +811,7 @@ class AppStrings {
   static const String DISPATCH_SUMMARY_ITEMS = 'Bags';
 
   static const String PRODUCT_STOCK = 'Product Stock';
-  static const String RAW_MATERIAL_STOCK = 'Raw Material';
+  static const String RAW_MATERIAL_STOCK = 'Raw Material Stock';
 
   static const String OTHER_MATERIAL_STOCK = 'Material Stock';
   static const String PACKETS_PER_BAG_SUFFIX = 'packets / bag';
@@ -833,6 +836,7 @@ class AppStrings {
   static const String COLUMN_INCOMING_KG = 'Incoming (kg)';
   static const String COLUMN_PACKED_KG = 'Packed (kg)';
   static const String COLUMN_AVAILABLE_KG = 'Available (kg)';
+  static const String COLUMN_REJECTED_KG = 'Rejected (kg)';
 
   static const String STOCK_KIND_BAG = 'Bag';
   static const String STOCK_KIND_LOOSE = 'Packet';
@@ -855,9 +859,9 @@ class AppStrings {
       'Could not load raw material stock';
   static const String STOCK_AS_OF_PREFIX = 'As of';
 
-  static const String INWARD_RAW_MATERIALS = 'Raw Material';
+  static const String INWARD_RAW_MATERIALS = 'Raw Material Inward';
   static const String OTHER_RAW_MATERIALS = 'Material Recipes';
-  static const String OTHER_MATERIAL_INWARD = 'Other Material Inward';
+  static const String OTHER_MATERIAL_INWARD = 'Other Mat. Inward';
 
   static const String COLUMN_RECIPE = 'Recipe';
 
@@ -934,6 +938,26 @@ class AppStrings {
       'This lot is already in use.';
   static const String INWARD_STATUS_LOCKED_NOTE =
       'A lot already in use cannot change status.';
+  static const String STATUS_REJECTED = 'Rejected';
+  static const String INWARD_MARK_IN_USE_REJECTED =
+      'A rejected lot must go back to Lab Testing first.';
+  static const String INWARD_MARK_REJECTED = 'Mark rejected';
+  static const String INWARD_MARK_REJECTED_TITLE = 'Reject this lot?';
+  static const String INWARD_MARK_REJECTED_BODY =
+      'The lot moves from Lab Testing to Rejected and stops counting '
+      'toward usable stock.';
+  static const String INWARD_MARK_REJECTED_DONE = 'Lot rejected';
+  static const String INWARD_REVERT_TITLE = 'Send back to Lab Testing?';
+  static const String INWARD_REVERT_BODY =
+      'The lot returns to Lab Testing and its effective date is cleared.';
+  static const String INWARD_REVERT = 'Send to Lab Testing';
+  static const String INWARD_REVERT_DONE = 'Lot sent to Lab Testing';
+  static const String INWARD_STATUS_CHANGE_LABEL = 'Change status';
+  static const String INWARD_STATUS_KEEP = 'Leave unchanged';
+  static const String COLUMN_LOT_NO = 'Lot No.';
+  static const String FIELD_LOT_NO = 'Lot number';
+  static const String FIELD_LOT_NO_HINT = 'e.g. SUP-LOT-A1';
+  static const String VALIDATION_LOT_NO_REQUIRED = 'Lot number is required.';
 
   static const String RECIPE_DETAIL_TITLE = 'Material recipe';
   static const String RECIPE_DETAIL_SUBTITLE =
@@ -965,8 +989,7 @@ class AppStrings {
   static const String STOCK_UPDATE_ACTION = 'Update Stock';
   static const String STOCK_CONFIRM_TITLE = 'Update today\'s stock';
   static const String STOCK_CONFIRM_BODY =
-      'Please update stock of all products together. Counts you leave blank '
-      'keep the value already recorded for today.';
+      'Are you sure you want to record these counts?';
   static const String STOCK_CONFIRM_ACTION = 'Confirm';
   static const String STOCK_NOTHING_ENTERED_TITLE = 'Nothing to update';
   static const String STOCK_NOTHING_ENTERED_BODY =
@@ -977,7 +1000,7 @@ class AppStrings {
   static const String COLUMN_STOCK_RESERVED = 'Reserved';
   static const String COLUMN_STOCK_CONSUMED = 'Consumed';
   static const String COLUMN_STOCK_AVAILABLE = 'Available';
-  static const String COLUMN_STOCK_COUNTED = 'Counted';
+  static const String COLUMN_STOCK_COUNTED = 'Stock Count';
   static const String COLUMN_PACKETS_PER_BAG = 'Packets / Bag';
 
   static const String BAG_STOCK_TABLE_SEARCH_HINT = 'Search bag stock...';

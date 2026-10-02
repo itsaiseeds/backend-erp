@@ -66,6 +66,8 @@ class AppColors {
   static const Color TABLE_HEADER_DIVIDER = Color(0xFF4CA35E);
   static const Color TABLE_HEADER_PIN_IDLE = Color(0xFF9CC7A6);
   static const Color TABLE_ROW_HOVER = Color(0xFFF4F8F4);
+  static const Color TABLE_ROW_STRIPE = Color(0xFFF7FBF8);
+  static const Color STOCK_COUNT_IDLE = Color(0xFFE6E6E6);
   static const Color TABLE_ROW_DIVIDER = Color(0xFFECEFEC);
   static const Color TABLE_SCROLL_TRACK = Color(0xFFEDEFED);
   static const Color TABLE_SCROLL_THUMB = Color(0xFF4CA35E);

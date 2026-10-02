@@ -16,6 +16,7 @@ class DispatchChallansTable extends StatefulWidget {
   static const String CONFIG_KEY = 'dispatch-challans';
   static const String COLUMN_ORDER_ID = 'order_public_id';
   static const String COLUMN_DISPATCH_ID = 'dispatch_public_id';
+  static const String COLUMN_CHALLAN_NUMBER = 'challan_number';
   static const String COLUMN_LR = 'lr_number';
   static const String COLUMN_DATE = 'dispatch_date';
   static const String COLUMN_TRANSPORT = 'is_private';
@@ -92,6 +93,11 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
     AppDataColumn(
       id: DispatchChallansTable.COLUMN_DISPATCH_ID,
       label: AppStrings.COLUMN_DISPATCH_ID,
+      width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: DispatchChallansTable.COLUMN_CHALLAN_NUMBER,
+      label: AppStrings.COLUMN_CHALLAN_NUMBER,
       width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
@@ -304,6 +310,8 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
         return _textCell(challan.orderPublicId, isStrong: true);
       case DispatchChallansTable.COLUMN_DISPATCH_ID:
         return _textCell(challan.dispatchPublicId);
+      case DispatchChallansTable.COLUMN_CHALLAN_NUMBER:
+        return _textCell(challan.challanNumber);
       case DispatchChallansTable.COLUMN_LR:
         return _textCell(dispatch?.lrNumber ?? '');
       case DispatchChallansTable.COLUMN_DATE:

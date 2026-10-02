@@ -32,6 +32,7 @@ class AppSizes {
   static const double borderMedium = 1.5;
   static const double borderThick = 2.0;
 
+  static const double iconXs = 14.0;
   static const double iconSm = 16.0;
   static const double iconMd = 18.0;
 
@@ -56,10 +57,12 @@ class AppSizes {
   static const double iconXl = 24.0;
   static const double iconXxl = 40.0;
 
-  static const double sidebarExpandedWidth = 300.0;
+  static const double sidebarExpandedWidth = 332.0;
   static const double sidebarCollapsedWidth = 72.0;
   static const double sidebarBrandingHeight = 72.0;
   static const double sidebarItemHeight = 44.0;
+  static const double sidebarWorkspaceSegmentHeight = 34.0;
+  static const double sidebarGroupDot = 6.0;
   static const double challanItemsHeight = 420.0;
   static const double sidebarGroupHeaderHeight = 34.0;
   static const double sidebarGroupHeaderTopGap = 10.0;
@@ -76,7 +79,7 @@ class AppSizes {
   static const double sidebarActiveRail = 4.0;
   static const double sidebarActiveRailHeight = 18.0;
   static const double sidebarActiveRailRadius = 2.0;
-  static const double sidebarLogo = 100.0;
+  static const double sidebarLogo = 72.0;
   static const double sidebarLogoCollapsed = 32.0;
   static const double sidebarLogoFallbackIcon = 48.0;
   static const double sidebarLogoFallbackIconCollapsed = 24.0;
@@ -113,7 +116,7 @@ class AppSizes {
   static const double tableOverheadHeight = 96.0;
   static const double tableResizeHandleWidth = 8.0;
   static const double tableResizeGripHeight = 22.0;
-  static const double tableMinColumnWidth = 60.0;
+  static const double tableMinColumnWidth = 110.0;
   static const double tableMinSelectColumnWidth = 40.0;
   static const double tableMinActionColumnWidth = 80.0;
   static const double tableMaxColumnWidth = 2000.0;
@@ -128,6 +131,7 @@ class AppSizes {
   static const double tableSettingsDialogWidth = 600.0;
   static const double tableSettingsTileWidth = 260.0;
   static const double tablePinIconSize = 12.0;
+  static const double tablePinGutter = 22.0;
   static const double tableFilterMenuWidth = 280.0;
   static const double tableFilterMenuMaxHeight = 300.0;
   static const double searchMenuMaxHeight = 260.0;

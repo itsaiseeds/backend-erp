@@ -72,7 +72,7 @@ class _StockCountFieldState extends State<StockCountField> {
         ? AppColors.PRIMARY_SURFACE
         : hasValue
         ? AppColors.SUCCESS_LIGHT
-        : AppColors.TRANSPARENT;
+        : AppColors.STOCK_COUNT_IDLE;
 
     return SizedBox(
       height: double.infinity,

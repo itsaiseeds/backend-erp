@@ -92,27 +92,54 @@ class _InwardRawMaterialsContentState
     );
   }
 
-  Future<void> _onMarkInUse(InwardRawMaterialModel lot) async {
+  Future<void> _onChangeStatus(
+    InwardRawMaterialModel lot,
+    String nextStatus,
+  ) async {
     final InwardRawMaterialsCubit cubit = context
         .read<InwardRawMaterialsCubit>();
 
+    final bool isRevert = nextStatus == InwardStatus.LAB_TESTING_WIRE;
+    final bool isReject = nextStatus == InwardStatus.REJECTED_WIRE;
+
+    final String title = isRevert
+        ? AppStrings.INWARD_REVERT_TITLE
+        : (isReject
+              ? AppStrings.INWARD_MARK_REJECTED_TITLE
+              : AppStrings.INWARD_MARK_IN_USE_TITLE);
+    final String body = isRevert
+        ? AppStrings.INWARD_REVERT_BODY
+        : (isReject
+              ? AppStrings.INWARD_MARK_REJECTED_BODY
+              : AppStrings.INWARD_MARK_IN_USE_BODY);
+    final String confirmLabel = isRevert
+        ? AppStrings.INWARD_REVERT
+        : (isReject
+              ? AppStrings.INWARD_MARK_REJECTED
+              : AppStrings.INWARD_MARK_IN_USE);
+    final String done = isRevert
+        ? AppStrings.INWARD_REVERT_DONE
+        : (isReject
+              ? AppStrings.INWARD_MARK_REJECTED_DONE
+              : AppStrings.INWARD_MARK_IN_USE_DONE);
+
     final bool confirmed = await ConfirmationDialog.show(
       context,
-      title: AppStrings.INWARD_MARK_IN_USE_TITLE,
-      message: '${lot.productName} — '
-          '${AppStrings.INWARD_MARK_IN_USE_BODY}',
-      confirmLabel: AppStrings.INWARD_MARK_IN_USE,
+      title: title,
+      message: '${lot.productName} — $body',
+      confirmLabel: confirmLabel,
+      isDangerous: isReject,
     );
     if (!confirmed) return;
 
     final bool succeeded = await cubit.updateLot(
       publicId: lot.publicId,
-      status: InwardStatus.IN_USE_WIRE,
+      status: nextStatus,
     );
     if (!mounted) return;
 
     if (succeeded) {
-      ToastUtils.showSuccess(context, AppStrings.INWARD_MARK_IN_USE_DONE);
+      ToastUtils.showSuccess(context, done);
       return;
     }
     ToastUtils.showError(
@@ -184,7 +211,7 @@ class _InwardRawMaterialsContentState
             onView: (lot) =>
                 InwardRecordDialog.show(context, lot, cubit: cubit),
             onDelete: _onDelete,
-            onMarkInUse: _onMarkInUse,
+            onChangeStatus: _onChangeStatus,
             isMutating: state.isMutating,
             emptyTitle: state.isEmptySource
                 ? AppStrings.INWARD_EMPTY_STATE_TITLE

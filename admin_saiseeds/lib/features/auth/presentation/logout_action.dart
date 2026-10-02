@@ -1,9 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/routing/route_constants.dart';
 import '../../../core/services/metadata_service.dart';
 import '../../../core/services/session_guard.dart';
+import '../../../core/widgets/feedback/confirmation_dialog.dart';
 import '../data/auth_repository.dart';
 import 'bloc/auth_bloc.dart';
 import 'bloc/auth_event.dart';
@@ -13,6 +15,14 @@ class LogoutAction {
   LogoutAction._();
 
   static Future<void> run(BuildContext context) async {
+    final bool confirmed = await ConfirmationDialog.show(
+      context,
+      title: AppStrings.LOGOUT_CONFIRM_TITLE,
+      message: AppStrings.LOGOUT_CONFIRM_BODY,
+      confirmLabel: AppStrings.LOGOUT,
+    );
+    if (!confirmed || !context.mounted) return;
+
     final authBloc = context.read<AuthBloc>();
     final sessionCubit = context.read<SessionCubit>();
     final authRepository = context.read<AuthRepository>();

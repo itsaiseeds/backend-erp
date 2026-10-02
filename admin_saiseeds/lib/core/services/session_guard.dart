@@ -38,6 +38,11 @@ class SessionGuard {
   static Future<bool> hasValidSession() => _verifyWithServer();
 
   static Future<void> endSession() async {
+    // TEMP DIAGNOSTIC - remove once the early-logout cause is found.
+    debugPrint(
+      '[SESSION-END] ${DateTime.now().toIso8601String()} '
+      'from: ${StackTrace.current}',
+    );
     await StorageService.clearSession();
     _hasSession.value = false;
   }

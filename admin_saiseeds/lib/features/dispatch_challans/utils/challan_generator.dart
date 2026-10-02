@@ -176,7 +176,7 @@ class ChallanGenerator {
                   ),
                 ),
                 pw.SizedBox(height: 5),
-                _kv('Challan No:', challan.dispatchPublicId),
+                _kv('Challan No:', challan.challanNumber),
                 _kv('Order No:', challan.orderPublicId),
                 _kv('Date:', _date(dispatch?.dispatchDateTime)),
                 _kv('F.Y.:', challan.financialYear),
@@ -197,7 +197,7 @@ class ChallanGenerator {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              'DELIVERY CHALLAN  ${challan.dispatchPublicId}',
+              'DELIVERY CHALLAN  ${challan.challanNumber}',
               style: pw.TextStyle(
                 fontSize: 8,
                 fontWeight: pw.FontWeight.bold,
@@ -442,9 +442,10 @@ class ChallanGenerator {
         0: pw.FixedColumnWidth(26),
         1: pw.FlexColumnWidth(),
         2: pw.FixedColumnWidth(78),
-        3: pw.FixedColumnWidth(58),
-        4: pw.FixedColumnWidth(40),
-        5: pw.FixedColumnWidth(56),
+        3: pw.FixedColumnWidth(54),
+        4: pw.FixedColumnWidth(52),
+        5: pw.FixedColumnWidth(62),
+        6: pw.FixedColumnWidth(38),
       },
       children: [
         pw.TableRow(
@@ -454,8 +455,9 @@ class ChallanGenerator {
             _th('DESCRIPTION OF GOODS', pw.TextAlign.left),
             _th('LOT NO.', pw.TextAlign.left),
             _th('PACKING', pw.TextAlign.center),
-            _th('BAGS', pw.TextAlign.right),
             _th('PACKETS', pw.TextAlign.right),
+            _th('TOTAL WT.', pw.TextAlign.right),
+            _th('BAGS', pw.TextAlign.right),
           ],
         ),
         ...challan.items.asMap().entries.map((entry) {
@@ -483,8 +485,14 @@ class ChallanGenerator {
               ),
               _td(item.lotNumber, pw.TextAlign.left),
               _td('${item.packetWeight} kg', pw.TextAlign.center),
-              _td('${item.quantity}', pw.TextAlign.right),
               _tdBold('${item.packets * item.quantity}', pw.TextAlign.right),
+              _td(
+                item.shippedWeight.isEmpty
+                    ? _blank
+                    : '${item.shippedWeight} kg',
+                pw.TextAlign.right,
+              ),
+              _td('${item.quantity}', pw.TextAlign.right),
             ],
           );
         }),
@@ -542,6 +550,11 @@ class ChallanGenerator {
       (sum, item) => sum + item.quantity,
     );
 
+    final double totalWeight = challan.items.fold<double>(
+      0,
+      (sum, item) => sum + (double.tryParse(item.shippedWeight) ?? 0),
+    );
+
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.end,
       children: [
@@ -554,6 +567,7 @@ class ChallanGenerator {
           child: pw.Column(
             children: [
               _totalLine('Total Items', '${challan.itemCount}'),
+              _totalLine('Total Weight', '${totalWeight.toStringAsFixed(3)} kg'),
               _totalLine('Total Bags', '$totalBags'),
               _totalLine(
                 'Total Packets',

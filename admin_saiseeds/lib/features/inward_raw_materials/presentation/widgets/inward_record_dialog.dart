@@ -8,6 +8,7 @@ import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/widgets/dialogs/app_record_dialog.dart';
 import '../../../../core/widgets/feedback/app_badge.dart';
 import '../../../../core/widgets/inputs/record_field.dart';
+import '../../../../core/widgets/inputs/searchable_field.dart';
 import '../../../../core/widgets/inputs/single_date_field.dart';
 import '../../../../core/widgets/layout/record_field_row.dart';
 import '../../data/models/inward_raw_material_model.dart';
@@ -51,7 +52,7 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
 
   late RecordDialogMode _mode;
   DateTime? _labSamplingDate;
-  bool _markInUse = false;
+  String? _nextStatus;
   bool _isSubmitting = false;
 
   InwardRawMaterialModel get _lot => widget.lot;
@@ -83,7 +84,7 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
   void _cancelEdit() {
     setState(() {
       _labSamplingDate = _lot.labSamplingDateTime;
-      _markInUse = false;
+      _nextStatus = null;
       _mode = RecordDialogMode.view;
     });
   }
@@ -107,7 +108,7 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
       labSamplingDate: _labSamplingDate == null
           ? null
           : InwardFormDialog.isoDate.format(_labSamplingDate!),
-      status: _markInUse ? InwardStatus.IN_USE_WIRE : null,
+      status: _nextStatus,
     );
 
     if (!mounted) return;
@@ -138,9 +139,7 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
         label: _lot.statusLabel.isEmpty
             ? AppStrings.STATUS_LAB_TESTING
             : _lot.statusLabel,
-        variant: _lot.isInUse
-            ? AppBadgeVariant.success
-            : AppBadgeVariant.warning,
+        variant: _statusVariant,
       ),
       body: _buildFields(),
       onEdit: _enterEditMode,
@@ -192,27 +191,28 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
     );
   }
 
+  AppBadgeVariant get _statusVariant {
+    if (_lot.isInUse) return AppBadgeVariant.success;
+    if (_lot.isRejected) return AppBadgeVariant.error;
+    return AppBadgeVariant.warning;
+  }
+
   Widget _buildStatusSection() {
-    if (_lot.isInUse) {
-      return _StatusNote(message: AppStrings.INWARD_STATUS_LOCKED_NOTE);
-    }
+    if (!_isEditing) return const SizedBox.shrink();
 
-    if (!_isEditing) {
-      return const SizedBox.shrink();
-    }
+    // Only the moves the workflow actually permits are offered: a settled
+    // lot goes back to Lab Testing, never straight to the other state.
+    final List<String> options = _lot.allowedNextStatuses;
 
-    return CheckboxListTile(
-      value: _markInUse,
-      onChanged: _isSubmitting
-          ? null
-          : (checked) => setState(() => _markInUse = checked ?? false),
-      controlAffinity: ListTileControlAffinity.leading,
-      contentPadding: EdgeInsets.zero,
-      activeColor: AppColors.PRIMARY,
-      title: Text(
-        AppStrings.INWARD_MARK_IN_USE,
-        style: AppTypography.bodyMedium,
-      ),
+    return SearchableField<String>(
+      label: AppStrings.INWARD_STATUS_CHANGE_LABEL,
+      hintText: AppStrings.INWARD_STATUS_KEEP,
+      value: _nextStatus,
+      items: options,
+      itemToString: (status) => status,
+      isSame: (a, b) => a == b,
+      enabled: !_isSubmitting,
+      onSelected: (status) => setState(() => _nextStatus = status),
     );
   }
 }

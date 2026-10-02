@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
-import '../../../../core/config/observability_config.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/utils/toast_utils.dart';
-import '../../../../core/widgets/buttons/secondary_button.dart';
 import '../../../../core/widgets/layout/app_surface_card.dart';
 
 class LaunchingSoonPanel extends StatelessWidget {
@@ -53,14 +49,6 @@ class LaunchingSoonPanel extends StatelessWidget {
                     color: AppColors.TEXT_SECONDARY,
                   ),
                 ),
-                if (ObservabilityConfig.isEnabled) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  SecondaryButton(
-                    label: AppStrings.SENTRY_TEST_BUTTON,
-                    icon: Icons.bug_report_outlined,
-                    onPressed: () => _sendTestError(context),
-                  ),
-                ],
               ],
             ),
           ),
@@ -69,17 +57,4 @@ class LaunchingSoonPanel extends StatelessWidget {
     );
   }
 
-  Future<void> _sendTestError(BuildContext context) async {
-    try {
-      throw Exception(AppStrings.SENTRY_TEST_EXCEPTION);
-    } catch (error, stackTrace) {
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
-    if (!context.mounted) return;
-    ToastUtils.showSuccess(
-      context,
-      AppStrings.SENTRY_TEST_SENT_TITLE,
-      description: AppStrings.SENTRY_TEST_SENT_BODY,
-    );
-  }
 }
