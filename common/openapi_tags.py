@@ -139,6 +139,8 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "inward-raw-materials",
             "inward-other-material",
             "inward-other-materials",
+            "raw-material-waste",
+            "raw-material-wastes",
         ),
         (ADMIN_INWARD,),
     ),

@@ -1,0 +1,181 @@
+"""Raw material waste endpoint: ``GET``/``POST`` ``/api/sales-admin/raw-material-wastes``.
+
+Only an application Admin may view or record waste (``admin_required``). A row
+writes off ``quantity_kg`` of a ``Product``'s raw material -- spoiled, spilled
+or otherwise unusable -- with an optional free-text ``reason``. There is no
+date: a waste row is a standing deduction from the product's unpacked raw pool
+(see ``InventoryOperations.raw_wasted_kg``) from the moment it exists, and
+shows up as ``wasted_kg`` on ``raw-material-stock``.
+
+A waste larger than the product's unpacked raw kilograms is refused (400).
+Every row is exposed by its ``public_id`` (``WS-…``); the primary key is never
+sent out. A wrong row is removed with ``DELETE`` (see
+``UpdateRawMaterialWasteView``).
+"""
+
+from __future__ import annotations
+
+from django.db.models import QuerySet
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, status
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+from aggregator import InventoryOperations
+from aggregator.InwardOperations import raw_waste_payload
+from aggregator.models import Product, RawMaterialWaste
+from api.paginated_views import AdminPaginatedDateRangeListView
+from common.views.paginated_date_range import (
+    FilterCatalogueEntrySerializer,
+    QuerysetFilter,
+    SortCatalogueEntrySerializer,
+    SortOption,
+    list_query_parameters,
+    parse_str,
+)
+
+
+class RawMaterialWasteProductRefSerializer(serializers.Serializer):
+    """Output shape for the ``product`` reference on a waste row."""
+
+    public_id = serializers.CharField()
+    name = serializers.CharField()
+
+
+class RawMaterialWastePayloadSerializer(serializers.Serializer):
+    """Output shape for one waste row."""
+
+    public_id = serializers.CharField()
+    product = RawMaterialWasteProductRefSerializer()
+    quantity_kg = serializers.CharField(help_text="Kilograms wasted.")
+    reason = serializers.CharField(allow_blank=True)
+    created_at = serializers.DateTimeField(help_text="When the waste was recorded.")
+
+
+class CreateRawMaterialWasteSerializer(serializers.Serializer):
+    """Request validation for recording raw-material waste."""
+
+    product = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Product.objects.all(),
+        error_messages={"required": "Product is required."},
+    )
+    quantity_kg = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        min_value=0,
+        error_messages={"required": "Quantity in kg is required."},
+        help_text="Kilograms of raw material wasted.",
+    )
+    reason = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+
+    def validate(self, attrs):
+        if attrs["quantity_kg"] <= 0:
+            raise serializers.ValidationError(
+                {"quantity_kg": "Quantity must be greater than zero."}
+            )
+        return attrs
+
+
+class RawMaterialWasteListPageSerializer(serializers.Serializer):
+    """Output shape for the paginated envelope (schema only)."""
+
+    total_count = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+    next_page_number = serializers.IntegerField(allow_null=True)
+    previous_page_number = serializers.IntegerField(allow_null=True)
+    results = RawMaterialWastePayloadSerializer(many=True)
+    available_filters = FilterCatalogueEntrySerializer(many=True)
+    available_sorts = SortCatalogueEntrySerializer(many=True)
+
+
+def _products_with_waste(request: Request) -> list[dict]:
+    """Every distinct product that has a waste row (the ``product`` filter's options)."""
+    rows = (
+        RawMaterialWaste.objects.values_list("product__public_id", "product__name")
+        .distinct()
+        .order_by("product__name")
+    )
+    return [{"value": public_id, "label": name} for public_id, name in rows]
+
+
+_QUERYSET_FILTERS = (
+    QuerysetFilter(
+        "product",
+        label="Product",
+        lookup="product__public_id__in",
+        parse=parse_str,
+        description="Product public id(s) (see options).",
+        options=_products_with_waste,
+    ),
+)
+_SORT_OPTIONS = (
+    SortOption(
+        "created_at",
+        label="Created",
+        description="When the waste was recorded (default: newest first).",
+    ),
+    SortOption(
+        "product",
+        label="Product",
+        fields=("product__name",),
+        description="Product name, A->Z.",
+    ),
+    SortOption(
+        "quantity_kg",
+        label="Quantity",
+        fields=("quantity_kg",),
+        description="Smallest quantity first.",
+    ),
+)
+
+
+class RawMaterialWastesView(AdminPaginatedDateRangeListView):
+    """List (GET) or record (POST) raw-material waste (app admin only)."""
+
+    serializer_class = CreateRawMaterialWasteSerializer
+    enforce_date_range_filters = False
+    default_sort = ("-created_at", "pk")
+    queryset_filters = _QUERYSET_FILTERS
+    sort_options = _SORT_OPTIONS
+
+    @extend_schema(
+        operation_id="sales_admin_raw_material_wastes_list",
+        summary="List raw-material waste (filter by product, sortable)",
+        parameters=list_query_parameters(
+            queryset_filters=_QUERYSET_FILTERS,
+            sort_options=_SORT_OPTIONS,
+            date_window="none",
+        ),
+        responses={200: RawMaterialWasteListPageSerializer},
+    )
+    def get(self, request: Request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self, request: Request) -> QuerySet:
+        return RawMaterialWaste.objects.select_related("product")
+
+    def serialize_page(self, page_items, request: Request) -> list[dict]:
+        return [raw_waste_payload(entry) for entry in page_items]
+
+    @extend_schema(
+        summary="Record raw-material waste",
+        request=CreateRawMaterialWasteSerializer,
+        responses={201: RawMaterialWastePayloadSerializer},
+    )
+    def post(self, request):
+        serializer = CreateRawMaterialWasteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            entry = InventoryOperations.record_raw_waste(
+                product=data["product"],
+                quantity_kg=data["quantity_kg"],
+                reason=data["reason"],
+                actor=request.user,
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"quantity_kg": str(exc)}) from None
+        return Response(raw_waste_payload(entry), status=status.HTTP_201_CREATED)

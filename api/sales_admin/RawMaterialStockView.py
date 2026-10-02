@@ -10,8 +10,9 @@ off). Soft-deleted lots never count.
 
 ``incoming_kg`` is everything that has come in. ``packed_kg`` is what has
 since been packed into bags or sample packets via ``update-bag-stock`` /
-``update-sample-packet-stock``, and ``available_kg`` is what is left to pack
-(``incoming_kg - packed_kg``) -- see ``InventoryOperations.raw_available_kg``.
+``update-sample-packet-stock``, ``wasted_kg`` is what was written off via
+``raw-material-wastes``, and ``available_kg`` is what is left to pack
+(``incoming_kg - packed_kg - wasted_kg``) -- see ``InventoryOperations.raw_available_kg``.
 
 Optional ``?product=<P-...,...>`` narrows the report to those products.
 """
@@ -37,8 +38,9 @@ class RawMaterialStockLineSerializer(serializers.Serializer):
     packed_kg = serializers.CharField(
         help_text="KG already packed into bags or sample packets."
     )
+    wasted_kg = serializers.CharField(help_text="KG written off as waste.")
     available_kg = serializers.CharField(
-        help_text="KG left to pack: incoming_kg minus packed_kg."
+        help_text="KG left to pack: incoming_kg minus packed_kg minus wasted_kg."
     )
 
 
@@ -70,6 +72,7 @@ class RawMaterialStockView(AdminApiView):
                 "name": line["name"],
                 "incoming_kg": str(line["incoming_kg"]),
                 "packed_kg": str(line["packed_kg"]),
+                "wasted_kg": str(line["wasted_kg"]),
                 "available_kg": str(line["available_kg"]),
             }
             for line in InwardOperations.raw_incoming_stock(

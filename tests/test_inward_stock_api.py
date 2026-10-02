@@ -181,6 +181,7 @@ class InwardStockApiTest(WebApiTestCase):
             "name": "SAI-33",
             "incoming_kg": "100.000",
             "packed_kg": "0.000",
+            "wasted_kg": "0.000",
             "available_kg": "100.000",
         })
 
@@ -248,6 +249,7 @@ class InwardStockApiTest(WebApiTestCase):
             "name": "SAI-33",
             "incoming_kg": "25.000",
             "packed_kg": "0.000",
+            "wasted_kg": "0.000",
             "available_kg": "25.000",
         }])
 
@@ -279,6 +281,7 @@ class InwardStockApiTest(WebApiTestCase):
             "name": "SAI-33",
             "incoming_kg": "25.000",
             "packed_kg": "0.000",
+            "wasted_kg": "0.000",
             "available_kg": "25.000",
         }])
 

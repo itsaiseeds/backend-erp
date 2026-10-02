@@ -41,6 +41,7 @@ from .models import (
     Product,
     ProductDescriptionItem,
     ProductPackaging,
+    RawMaterialWaste,
     Stage,
     State,
     Status,
@@ -773,6 +774,23 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
     list_filter = ("status", "effective_date")
     autocomplete_fields = ("product", "party", "status")
     list_select_related = ("product", "party", "status")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+
+
+@admin.register(RawMaterialWaste)
+class RawMaterialWasteAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "public_id",
+        "product",
+        "quantity_kg",
+        "reason",
+        "created_by",
+        "created_at",
+    )
+    search_fields = ("public_id", "product__name", "reason")
+    autocomplete_fields = ("product",)
+    list_select_related = ("product",)
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
 

@@ -321,6 +321,59 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         options = {opt["value"]: opt["label"] for opt in entry["options"]}
         self.assertEqual(options, {self.product.public_id: self.product.name})
 
+    def test_effective_date_range_filter_selects_previous_inward_lots(self):
+        """Inclusive day bounds; lots still in Lab Testing (no date) never match.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_effective_date_range_filter_selects_previous_inward_lots
+        """
+        self.login_as(self.seed_admin)
+        dated = {}
+        for day in ("2026-08-30", "2026-09-01", "2026-09-15", "2026-09-30", "2026-10-02"):
+            created = self._create_lot()
+            self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+            InwardRawMaterial.objects.filter(public_id=created.data["public_id"]).update(
+                effective_date=day
+            )
+            dated[day] = created.data["public_id"]
+        undated = self._create_lot().data["public_id"]
+
+        def ids(**params):
+            response = self.client.get(LOTS_URL, params)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+            return {row["public_id"] for row in response.data["results"]}
+
+        self.assertEqual(
+            ids(effective_date_gte="2026-09-01", effective_date_lte="2026-09-30"),
+            {dated["2026-09-01"], dated["2026-09-15"], dated["2026-09-30"]},
+        )
+        self.assertEqual(
+            ids(effective_date_gte="2026-09-15", effective_date_lte="2026-09-15"),
+            {dated["2026-09-15"]},
+        )
+        self.assertEqual(
+            ids(effective_date_lte="2026-09-01"),
+            {dated["2026-08-30"], dated["2026-09-01"]},
+        )
+        self.assertEqual(
+            ids(effective_date_gte="2026-09-30"),
+            {dated["2026-09-30"], dated["2026-10-02"]},
+        )
+        self.assertNotIn(undated, ids(effective_date_gte="2000-01-01"))
+        self.assertEqual(
+            ids(effective_date_gte="2026-09-01", product="P-DOES-NOT-EXIST"), set()
+        )
+        self.assertIn(undated, ids())  # no window -> unchanged behaviour
+
+        bad = self.client.get(LOTS_URL, {"effective_date_lte": "not-a-date"})
+        self.assertEqual(bad.status_code, status.HTTP_400_BAD_REQUEST, bad.content)
+
+        entry = next(
+            item
+            for item in self.client.get(LOTS_URL).data["available_filters"]
+            if item["filter"] == "effective_date"
+        )
+        self.assertEqual(entry["kind"], "date_range")
+
     def test_product_is_addressed_by_public_id_not_pk(self):
         """Create and the ``?product=`` filter both take the product's public id.
 

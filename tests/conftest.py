@@ -24,6 +24,9 @@ def load_dml(cursor) -> None:
     later by test fixtures get ids after the seeded maximum.
     """
     dml = DML_PATH.read_text(encoding="utf-8")
+    # The manual-testing dummy rows (orders, parties, lots, ...) are fenced by
+    # markers in dml.sql; tests build their own fixtures on empty tables.
+    dml = re.sub(r"(?s)-- >>> DUMMY DATA BEGIN.*?-- <<< DUMMY DATA END\r?\n", "", dml)
     # The caller owns the transaction, so do not nest dml.sql's own BEGIN/COMMIT.
     dml = re.sub(r"(?m)^(BEGIN|COMMIT);\s*$", "", dml)
     cursor.execute("DELETE FROM auth_permission; DELETE FROM django_content_type;")

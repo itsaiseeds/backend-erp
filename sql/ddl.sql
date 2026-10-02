@@ -947,7 +947,9 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentryitem (
 	deleted_by_id int8 NULL,
 	created_by_id int8 NULL,
 	dispatch_entry_id int8 NOT NULL,
-	product_packaging_id int8 NOT NULL,
+	product_packaging_id int8 NULL,
+	product_id int8 NULL,
+	packet_weight numeric(8, 3) NULL,
 	negotiated_selling_price numeric(12, 2) NOT NULL,
 	quantity int8 NOT NULL,
 	lot_number varchar(64) NOT NULL,
@@ -1165,6 +1167,32 @@ CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_party_id_idx ON public.a
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_is_deleted_idx ON public.aggregator_inwardrawmaterial USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_created_by_id_idx ON public.aggregator_inwardrawmaterial USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_deleted_by_id_idx ON public.aggregator_inwardrawmaterial USING btree (deleted_by_id);
+
+-- aggregator_rawmaterialwaste -------------------------------------------------
+-- Raw material of a product written off as wasted. Each live row takes
+-- quantity_kg out of the product's unpacked raw pool. Deliberately undated:
+-- waste is a standing deduction. A wrong entry is soft-deleted.
+CREATE TABLE IF NOT EXISTS public.aggregator_rawmaterialwaste (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	product_id int8 NOT NULL,
+	quantity_kg numeric(10, 3) NOT NULL,
+	reason varchar(255) NOT NULL DEFAULT '',
+	CONSTRAINT aggregator_rawmaterialwaste_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_rawmaterialwaste_public_id_key UNIQUE (public_id),
+	CONSTRAINT ck_rawmaterialwaste_quantity_kg_positive CHECK (quantity_kg > 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_public_id_like ON public.aggregator_rawmaterialwaste USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_product_id_idx ON public.aggregator_rawmaterialwaste USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_is_deleted_idx ON public.aggregator_rawmaterialwaste USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_created_by_id_idx ON public.aggregator_rawmaterialwaste USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_deleted_by_id_idx ON public.aggregator_rawmaterialwaste USING btree (deleted_by_id);
 
 -- aggregator_othermaterialtype ---------------------------------------------------
 -- Master list of "other material" kinds (bag_outer_cover, packet_outer_cover,
@@ -1469,6 +1497,10 @@ ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inward
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_othermaterialtype ADD CONSTRAINT aggregator_othermaterialtype_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_othermaterialtype ADD CONSTRAINT aggregator_othermaterialtype_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;

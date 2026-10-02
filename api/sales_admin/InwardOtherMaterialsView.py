@@ -30,9 +30,11 @@ from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
     QuerysetFilter,
+    RangeFilter,
     SortCatalogueEntrySerializer,
     SortOption,
     list_query_parameters,
+    parse_date,
     parse_str,
 )
 
@@ -175,6 +177,15 @@ _QUERYSET_FILTERS = (
         description="Product public id(s) (see the recipe; see options).",
         options=_products_with_other_material_lots,
     ),
+    RangeFilter(
+        "effective_date",
+        label="Effective Date",
+        parse=parse_date,
+        suffixes=("gte", "lte"),
+        description=(
+            "Day the lot started counting toward stock (YYYY-MM-DD, inclusive)."
+        ),
+    ),
 )
 _SORT_OPTIONS = (
     SortOption(
@@ -210,7 +221,7 @@ class InwardOtherMaterialsView(AdminPaginatedDateRangeListView):
         operation_id="sales_admin_inward_other_materials_list",
         summary=(
             "List inward other-material lots (filter by party / material "
-            "type / product, sortable)"
+            "type / product / effective date range, sortable)"
         ),
         parameters=list_query_parameters(
             queryset_filters=_QUERYSET_FILTERS,

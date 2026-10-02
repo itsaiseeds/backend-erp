@@ -30,6 +30,7 @@ from .PrivateDispatchDetails import PrivateDispatchDetails
 from .Product import Product
 from .ProductDescriptionItem import ProductDescriptionItem
 from .ProductPackaging import ProductPackaging
+from .RawMaterialWaste import RawMaterialWaste
 from .SamplePacketStockSnapshot import LooseStockSnapshot
 from .Stage import Stage, StageIds
 from .State import State
@@ -70,6 +71,7 @@ __all__ = [
     "InwardEntryMixin",
     "InwardRawMaterial",
     "InwardRawMaterialStatus",
+    "RawMaterialWaste",
     "OtherMaterialType",
     "OtherMaterialUnitType",
     "OtherMaterialRecipe",

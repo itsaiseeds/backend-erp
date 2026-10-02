@@ -44,6 +44,7 @@ from .models import (
     InwardRawMaterialStatus,
     OtherMaterialType,
     Product,
+    RawMaterialWaste,
     Status,
     StatusIds,
 )
@@ -183,6 +184,20 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
     }
 
 
+def raw_waste_payload(entry: RawMaterialWaste) -> dict:
+    """Frontend-facing dict for one ``RawMaterialWaste`` row (``WS-…``)."""
+    return {
+        "public_id": entry.public_id,
+        "product": {
+            "public_id": entry.product.public_id,
+            "name": entry.product.name,
+        },
+        "quantity_kg": str(entry.quantity_kg),
+        "reason": entry.reason,
+        "created_at": entry.created_at.isoformat(),
+    }
+
+
 def inward_other_material_payload(entry: InwardOtherMaterial) -> dict:
     """Frontend-facing dict for one ``InwardOtherMaterial`` lot (``IO-…``)."""
     recipe = entry.recipe
@@ -220,7 +235,8 @@ def raw_incoming_stock(
     Only lots with ``status=In Use`` and ``effective_date <= as_of`` count
     toward ``incoming_kg``. ``packed_kg`` is what has since been packed into
     bags or sample packets (``InventoryOperations.raw_bagged_kg`` +
-    ``raw_loose_kg``, read as of now -- a count has no "as of" of its own) and
+    ``raw_loose_kg``, read as of now -- a count has no "as of" of its own),
+    ``wasted_kg`` is what was written off (``raw_wasted_kg``, undated) and
     ``available_kg`` is what is left to pack. The list is ready for display:
     each entry carries the product's public id / name and Decimal kilogram
     figures (serializers turn them into strings). ``product_public_ids``
@@ -247,6 +263,7 @@ def raw_incoming_stock(
         packed_kg = InventoryOperations.raw_bagged_kg(
             product
         ) + InventoryOperations.raw_loose_kg(product)
+        wasted_kg = InventoryOperations.raw_wasted_kg(product)
         lines.append(
             {
                 "product_id": row["product_id"],
@@ -254,7 +271,8 @@ def raw_incoming_stock(
                 "name": row["product__name"],
                 "incoming_kg": row["incoming_kg"],
                 "packed_kg": packed_kg,
-                "available_kg": row["incoming_kg"] - packed_kg,
+                "wasted_kg": wasted_kg,
+                "available_kg": row["incoming_kg"] - packed_kg - wasted_kg,
             }
         )
     return lines
