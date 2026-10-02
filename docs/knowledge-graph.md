@@ -50,6 +50,7 @@ graph TD
         U["User (custom user)"]
         U --> ADMINP["Admin (1:1)"]
         U --> SPP["SalesPerson (1:1)"]
+        U --> GMP["GodownManager (1:1)"]
     end
 
     subgraph AGG["Domain (aggregator/)"]
@@ -192,9 +193,9 @@ role-flag parent both client bases build on.
 | Auth classes | `api/authentication.py` | `SessionAuthentication` (DRF session but with a real `WWW-Authenticate` challenge so anonymous = **401**, not 403; used only by the web) + `ExpiringTokenAuthentication` (24h TTL via `TOKEN_TTL_HOURS`; an expired token is deleted on first use; used only by Android) | used by → `AdminApiView`, `AndroidBaseView` |
 | `AdminApiView` | `api/admin.py` | Sales-admin website base: **session cookie only** | → `BaseApiView` |
 | `AdminPaginatedDateRangeListView` | `api/paginated_views.py` | Sales-admin `GET` list base (default `admin_required = True`): paginated + optional/required `start_date_time`..`end_date_time` window + a declarative filter/sort catalogue. Subclass sets `get_queryset` / `serialize_page` and optionally `date_field`, `enforce_date_range_filters`, `queryset_filters`, `sort_options`, `default_sort` | → `AdminApiView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
-| Permissions | `api/permissions.py` | `IsRolePermission` meta-class + `IsAdminUser`, `IsSuperUser`, `IsSalesPerson` | keyed off → `User.is_admin_user/is_superuser/is_salesperson` |
+| Permissions | `api/permissions.py` | `IsRolePermission` meta-class + `IsAdminUser`, `IsSuperUser`, `IsSalesPerson`, `IsGodownManager`, `IsAndroidRole` (either Android role) | keyed off → `User.is_admin_user/is_superuser/is_salesperson` |
 | Top API router | `api/urls.py` | `/api/sales-admin/`, `/api/utilities/` (web, session-only) | → namespace URLconfs |
-| `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales-admin/auth/otp/verify` — pre-auth, `AllowAny`; verifies the user's **TOTP** code, opens a session, returns the user payload + `can_create_admin`/`can_create_sales_person` flags (no token) | reads → `User`; calls → `login()` + `get_token()` (issues `sessionid` + `csrftoken` cookies) |
+| `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales-admin/auth/otp/verify` — pre-auth, `AllowAny`; verifies the user's **TOTP** code, opens a session, returns the user payload + `can_create_admin`/`can_create_sales_person`/`can_create_godown_manager` flags (no token) | reads → `User`; calls → `login()` + `get_token()` (issues `sessionid` + `csrftoken` cookies) |
 | `AdminDateRangeExportView` | `api/export_views.py` | Base for the date-range exports: validates `start_date`/`end_date` (inclusive IST days, ≤ 31 days), hands a `DateWindow` to `export()`, returns `{start_date, end_date, count, results}`. Business fields only — no audit columns. `admin_required` | ← the five `Export*View`s |
 | `Export*View` (×5) | `api/sales_admin/Export*View.py` | `GET /api/sales-admin/export/{orders, custom-orders, dispatch-receipts, inward-entries, inventory-snapshots}`: orders / custom orders booked in the window with items and the order's city; the challans (`challan_queryset()`) of every still-dispatched order booked in the window, LR recorded or not; raw + other inward entries grouped by booking day; bag + loose counts grouped by `snapshot_date` (counted figures only) | reads → `OrderOperations`, `CustomOrderOperations`, `DispatchOperations`, `InwardOperations`, `InventoryOperations` payloads |
 | `ExecuteCodeView` / `execute_code_page` | `api/execute_code.py` | `POST /api/execute-code/` (outside `sales-admin/`; UI page at `GET /execute-code/`, template `api/templates/api/execute_code.html`: a vendored CodeMirror 5 editor under `api/static/api/vendor/codemirror/` with Python highlighting and autocomplete built from the execution scope -- every model, its managers and fields, and every enum defined next to a model) — runs Python with every model in scope inside one `transaction.atomic` (commit on success, rollback on error, `statement_timeout` 30s); returns `stdout`/`result`/`error`. **404 unless `ENABLE_EXECUTE_CODE=1`** (keep it off in production); when enabled, requires a superuser (`superuser_required`) **and** the `authentication.execute_python_code` permission (`required_permission` → `HasDjangoPermission`); every run is logged by user id and the code's SHA-256, never the code itself | reads/writes → any model |
@@ -209,7 +210,9 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
-| `AndroidBaseView` | `android/api/base.py` | Salesperson Android base: **bearer `ExpiringTokenAuthentication` only** + requires `SalesPerson` profile | → `BaseApiView`, `api.permissions.IsSalesPerson` |
+| `AndroidTokenView` | `android/api/base.py` | Fixes the Android credential scheme (**bearer `ExpiringTokenAuthentication` only**), no role | → `BaseApiView` |
+| `AndroidBaseView` / `AndroidGodownBaseView` / `AndroidSharedView` | `android/api/base.py` | The three role bases over `AndroidTokenView`: salesperson-only (`salesperson_required`), godown-manager-only (`godown_manager_required`, the `godown/…` routes) and either-role (`android_role_required`: `utilities/…`, `auth/reauthenticate`) | → `AndroidTokenView`, `api.permissions.IsSalesPerson` / `IsGodownManager` / `IsAndroidRole` |
+| `api.inward_serializers` | `api/inward_serializers.py` | Inward-domain request/response serializers and filter/sort catalogues shared by the sales-admin web views and the `godown/…` Android views (the business rules stay in `aggregator.InwardOperations`, incl. `locked_raw_lot`) | used by → sales-admin inward/stock/recipe views, `Godown*View` |
 | `AndroidPaginatedDateRangeListView` | `android/api/paginated_views.py` | Android `GET` list base (inherits `salesperson_required`): paginated + optional/required `start_date_time`..`end_date_time` window + a declarative filter/sort catalogue. Subclass sets `get_queryset` / `serialize_page` and optionally `date_field`, `enforce_date_range_filters`, `queryset_filters`, `sort_options`, `default_sort` | → `AndroidBaseView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
 | Routing mechanism | `android/api/routing.py` | `merged_routes(versions)` merges each version's `routes.ROUTES` in order (later wins); `build_urlpatterns` turns the merge into urlpatterns | used by → `android/api/urls.py` |
 | Version router | `android/api/urls.py` | `VERSIONS = ["v1", ...]`; mounts `<version>/` with routes inherited from every earlier version | → `routing.build_urlpatterns` |
@@ -226,9 +229,10 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | Node | Path | Purpose | Edges |
 |---|---|---|---|
 | `User` | `authentication/models/User.py` | Custom user (`AbstractBaseUser` + `PermissionsMixin`); `phone_number` is `USERNAME_FIELD` (10 digits, no country code); password only for staff; everyone else logs in via **TOTP authenticator app**; `created_by`/`verified_by` self-FK invariants (superusers self-reference); TOTP helpers (`generate_totp_secret`, `enable_totp`, `verify_totp`, provisioning URI); role helpers `role`, `is_salesperson`, `is_admin_user`, `is_verified_user`, `can_login_with_password` | extends → `TimeStampedModel`; related ← `Admin`, `SalesPerson` |
-| `Admin` | `authentication/models/Admin.py` | Application admin profile (1:1). Only a superuser may create one; `can_update_stock_count` gates writing an `InventorySnapshot` (the day's stock count) and nothing else — it does **not** gate order verification | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
+| `Admin` | `authentication/models/Admin.py` | Application admin profile (1:1). Only a superuser may create one; `can_update_stock_count` gates writing an `InventorySnapshot` (the day's stock count) and nothing else — it does **not** gate order verification; `share_contact` (default false) opts the admin into `utilities/sales-admins` (name + phone only) | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
 | `SalesPerson` | `authentication/models/SalesPerson.py` | Salesperson profile (1:1). Only an Admin (or superuser) may create one; `city` FK | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User`; FK → `aggregator.City` |
-| Admin site | `authentication/admin.py` | Registers `User`, `Admin`, `SalesPerson`; enforces who may grant `Admin`/`SalesPerson` roles; unregisters stock `Group` admin | configures → Django `admin` |
+| `GodownManager` | `authentication/models/GodownManager.py` | Godown (warehouse) manager profile (1:1), no location field. Only an Admin (or superuser) may create one; losing it revokes the user's credentials | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
+| Admin site | `authentication/admin.py` | Registers `User`, `Admin`, `SalesPerson`, `GodownManager`; enforces who may grant `Admin`/`SalesPerson` roles; unregisters stock `Group` admin | configures → Django `admin` |
 | Validator | `authentication/validators.py` | `^\d{10}$` 10-digit phone validator | used by → `User.phone_number` |
 
 ### Domain — aggregator (geo master data)
@@ -309,6 +313,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 erDiagram
     USER ||--o| ADMIN : "admin_profile (1:1)"
     USER ||--o| SALESPERSON : "salesperson_profile (1:1)"
+    USER ||--o| GODOWNMANAGER : "godown_manager_profile (1:1)"
     USER o|--o| USER : "created_by / verified_by (self-FK)"
     SALESPERSON o|--o| CITY : "city FK"
     COUNTRY ||--o{ STATE : "states"
@@ -333,6 +338,12 @@ erDiagram
     ADMIN {
         fk user "1:1, CASCADE"
         bool can_update_stock_count "gates writing an InventorySnapshot"
+        bool share_contact "listed on utilities/sales-admins"
+        fk created_by "PROTECT; acting request.user"
+        bool is_deleted "soft delete"
+    }
+    GODOWNMANAGER {
+        fk user "1:1, CASCADE"
         fk created_by "PROTECT; acting request.user"
         bool is_deleted "soft delete"
     }
@@ -388,6 +399,8 @@ erDiagram
 │   ├── admins/<int:id>      PATCH/DELETE  UpdateAdminView (IsSuperUser)
 │   ├── sales-people         GET/POST  SalesPeopleView    (IsAdminUser)
 │   ├── sales-people/<int:id> PATCH/DELETE  UpdateSalesPersonView (IsAdminUser)
+│   ├── godown-managers      GET/POST  GodownManagersView (IsAdminUser)
+│   ├── godown-managers/<int:id> PATCH/DELETE  UpdateGodownManagerView (IsAdminUser)
 │   ├── verify-client/       POST  VerifyClientView       (IsAdminUser → marks VERIFIED + verified_by/at)
 │   ├── update-client/       POST  UpdateClientView       (IsAdminUser → core fields + any list)
 │   ├── get-clients/         GET   GetClientsView         (IsAdminUser → every client; paginated; ?created_by / ?verified_by / ?city_id / ?status / ?company_name / ?address / ?created_gte / ?created_lte filters + ?sort; catalogues in available_filters/available_sorts)
@@ -419,8 +432,8 @@ erDiagram
 └── api/
     └── v1/                    (routes.ROUTES; inherited by every later version)
         ├── auth/login         POST  LoginView            (AllowAny → TOTP login, mints a token)
-        ├── auth/logout        POST  LogoutView           (IsSalesPerson → deletes the token)
-        ├── auth/reauthenticate GET  ReauthenticateView    (IsSalesPerson)
+        ├── auth/logout        POST  LogoutView           (any valid token → deletes the token)
+        ├── auth/reauthenticate GET  ReauthenticateView    (IsAndroidRole → user incl. is_sales_person / is_godown_manager)
         ├── utilities/countries GET  CountriesView         (IsSalesPerson → [{id,name,iso_code}])
         ├── utilities/states   GET   StatesView            (IsSalesPerson → [{id,name,code,country_id}], ?country_id=)
         ├── utilities/cities   GET   CitiesView            (IsSalesPerson → India state→city tree)
@@ -438,7 +451,17 @@ erDiagram
         ├── end-field-trip/<public_id>    POST  EndFieldTripView    (IsSalesPerson → IN_PROGRESS → COMPLETED)
         ├── delete-field-trip/<public_id> DELETE DeleteFieldTripView (IsSalesPerson → own PLANNED/APPROVED trip)
         ├── field-trip-farmer-visits/<public_id> GET GetFieldTripFarmerVisitsView (IsSalesPerson → farmers on own trip)
-        └── create-farmer-visit POST CreateFarmerVisitView (IsSalesPerson → own IN_PROGRESS trip only)
+        ├── create-farmer-visit POST CreateFarmerVisitView (IsSalesPerson → own IN_PROGRESS trip only)
+        ├── utilities/parties  GET   PartiesView           (IsAndroidRole → flat party list)
+        ├── utilities/other-material-types GET OtherMaterialTypesView (IsAndroidRole → flat list)
+        ├── utilities/sales-admins GET SalesAdminsView     (IsAndroidRole → [{name, phone_number}], share_contact admins only)
+        ├── godown/raw-material-stock   GET  GodownRawMaterialStockView   (IsGodownManager)
+        ├── godown/other-material-stock GET  GodownOtherMaterialStockView (IsGodownManager)
+        ├── godown/inward-raw-materials GET/POST GodownInwardRawMaterialsView (IsGodownManager → paginated lots / book a lot)
+        ├── godown/inward-raw-material/<public_id> PATCH/DELETE UpdateGodownInwardRawMaterialView (IsGodownManager → InwardOperations lifecycle + removability)
+        ├── godown/inward-other-materials GET/POST GodownInwardOtherMaterialsView (IsGodownManager)
+        ├── godown/inward-other-material/<public_id> PATCH/DELETE UpdateGodownInwardOtherMaterialView (IsGodownManager)
+        └── godown/other-material-recipes GET GodownOtherMaterialRecipesView (IsGodownManager, view-only)
 /sales-admin[/...]   -> Flutter build  (config/views.py catch-all)
 ```
 
@@ -501,7 +524,7 @@ master merged → Render auto-deploy (Docker build)
 - `admin_saiseeds/build/web/` (Flutter) is **committed**; rebuild with `bash scripts/run.sh flutter` before pushing Flutter changes.
 - Tests never boot gunicorn: they run in short-lived one-off `web` containers against the `db` service.
 - **Auth/TOTP:** non-staff users log in with an **authenticator app (TOTP)**, not SMS/OTP. Web login is `POST /api/sales-admin/auth/otp/verify` (admins/superusers, opens a session); Android login is `POST /android/api/v1/auth/login` (sales persons, mints a token). Neither has an `otp/request` step.
-- **Role creation:** only superusers can create Admins; superusers *and* Admins can create SalesPeople. `VerifyOTPView` exposes this to the SPA via `can_create_admin` / `can_create_sales_person`.
+- **Role creation:** only superusers can create Admins; superusers *and* Admins can create SalesPeople. Admins (and superusers) also create `GodownManager`s. `VerifyOTPView` exposes this to the SPA via `can_create_admin` / `can_create_sales_person` / `can_create_godown_manager`.
 - **Strict client separation:** the web (`api/`) is session-only and never touches `authtoken_token`; the Android app (`android/`) is token-only and never touches sessions/`django_session`. `AdminApiView` and `AndroidBaseView` are the two client base views that enforce this — no view should extend `BaseApiView` directly.
 - **Token TTL:** bearer tokens die `TOKEN_TTL_HOURS` (24) after their last "login"; `ExpiringTokenAuthentication` deletes an expired token on first use so the next request forces a fresh login. Session cookies share the same 24h through `SESSION_COOKIE_AGE`.
 - **401 vs 403:** the custom `SessionAuthentication`/`ExpiringTokenAuthentication` return a `WWW-Authenticate` challenge header, which is what keeps anonymous calls a **401** instead of DRF's default 403.

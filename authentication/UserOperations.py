@@ -2,7 +2,7 @@
 
 Account creation (``create_verified_user``), update validation serializers,
 and the dict shapes / swagger schemas returned to clients for the
-``authentication`` profiles (``Admin``, ``SalesPerson``) live here so the
+``authentication`` profiles (``Admin``, ``SalesPerson``, ``GodownManager``) live here so the
 views stay thin. Payloads never expose internal keys (``user_id``,
 ``is_deleted``/``deleted_by``/``deleted_at``); an admin carries no ``city``
 or ``address`` and a sales person carries only its ``city``.
@@ -14,7 +14,7 @@ import pyotp
 from rest_framework import serializers
 
 from aggregator.models import City
-from authentication.models import Admin, SalesPerson, User
+from authentication.models import Admin, GodownManager, SalesPerson, User
 from authentication.validators import validate_phone_number
 
 # -- Output payloads -----------------------------------------------------------
@@ -65,6 +65,7 @@ class AdminPayloadSerializer(serializers.Serializer):
     created_by = UserRefSerializer(allow_null=True, required=False)
     created_at = serializers.DateTimeField()
     can_update_stock_count = serializers.BooleanField()
+    share_contact = serializers.BooleanField()
     totp = TotpSerializer(required=False)
 
 
@@ -79,6 +80,19 @@ class SalesPersonPayloadSerializer(serializers.Serializer):
     created_by = UserRefSerializer(allow_null=True, required=False)
     created_at = serializers.DateTimeField()
     city = CityRefSerializer(allow_null=True, required=False)
+    totp = TotpSerializer(required=False)
+
+
+class GodownManagerPayloadSerializer(serializers.Serializer):
+    """Swagger schema for one godown manager row (no location, no audit keys)."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    email = serializers.CharField(allow_null=True, required=False)
+    phone_number = serializers.CharField()
+    role = serializers.CharField()
+    created_by = UserRefSerializer(allow_null=True, required=False)
+    created_at = serializers.DateTimeField()
     totp = TotpSerializer(required=False)
 
 
@@ -99,6 +113,7 @@ def admin_payload(admin: Admin, *, include_totp: bool = False) -> dict:
         "created_by": _user_ref(admin.created_by),
         "created_at": admin.created_at,
         "can_update_stock_count": admin.can_update_stock_count,
+        "share_contact": admin.share_contact,
     }
     if include_totp and user.totp is not None:
         payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
@@ -122,6 +137,27 @@ def salesperson_payload(salesperson: SalesPerson, *, include_totp: bool = False)
         "created_by": _user_ref(salesperson.created_by),
         "created_at": salesperson.created_at,
         "city": _city_ref(salesperson.city),
+    }
+    if include_totp and user.totp is not None:
+        payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
+    return payload
+
+
+def godown_manager_payload(manager: GodownManager, *, include_totp: bool = False) -> dict:
+    """Serialize a ``GodownManager`` for the frontend (no location, no audit keys).
+
+    When ``include_totp`` is set, the user's TOTP provisioning URI is included
+    so the caller can render/re-render an enrollment QR code.
+    """
+    user = manager.user
+    payload = {
+        "id": manager.id,
+        "name": user.name,
+        "email": user.email,
+        "phone_number": user.phone_number,
+        "role": "godown_manager",
+        "created_by": _user_ref(manager.created_by),
+        "created_at": manager.created_at,
     }
     if include_totp and user.totp is not None:
         payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
@@ -178,6 +214,7 @@ class UpdateAdminSerializer(serializers.Serializer):
         max_length=10, required=False, validators=[validate_phone_number]
     )
     can_update_stock_count = serializers.BooleanField(required=False)
+    share_contact = serializers.BooleanField(required=False)
 
     def validate_phone_number(self, value):
         own_user_id = self.instance.user.id if self.instance is not None else None
@@ -199,6 +236,26 @@ class UpdateSalesPersonSerializer(serializers.Serializer):
         max_length=10, required=False, validators=[validate_phone_number]
     )
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), required=False)
+
+    def validate_phone_number(self, value):
+        own_user_id = self.instance.user.id if self.instance is not None else None
+        if _phone_number_taken(value, own_user_id):
+            raise serializers.ValidationError("A user with this contact number already exists.")
+        return value
+
+
+class UpdateGodownManagerSerializer(serializers.Serializer):
+    """Request validation for updating a ``GodownManager`` (name/email/phone).
+
+    Callers pass the ``GodownManager`` being edited as ``instance=`` so the
+    phone uniqueness check excludes that user's own row.
+    """
+
+    name = serializers.CharField(max_length=255, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    phone_number = serializers.CharField(
+        max_length=10, required=False, validators=[validate_phone_number]
+    )
 
     def validate_phone_number(self, value):
         own_user_id = self.instance.user.id if self.instance is not None else None

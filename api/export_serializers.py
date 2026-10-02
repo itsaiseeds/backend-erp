@@ -10,6 +10,10 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from api.inward_serializers import (
+    InwardOtherMaterialPayloadSerializer,
+    InwardRawMaterialPayloadSerializer,
+)
 from api.order_serializers import (
     OrderItemPayloadSerializer,
     ProductRefSerializer,
@@ -19,8 +23,6 @@ from api.sales_admin.GetDispatchChallansView import (
     CustomDispatchChallanItemSerializer,
     DispatchChallanItemSerializer,
 )
-from api.sales_admin.InwardOtherMaterialsView import InwardOtherMaterialPayloadSerializer
-from api.sales_admin.InwardRawMaterialsView import InwardRawMaterialPayloadSerializer
 from api.sales_admin.UpdateBagStockView import PackagingRefSerializer
 
 # -- shared pieces ---------------------------------------------------------
@@ -121,10 +123,12 @@ class ExportCustomDispatchReceiptSerializer(CustomDispatchChallanItemSerializer)
 
 
 class ExportInwardRawMaterialSerializer(InwardRawMaterialPayloadSerializer):
+    created_by = None  # exports carry no audit keys; the lot payloads do
     created_at = serializers.DateTimeField()
 
 
 class ExportInwardOtherMaterialSerializer(InwardOtherMaterialPayloadSerializer):
+    created_by = None  # exports carry no audit keys; the lot payloads do
     created_at = serializers.DateTimeField()
 
 

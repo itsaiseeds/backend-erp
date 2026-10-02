@@ -32,13 +32,17 @@ ANDROID_CLIENTS = "Android · Clients"
 ANDROID_ORDERS = "Android · Orders"
 ANDROID_CATALOGUE = "Android · Catalogue"
 ANDROID_FIELD_TRIPS = "Android · Field trips"
+ANDROID_GODOWN = "Android · Godown"
 ANDROID_UTILITIES = "Android · Utilities"
 DEVELOPER = "Developer tools"
 
 # Swagger renders groups in this order.
 OPENAPI_TAGS: list[dict[str, str]] = [
     {"name": ADMIN_AUTH, "description": "Sales-admin website sign-in and session."},
-    {"name": ADMIN_USERS, "description": "Admin and sales-person accounts."},
+    {
+        "name": ADMIN_USERS,
+        "description": "Admin, sales-person and godown-manager accounts.",
+    },
     {"name": ADMIN_CLIENTS, "description": "Client records and verification."},
     {"name": ADMIN_ORDERS, "description": "Order review: verify, hold, reject, edit."},
     {"name": ADMIN_DISPATCH, "description": "Dispatching orders, challans and LR numbers."},
@@ -67,7 +71,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Report exports; each also appears under its own domain group.",
     },
     {"name": ADMIN_UTILITIES, "description": "Geography look-ups for the admin website."},
-    {"name": ANDROID_AUTH, "description": "Sales-person app sign-in and session."},
+    {"name": ANDROID_AUTH, "description": "Android app sign-in and session (either role)."},
     {"name": ANDROID_CLIENTS, "description": "The sales person's clients, addresses, transport."},
     {"name": ANDROID_ORDERS, "description": "Placing and listing the sales person's orders."},
     {"name": ANDROID_CATALOGUE, "description": "Products the sales person can sell."},
@@ -76,8 +80,15 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Planning, running and ending field trips, and recording farmers met.",
     },
     {
+        "name": ANDROID_GODOWN,
+        "description": "Godown manager: inward lots, stock positions and recipes.",
+    },
+    {
         "name": ANDROID_UTILITIES,
-        "description": "Look-ups for the app: geography, crops and products.",
+        "description": (
+            "Look-ups for the app (either role): geography, crops, products, "
+            "parties, material types and sales-admin contacts."
+        ),
     },
     {"name": DEVELOPER, "description": "Internal debugging endpoints."},
 ]
@@ -98,7 +109,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     # -- sales-admin website ------------------------------------------------
     (_route(_ADMIN, "auth"), (ADMIN_AUTH,)),
     (_route(_ADMIN_UTILITIES, "reauthenticate"), (ADMIN_AUTH,)),
-    (_route(_ADMIN, "admins", "sales-people"), (ADMIN_USERS,)),
+    (_route(_ADMIN, "admins", "sales-people", "godown-managers"), (ADMIN_USERS,)),
     (
         _route(_ADMIN, "client", "get-clients", "update-client", "verify-client"),
         (ADMIN_CLIENTS,),
@@ -205,6 +216,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     ),
     (_route(_ANDROID, "create-multi-select-bag-order", "get-orders"), (ANDROID_ORDERS,)),
     (_route(_ANDROID, "sales-person-catalogue"), (ANDROID_CATALOGUE,)),
+    (_route(_ANDROID, "godown"), (ANDROID_GODOWN,)),
     (
         _route(
             _ANDROID,
@@ -227,6 +239,9 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "utilities/states",
             "utilities/crops",
             "utilities/products",
+            "utilities/parties",
+            "utilities/other-material-types",
+            "utilities/sales-admins",
         ),
         (ANDROID_UTILITIES,),
     ),

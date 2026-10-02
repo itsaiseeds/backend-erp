@@ -34,10 +34,11 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from django.db.models import Sum
+from django.db.models import QuerySet, Sum
+from django.http import Http404
 
 from . import InventoryOperations
-from .InventoryOperations import today
+from .InventoryOperations import lock_raw_pools, today
 from .models import (
     InwardOtherMaterial,
     InwardRawMaterial,
@@ -199,6 +200,11 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
         "effective_date": (
             entry.effective_date.isoformat() if entry.effective_date is not None else None
         ),
+        "created_by": (
+            {"id": entry.created_by_id, "name": entry.created_by.display_name}
+            if entry.created_by_id is not None
+            else None
+        ),
     }
 
 
@@ -224,6 +230,11 @@ def inward_other_material_payload(entry: InwardOtherMaterial) -> dict:
         "quantity": str(entry.quantity),
         "effective_date": (
             entry.effective_date.isoformat() if entry.effective_date is not None else None
+        ),
+        "created_by": (
+            {"id": entry.created_by_id, "name": entry.created_by.display_name}
+            if entry.created_by_id is not None
+            else None
         ),
     }
 
@@ -347,3 +358,33 @@ def other_material_on_hand(
             id__in=active
         ).order_by("name")
     ]
+
+
+def locked_raw_lot(queryset: QuerySet, public_id: str) -> InwardRawMaterial:
+    """Load a lot with its product's raw pool locked, for a revert or delete.
+
+    Removing a lot is checked against the raw pool (``assert_raw_lot_removable``)
+    and stock counts are written against that same pool under
+    ``lock_raw_pools``. Taking the same lock here, *before* the lot is read,
+    stops a count and a removal from interleaving and stranding bags with no
+    raw material behind them. The lot itself is then read -- and locked --
+    after the pool, so its status is the one the check will act on and every
+    caller acquires the rows in the same order.
+
+    The lot's own lock is taken on the bare row and the joined load runs
+    afterwards: a locking query that waited re-checks its joins against the
+    changed row, so locking through the ``status`` join would drop a lot whose
+    status had just changed and 404 (see ``GetOrderView.get_locked_order``).
+
+    Must be called inside ``transaction.atomic``.
+    """
+    lots = InwardRawMaterial.objects.filter(public_id=public_id)
+    product_id = lots.values_list("product_id", flat=True).first()
+    if product_id is None:
+        raise Http404("No InwardRawMaterial matches the given query.")
+    lock_raw_pools([product_id])
+    # Soft-deleted by a request that held the lock before us: gone, so a 404.
+    pk = lots.select_for_update().values_list("pk", flat=True).first()
+    if pk is None:
+        raise Http404("No InwardRawMaterial matches the given query.")
+    return queryset.get(pk=pk)

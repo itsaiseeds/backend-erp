@@ -16,171 +16,22 @@ from __future__ import annotations
 
 from django.db.models import QuerySet
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator.InwardOperations import recipe_payload
-from aggregator.models import OtherMaterialRecipe, OtherMaterialType, Product
+from aggregator.models import OtherMaterialRecipe
+from api.inward_serializers import (
+    RECIPE_QUERYSET_FILTERS,
+    RECIPE_SORT_OPTIONS,
+    CreateRecipeSerializer,
+    RecipeListPageSerializer,
+    RecipePayloadSerializer,
+)
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
-    FilterCatalogueEntrySerializer,
-    QuerysetFilter,
-    SortCatalogueEntrySerializer,
-    SortOption,
     list_query_parameters,
-    parse_str,
-)
-
-
-class RecipeMaterialTypeRefSerializer(serializers.Serializer):
-    """Output shape for the ``material_type`` reference on a recipe."""
-
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-    unit_type = serializers.CharField()
-
-
-class RecipeProductRefSerializer(serializers.Serializer):
-    """Output shape for the ``product`` reference on a recipe."""
-
-    public_id = serializers.CharField()
-    name = serializers.CharField()
-
-
-class RecipePayloadSerializer(serializers.Serializer):
-    """Output shape for one recipe row."""
-
-    public_id = serializers.CharField()
-    product = RecipeProductRefSerializer()
-    material_type = RecipeMaterialTypeRefSerializer()
-    packet_weight = serializers.CharField(help_text="Weight of the covered packet, in kg.")
-    quantity = serializers.CharField(help_text="Amount per pack, in the material type's unit.")
-
-
-class CreateRecipeSerializer(serializers.Serializer):
-    """Request validation for creating a new ``OtherMaterialRecipe``."""
-
-    product = serializers.SlugRelatedField(
-        slug_field="public_id",
-        queryset=Product.objects.all(),
-        error_messages={"required": "Product is required."},
-    )
-    material_type = serializers.PrimaryKeyRelatedField(
-        queryset=OtherMaterialType.objects.all(),
-        error_messages={"required": "Material type is required."},
-    )
-    packet_weight = serializers.DecimalField(
-        max_digits=8,
-        decimal_places=3,
-        min_value=0,
-        error_messages={"required": "Packet weight is required."},
-        help_text="Weight of the covered packet, in kilograms (the product variant).",
-    )
-    quantity = serializers.DecimalField(
-        max_digits=10,
-        decimal_places=3,
-        min_value=0,
-        error_messages={"required": "Quantity is required."},
-        help_text=(
-            "Multiples of the material per pack, in the material type's unit "
-            "(2 leaflets, 2.000 kg cover, 5 litre)."
-        ),
-    )
-
-    def validate(self, attrs):
-        if attrs["packet_weight"] <= 0:
-            raise serializers.ValidationError(
-                {"packet_weight": "Packet weight must be greater than zero."}
-            )
-        if attrs["quantity"] <= 0:
-            raise serializers.ValidationError(
-                {"quantity": "Quantity must be greater than zero."}
-            )
-        qs = OtherMaterialRecipe.all_objects.filter(
-            product=attrs["product"],
-            material_type=attrs["material_type"],
-            packet_weight=attrs["packet_weight"],
-        )
-        if qs.exists():
-            raise serializers.ValidationError(
-                "A recipe for this product, material type and packet weight "
-                "already exists."
-            )
-        return attrs
-
-
-class RecipeListPageSerializer(serializers.Serializer):
-    """Output shape for the paginated envelope (schema only)."""
-
-    total_count = serializers.IntegerField()
-    total_pages = serializers.IntegerField()
-    next_page_number = serializers.IntegerField(allow_null=True)
-    previous_page_number = serializers.IntegerField(allow_null=True)
-    results = RecipePayloadSerializer(many=True)
-    available_filters = FilterCatalogueEntrySerializer(many=True)
-    available_sorts = SortCatalogueEntrySerializer(many=True)
-
-
-def _products_with_recipes(request: Request) -> list[dict]:
-    """Every distinct product that has a live recipe.
-
-    The eligible value set for the ``product`` filter: the picker only ever
-    needs to offer a product that actually has a recipe behind it.
-    """
-    rows = (
-        OtherMaterialRecipe.objects.values_list("product__public_id", "product__name")
-        .distinct()
-        .order_by("product__name")
-    )
-    return [{"value": public_id, "label": name} for public_id, name in rows]
-
-
-def _material_types_with_recipes(request: Request) -> list[dict]:
-    """Every distinct material type that has a live recipe."""
-    rows = (
-        OtherMaterialRecipe.objects.values_list("material_type_id", "material_type__name")
-        .distinct()
-        .order_by("material_type__name")
-    )
-    return [{"value": material_type_id, "label": name} for material_type_id, name in rows]
-
-
-_QUERYSET_FILTERS = (
-    QuerysetFilter(
-        "product",
-        label="Product",
-        lookup="product__public_id__in",
-        parse=parse_str,
-        description="Product public id(s) (see options).",
-        options=_products_with_recipes,
-    ),
-    QuerysetFilter(
-        "material_type",
-        label="Material Type",
-        lookup="material_type_id__in",
-        description="Material type id(s) (see options).",
-        options=_material_types_with_recipes,
-    ),
-)
-_SORT_OPTIONS = (
-    SortOption(
-        "product",
-        label="Product",
-        fields=("product__name",),
-        description="Product name, A->Z (default).",
-    ),
-    SortOption(
-        "packet_weight",
-        label="Packet Weight",
-        fields=("packet_weight",),
-        description="Packet weight, lightest first.",
-    ),
-    SortOption(
-        "created_at",
-        label="Created",
-        description="When the recipe was added.",
-    ),
 )
 
 
@@ -190,15 +41,15 @@ class OtherMaterialRecipesView(AdminPaginatedDateRangeListView):
     serializer_class = CreateRecipeSerializer
     enforce_date_range_filters = False
     default_sort = ("product__name", "packet_weight", "pk")
-    queryset_filters = _QUERYSET_FILTERS
-    sort_options = _SORT_OPTIONS
+    queryset_filters = RECIPE_QUERYSET_FILTERS
+    sort_options = RECIPE_SORT_OPTIONS
 
     @extend_schema(
         operation_id="sales_admin_other_material_recipes_list",
         summary="List other material recipes (filter by product / material type, sortable)",
         parameters=list_query_parameters(
-            queryset_filters=_QUERYSET_FILTERS,
-            sort_options=_SORT_OPTIONS,
+            queryset_filters=RECIPE_QUERYSET_FILTERS,
+            sort_options=RECIPE_SORT_OPTIONS,
             date_window="none",
         ),
         responses={200: RecipeListPageSerializer},

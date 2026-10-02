@@ -17,41 +17,13 @@ Optional ``?material_type=<id,...>`` narrows the report to those types.
 from __future__ import annotations
 
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator import InwardOperations
 from api.admin import AdminApiView
+from api.inward_serializers import OtherMaterialStockSerializer
 from common.views.paginated_date_range import parse_int
-
-
-class OtherMaterialTypeRefSerializer(serializers.Serializer):
-    """Output shape for the ``material_type`` reference on a line."""
-
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-    unit_type = serializers.CharField(help_text="Count / kg / litre -- the unit of on_hand.")
-
-
-class OtherMaterialStockLineSerializer(serializers.Serializer):
-    """Output shape for one material type's on-hand position."""
-
-    material_type = OtherMaterialTypeRefSerializer()
-    on_hand = serializers.CharField(
-        help_text=(
-            "Units received (reached effective date) minus units used by the "
-            "packets currently packed. Negative when the counts outrun the "
-            "recorded inward lots."
-        )
-    )
-
-
-class OtherMaterialStockSerializer(serializers.Serializer):
-    """Output shape for the whole other-material position."""
-
-    as_of = serializers.DateField(help_text="The day the numbers are as of.")
-    lines = OtherMaterialStockLineSerializer(many=True)
 
 
 class OtherMaterialStockView(AdminApiView):

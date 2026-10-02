@@ -1,7 +1,7 @@
 """TOTP login endpoint used by the sales-person Android app.
 
 Verifies a 6-digit authenticator-app code against the user's enrolled TOTP
-secret and issues a bearer token for the matching sales person -- the token
+secret and issues a bearer token for a sales person or godown manager -- the token
 counterpart of ``api.sales_admin.VerifyOTPView`` (which issues a session
 cookie for the web). This view never touches sessions: no ``login()``, no
 ``request.session``.
@@ -37,12 +37,14 @@ class LoginSerializer(serializers.Serializer):
 
 
 class LoginUserSerializer(serializers.Serializer):
-    """The authenticated sales person, as returned by the login flow."""
+    """The authenticated user, as returned by the login flow."""
 
     id = serializers.IntegerField()
     name = serializers.CharField()
     phone_number = serializers.CharField()
     role = serializers.CharField()
+    is_sales_person = serializers.BooleanField()
+    is_godown_manager = serializers.BooleanField()
 
 
 class LoginResponseSerializer(serializers.Serializer):
@@ -70,7 +72,7 @@ _GENERIC_FAILURE = {"detail": "Invalid phone number or TOTP code."}
 
 
 class LoginView(APIView):
-    """Validate a TOTP code, then issue a bearer token for that sales person."""
+    """Validate a TOTP code, then issue a bearer token for that sales person or godown manager."""
 
     serializer_class = LoginSerializer
 
@@ -100,7 +102,9 @@ class LoginView(APIView):
             user = (
                 User.objects.select_for_update().filter(phone_number=data["phone_number"]).first()
             )
-            if user is None or not user.is_active or not user.is_salesperson:
+            if user is None or not user.is_active or not (
+                user.is_salesperson or user.is_godown_manager
+            ):
                 return Response(_GENERIC_FAILURE, status=400)
 
             if user.is_totp_locked():
@@ -125,6 +129,8 @@ class LoginView(APIView):
                     "name": user.name,
                     "phone_number": user.phone_number,
                     "role": user.role,
+                    "is_sales_person": user.is_salesperson,
+                    "is_godown_manager": user.is_godown_manager,
                 },
             }
         )

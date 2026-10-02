@@ -114,6 +114,7 @@ class SessionAuthFlowTest(WebApiTestCase):
         self.assertEqual(response.data["user"]["role"], "superuser")
         self.assertTrue(response.data["can_create_admin"])
         self.assertTrue(response.data["can_create_sales_person"])
+        self.assertTrue(response.data["can_create_godown_manager"])
 
     # -- logout ---------------------------------------------------------------
 

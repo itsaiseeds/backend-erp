@@ -21,7 +21,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator.models import State
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 
 
 class AndroidStateRefSerializer(serializers.Serializer):
@@ -33,7 +33,7 @@ class AndroidStateRefSerializer(serializers.Serializer):
     country_id = serializers.IntegerField()
 
 
-class StatesView(AndroidBaseView):
+class StatesView(AndroidSharedView):
     """List the states available for a client address, optionally by country."""
 
     @extend_schema(

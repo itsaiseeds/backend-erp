@@ -18,7 +18,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator.models import Crop
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 from common.views.paginated_date_range import query_flag
 
 SHOW_DELETED_PARAMETER = OpenApiParameter(
@@ -39,7 +39,7 @@ class UtilityCropSerializer(serializers.Serializer):
     is_deleted = serializers.BooleanField()
 
 
-class CropsView(AndroidBaseView):
+class CropsView(AndroidSharedView):
     """List every crop, optionally including soft-deleted ones."""
 
     @extend_schema(

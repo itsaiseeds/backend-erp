@@ -16,7 +16,7 @@ from rest_framework import serializers
 from rest_framework.response import Response
 
 from aggregator.models import City, Country, State
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 
 
 class AndroidCitySerializer(serializers.Serializer):
@@ -34,7 +34,7 @@ class AndroidStateSerializer(serializers.Serializer):
     cities = AndroidCitySerializer(many=True)
 
 
-class CitiesView(AndroidBaseView):
+class CitiesView(AndroidSharedView):
     """List Indian states, each with its cities, grouped by state."""
 
     @extend_schema(
