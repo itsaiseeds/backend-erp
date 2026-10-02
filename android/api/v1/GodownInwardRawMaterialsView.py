@@ -38,7 +38,10 @@ class GodownInwardRawMaterialsView(AndroidGodownPaginatedDateRangeListView):
 
     @extend_schema(
         operation_id="android_api_v1_godown_inward_raw_materials_list",
-        summary="List inward raw-material lots (filter by product / party / status, sortable)",
+        summary=(
+            "List inward raw-material lots (filter by product / party / status / "
+            "effective date range, sortable)"
+        ),
         parameters=list_query_parameters(
             queryset_filters=RAW_LOT_QUERYSET_FILTERS,
             sort_options=RAW_LOT_SORT_OPTIONS,

@@ -33,6 +33,7 @@ class GodownRawMaterialStockView(AndroidGodownBaseView):
                 "name": line["name"],
                 "incoming_kg": str(line["incoming_kg"]),
                 "packed_kg": str(line["packed_kg"]),
+                "wasted_kg": str(line["wasted_kg"]),
                 "available_kg": str(line["available_kg"]),
                 "rejected_kg": str(line["rejected_kg"]),
             }

@@ -38,7 +38,8 @@ class GodownInwardOtherMaterialsView(AndroidGodownPaginatedDateRangeListView):
     @extend_schema(
         operation_id="android_api_v1_godown_inward_other_materials_list",
         summary=(
-            "List inward other-material lots (filter by party / material type / product, sortable)"
+            "List inward other-material lots (filter by party / material type / product / "
+            "effective date range, sortable)"
         ),
         parameters=list_query_parameters(
             queryset_filters=OTHER_LOT_QUERYSET_FILTERS,

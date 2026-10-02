@@ -268,6 +268,11 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/products": ("ProductsView", SESSION_ADMIN),
     "api/sales-admin/products/<str:public_id>": ("UpdateProductView", SESSION_ADMIN),
     "api/sales-admin/raw-material-stock": ("RawMaterialStockView", SESSION_ADMIN),
+    "api/sales-admin/raw-material-waste/<str:public_id>": (
+        "UpdateRawMaterialWasteView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/raw-material-wastes": ("RawMaterialWastesView", SESSION_ADMIN),
     "api/sales-admin/godown-managers": ("GodownManagersView", SESSION_ADMIN),
     "api/sales-admin/godown-managers/<int:id>": ("UpdateGodownManagerView", SESSION_ADMIN),
     "api/sales-admin/sales-people": ("SalesPeopleView", SESSION_ADMIN),

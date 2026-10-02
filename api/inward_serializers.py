@@ -27,12 +27,15 @@ from aggregator.models import (
     OtherMaterialType,
     Party,
     Product,
+    RawMaterialWaste,
 )
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
     QuerysetFilter,
+    RangeFilter,
     SortCatalogueEntrySerializer,
     SortOption,
+    parse_date,
     parse_str,
 )
 
@@ -160,6 +163,16 @@ RAW_LOT_QUERYSET_FILTERS = (
             for s in InwardRawMaterialStatus
         ],
     ),
+    RangeFilter(
+        "effective_date",
+        label="Effective Date",
+        parse=parse_date,
+        suffixes=("gte", "lte"),
+        description=(
+            "Day the lot started counting toward stock (YYYY-MM-DD, inclusive). "
+            "Lots without an effective date are excluded."
+        ),
+    ),
 )
 RAW_LOT_SORT_OPTIONS = (
     SortOption(
@@ -178,6 +191,101 @@ RAW_LOT_SORT_OPTIONS = (
         label="Effective Date",
         fields=("effective_date",),
         description="Soonest effective date first (undated lots last).",
+    ),
+)
+
+
+class RawMaterialWastePayloadSerializer(serializers.Serializer):
+    """Output shape for one raw-material waste row."""
+
+    public_id = serializers.CharField()
+    product = InwardRawMaterialProductRefSerializer()
+    quantity_kg = serializers.CharField(help_text="Kilograms wasted.")
+    reason = serializers.CharField(allow_blank=True)
+    created_at = serializers.DateTimeField(help_text="When the waste was recorded.")
+    created_by = InwardCreatedByRefSerializer(allow_null=True)
+
+
+class CreateRawMaterialWasteSerializer(serializers.Serializer):
+    """Request validation for recording raw-material waste.
+
+    There is no date field: waste is a standing deduction from the product's
+    unpacked raw pool from the moment it is recorded.
+    """
+
+    product = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Product.objects.all(),
+        error_messages={"required": "Product is required."},
+    )
+    quantity_kg = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        min_value=0,
+        error_messages={"required": "Quantity in kg is required."},
+        help_text="Kilograms of raw material wasted.",
+    )
+    reason = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+
+    def validate(self, attrs):
+        if attrs["quantity_kg"] <= 0:
+            raise serializers.ValidationError(
+                {"quantity_kg": "Quantity must be greater than zero."}
+            )
+        return attrs
+
+
+class RawMaterialWasteListPageSerializer(serializers.Serializer):
+    """Output shape for the paginated envelope (schema only)."""
+
+    total_count = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+    next_page_number = serializers.IntegerField(allow_null=True)
+    previous_page_number = serializers.IntegerField(allow_null=True)
+    results = RawMaterialWastePayloadSerializer(many=True)
+    available_filters = FilterCatalogueEntrySerializer(many=True)
+    available_sorts = SortCatalogueEntrySerializer(many=True)
+
+
+def _products_with_waste(request: Request) -> list[dict]:
+    """Every distinct product that has a waste row (the ``product`` filter's options)."""
+    rows = (
+        RawMaterialWaste.objects.values_list("product__public_id", "product__name")
+        .distinct()
+        .order_by("product__name")
+    )
+    return [{"value": public_id, "label": name} for public_id, name in rows]
+
+
+RAW_WASTE_QUERYSET_FILTERS = (
+    QuerysetFilter(
+        "product",
+        label="Product",
+        lookup="product__public_id__in",
+        parse=parse_str,
+        description="Product public id(s) (see options).",
+        options=_products_with_waste,
+    ),
+)
+RAW_WASTE_SORT_OPTIONS = (
+    SortOption(
+        "created_at",
+        label="Created",
+        description="When the waste was recorded (default: newest first).",
+    ),
+    SortOption(
+        "product",
+        label="Product",
+        fields=("product__name",),
+        description="Product name, A->Z.",
+    ),
+    SortOption(
+        "quantity_kg",
+        label="Quantity",
+        fields=("quantity_kg",),
+        description="Smallest quantity first.",
     ),
 )
 
@@ -320,6 +428,15 @@ OTHER_LOT_QUERYSET_FILTERS = (
         parse=parse_str,
         description="Product public id(s) (see the recipe; see options).",
         options=_products_with_other_material_lots,
+    ),
+    RangeFilter(
+        "effective_date",
+        label="Effective Date",
+        parse=parse_date,
+        suffixes=("gte", "lte"),
+        description=(
+            "Day the lot started counting toward stock (YYYY-MM-DD, inclusive)."
+        ),
     ),
 )
 OTHER_LOT_SORT_OPTIONS = (
@@ -577,8 +694,9 @@ class RawMaterialStockLineSerializer(serializers.Serializer):
     packed_kg = serializers.CharField(
         help_text="KG already packed into bags or sample packets."
     )
+    wasted_kg = serializers.CharField(help_text="KG written off as waste (undated).")
     available_kg = serializers.CharField(
-        help_text="KG left to pack: incoming_kg minus packed_kg."
+        help_text="KG left to pack: incoming_kg minus packed_kg minus wasted_kg."
     )
     rejected_kg = serializers.CharField(
         help_text="Rejected KG with a reached effective date. Reported only, never spendable."
