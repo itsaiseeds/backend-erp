@@ -344,6 +344,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
         self.assertEqual(
             [(f["filter"], f["kind"]) for f in response.data["available_filters"]],
             [
+                ("public_id", "text"),
                 ("city_id", "select"),
                 ("status", "select"),
                 ("company_name", "text"),
@@ -364,6 +365,23 @@ class AndroidClientApiTest(AndroidApiTestCase):
         card = next(c for c in response.data["results"] if c["company_name"] == "Acme Seeds")
         self.assertEqual(card["primary_contact"]["phone_number"], "9876500001")
         self.assertEqual(card["primary_address"]["pincode"], "395007")
+
+    def test_public_id_filter_is_a_case_insensitive_substring_text_filter(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_public_id_filter_is_a_case_insensitive_substring_text_filter"""
+        created = self._create()
+        self.login_as(self.sales_person)
+
+        response = self.client.get(
+            GET_CLIENTS_URL, {"public_id": created.data["public_id"][2:8].lower()}
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual([c["public_id"] for c in response.data["results"]], [created.data["public_id"]])
+        entry = next(f for f in response.data["available_filters"] if f["filter"] == "public_id")
+        self.assertEqual(entry["kind"], "text")
+        self.assertNotIn("options", entry)
+
+        none = self.client.get(GET_CLIENTS_URL, {"public_id": "NOPE-NOPE"})
+        self.assertEqual(none.data["results"], [])
 
     def test_the_list_is_scoped_to_the_calling_sales_person(self):
         """Another sales person's clients are neither listed nor advertised in the
@@ -386,7 +404,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
         )
         # The city catalogue must not leak Ahmedabad, where only the other
         # sales person has a client.
-        options = mine.data["available_filters"][0]["options"]
+        options = mine.data["available_filters"][1]["options"]
         self.assertEqual([o["label"] for o in options], ["Surat"])
         self.assertEqual([o["value"] for o in options], [self.city.id])
 
@@ -455,7 +473,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
             [c["company_name"] for c in pending.data["results"]], ["Acme Seeds"]
         )
         self.assertEqual(
-            [o["value"] for o in verified.data["available_filters"][1]["options"]],
+            [o["value"] for o in verified.data["available_filters"][2]["options"]],
             ["VERIFICATION_PENDING", "VERIFIED"],
         )
 

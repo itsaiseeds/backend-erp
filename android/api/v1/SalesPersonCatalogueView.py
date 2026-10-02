@@ -46,6 +46,7 @@ from common.views.paginated_date_range import (
     parse_decimal,
     parse_int,
     parse_str,
+    public_id_filter,
 )
 
 _STAGE_CODES = [stage.name for stage in StageIds]
@@ -142,6 +143,7 @@ def _parse_stage(raw: str) -> str:
 
 
 _QUERYSET_FILTERS = (
+    public_id_filter("PP-"),
     QuerysetFilter(
         "crop",
         label="Crop",
