@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import ClassVar
 
 from django.core.cache import cache
-from django.db import connection
-from django.test import TestCase
+from django.db import connection, transaction
+from django.test import TestCase, TransactionTestCase
 from rest_framework.test import APIClient
 
 # Every sequence in the schema, with the value to rewind it to. ``last_value``
@@ -101,6 +101,29 @@ class DMLTestCase(TestCase):
             cursor.execute(_RESTORE_SEQUENCES, self._sequence_baseline)
 
 
+class DMLTransactionTestCase(TransactionTestCase):
+    """A test case whose writes really commit, for tests that race threads.
+
+    ``DMLTestCase`` wraps every test in a transaction on one connection, so a
+    second thread -- which opens its own connection -- could never see the
+    test's rows, and no two transactions could ever contend for a lock. This
+    base commits instead.
+
+    The cost: ``TransactionTestCase`` restores isolation by **flushing every
+    table** after each test, which would take the session's ``dml.sql``
+    baseline with it and break every ``DMLTestCase`` that runs afterwards. The
+    baseline is therefore re-seeded straight after the flush, so the database
+    is handed on exactly as it was received.
+    """
+
+    def _fixture_teardown(self):
+        super()._fixture_teardown()
+        from tests.conftest import load_dml
+
+        with transaction.atomic(), connection.cursor() as cursor:
+            load_dml(cursor)
+
+
 class WebApiTestCase(DMLTestCase):
     """Base for session-only web (sales-admin) endpoint tests.
 
@@ -154,6 +177,7 @@ def book_raw_material(product, quantity_kg, *, actor, effective_date=None, booke
     lot = InwardRawMaterial.objects.create(
         product=product,
         party=party,
+        lot_no="TEST-LOT",
         quantity_kg=quantity_kg,
         status_id=StatusIds.IN_USE.value,
         effective_date=effective_date or date.today(),

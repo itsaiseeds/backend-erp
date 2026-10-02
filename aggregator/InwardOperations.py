@@ -12,7 +12,8 @@ its effective date has come, so nothing surprises the books mid-day.
 Read-time derivation (no stored counters, no cron): the raw-material stock of a
 product is the sum of its ``quantity_kg`` over lots with ``status=In Use`` and
 ``effective_date <= today``; the on-hand of a material type is the sum of its
-``InwardOtherMaterial.quantity`` over entries with ``effective_date <= today``.
+``InwardOtherMaterial.quantity`` over entries with ``effective_date <= today``,
+less what the packets currently packed have used per their recipes.
 A freshly recorded other-material lot is therefore in stock the day it arrives;
 a raw lot counts only while its status is ``In Use`` -- flipping stamps today,
 reverting clears the date and drops it back out of stock.
@@ -30,6 +31,7 @@ Everything here is derived or shape-only: nothing in this module writes rows.
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.db.models import Sum
@@ -52,12 +54,28 @@ if TYPE_CHECKING:
 
 # Two-way status transitions for an ``InwardRawMaterial`` lot. Editing this dict
 # is the **only** change needed to change the flips: every guard below re-reads
-# it on each call. Flipping to ``In Use`` stamps ``effective_date`` with today;
-# reverting to ``Lab Testing`` clears it (see ``UpdateInwardRawMaterialView``).
+# it on each call. ``Lab Testing`` is the hub -- every route into or out of a
+# dated status (``In Use``, ``Rejected``) passes through it, so ``In Use`` and
+# ``Rejected`` never transition directly into one another; a lot already in
+# use is reverted to ``Lab Testing`` first, which is where the packed-stock
+# guard lives (see ``assert_raw_lot_removable``). Entering either dated status
+# stamps ``effective_date`` with today; reverting either to ``Lab Testing``
+# clears it (see ``UpdateInwardRawMaterialView``).
 ALLOWED_RAW_STATUS_TRANSITIONS = {
-    InwardRawMaterialStatus.LAB_TESTING: (InwardRawMaterialStatus.IN_USE,),
+    InwardRawMaterialStatus.LAB_TESTING: (
+        InwardRawMaterialStatus.IN_USE,
+        InwardRawMaterialStatus.RAW_MATERIAL_REJECTED,
+    ),
     InwardRawMaterialStatus.IN_USE: (InwardRawMaterialStatus.LAB_TESTING,),
+    InwardRawMaterialStatus.RAW_MATERIAL_REJECTED: (InwardRawMaterialStatus.LAB_TESTING,),
 }
+
+# The two statuses in which a lot carries an effective date -- "usable from"
+# for In Use, "disposable from" for Rejected. Lab Testing carries none.
+DATED_RAW_STATUSES = (
+    InwardRawMaterialStatus.IN_USE,
+    InwardRawMaterialStatus.RAW_MATERIAL_REJECTED,
+)
 
 
 def assert_raw_status_transition(current, requested) -> None:
@@ -96,9 +114,11 @@ def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
 
     Only a lot that is currently ``In Use`` *and* whose ``effective_date`` has
     come is counted in ``InventoryOperations.raw_available_kg`` at all --
-    removing anything else (still ``Lab Testing``, or dated in the future) is
-    always safe. Removing a counted lot must not strand bags or sample packets
-    that were packed from its kilograms with no raw material behind them.
+    removing anything else (still ``Lab Testing``, dated in the future, or
+    ``Rejected``) is always safe. A rejected lot was never packable in the
+    first place, so leaving it is never refused. Removing a counted lot must
+    not strand bags or sample packets that were packed from its kilograms
+    with no raw material behind them.
 
     Raises ``ValueError`` with a message an API renders as a 400, the same
     convention as ``assert_raw_status_transition``.
@@ -168,6 +188,7 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
             "name": entry.product.name,
         },
         "party": {"id": entry.party_id, "name": entry.party.name},
+        "lot_no": entry.lot_no,
         "quantity_kg": str(entry.quantity_kg),
         "status": raw_status_of(entry).value,
         "lab_sampling_date": (
@@ -210,51 +231,81 @@ def inward_other_material_payload(entry: InwardOtherMaterial) -> dict:
 # -- Read-time stock aggregates ------------------------------------------------
 
 
+def _dated_raw_kg_by_product(
+    status_id: int, as_of: date, product_public_ids: list[str] | None
+) -> dict[int, dict]:
+    """``{product_id: {public_id, name, kg}}`` for dated, reached, live lots of
+    one ``status_id``, summed over ``quantity_kg``. Rows summing to zero or
+    less are dropped (nothing left to report)."""
+    query = InwardRawMaterial.objects.filter(
+        effective_date__isnull=False,
+        effective_date__lte=as_of,
+        status_id=status_id,
+    )
+    if product_public_ids:
+        query = query.filter(product__public_id__in=product_public_ids)
+    rows = (
+        query.values("product_id", "product__public_id", "product__name")
+        .annotate(kg=Sum("quantity_kg"))
+        .filter(kg__gt=0)
+    )
+    return {
+        row["product_id"]: {
+            "public_id": row["product__public_id"],
+            "name": row["product__name"],
+            "kg": row["kg"],
+        }
+        for row in rows
+    }
+
+
 def raw_incoming_stock(
     as_of: date | None = None, *, product_public_ids: list[str] | None = None
 ) -> list[dict]:
     """Per-product incoming raw-material position as of ``as_of`` (default today).
 
     Only lots with ``status=In Use`` and ``effective_date <= as_of`` count
-    toward ``incoming_kg``. ``packed_kg`` is what has since been packed into
-    bags or sample packets (``InventoryOperations.raw_bagged_kg`` +
-    ``raw_loose_kg``, read as of now -- a count has no "as of" of its own) and
-    ``available_kg`` is what is left to pack. The list is ready for display:
+    toward ``incoming_kg``; only ``status=Rejected`` lots, dated and reached
+    the same way, count toward ``rejected_kg``. ``packed_kg`` is what has
+    since been packed into bags or sample packets
+    (``InventoryOperations.raw_bagged_kg`` + ``raw_loose_kg``, read as of now
+    -- a count has no "as of" of its own) and ``available_kg`` is what is left
+    to pack; rejected kilograms are never counted there -- a rejected lot is
+    invisible to the packing check regardless of its date. A product is
+    listed whenever it has incoming or rejected kilograms, so a product whose
+    entire intake was rejected still appears. The list is ready for display:
     each entry carries the product's public id / name and Decimal kilogram
     figures (serializers turn them into strings). ``product_public_ids``
     narrows the report to those products.
     """
     as_of = as_of or today()
-    query = InwardRawMaterial.objects.filter(
-        effective_date__isnull=False,
-        effective_date__lte=as_of,
-        status_id=StatusIds.IN_USE.value,
+    incoming = _dated_raw_kg_by_product(StatusIds.IN_USE.value, as_of, product_public_ids)
+    rejected = _dated_raw_kg_by_product(
+        StatusIds.RAW_MATERIAL_REJECTED.value, as_of, product_public_ids
     )
-    if product_public_ids:
-        query = query.filter(product__public_id__in=product_public_ids)
-    rows = list(
-        query.values("product_id", "product__public_id", "product__name")
-        .annotate(incoming_kg=Sum("quantity_kg"))
-        .filter(incoming_kg__gt=0)
-        .order_by("product__name")
-    )
-    products = Product.objects.in_bulk(row["product_id"] for row in rows)
+    product_ids = sorted(set(incoming) | set(rejected))
+    products = Product.objects.in_bulk(product_ids)
     lines = []
-    for row in rows:
-        product = products[row["product_id"]]
+    for product_id in product_ids:
+        product = products[product_id]
+        incoming_kg = incoming.get(product_id, {}).get("kg", Decimal("0.000"))
+        rejected_kg = rejected.get(product_id, {}).get("kg", Decimal("0.000"))
         packed_kg = InventoryOperations.raw_bagged_kg(
             product
         ) + InventoryOperations.raw_loose_kg(product)
+        row = incoming[product_id] if product_id in incoming else rejected[product_id]
         lines.append(
             {
-                "product_id": row["product_id"],
-                "public_id": row["product__public_id"],
-                "name": row["product__name"],
-                "incoming_kg": row["incoming_kg"],
+                "product_id": product_id,
+                "public_id": row["public_id"],
+                "name": row["name"],
+                "incoming_kg": incoming_kg,
                 "packed_kg": packed_kg,
-                "available_kg": row["incoming_kg"] - packed_kg,
+                "available_kg": incoming_kg - packed_kg,
+                "rejected_kg": rejected_kg,
             }
         )
+    lines.sort(key=lambda line: line["name"])
     return lines
 
 
@@ -263,34 +314,36 @@ def other_material_on_hand(
 ) -> list[dict]:
     """Per-material-type on-hand position as of ``as_of`` (default today).
 
-    Only entries with ``effective_date <= as_of`` count; the unit is the
+    ``on_hand`` is what has come in (entries with ``effective_date <= as_of``)
+    minus what the packets currently packed have used, per the products'
+    recipes -- see ``InventoryOperations.other_material_used``. The unit is the
     material type's own ``unit_type`` (count / kg / litre), so each line tells
     the reader how to read its ``on_hand`` number.
-    ``material_type_ids`` narrows the report to those material types.
+
+    Every material type that has come in or been used is listed, including
+    one whose figure is zero or negative: a negative line means packets were
+    counted that the recorded inward lots cannot cover, which is exactly what
+    this report must not hide. ``material_type_ids`` narrows the report to
+    those material types.
     """
     as_of = as_of or today()
-    query = InwardOtherMaterial.objects.filter(
-        effective_date__isnull=False,
-        effective_date__lte=as_of,
-    )
-    if material_type_ids:
-        query = query.filter(recipe__material_type_id__in=material_type_ids)
-    rows = (
-        query.values(
-            "recipe__material_type_id",
-            "recipe__material_type__name",
-            "recipe__material_type__unit_type",
-        )
-        .annotate(on_hand=Sum("quantity"))
-        .filter(on_hand__gt=0)
-        .order_by("recipe__material_type__name")
-    )
+    inward = InventoryOperations.other_material_inward(material_type_ids or None, as_of)
+    used = InventoryOperations.other_material_used(material_type_ids or None)
+    active = {
+        material_type_id
+        for figures in (inward, used)
+        for material_type_id, amount in figures.items()
+        if amount > 0
+    }
     return [
         {
-            "material_type_id": row["recipe__material_type_id"],
-            "name": row["recipe__material_type__name"],
-            "unit_type": row["recipe__material_type__unit_type"],
-            "on_hand": row["on_hand"],
+            "material_type_id": material_type.id,
+            "name": material_type.name,
+            "unit_type": material_type.unit_type,
+            "on_hand": inward.get(material_type.id, Decimal("0"))
+            - used.get(material_type.id, Decimal("0")),
         }
-        for row in rows
+        for material_type in OtherMaterialType.all_objects.filter(
+            id__in=active
+        ).order_by("name")
     ]

@@ -13,6 +13,7 @@ Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
   entry lists the eligible ``{value, label}`` crops (only the ones that actually
   have bags), so the picker needs no second call.
 * ``?product=<P-...,...>`` -- bags of those products, by product public id.
+  The ``available_filters`` entry lists the eligible products the same way.
 * ``?stage=<CODE,...>`` -- ``BREEDER`` / ``FOUNDATION`` / ``RESEARCH`` /
   ``CERTIFIED``; the entry carries all four as options.
 * ``?name=<term>`` -- case-insensitive substring of the product name.
@@ -115,6 +116,22 @@ def _crops_with_packagings(request: Request) -> list[dict]:
     return [{"value": crop_id, "label": name} for crop_id, name in rows]
 
 
+def _products_with_packagings(request: Request) -> list[dict]:
+    """The distinct products that actually have a bag on the shelf.
+
+    Mirrors ``_crops_with_packagings``: ``product__is_deleted`` is explicit
+    because the span does not pick up ``Product``'s default soft-delete
+    manager.
+    """
+    rows = (
+        ProductPackaging.objects.filter(product__is_deleted=False)
+        .values_list("product__public_id", "product__name")
+        .distinct()
+        .order_by("product__name")
+    )
+    return [{"value": public_id, "label": name} for public_id, name in rows]
+
+
 def _parse_stage(raw: str) -> str:
     code = parse_str(raw).upper()
     if code not in _STAGE_CODES:
@@ -138,7 +155,8 @@ _QUERYSET_FILTERS = (
         label="Product",
         lookup="product__public_id__in",
         parse=parse_str,
-        description="Product public id(s), e.g. P-E79QA0E2OIHF.",
+        description="Product public id(s), e.g. P-E79QA0E2OIHF (see options).",
+        options=_products_with_packagings,
     ),
     QuerysetFilter(
         "stage",

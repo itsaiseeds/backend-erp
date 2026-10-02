@@ -1,10 +1,13 @@
 from django import forms
 from django.contrib import admin
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.serializers import ValidationError as DRFValidationError
 
 from common.admin import AUDIT_FIELDS, SoftDeleteModelAdmin
+from common.models import indian_now
 from common.storage import delete_image, upload_image
 
+from .CustomOrderOperations import assert_loose_stock_covers
 from .models import (
     Address,
     City,
@@ -41,7 +44,19 @@ from .models import (
     Stage,
     State,
     Status,
+    StatusIds,
     TransportAgency,
+)
+
+# An order's lifecycle and verification: moved only by the lifecycle verbs
+# (verify / dispatch / revert / hold / reject ...), which carry the status
+# guards and stock checks. The admin shows them but never writes them.
+ORDER_LIFECYCLE_FIELDS = (
+    "status",
+    "verified_by",
+    "verified_at",
+    "dispatch_details",
+    "private_dispatch_details",
 )
 
 
@@ -412,6 +427,7 @@ class DispatchEntryItemInline(CreatedByStampInlineMixin, admin.TabularInline):
 class DispatchEntryAdmin(SoftDeleteParentAdmin):
     list_display = (
         "public_id",
+        "challan_number",
         "order",
         "client",
         "lr_number",
@@ -422,6 +438,7 @@ class DispatchEntryAdmin(SoftDeleteParentAdmin):
     )
     search_fields = (
         "public_id",
+        "challan_number",
         "order__public_id",
         "client__company_name",
         "dispatch_details__lr_number",
@@ -463,9 +480,24 @@ class DispatchEntryItemAdmin(SoftDeleteModelAdmin):
 
 
 class OrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):
+    """An order's lines, view-only.
+
+    Lines are reservations once the order is confirmed; they change only
+    through ``edit-order``, which re-checks stock.
+    """
+
     model = OrderItem
     extra = 0
     autocomplete_fields = ("product_packaging",)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Order)
@@ -491,9 +523,29 @@ class OrderAdmin(SoftDeleteParentAdmin):
     list_select_related = ("client", "status")
     inlines = (OrderItemInline,)
 
+    def has_add_permission(self, request):
+        """Orders are booked from the app, never here."""
+        return request.user.is_superuser
+
+    def get_readonly_fields(self, request, obj=None):
+        return (*super().get_readonly_fields(request, obj), *ORDER_LIFECYCLE_FIELDS)
+
+
+class ViewOnlyAdminMixin:
+    """View-only: the rows are maintained by the operations layer alone."""
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
 
 @admin.register(OrderItem)
-class OrderItemAdmin(SoftDeleteModelAdmin):
+class OrderItemAdmin(ViewOnlyAdminMixin, SoftDeleteModelAdmin):
     list_display = (
         "order",
         "product_packaging",
@@ -523,6 +575,7 @@ class InventorySnapshotAdmin(SoftDeleteModelAdmin):
         "product_packaging",
         "bags",
         "total_packets",
+        "counted_at",
         "created_by",
         "created_at",
     )
@@ -549,6 +602,7 @@ class LooseStockSnapshotAdmin(SoftDeleteModelAdmin):
         "packet_weight",
         "packets",
         "total_weight",
+        "counted_at",
         "created_by",
         "created_at",
     )
@@ -563,10 +617,54 @@ class LooseStockSnapshotAdmin(SoftDeleteModelAdmin):
 # -- Custom orders -------------------------------------------------------------
 
 
+class CustomOrderItemFormSet(forms.BaseInlineFormSet):
+    """A new custom order's lines, checked against loose stock as a whole.
+
+    The same gate as ``CustomOrderOperations.create_custom_order``: lines are
+    summed per ``(product, packet_weight)`` pool before the check, under the
+    pools' locks, which Django's atomic add view holds until the order is
+    saved. A shortfall is an ordinary form error.
+    """
+
+    def clean(self):
+        super().clean()
+        if self.instance.pk is not None or any(self.errors):
+            return  # lines are view-only on an existing order
+        needed: dict = {}
+        for form in self.forms:
+            data = getattr(form, "cleaned_data", None)
+            if not data or data.get("DELETE"):
+                continue
+            pool = (data["product"], data["packet_weight"])
+            needed[pool] = needed.get(pool, 0) + data["packets"]
+        if not needed:
+            raise forms.ValidationError("A custom order needs at least one line.")
+        try:
+            assert_loose_stock_covers(needed)
+        except DjangoValidationError as exc:
+            raise forms.ValidationError(exc.messages) from None
+
+
 class CustomOrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):
+    """A custom order's lines: written once, when the order is added.
+
+    A custom order confirms -- reserves its packets -- as it is created, so its
+    lines are fixed from then on.
+    """
+
     model = CustomOrderItem
+    formset = CustomOrderItemFormSet
     extra = 0
     autocomplete_fields = ("product",)
+
+    def has_add_permission(self, request, obj=None):
+        return obj is None
+
+    def has_change_permission(self, request, obj=None):
+        return obj is None
+
+    def has_delete_permission(self, request, obj=None):
+        return obj is None
 
 
 @admin.register(CustomOrder)
@@ -594,9 +692,42 @@ class CustomOrderAdmin(SoftDeleteParentAdmin):
     list_select_related = ("client", "status", "verified_by")
     inlines = (CustomOrderItemInline,)
 
+    def get_readonly_fields(self, request, obj=None):
+        return (*super().get_readonly_fields(request, obj), *ORDER_LIFECYCLE_FIELDS)
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form = super().get_form(request, obj, change=change, **kwargs)
+        if obj is not None:
+            return form
+        user = request.user
+
+        class AddCustomOrderForm(form):
+            def clean(self):
+                cleaned = super().clean()
+                if not (user.is_admin_user or user.is_superuser):
+                    raise forms.ValidationError(
+                        "Custom orders can only be booked by a sales admin."
+                    )
+                return cleaned
+
+        return AddCustomOrderForm
+
+    def save_model(self, request, obj, form, change):
+        """A new custom order is born CONFIRMED and verified by its creator.
+
+        The same as ``CustomOrderOperations.create_custom_order``: creating one
+        *is* verifying it, and its lines were checked against loose stock by
+        ``CustomOrderItemFormSet``.
+        """
+        if not change:
+            obj.status = Status.by_id(StatusIds.CONFIRMED)
+            obj.verified_by = request.user
+            obj.verified_at = indian_now()
+        super().save_model(request, obj, form, change)
+
 
 @admin.register(CustomOrderItem)
-class CustomOrderItemAdmin(SoftDeleteModelAdmin):
+class CustomOrderItemAdmin(ViewOnlyAdminMixin, SoftDeleteModelAdmin):
     list_display = (
         "custom_order",
         "product",
@@ -628,6 +759,7 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
         "public_id",
         "product",
         "party",
+        "lot_no",
         "quantity_kg",
         "status",
         "effective_date",
@@ -640,6 +772,7 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
         "product__name",
         "product__crop__name",
         "party__name",
+        "lot_no",
     )
     list_filter = ("status", "effective_date")
     autocomplete_fields = ("product", "party", "status")

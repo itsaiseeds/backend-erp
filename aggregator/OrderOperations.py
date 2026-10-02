@@ -207,10 +207,17 @@ VERIFIABLE_STATUS_CODES = frozenset(
 UNVERIFIABLE_STATUS_CODES = frozenset({StatusIds.CONFIRMED.name})
 DISPATCHABLE_STATUS_CODES = frozenset({StatusIds.CONFIRMED.name})
 REVERTIBLE_DISPATCH_STATUS_CODES = frozenset({StatusIds.DISPATCHED.name})
+DELIVERABLE_STATUS_CODES = frozenset({StatusIds.DISPATCHED.name})
 HOLDABLE_STATUS_CODES = frozenset(
     {StatusIds.BOOKED.name, StatusIds.UNDER_REVIEW.name, StatusIds.CONFIRMED.name}
 )
 REJECTABLE_STATUS_CODES = HOLDABLE_STATUS_CODES | {StatusIds.ON_HOLD.name}
+# An LR is the transporter's note for goods that actually left. A reverted
+# dispatch (back to CONFIRMED) keeps its dispatch record, so the record alone
+# does not prove the goods are on the road -- the status does.
+LR_RECORDABLE_STATUS_CODES = frozenset(
+    {StatusIds.DISPATCHED.name, StatusIds.DELIVERED.name}
+)
 
 # Only a freshly booked order or a confirmed one may be edited. Every other
 # status is refused: DISPATCHED/DELIVERED because the goods have physically
@@ -238,6 +245,89 @@ def assert_order_status(order: Order, allowed: frozenset[str], action: str) -> N
         )
 
 
+def assert_dispatched_today(order) -> None:
+    """Raise unless ``order``'s dispatch was recorded today (IST).
+
+    A revert is a correction of something just recorded, not a time machine.
+    Rewinding an older dispatch moves its bags from consumed back to reserved
+    against *today's* stock position, and the re-dispatch that follows re-stamps
+    ``dispatched_at`` with today -- so a consignment that physically left on the
+    1st would silently become one that left today, challan number and all.
+
+    Shared by ``revert_dispatch`` here and its ``CustomOrderOperations``
+    counterpart, and called **after** each one's status check so the existing
+    "an order that is CONFIRMED" refusal still comes first. It takes no
+    ``action`` word, unlike ``assert_order_status``: revert is the only verb
+    this rule applies to, and threading one through only made the message say
+    "dispatch" twice.
+
+    The day is read off the challan, which is the timestamp a re-dispatch
+    re-stamps. A DISPATCHED order with no challan is reachable (dispatch rows
+    attached and the status moved directly, as some tests do), so the dispatch
+    record itself is the fallback -- ``Order.clean`` guarantees one of the two
+    is there once the order is DISPATCHED.
+
+    Raises ``ValidationError``, which the API's exception handler turns into a
+    400, the same convention as ``assert_order_status``.
+    """
+    entry = getattr(order, "dispatch_entry", None)
+    dispatch = entry if entry is not None else order.active_dispatch
+    if dispatch is None:
+        return
+    day = dispatch.dispatch_date
+    # ``indian_now().date()`` rather than ``InventoryOperations.today()``: the
+    # same value, without the local import that module needs here (and the same
+    # call ``mark_delivered`` below already makes).
+    if day != indian_now().date():
+        raise ValidationError(
+            {
+                "status": (
+                    f"This dispatch was recorded on {day:%Y-%m-%d}: only a "
+                    "dispatch recorded today can be reverted."
+                )
+            }
+        )
+
+
+# The refusal an own-vehicle dispatch gets per blank field. Declared here, with
+# the rule, and reused by ``DispatchCustomOrderView`` so the serializer that
+# re-requires these fields answers in exactly the same words.
+OWN_VEHICLE_FIELD_REQUIRED = "{field} is required on an own-vehicle dispatch."
+
+
+def assert_driver_details(
+    driver_name: str, driver_number: str, vehicle_number: str
+) -> None:
+    """Raise unless an own-vehicle dispatch names its driver and vehicle.
+
+    All three are optional on an **agency** dispatch: the agency assigns the
+    vehicle and often only tells us which one after collection, so a blank there
+    is a detail still to come. Our own vehicle always has a known driver, so a
+    blank is a mistake, and recording one would put an unchaseable consignment
+    on the road.
+
+    This lives beside ``assert_order_status`` rather than in the serializer
+    because which kind of dispatch it is comes from the *order*
+    (``transport_agency``), not from the request -- the same reason
+    ``dispatch_order`` picks the ``attach`` function off the order. The custom
+    order path calls it unconditionally: a custom order is always own-vehicle.
+
+    Raises ``ValidationError``, which the API's exception handler turns into a
+    400, naming every field that was left blank.
+    """
+    blanks = {
+        field: OWN_VEHICLE_FIELD_REQUIRED.format(field=field)
+        for field, value in (
+            ("driver_name", driver_name),
+            ("driver_number", driver_number),
+            ("vehicle_number", vehicle_number),
+        )
+        if not value
+    }
+    if blanks:
+        raise ValidationError(blanks)
+
+
 def assert_stock_covers(
     needed: Mapping[ProductPackaging, int],
     action: str,
@@ -255,6 +345,13 @@ def assert_stock_covers(
     Two gates, the same ones verification applies: today's stock count must be
     complete, and every packaging must have the bags. Raises
     ``ValidationError``, which the API turns into a 400.
+
+    **The packagings being grown are locked before availability is read**
+    (:func:`InventoryOperations.lock_bag_pools`) and stay locked until the
+    caller's transaction commits the reservation. Without it two orders
+    verified at the same moment would both read the same available figure and
+    together reserve more bags than exist. Callers must therefore be inside
+    ``transaction.atomic`` and write their reservation in that same block.
     """
     from . import InventoryOperations
 
@@ -266,6 +363,8 @@ def assert_stock_covers(
     }
     if not increases:
         return
+
+    InventoryOperations.lock_bag_pools(increases)
 
     if not InventoryOperations.is_stock_count_complete():
         missing = [
@@ -323,6 +422,7 @@ def dispatch_order(
     driver_number: str,
     vehicle_number: str,
     lot_numbers: dict[str, str],
+    quantities: dict[str, int] | None = None,
 ) -> Order:
     """Record a dispatch against a verified order and move it to DISPATCHED.
 
@@ -338,6 +438,12 @@ def dispatch_order(
     booking time is what gets recorded. Both kinds take the same details -- who
     drove, on what number, in which vehicle -- so the caller supplies one shape
     either way.
+
+    **How strict those details are also comes from the order.** On an agency
+    dispatch all three may be blank: the agency assigns the vehicle, and often
+    only says which after collection. On an own-vehicle dispatch all three are
+    required (``assert_driver_details``), because our own vehicle always has a
+    known driver.
 
     Two things are **derived, not passed**: the dispatch date is today (the
     dispatch is being recorded as it happens), and the destination is the city
@@ -356,17 +462,34 @@ def dispatch_order(
     challan is written from: the dispatch itself is one journey, but the goods
     on it are traced batch by batch.
 
+    ``quantities`` maps a line to how many bags actually shipped, when that
+    falls short of what was ordered; a line left out ships in full. A shortfall
+    does not vanish -- it stays reserved against this same order (see
+    ``InventoryOperations.reserved_bags``) until someone corrects it by hand,
+    since dispatch is a one-shot action and there is no later shipment to
+    finish the line.
+
     The details are attached *before* the status moves: ``Order.clean`` rejects
     a DISPATCHED order that carries no dispatch record, so the other order would
     fail validation. No stock is written -- CONFIRMED to DISPATCHED moves the
     bags from reserved to consumed on its own.
     """
-    from .DispatchOperations import sync_dispatch_entry, validated_lot_numbers
+    from .DispatchOperations import (
+        sync_dispatch_entry,
+        validated_lot_numbers,
+        validated_quantities,
+    )
 
     assert_order_status(order, DISPATCHABLE_STATUS_CODES, "dispatch")
 
     # Validated before anything is written, so a bad lot number costs nothing.
     validated_lot_numbers(order, lot_numbers)
+    validated_quantities(order, quantities)
+    # The order decides both which table the dispatch lands on and whether the
+    # driver details were optional, so the two reads of ``transport_agency_id``
+    # below can never disagree.
+    if not order.transport_agency_id:
+        assert_driver_details(driver_name, driver_number, vehicle_number)
 
     dispatched_at = indian_now()
     to_city = order.delivery_address.city
@@ -396,6 +519,7 @@ def dispatch_order(
         driver_number=driver_number,
         vehicle_number=vehicle_number,
         lot_numbers=lot_numbers,
+        quantities=quantities,
     )
     return update_order_status(order, StatusIds.DISPATCHED)
 
@@ -459,8 +583,13 @@ def revert_dispatch(order: Order) -> Order:
 
     The dispatch record stays attached -- it is what actually happened, and a
     re-dispatch overwrites it. Only the status is rewound.
+
+    Only today's dispatch can be reverted (``assert_dispatched_today``). Note
+    the knock-on: because a re-dispatch needs a revert first, re-dispatching is
+    same-day only too.
     """
     assert_order_status(order, REVERTIBLE_DISPATCH_STATUS_CODES, "revert the dispatch of")
+    assert_dispatched_today(order)
     order.status = Status.by_id(StatusIds.CONFIRMED)
     order.actual_delivery_date = None
     order.full_clean()
@@ -469,6 +598,8 @@ def revert_dispatch(order: Order) -> Order:
 
 
 def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
+    """Mark a dispatched order delivered."""
+    assert_order_status(order, DELIVERABLE_STATUS_CODES, "deliver")
     order.status = Status.by_id(StatusIds.DELIVERED)
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
     order.full_clean()
@@ -636,8 +767,15 @@ def update_order_core(order: Order, **fields) -> Order:
 
     ``created_by`` / ``created_at`` / ``verified_by`` / ``verified_at`` are not
     editable either: they are the audit record, and approval belongs to
-    :func:`verify_order` alone. ``status`` is editable, and arrives as a
-    ``StatusIds`` member so no caller ever spells a code or an id.
+    :func:`verify_order` alone.
+
+    ``status`` is not editable here: every status change goes through its own
+    lifecycle verb (:func:`verify_order`, :func:`unverify_order`,
+    :func:`hold_order`, :func:`reject_order`, :func:`dispatch_order`,
+    :func:`revert_dispatch`), which carries the guards and stock checks that
+    move needs. Setting it here would skip them -- e.g. flipping CONFIRMED to
+    BOOKED, raising quantities unchecked, and flipping back. An unknown field
+    is a ``TypeError`` so such a call fails loudly rather than being dropped.
 
     ``special_comments`` is **appended to**, never replaced -- see
     :func:`appended_comment`.
@@ -646,6 +784,10 @@ def update_order_core(order: Order, **fields) -> Order:
     belongs to the client, transport agency is one of the client's own,
     CONFIRMED carries its verification details -- so they are not restated here.
     """
+    unknown = set(fields) - set(ORDER_CORE_FIELDS)
+    if unknown:
+        raise TypeError(f"Not an editable order field: {', '.join(sorted(unknown))}.")
+
     for field in ORDER_CORE_FIELDS:
         if field not in fields:
             continue
@@ -653,8 +795,6 @@ def update_order_core(order: Order, **fields) -> Order:
             setattr(order, field, appended_comment(getattr(order, field), fields[field]))
         else:
             setattr(order, field, fields[field])
-    if "status" in fields:
-        order.status = Status.by_id(fields["status"])
     order.full_clean()
     order.save()
     return order

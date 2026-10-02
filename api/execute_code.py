@@ -5,16 +5,18 @@ body is ``{"code": "<python source>"}``; the code runs in-process with every
 Django model in scope by its class name (``Order``, ``Client``, ``User``, ...),
 plus ``apps``, ``timezone`` and ``transaction``.
 
-Gated by the ``authentication.execute_python_code`` permission **alone**, whatever
-the caller's role (a superuser holds it implicitly). Grant it per user in the
-Django admin. Every enum defined next to a model (``StatusIds``, ``StageIds``,
-``InwardRawMaterialStatus``, ...) is in scope too. Web session only: it lives
-outside ``/api/sales-admin/`` because it is a server tool, not part of the
-sales-admin app.
+**Disabled unless** ``settings.ENABLE_EXECUTE_CODE`` (env ``ENABLE_EXECUTE_CODE=1``)
+is set: otherwise both the API and the page are a 404. Keep it off in
+production -- this is in-process remote code execution. When enabled, the caller
+must be a Django superuser **and** hold the ``authentication.execute_python_code``
+permission (a superuser holds it implicitly). Every enum defined next to a model
+(``StatusIds``, ``StageIds``, ``InwardRawMaterialStatus``, ...) is in scope too.
+Web session only: it lives outside ``/api/sales-admin/`` because it is a server
+tool, not part of the sales-admin app.
 
 ``GET /execute-code/`` (:func:`execute_code_page`) is a minimal browser UI for
 it. It rides the same session cookie the sales-admin login sets, so log in at
-``/sales-admin/`` first; without the permission the page is a 403.
+``/sales-admin/`` first; anyone but a superuser gets a 403.
 
 Execution contract:
 
@@ -25,7 +27,8 @@ Execution contract:
   ``SET LOCAL statement_timeout``. Pure-Python loops are not capped.
 * ``print`` writes to a per-request buffer returned as ``stdout``; assign to a
   variable named ``result`` to get its ``repr`` back as ``result``.
-* Every run is logged -- who, the code, and the outcome.
+* Every run is logged -- who, the code's SHA-256, and the outcome. The code
+  itself is never logged, so secrets pasted into it do not leak into logs.
 
 The response is always ``200`` once the caller is authorised; ``success`` says
 whether the code itself raised, and ``error`` carries the traceback if it did.
@@ -35,6 +38,7 @@ from __future__ import annotations
 
 import enum
 import functools
+import hashlib
 import io
 import logging
 import sys
@@ -42,16 +46,18 @@ import time
 import traceback
 
 from django.apps import apps
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import connection, transaction
 from django.db.models import Model
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
+from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -125,13 +131,21 @@ def _namespace(stdout: io.StringIO) -> dict[str, object]:
 
 
 class ExecuteCodeView(AdminApiView):
-    """Execute Python on the server (``execute_python_code`` permission only)."""
+    """Execute Python on the server (superuser with ``execute_python_code``)."""
 
+    superuser_required = True
     required_permission = PERMISSION
+
+    def initial(self, request, *args, **kwargs):
+        # Checked before authentication: while disabled the endpoint does not
+        # exist, whoever asks.
+        if not settings.ENABLE_EXECUTE_CODE:
+            raise NotFound
+        super().initial(request, *args, **kwargs)
 
     @extend_schema(
         operation_id="execute_code",
-        summary="Execute Python code on the server (permission-gated)",
+        summary="Execute Python code on the server (superuser; off unless enabled)",
         request=ExecuteCodeRequestSerializer,
         responses={200: ExecuteCodeResponseSerializer},
     )
@@ -141,12 +155,9 @@ class ExecuteCodeView(AdminApiView):
         code: str = serializer.validated_data["code"]
         user = request.user
 
-        logging.info(
-            "execute-code: user id=%s phone=%s running:\n%s",
-            user.id,
-            user.phone_number,
-            code,
-        )
+        code_sha256 = hashlib.sha256(code.encode()).hexdigest()
+        # Never log the code: secrets pasted into it would end up in the logs.
+        logging.info("execute-code: user id=%s running code sha256=%s", user.id, code_sha256)
 
         stdout = io.StringIO()
         namespace = _namespace(stdout)
@@ -163,8 +174,9 @@ class ExecuteCodeView(AdminApiView):
         duration_ms = round((time.monotonic() - started) * 1000)
 
         logging.info(
-            "execute-code: user id=%s finished in %sms: %s",
+            "execute-code: user id=%s code sha256=%s finished in %sms: %s",
             user.id,
+            code_sha256,
             duration_ms,
             "success" if error is None else "failed (rolled back)",
         )
@@ -184,12 +196,15 @@ class ExecuteCodeView(AdminApiView):
 def execute_code_page(request: HttpRequest) -> HttpResponse:
     """``GET /execute-code/``: the browser UI for :class:`ExecuteCodeView`.
 
-    Anonymous visitors are sent to the sales-admin login; a logged-in user
-    without the permission gets a 403, the same rule the API applies.
+    A 404 while ``ENABLE_EXECUTE_CODE`` is off. Otherwise anonymous visitors are
+    sent to the sales-admin login, and anyone but a superuser holding the
+    permission gets a 403, the same rule the API applies.
     """
+    if not settings.ENABLE_EXECUTE_CODE:
+        raise Http404
     if not request.user.is_authenticated:
         return redirect("/sales-admin/")
-    if not request.user.has_perm(PERMISSION):
+    if not (request.user.is_superuser and request.user.has_perm(PERMISSION)):
         raise PermissionDenied
     return render(
         request,

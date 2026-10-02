@@ -173,6 +173,18 @@ class AndroidCatalogueApiTest(AndroidApiTestCase):
             ["Bajari", "Castor"],
         )
 
+    def test_product_filter_options_only_offer_products_that_have_bags(self):
+        entry = next(
+            item
+            for item in self._get()["available_filters"]
+            if item["filter"] == "product"
+        )
+        self.assertEqual(entry["kind"], "select")
+        options_by_value = {option["value"]: option["label"] for option in entry["options"]}
+        self.assertEqual(options_by_value[self.certificate.public_id], "Zeta Certificate")
+        self.assertEqual(options_by_value[self.breeder.public_id], "Alpha Breeder")
+        self.assertEqual(options_by_value[self.foundation.public_id], "Mid Foundation")
+
     def test_product_filter_takes_public_ids(self):
         self.assertEqual(
             self._ids(f"?product={self.breeder.public_id}"), [self.dear.public_id]

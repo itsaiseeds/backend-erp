@@ -66,6 +66,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         body = {
             "product": self.product.public_id,
             "party": self.party.id,
+            "lot_no": "SUP-2026-A1",
             "quantity_kg": "150.5",
             **overrides,
         }
@@ -86,6 +87,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertTrue(lot["public_id"].startswith("IR-"))
         self.assertEqual(lot["product"], {"public_id": "P-I34V7RI1JPUH", "name": "SAI-33"})
         self.assertEqual(lot["party"], {"id": self.party.id, "name": "ABC Traders"})
+        self.assertEqual(lot["lot_no"], "SUP-2026-A1")
         self.assertEqual(lot["quantity_kg"], "150.500")
         self.assertEqual(lot["status"], "Lab Testing")
         self.assertEqual(lot["lab_sampling_date"], InwardOperations.today().isoformat())
@@ -112,15 +114,31 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         """tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_missing_or_invalid_create_fields_are_400"""
         self.login_as(self.seed_admin)
         cases = [
-            ("missing product", {"party": self.party.id, "quantity_kg": "10"}),
-            ("missing party", {"product": self.product.public_id, "quantity_kg": "10"}),
+            (
+                "missing product",
+                {"party": self.party.id, "lot_no": "SUP-1", "quantity_kg": "10"},
+            ),
+            (
+                "missing party",
+                {"product": self.product.public_id, "lot_no": "SUP-1", "quantity_kg": "10"},
+            ),
+            (
+                "missing lot_no",
+                {"product": self.product.public_id, "party": self.party.id, "quantity_kg": "10"},
+            ),
             (
                 "missing quantity",
-                {"product": self.product.public_id, "party": self.party.id},
+                {"product": self.product.public_id, "party": self.party.id, "lot_no": "SUP-1"},
             ),
             ("negative quantity", {"quantity_kg": "-1"}),
-            ("unknown product", {"product": "P-UNKNOWN0000", "quantity_kg": "10"}),
-            ("unknown party", {"party": 999999, "quantity_kg": "10"}),
+            (
+                "unknown product",
+                {"product": "P-UNKNOWN0000", "lot_no": "SUP-1", "quantity_kg": "10"},
+            ),
+            (
+                "unknown party",
+                {"party": 999999, "lot_no": "SUP-1", "quantity_kg": "10"},
+            ),
         ]
         for label, body in cases:
             with self.subTest(case=label):
@@ -268,6 +286,84 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         )
         self.assertIsNone(reverted.data["effective_date"])
 
+    # -- rejection --------------------------------------------------------
+
+    def test_flipping_to_rejected_stamps_today_and_reverting_clears_it(self):
+        """rejected stamps today, same as in_use; reverting clears the date
+        and re-stamps lab_sampling_date, same as reverting from in_use.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_flipping_to_rejected_stamps_today_and_reverting_clears_it
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot(lab_sampling_date="2026-01-01")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+        url = self._url(created.data)
+
+        rejected = self.client.patch(url, {"status": "Rejected"}, format="json")
+        self.assertEqual(rejected.status_code, status.HTTP_200_OK, rejected.content)
+        self.assertEqual(rejected.data["status"], "Rejected")
+        self.assertEqual(rejected.data["effective_date"], InwardOperations.today().isoformat())
+        self.assertEqual(rejected.data["lab_sampling_date"], "2026-01-01")
+
+        in_db = InwardRawMaterial.all_objects.get(public_id=created.data["public_id"])
+        self.assertEqual(in_db.status.name, "Rejected")
+        self.assertEqual(in_db.status.code, "RAW_MATERIAL_REJECTED")
+        self.assertEqual(in_db.effective_date, InwardOperations.today())
+
+        reverted = self.client.patch(url, {"status": "Lab Testing"}, format="json")
+        self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)
+        self.assertEqual(reverted.data["status"], "Lab Testing")
+        self.assertIsNone(reverted.data["effective_date"])
+        self.assertEqual(reverted.data["lab_sampling_date"], InwardOperations.today().isoformat())
+
+        in_db.refresh_from_db()
+        self.assertEqual(in_db.status.name, "Lab Testing")
+        self.assertIsNone(in_db.effective_date)
+
+    def test_in_use_and_rejected_are_never_a_direct_transition(self):
+        """Lab Testing is the hub: In Use and Rejected never move directly
+        into one another -- a lot must revert to Lab Testing first.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_in_use_and_rejected_are_never_a_direct_transition
+        """
+        self.login_as(self.seed_admin)
+
+        in_use_lot = self._create_lot()
+        self.client.patch(self._url(in_use_lot.data), {"status": "In Use"}, format="json")
+        direct_to_rejected = self.client.patch(
+            self._url(in_use_lot.data), {"status": "Rejected"}, format="json"
+        )
+        self.assertEqual(
+            direct_to_rejected.status_code, status.HTTP_400_BAD_REQUEST, direct_to_rejected.content
+        )
+
+        rejected_lot = self._create_lot()
+        self.client.patch(self._url(rejected_lot.data), {"status": "Rejected"}, format="json")
+        direct_to_in_use = self.client.patch(
+            self._url(rejected_lot.data), {"status": "In Use"}, format="json"
+        )
+        self.assertEqual(
+            direct_to_in_use.status_code, status.HTTP_400_BAD_REQUEST, direct_to_in_use.content
+        )
+
+    def test_a_rejected_lot_can_always_revert_or_be_deleted(self):
+        """A Rejected lot was never packable, so neither move is ever refused
+        on packed-stock grounds -- unlike reverting/deleting an In Use lot.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_a_rejected_lot_can_always_revert_or_be_deleted
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot(quantity_kg="40")
+        url = self._url(created.data)
+        self.client.patch(url, {"status": "Rejected"}, format="json")
+
+        reverted = self.client.patch(url, {"status": "Lab Testing"}, format="json")
+        self.assertEqual(reverted.status_code, status.HTTP_200_OK, reverted.content)
+
+        self.client.patch(url, {"status": "Rejected"}, format="json")
+        deleted = self.client.delete(url)
+        self.assertEqual(deleted.status_code, status.HTTP_204_NO_CONTENT, deleted.content)
+
     def test_product_party_and_quantity_are_immutable(self):
         """Sneaking a new booking into a PATCH changes nothing.
 
@@ -283,6 +379,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
             {
                 "product": 999999,
                 "party": 999999,
+                "lot_no": "SNEAKY-LOT",
                 "quantity_kg": "0.001",
                 "lab_sampling_date": "2026-09-12",
             },
@@ -292,6 +389,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(response.data["quantity_kg"], "150.500")
         self.assertEqual(response.data["product"]["public_id"], "P-I34V7RI1JPUH")
         self.assertEqual(response.data["party"]["id"], self.party.id)
+        self.assertEqual(response.data["lot_no"], "SUP-2026-A1")
         self.assertEqual(response.data["lab_sampling_date"], "2026-09-12")
 
     # -- listing --------------------------------------------------------------
@@ -306,6 +404,20 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(listing.status_code, status.HTTP_200_OK)
         self.assertEqual(listing.data["total_count"], 1)
         self.assertEqual(listing.data["results"][0]["public_id"], created.data["public_id"])
+
+    def test_product_filter_offers_only_products_with_a_lot(self):
+        """The ``product`` filter's options list only products that have a lot.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_product_filter_offers_only_products_with_a_lot
+        """
+        self.login_as(self.seed_admin)
+        created = self._create_lot()
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+
+        available_filters = self.client.get(LOTS_URL).data["available_filters"]
+        entry = next(item for item in available_filters if item["filter"] == "product")
+        options = {opt["value"]: opt["label"] for opt in entry["options"]}
+        self.assertEqual(options, {self.product.public_id: self.product.name})
 
     def test_product_is_addressed_by_public_id_not_pk(self):
         """Create and the ``?product=`` filter both take the product's public id.

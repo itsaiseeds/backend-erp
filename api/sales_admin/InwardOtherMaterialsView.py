@@ -121,6 +121,38 @@ class InwardOtherMaterialListPageSerializer(serializers.Serializer):
     available_sorts = SortCatalogueEntrySerializer(many=True)
 
 
+def _material_types_with_other_material_lots(request: Request) -> list[dict]:
+    """Every distinct material type that has an inward other-material lot.
+
+    The eligible value set for the ``material_type`` filter: the picker only
+    ever needs to offer a material type that actually has a lot behind it.
+    """
+    rows = (
+        InwardOtherMaterial.objects.values_list(
+            "recipe__material_type_id", "recipe__material_type__name"
+        )
+        .distinct()
+        .order_by("recipe__material_type__name")
+    )
+    return [{"value": material_type_id, "label": name} for material_type_id, name in rows]
+
+
+def _products_with_other_material_lots(request: Request) -> list[dict]:
+    """Every distinct product that has an inward other-material lot (via its recipe).
+
+    The eligible value set for the ``product`` filter: the picker only ever
+    needs to offer a product that actually has a lot behind it.
+    """
+    rows = (
+        InwardOtherMaterial.objects.values_list(
+            "recipe__product__public_id", "recipe__product__name"
+        )
+        .distinct()
+        .order_by("recipe__product__name")
+    )
+    return [{"value": public_id, "label": name} for public_id, name in rows]
+
+
 _QUERYSET_FILTERS = (
     QuerysetFilter(
         "party",
@@ -132,14 +164,16 @@ _QUERYSET_FILTERS = (
         "material_type",
         label="Material Type",
         lookup="recipe__material_type_id__in",
-        description="Material type id(s) (see the recipe).",
+        description="Material type id(s) (see the recipe; see options).",
+        options=_material_types_with_other_material_lots,
     ),
     QuerysetFilter(
         "product",
         label="Product",
         lookup="recipe__product__public_id__in",
         parse=parse_str,
-        description="Product public id(s) (see the recipe).",
+        description="Product public id(s) (see the recipe; see options).",
+        options=_products_with_other_material_lots,
     ),
 )
 _SORT_OPTIONS = (

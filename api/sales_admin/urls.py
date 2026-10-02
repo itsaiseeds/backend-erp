@@ -10,8 +10,11 @@ from .AdminsView import AdminsView
 from .ApproveFieldTripView import ApproveFieldTripView
 from .BagStockView import BagStockView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
+from .CreateCustomOrderView import CreateCustomOrderView
 from .CropsView import CropsView
+from .CustomOrderView import CustomOrderView
 from .DeleteOtherMaterialRecipeView import DeleteOtherMaterialRecipeView
+from .DispatchCustomOrderView import DispatchCustomOrderView
 from .DispatchOrderView import DispatchOrderView
 from .ExportCustomOrdersView import ExportCustomOrdersView
 from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
@@ -21,6 +24,7 @@ from .ExportOrdersView import ExportOrdersView
 from .FieldTripView import FieldTripView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
+from .GetCustomOrdersView import GetCustomOrdersView
 from .GetDispatchChallansView import GetDispatchChallansView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
@@ -38,6 +42,7 @@ from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
 from .RawMaterialStockView import RawMaterialStockView
 from .RejectOrderView import RejectOrderView
+from .RevertCustomOrderDispatchView import RevertCustomOrderDispatchView
 from .RevertDispatchView import RevertDispatchView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
@@ -48,6 +53,7 @@ from .UpdateAdminView import UpdateAdminView
 from .UpdateBagStockView import UpdateTodaysInventoryView
 from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
+from .UpdateCustomOrderView import UpdateCustomOrderView
 from .UpdateFieldTripView import UpdateFieldTripView
 from .UpdateInwardOtherMaterialView import UpdateInwardOtherMaterialView
 from .UpdateInwardRawMaterialView import UpdateInwardRawMaterialView
@@ -147,6 +153,38 @@ urlpatterns = [
     ),
     path("hold-order/<str:public_id>", HoldOrderView.as_view(), name="hold-order"),
     path("reject-order/<str:public_id>", RejectOrderView.as_view(), name="reject-order"),
+    # Custom (loose-packet) orders mirror the order routes: ``custom-orders/`` is
+    # a collection, ``custom-order/<public_id>`` a collection item (GET /
+    # DELETE), and the verbs carry the id in the path. Booking is admin-only,
+    # hence a sales-admin ``create-custom-order`` rather than an Android route.
+    path("custom-orders/", GetCustomOrdersView.as_view(), name="custom-orders"),
+    path(
+        "create-custom-order",
+        CreateCustomOrderView.as_view(),
+        name="create-custom-order",
+    ),
+    path(
+        "custom-order/<str:public_id>",
+        CustomOrderView.as_view(),
+        name="custom-order-detail",
+    ),
+    path(
+        "edit-custom-order/<str:public_id>",
+        UpdateCustomOrderView.as_view(),
+        name="edit-custom-order",
+    ),
+    # No upload-lr-number counterpart: a custom order always goes on our
+    # own vehicle, so there is no transporter to issue an LR.
+    path(
+        "dispatch-custom-order/<str:public_id>",
+        DispatchCustomOrderView.as_view(),
+        name="dispatch-custom-order",
+    ),
+    path(
+        "revert-custom-order-dispatch/<str:public_id>",
+        RevertCustomOrderDispatchView.as_view(),
+        name="revert-custom-order-dispatch",
+    ),
     # Field trips follow the order convention: ``field-trips/`` is a collection,
     # ``field-trip/<public_id>`` a collection item (GET / DELETE), and the verbs
     # carry the id in the path.

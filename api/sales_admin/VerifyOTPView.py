@@ -117,7 +117,11 @@ class VerifyOTPView(APIView):
             user = (
                 User.objects.select_for_update().filter(phone_number=data["phone_number"]).first()
             )
-            if user is None or (not user.is_admin_user and not user.is_superuser):
+            if (
+                user is None
+                or not user.is_active
+                or (not user.is_admin_user and not user.is_superuser)
+            ):
                 return Response(_GENERIC_FAILURE, status=400)
 
             # Return the same generic 400 whether the caller is locked or

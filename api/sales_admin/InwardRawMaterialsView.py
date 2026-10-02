@@ -55,6 +55,7 @@ class InwardRawMaterialPayloadSerializer(serializers.Serializer):
     public_id = serializers.CharField()
     product = InwardRawMaterialProductRefSerializer()
     party = InwardRawMaterialPartyRefSerializer()
+    lot_no = serializers.CharField(help_text="The supplier's own batch number.")
     quantity_kg = serializers.CharField(help_text="Kilograms received.")
     status = serializers.CharField()
     lab_sampling_date = serializers.DateField(allow_null=True)
@@ -65,11 +66,12 @@ class CreateInwardRawMaterialSerializer(serializers.Serializer):
     """Request validation for booking a new raw-material lot.
 
     ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
-    ``In Use`` later with ``PATCH``. ``effective_date`` is stamped (today) at
-    that flip and is deliberately absent here. ``lab_sampling_date`` may be
-    given explicitly; left out, it defaults to today -- a lot never starts
-    with no sampling date, since it arrives for lab testing the day it's
-    booked.
+    ``In Use`` or ``Rejected`` later with ``PATCH``. ``effective_date`` is
+    stamped (today) at that flip and is deliberately absent here.
+    ``lab_sampling_date`` may be given explicitly; left out, it defaults to
+    today -- a lot never starts with no sampling date, since it arrives for
+    lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
+    number on the consignment -- is required.
     """
 
     product = serializers.SlugRelatedField(
@@ -80,6 +82,11 @@ class CreateInwardRawMaterialSerializer(serializers.Serializer):
     party = serializers.PrimaryKeyRelatedField(
         queryset=Party.objects.all(),
         error_messages={"required": "Party is required."},
+    )
+    lot_no = serializers.CharField(
+        max_length=64,
+        error_messages={"required": "Lot number is required.", "blank": "Lot number is required."},
+        help_text="The supplier's own batch number for this consignment.",
     )
     quantity_kg = serializers.DecimalField(
         max_digits=10,
@@ -103,13 +110,28 @@ class InwardRawMaterialListPageSerializer(serializers.Serializer):
     available_sorts = SortCatalogueEntrySerializer(many=True)
 
 
+def _products_with_raw_material_lots(request: Request) -> list[dict]:
+    """Every distinct product that has an inward raw-material lot.
+
+    The eligible value set for the ``product`` filter: the picker only ever
+    needs to offer a product that actually has a lot behind it.
+    """
+    rows = (
+        InwardRawMaterial.objects.values_list("product__public_id", "product__name")
+        .distinct()
+        .order_by("product__name")
+    )
+    return [{"value": public_id, "label": name} for public_id, name in rows]
+
+
 _QUERYSET_FILTERS = (
     QuerysetFilter(
         "product",
         label="Product",
         lookup="product__public_id__in",
         parse=parse_str,
-        description="Product public id(s).",
+        description="Product public id(s) (see options).",
+        options=_products_with_raw_material_lots,
     ),
     QuerysetFilter(
         "party",
@@ -122,7 +144,7 @@ _QUERYSET_FILTERS = (
         label="Status",
         lookup="status__name",
         parse=parse_str,
-        description="Lot status (Lab Testing / In Use).",
+        description="Lot status (Lab Testing / In Use / Rejected).",
         options=[
             {"value": s.value, "label": s.label}
             for s in InwardRawMaterialStatus
@@ -190,6 +212,7 @@ class InwardRawMaterialsView(AdminPaginatedDateRangeListView):
         entry = InwardRawMaterial.objects.create(
             product=data["product"],
             party=data["party"],
+            lot_no=data["lot_no"],
             quantity_kg=data["quantity_kg"],
             lab_sampling_date=data.get("lab_sampling_date") or today(),
             created_by=request.user,

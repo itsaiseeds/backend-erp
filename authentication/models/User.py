@@ -12,10 +12,15 @@ from django.utils import timezone
 
 from common.models import TimeStampedModel
 
+from ..credentials import revoke_user_credentials
 from ..validators import validate_phone_number
 
 TOTP_ISSUER = "SaiSeeds"
 TOTP_ISSUER_INTERNAL = "SaiSeeds Internal"
+
+# The fields every live session / token was granted on. Saving a change to any
+# of them logs the user out everywhere (see ``User.save``).
+CREDENTIAL_FIELDS = ("is_active", "phone_number", "totp_secret")
 
 
 class UserManager(BaseUserManager):
@@ -182,10 +187,39 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
         super().clean()
         self._validate_user_fields()
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._remember_credential_fields(CREDENTIAL_FIELDS)
+        return instance
+
+    def _remember_credential_fields(self, fields) -> None:
+        """Snapshot the loaded values of ``fields`` (deferred ones are skipped)."""
+        remembered = self.__dict__.setdefault("_saved_credential_fields", {})
+        for field in fields:
+            if field in self.__dict__:
+                remembered[field] = self.__dict__[field]
+
     def save(self, *args, **kwargs):
         if kwargs.pop("skip_full_clean", False) is not True:
             self.full_clean(exclude=["password", "last_login", "groups", "user_permissions"])
+
+        update_fields = kwargs.get("update_fields")
+        saving = CREDENTIAL_FIELDS if update_fields is None else [
+            field for field in CREDENTIAL_FIELDS if field in update_fields
+        ]
+        remembered = self.__dict__.get("_saved_credential_fields", {})
+        credentials_changed = any(
+            field in remembered and self.__dict__.get(field) != remembered[field]
+            for field in saving
+        )
+
         super().save(*args, **kwargs)
+        self._remember_credential_fields(saving)
+        if credentials_changed:
+            # Deactivated, re-numbered or re-enrolled: whatever was granted on
+            # the old values must not outlive them.
+            revoke_user_credentials(self)
 
     def _validate_user_fields(self):
         errors = {}
@@ -218,18 +252,33 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
             raise ValidationError(errors)
 
     # -- Convenience role helpers -------------------------------------------------
+    def _live_profile(self, related_name: str):
+        """The ``related_name`` profile, or ``None`` if missing or soft-deleted.
+
+        The reverse one-to-one accessor goes through the related model's
+        ``_base_manager``, not ``SoftDeletedManager``, so it still returns a
+        soft-deleted profile -- which must not confer the role.
+        """
+        if self.id is None:
+            return None
+        profile = getattr(self, related_name, None)
+        if profile is None or profile.is_deleted:
+            return None
+        return profile
+
+    @property
+    def live_admin_profile(self):
+        """This user's ``Admin`` profile, unless absent or soft-deleted."""
+        return self._live_profile("admin_profile")
+
     @property
     def is_salesperson(self):
-        if self.id is None:
-            return False
-        return hasattr(self, "salesperson_profile")
+        return self._live_profile("salesperson_profile") is not None
 
     @property
     def is_admin_user(self):
-        """'Admin' = an Admin profile, NOT a Django superuser."""
-        if self.id is None:
-            return False
-        return hasattr(self, "admin_profile")
+        """'Admin' = a live Admin profile, NOT a Django superuser."""
+        return self.live_admin_profile is not None
 
     @property
     def role(self):

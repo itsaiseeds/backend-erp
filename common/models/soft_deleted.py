@@ -1,6 +1,8 @@
+from collections.abc import Callable
+
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import models
+from django.db import models, transaction
 
 from .timestamped import indian_now
 
@@ -56,6 +58,43 @@ class SoftDeletedModel(models.Model):
     def _delete_permission_codename(self):
         return f"{self._meta.app_label}.delete_{self._meta.model_name}"
 
+    def guard_soft_delete(self, perform: Callable[[], None]) -> None:
+        """Run ``perform`` -- the soft delete itself. Override to refuse one.
+
+        Every soft delete goes through here, :meth:`delete` (the Django admin,
+        single and bulk) and :meth:`mark_deleted` (the API) alike, inside one
+        transaction. An override can take locks, read figures, call
+        ``perform()``, read them again and raise ``ValidationError`` to refuse:
+        the raise rolls the delete back. ``SoftDeleteModelAdmin`` shows that
+        error as an admin message and the API renders it as a 400.
+        """
+        perform()
+
+    def _soft_delete(self, actor, using) -> None:
+        """Flag the row deleted through :meth:`guard_soft_delete`, atomically.
+
+        If the guard refuses, the in-memory flags are put back too, so the
+        instance never claims a deletion the database rolled back.
+        """
+
+        def perform():
+            self.deleted_by = actor
+            self.deleted_at = indian_now()
+            self.is_deleted = True
+            self.save(
+                using=using,
+                update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"],
+            )
+
+        try:
+            with transaction.atomic(using=using):
+                self.guard_soft_delete(perform)
+        except Exception:
+            self.deleted_by = None
+            self.deleted_at = None
+            self.is_deleted = False
+            raise
+
     def delete(self, deleted_by=None, using=None, keep_parents=False):
         """Soft delete: flag the row instead of removing it.
 
@@ -75,13 +114,7 @@ class SoftDeletedModel(models.Model):
                 f"User '{deleted_by}' does not have permission to delete '{self._meta.model_name}'."
             )
 
-        self.deleted_by = deleted_by
-        self.deleted_at = indian_now()
-        self.is_deleted = True
-        self.save(
-            using=using,
-            update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"],
-        )
+        self._soft_delete(deleted_by, using)
 
     def hard_delete(self, using=None, keep_parents=False):
         """Physically remove the row, bypassing soft-delete checks."""
@@ -102,13 +135,7 @@ class SoftDeletedModel(models.Model):
         """
         if self.is_deleted:
             return
-        self.deleted_by = actor
-        self.deleted_at = indian_now()
-        self.is_deleted = True
-        self.save(
-            using=using,
-            update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"],
-        )
+        self._soft_delete(actor, using)
 
     def restore(self, using=None):
         """Clear the deleted flags, bringing the record back."""

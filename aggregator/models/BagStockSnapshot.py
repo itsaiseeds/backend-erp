@@ -64,6 +64,17 @@ class InventorySnapshot(
             "OrderItem.quantity. May be 0 when only loose stock is held."
         ),
     )
+    counted_at = models.DateTimeField(
+        "counted at",
+        default=indian_now,
+        editable=False,
+        help_text=(
+            "When this count was last written. A dispatch recorded on "
+            "``snapshot_date`` before this moment is already absent from the "
+            "figure; one recorded after it is not. Set only by the count "
+            "writers in InventoryOperations, never by an admin edit."
+        ),
+    )
     class Meta:
         verbose_name = "inventory snapshot"
         verbose_name_plural = "inventory snapshots"
@@ -74,6 +85,18 @@ class InventorySnapshot(
                 name="uniq_inventorysnapshot_date_packaging",
             ),
         ]
+
+    def guard_soft_delete(self, perform):
+        """Refuse a deletion that leaves this packaging's stock, or the raw or
+        packing material behind it, short -- see
+        ``InventoryOperations.guard_stock_deletion``."""
+        from aggregator import InventoryOperations
+
+        InventoryOperations.guard_stock_deletion(
+            perform,
+            product_ids=[self.product_packaging.product_id],
+            packagings=[self.product_packaging],
+        )
 
     def __str__(self):
         if self.product_packaging_id:
@@ -97,7 +120,7 @@ class InventorySnapshot(
         # ``can_update_stock_count`` gates exactly one thing: writing a stock
         # count. It deliberately does not gate order verification.
         if self.created_by_id and not self.created_by.is_superuser:
-            admin = getattr(self.created_by, "admin_profile", None)
+            admin = self.created_by.live_admin_profile
             if admin is None:
                 errors["created_by"] = (
                     "Stock counts can only be recorded by a sales admin."

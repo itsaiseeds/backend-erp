@@ -229,6 +229,23 @@ class OtherMaterialRecipeApiTest(WebApiTestCase):
         self.assertEqual(response.data["total_count"], 1)
         self.assertEqual(response.data["results"][0]["product"]["public_id"], self.product.public_id)
 
+    def test_product_and_material_type_filters_offer_options(self):
+        """Both filters list only the products/material types that have a recipe.
+
+        tests/test_other_material_recipe_api.py::OtherMaterialRecipeApiTest::test_product_and_material_type_filters_offer_options
+        """
+        self.login_as(self.seed_admin)
+        self._create_recipe(product=self.product, material_type=self.packet_cover)
+
+        available_filters = self.client.get(RECIPES_URL).data["available_filters"]
+        by_name = {entry["filter"]: entry for entry in available_filters}
+
+        product_options = {opt["value"]: opt["label"] for opt in by_name["product"]["options"]}
+        self.assertEqual(product_options, {self.product.public_id: self.product.name})
+
+        type_options = {opt["value"]: opt["label"] for opt in by_name["material_type"]["options"]}
+        self.assertEqual(type_options, {self.packet_cover.id: self.packet_cover.name})
+
     # -- deletion -------------------------------------------------------------
 
     def test_delete_soft_deletes_and_removes_the_recipe_from_the_api(self):

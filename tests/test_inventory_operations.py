@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import datetime
 from decimal import Decimal
+from unittest import mock
 
 from django.core.exceptions import PermissionDenied, ValidationError
 
 from aggregator import InventoryOperations as inv
 from aggregator.ClientOperations import add_client_address, create_client
+from aggregator.DispatchOperations import sync_dispatch_entry
 from aggregator.models import (
     Address,
     City,
@@ -36,6 +38,7 @@ from aggregator.OrderOperations import (
 )
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, SalesPerson, User
+from common.models import indian_now
 from tests.common import DMLTestCase, book_raw_material, book_raw_material_for_every_product
 
 
@@ -116,12 +119,49 @@ class InventoryOperationsTest(DMLTestCase):
         )
         return snapshots
 
-    def _order(self, quantity=2):
+    def _order(self, quantity=2, packaging=None):
         return create_order(
             client=self.client_obj,
             delivery_address=self.addr,
             actor=self.sp_user,
-            items=[{"product_packaging": self.pack, "quantity": quantity}],
+            items=[{"product_packaging": packaging or self.pack, "quantity": quantity}],
+        )
+
+    def _dispatch(self, order, *, dispatch_date, lr_number, packaging=None, quantities=None):
+        """Attach dispatch details and write the challan (status is not moved).
+
+        Mirrors what ``OrderOperations.dispatch_order`` does before flipping the
+        order to DISPATCHED. ``consumed_bags``/``reserved_bags`` now read the
+        challan's ``DispatchEntryItem.quantity``, not just the order line, so a
+        dispatched order needs one of these to mean anything -- a bare status
+        flip (as these tests used to do) leaves no record of what shipped.
+        """
+        packaging = packaging or self.pack
+        # A same-day dispatch needs a real, precise timestamp -- InventoryOperations
+        # compares it against a count's ``counted_at`` to decide which side of that
+        # count it falls on (see ``_dispatch_conditions``). A backdated dispatch
+        # (a different calendar day) only needs *a* time on that day.
+        dispatched_at = (
+            indian_now()
+            if dispatch_date == self.today
+            else datetime.datetime.combine(
+                dispatch_date, datetime.time(), tzinfo=indian_now().tzinfo
+            )
+        )
+        attach_dispatch_details(
+            order, dispatched_by=self.stock_admin, dispatch_date=dispatch_date,
+            from_city=self.city, to_city=self.city2, lr_number=lr_number,
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+        )
+        sync_dispatch_entry(
+            order, actor=self.stock_admin,
+            dispatched_at=dispatched_at,
+            from_city=self.city, to_city=self.city2,
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+            lot_numbers={packaging.public_id: "LOT-1"},
+            quantities=quantities,
         )
 
     # -- writing the count -----------------------------------------------------
@@ -267,12 +307,7 @@ class InventoryOperationsTest(DMLTestCase):
         self._count_everything(bags=400)
         order = self._order(quantity=5)
         verify_order(order, self.stock_admin)
-        attach_dispatch_details(
-            order, dispatched_by=self.stock_admin, dispatch_date=self.today,
-            from_city=self.city, to_city=self.city2, lr_number="LR777",
-            driver_name="Ramesh Driver", driver_number="9876500009",
-            vehicle_number="GJ05AB1234",
-        )
+        self._dispatch(order, dispatch_date=self.today, lr_number="LR777")
         update_order_status(order, StatusIds.DISPATCHED)
 
         assert inv.reserved_bags(self.pack) == 0
@@ -284,17 +319,48 @@ class InventoryOperationsTest(DMLTestCase):
         assert inv.consumed_bags(self.pack) == 0
         assert inv.available_bags(self.pack) == 395
 
+    def test_partial_dispatch_leaves_shortfall_reserved(self):
+        """Shipping fewer bags than ordered leaves the gap reserved, not consumed.
+
+        4 counted, order for 2, only 1 actually dispatched: 1 consumed, 1 still
+        reserved (the undelivered remainder), 2 available, and the live on-hand
+        (available + reserved) is 3 -- one bag genuinely left the floor.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_partial_dispatch_leaves_shortfall_reserved
+        """
+        self._count_everything(bags=4)
+        order = self._order(quantity=2)
+        verify_order(order, self.stock_admin)
+        assert inv.reserved_bags(self.pack) == 2
+        assert inv.available_bags(self.pack) == 2
+
+        self._dispatch(
+            order,
+            dispatch_date=self.today,
+            lr_number="LR950",
+            quantities={self.pack.public_id: 1},
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+
+        assert inv.consumed_bags(self.pack) == 1
+        assert inv.reserved_bags(self.pack) == 1
+        assert inv.available_bags(self.pack) == 2
+
+        position = next(p for p in inv.stock_position() if p["packaging"] == self.pack)
+        assert position["packets_reserved"] == 1
+        assert position["packets_consumed"] == 1
+        assert position["packets_available"] == 2
+        assert position["packets_on_hand"] == 3
+
     def test_dispatch_before_the_count_is_not_subtracted_twice(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_dispatch_before_the_count_is_not_subtracted_twice"""
         self._count_everything(bags=400)
         order = self._order(quantity=5)
         verify_order(order, self.stock_admin)
-        attach_dispatch_details(
-            order, dispatched_by=self.stock_admin,
+        self._dispatch(
+            order,
             dispatch_date=self.today - datetime.timedelta(days=3),
-            from_city=self.city, to_city=self.city2, lr_number="LR778",
-            driver_name="Ramesh Driver", driver_number="9876500009",
-            vehicle_number="GJ05AB1234",
+            lr_number="LR778",
         )
         update_order_status(order, StatusIds.DISPATCHED)
 
@@ -302,6 +368,62 @@ class InventoryOperationsTest(DMLTestCase):
         # absent from the counted 400 and must not be subtracted again.
         assert inv.consumed_bags(self.pack) == 0
         assert inv.available_bags(self.pack) == 400
+
+    def _dispatch_today(self, order):
+        self._dispatch(order, dispatch_date=self.today, lr_number="LR779")
+        update_order_status(order, StatusIds.DISPATCHED)
+
+    def test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice(self):
+        """Dispatched at 10:00, counted at 17:00: the count already lacks those bags.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice
+        """
+        self._count_everything(bags=400)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        self._dispatch_today(order)
+
+        # The re-count finds the 5 dispatched bags gone from the floor.
+        inv.record_stock_count(product_packaging=self.pack, bags=395, actor=self.stock_admin)
+
+        assert inv.consumed_bags(self.pack) == 0
+        assert inv.available_bags(self.pack) == 395
+        # Still spent from raw material: 395 on the floor + 5 on the road.
+        assert inv.raw_available_kg(self.product) == raw_before
+
+    def test_a_same_day_dispatch_after_the_count_is_consumed(self):
+        """Counted first, dispatched later the same day: subtracted once, not ignored.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_a_same_day_dispatch_after_the_count_is_consumed
+        """
+        self._count_everything(bags=400)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._order(quantity=5)
+        verify_order(order, self.stock_admin)
+        self._dispatch_today(order)
+
+        assert inv.consumed_bags(self.pack) == 5
+        assert inv.available_bags(self.pack) == 395
+        assert inv.raw_available_kg(self.product) == raw_before
+
+    def test_only_a_count_write_moves_the_count_time(self):
+        """An admin edit of a count line keeps ``counted_at``; a re-count moves it.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_only_a_count_write_moves_the_count_time
+        """
+        self._count_everything(bags=400)
+        line = inv.snapshot_line(self.pack)
+        counted_at = line.counted_at
+
+        line.full_clean()
+        line.save()  # what the Django admin's change form does
+        line.refresh_from_db()
+        assert line.counted_at == counted_at
+
+        inv.record_stock_count(product_packaging=self.pack, bags=399, actor=self.stock_admin)
+        line.refresh_from_db()
+        assert line.counted_at > counted_at
 
     # -- raw material backing ---------------------------------------------------
     #
@@ -348,7 +470,7 @@ class InventoryOperationsTest(DMLTestCase):
             name="Raw Ops Test Party", city=self.city, defaults={"created_by": self.su}
         )
         InwardRawMaterial.objects.create(
-            product=product, party=party, quantity_kg=Decimal("10.000"),
+            product=product, party=party, lot_no="LOT-1", quantity_kg=Decimal("10.000"),
             created_by=self.su,
         )  # default status=lab_testing, effective_date=None
 
@@ -412,12 +534,10 @@ class InventoryOperationsTest(DMLTestCase):
 
         order = self._order(quantity=5)
         verify_order(order, self.stock_admin)
-        attach_dispatch_details(
-            order, dispatched_by=self.stock_admin,
+        self._dispatch(
+            order,
             dispatch_date=self.today - datetime.timedelta(days=3),
-            from_city=self.city, to_city=self.city2, lr_number="LR900",
-            driver_name="Ramesh Driver", driver_number="9876500009",
-            vehicle_number="GJ05AB1234",
+            lr_number="LR900",
         )
         update_order_status(order, StatusIds.DISPATCHED)
 
@@ -438,6 +558,116 @@ class InventoryOperationsTest(DMLTestCase):
 
         assert inv.reserved_bags(self.pack) == 5
         assert inv.raw_available_kg(self.product) == before
+
+    def test_raw_material_carries_forward_across_a_new_inward_lot(self):
+        """A new day's count is a fresh total, not a delta from raw material.
+
+        100kg in stock; 10 bags of 10kg are made (100kg spent) -- 5 dispatch
+        the same day, 5 stay. That leaves 0kg available: dispatching same-day
+        does not double-spend, since the day's count (10) already included the
+        bags that would ship later that day.
+
+        A second 100kg lot arrives tomorrow. Tomorrow's count is 10 again (the
+        5 that stayed, plus 5 freshly made) -- the raw check must recognise
+        only 5 bags are genuinely new against the new lot, landing on 50kg
+        still available out of 200kg ever supplied (150kg ever bagged), not
+        rejecting the count or double-charging the carried-forward 5.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_raw_material_carries_forward_across_a_new_inward_lot
+        """
+        tomorrow = self.today + datetime.timedelta(days=1)
+
+        product2, pack2 = self._raw_pack(
+            name="Bajra", packet_weight=Decimal("10.000"), packets=1
+        )
+        book_raw_material(
+            product2, Decimal("100.000"), actor=self.stock_admin, effective_date=self.today
+        )
+
+        # Every other packaging just needs *a* count so verification isn't
+        # blocked -- pack2 is the one under test.
+        inv.record_stock_counts(
+            counts=dict.fromkeys(ProductPackaging.objects.exclude(pk=pack2.pk), 1),
+            actor=self.stock_admin,
+        )
+        # Today's opening count: 10 bags made from the 100kg lot. 5 will ship
+        # today; entering 10 (not 5) is what makes the formula work -- see
+        # ``on_hand_bags`` on the count being the stale, as-counted figure.
+        inv.record_stock_count(product_packaging=pack2, bags=10, actor=self.stock_admin)
+
+        order = self._order(quantity=5, packaging=pack2)
+        verify_order(order, self.stock_admin)
+        self._dispatch(order, dispatch_date=self.today, lr_number="LR-BAJRA", packaging=pack2)
+        update_order_status(order, StatusIds.DISPATCHED)
+
+        assert inv.raw_bagged_kg(product2) == Decimal("100.000")
+        assert inv.raw_available_kg(product2) == Decimal("0.000")
+
+        with mock.patch("aggregator.InventoryOperations.today", return_value=tomorrow):
+            book_raw_material(
+                product2, Decimal("100.000"), actor=self.stock_admin, effective_date=tomorrow
+            )
+            # Tomorrow's count: the 5 that stayed, plus 5 freshly made.
+            inv.record_stock_count(product_packaging=pack2, bags=10, actor=self.stock_admin)
+
+            assert inv.raw_inward_kg(product2) == Decimal("200.000")
+            # 15 bags have ever been made (10 yesterday + 5 today) -- 150kg,
+            # not 200kg, even though the count only ever shows 10 at a time.
+            assert inv.raw_bagged_kg(product2) == Decimal("150.000")
+            assert inv.raw_available_kg(product2) == Decimal("50.000")
+
+    def test_higher_next_day_count_allowed_up_to_leftover_raw_material(self):
+        """Growing tomorrow's count is fine as long as raw material still covers it --
+        no second inward lot needed if yesterday's lot was not fully used.
+
+        400kg in stock; 20 bags of 10kg are made (200kg spent), 10 dispatch,
+        10 stay -- 200kg of the original lot is still untouched. Tomorrow's
+        count of 30 (the 10 that stayed, plus 20 freshly made) needs exactly
+        that leftover 200kg and must be accepted, landing on 0kg available.
+        One bag more (31) needs 210kg, which isn't there, and must be refused.
+
+        tests/test_inventory_operations.py::InventoryOperationsTest::test_higher_next_day_count_allowed_up_to_leftover_raw_material
+        """
+        tomorrow = self.today + datetime.timedelta(days=1)
+
+        product3, pack3 = self._raw_pack(
+            name="Ragi", packet_weight=Decimal("10.000"), packets=1
+        )
+        book_raw_material(
+            product3, Decimal("400.000"), actor=self.stock_admin, effective_date=self.today
+        )
+
+        inv.record_stock_counts(
+            counts=dict.fromkeys(ProductPackaging.objects.exclude(pk=pack3.pk), 1),
+            actor=self.stock_admin,
+        )
+        # Today's opening count: 20 bags (200kg) -- 10 will ship today.
+        inv.record_stock_count(product_packaging=pack3, bags=20, actor=self.stock_admin)
+
+        order = self._order(quantity=10, packaging=pack3)
+        verify_order(order, self.stock_admin)
+        self._dispatch(order, dispatch_date=self.today, lr_number="LR-RAGI", packaging=pack3)
+        update_order_status(order, StatusIds.DISPATCHED)
+
+        # 200kg spent, 200kg of the 400kg lot still untouched.
+        assert inv.raw_bagged_kg(product3) == Decimal("200.000")
+        assert inv.raw_available_kg(product3) == Decimal("200.000")
+
+        with mock.patch("aggregator.InventoryOperations.today", return_value=tomorrow):
+            # No new inward lot -- same 400kg, no more, no less.
+            assert inv.raw_inward_kg(product3) == Decimal("400.000")
+
+            # 31 needs 210kg against the leftover 200kg: refused.
+            with self.assertRaises(ValueError):
+                inv.record_stock_count(
+                    product_packaging=pack3, bags=31, actor=self.stock_admin
+                )
+
+            # 30 (10 carried + 20 new) needs exactly the leftover 200kg: allowed.
+            inv.record_stock_count(product_packaging=pack3, bags=30, actor=self.stock_admin)
+            assert inv.on_hand_bags(pack3) == 30
+            assert inv.raw_bagged_kg(product3) == Decimal("400.000")
+            assert inv.raw_available_kg(product3) == Decimal("0.000")
 
     def test_uncounted_packaging_has_no_stock(self):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_uncounted_packaging_has_no_stock"""
@@ -477,13 +707,7 @@ class InventoryOperationsTest(DMLTestCase):
 
         dispatched_order = self._order(quantity=3)
         verify_order(dispatched_order, self.stock_admin)
-        attach_dispatch_details(
-            dispatched_order, dispatched_by=self.stock_admin,
-            dispatch_date=self.today,
-            from_city=self.city, to_city=self.city2, lr_number="LR901",
-            driver_name="Suresh Driver", driver_number="9876500010",
-            vehicle_number="GJ05AB5678",
-        )
+        self._dispatch(dispatched_order, dispatch_date=self.today, lr_number="LR901")
         update_order_status(dispatched_order, StatusIds.DISPATCHED)
 
         # The raw count itself never changes -- it's the day's opening balance.

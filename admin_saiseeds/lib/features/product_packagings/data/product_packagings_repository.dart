@@ -45,21 +45,16 @@ class ProductPackagingsRepository {
     );
   }
 
+  /// Only the price of an existing packaging can change: its product, packet
+  /// weight and packet count are fixed once created, since orders, challans
+  /// and stock counts all read them live.
   Future<void> updateProductPackaging({
     required String publicId,
-    required String productPublicId,
-    required String packetWeight,
-    required String packets,
     required String sellingPrice,
   }) async {
     await _apiClient.patch(
       ProductPackagingsEndpoints.detail(publicId),
-      body: _body(
-        productPublicId: productPublicId,
-        packetWeight: packetWeight,
-        packets: packets,
-        sellingPrice: sellingPrice,
-      ),
+      body: {'selling_price': sellingPrice},
     );
   }
 

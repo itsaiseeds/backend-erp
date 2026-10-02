@@ -16,6 +16,60 @@ from .Status import StatusIds
 
 ORDER_STATUS_CODES = {s.name for s in StatusIds.order_statuses()}
 DISPATCH_REQUIRED_STATUS_CODES = {StatusIds.DISPATCHED.name, StatusIds.DELIVERED.name}
+# Statuses in which an order holds stock: reserved (CONFIRMED) or consumed
+# (DISPATCHED, DELIVERED). Such an order cannot be deleted -- see
+# ``refuse_deleting_stock_holder``.
+STOCK_HOLDING_STATUS_IDS = frozenset(
+    {StatusIds.CONFIRMED, StatusIds.DISPATCHED, StatusIds.DELIVERED}
+)
+
+
+def refuse_deleting_stock_holder(order: models.Model) -> None:
+    """Raise unless ``order`` (an Order or CustomOrder) may be soft-deleted.
+
+    The stock math leaves deleted orders out entirely, which is only right if
+    a deleted order never held stock: a CONFIRMED order's reservation would
+    silently lapse, and a dispatched one's bags -- which physically left --
+    would reappear as available stock and hand their raw and packing material
+    back. So an order holding stock must first be moved out of it through its
+    lifecycle (unverify / revert the dispatch / reject). A delivered order is
+    history and can never be deleted.
+
+    The stored status is read under a row lock, so a concurrent transition
+    cannot slip between the check and the delete.
+    """
+    status_id = (
+        type(order)._base_manager.select_for_update()
+        .filter(pk=order.pk)
+        .values_list("status_id", flat=True)
+        .first()
+    )
+    if status_id in STOCK_HOLDING_STATUS_IDS:
+        code = StatusIds(status_id).name
+        raise ValidationError(
+            f"Cannot delete an order that is {code}: it holds stock. "
+            "Unverify, revert the dispatch of, or reject it first."
+        )
+
+
+def client_link_changed(instance: models.Model, *fields: str) -> bool:
+    """Whether any of ``fields`` differs from what is stored for ``instance``.
+
+    True for an unsaved instance. The address and agency an order was booked
+    against are checked against the client's *live* links when they are set,
+    not on every later save: the client's lists are full replacements that
+    soft-delete a dropped link (and an address is keyed by its text, so fixing
+    a typo unlinks the old one), and re-checking an unchanged reference would
+    leave every open order using it unable to move again.
+    """
+    if instance._state.adding or instance.pk is None:
+        return True
+    stored = (
+        type(instance)._base_manager.filter(pk=instance.pk).values(*fields).first()
+    )
+    if stored is None:
+        return True
+    return any(stored[field] != getattr(instance, field) for field in fields)
 
 
 def default_expected_delivery_date():
@@ -123,6 +177,11 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
             ),
         ]
 
+    def guard_soft_delete(self, perform):
+        """See ``refuse_deleting_stock_holder``."""
+        refuse_deleting_stock_holder(self)
+        perform()
+
     def __str__(self):
         return self.public_id or "Order"
 
@@ -175,7 +234,11 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
         ):
             errors["verified_by"] = "Orders can only be verified by a sales admin."
 
-        if self.client_id and self.delivery_address_id:
+        if (
+            self.client_id
+            and self.delivery_address_id
+            and client_link_changed(self, "client_id", "delivery_address_id")
+        ):
             from .ClientAddress import ClientAddress
 
             belongs = ClientAddress.objects.filter(
@@ -187,7 +250,11 @@ class Order(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedBy
                     "Delivery address must belong to the selected client."
                 )
 
-        if self.client_id and self.transport_agency_id:
+        if (
+            self.client_id
+            and self.transport_agency_id
+            and client_link_changed(self, "client_id", "transport_agency_id")
+        ):
             from .ClientTransportAgency import ClientTransportAgency
 
             linked = ClientTransportAgency.objects.filter(

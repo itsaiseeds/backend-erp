@@ -16,14 +16,20 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 
 from aggregator import InventoryOperations as inv
-from aggregator.ClientOperations import add_client_address, create_client
+from aggregator.ClientOperations import (
+    add_client_address,
+    create_client,
+    sync_client_addresses,
+)
 from aggregator.CustomOrderOperations import (
     add_custom_order_item,
     attach_dispatch_details,
     create_custom_order,
+    mark_delivered,
     revert_dispatch,
     update_custom_order_status,
 )
+from aggregator.DispatchOperations import sync_custom_dispatch_entry
 from aggregator.models import (
     Address,
     City,
@@ -38,6 +44,7 @@ from aggregator.models import (
 )
 from aggregator.ProductOperations import add_packaging, create_product
 from authentication.models import Admin, SalesPerson, User
+from common.models import indian_now
 from tests.common import DMLTestCase, book_raw_material_for_every_product
 
 
@@ -160,11 +167,37 @@ class CustomOrderOperationsTest(DMLTestCase):
         )
 
     def _dispatch(self, order, *, date=None):
+        """Attach dispatch details and write the challan, then move to DISPATCHED.
+
+        Mirrors ``CustomOrderOperations.dispatch_custom_order``.
+        ``consumed_loose_packets``/``reserved_loose_packets`` read the challan's
+        ``DispatchEntryItem`` (and its ``DispatchEntry.dispatched_at``, for
+        same-day ordering against a count) -- a bare status flip leaves no
+        record of what shipped or when.
+        """
+        dispatch_date = date or self.today
+        dispatched_at = (
+            indian_now()
+            if dispatch_date == self.today
+            else datetime.datetime.combine(
+                dispatch_date, datetime.time(), tzinfo=indian_now().tzinfo
+            )
+        )
         attach_dispatch_details(
-            order, dispatched_by=self.stock_admin, dispatch_date=date or self.today,
+            order, dispatched_by=self.stock_admin, dispatch_date=dispatch_date,
             from_city=self.city, to_city=self.city2, lr_number="LR-CO",
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+        )
+        sync_custom_dispatch_entry(
+            order, actor=self.stock_admin, dispatched_at=dispatched_at,
+            from_city=self.city, to_city=self.city2,
+            driver_name="Ramesh Driver", driver_number="9876500009",
+            vehicle_number="GJ05AB1234",
+            lot_numbers={
+                (item.product.public_id, item.packet_weight): "LOT-CO"
+                for item in order.items.select_related("product")
+            },
         )
         update_custom_order_status(order, StatusIds.DISPATCHED)
 
@@ -213,6 +246,92 @@ class CustomOrderOperationsTest(DMLTestCase):
                 client=self.client_obj, delivery_address=self.addr_other, actor=self.stock_admin,
                 items=[{"product": self.product, "packet_weight": self.w1, "packets": 5}],
             )
+
+    def test_a_custom_order_keeps_moving_after_its_address_is_unlinked(self):
+        """Create, drop the address from the client, then dispatch and revert.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_custom_order_keeps_moving_after_its_address_is_unlinked
+        """
+        self._count()
+        order = self._custom_order(packets=5)
+        sync_client_addresses(
+            self.client_obj,
+            [
+                {
+                    "line_1": "5 Fresh Rd",
+                    "line_2": "",
+                    "pincode": "411003",
+                    "city": self.city,
+                    "state": self.state,
+                    "country": self.country,
+                    "is_primary": True,
+                }
+            ],
+            self.stock_admin,
+        )
+        assert not self.client_obj.client_addresses.filter(address=self.addr).exists()
+
+        self._dispatch(order)
+        revert_dispatch(order)
+
+        order.refresh_from_db()
+        assert order.status.code == "CONFIRMED"
+        assert order.delivery_address == self.addr
+
+    def test_lines_for_one_pool_are_checked_together(self):
+        """30 + 30 from a pool of 50: each line fits alone, the order does not.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_lines_for_one_pool_are_checked_together
+        """
+        self._count(loose_packets=50)
+        line = {"product": self.product, "packet_weight": self.w1, "packets": 30}
+
+        with self.assertRaisesMessage(ValidationError, "need 60, have 50"):
+            create_custom_order(
+                client=self.client_obj, delivery_address=self.addr,
+                actor=self.stock_admin, items=[line, dict(line)],
+            )
+        assert not CustomOrder.objects.exists()
+
+    def test_a_custom_order_holding_stock_cannot_be_deleted(self):
+        """Born CONFIRMED, it reserves packets from the start.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_custom_order_holding_stock_cannot_be_deleted
+        """
+        self._count(loose_packets=100)
+        order = self._custom_order(packets=30)
+
+        with self.assertRaisesMessage(ValidationError, "Cannot delete an order that is CONFIRMED"):
+            order.delete(deleted_by=self.su)
+        update_custom_order_status(order, StatusIds.REJECTED)
+        order.delete(deleted_by=self.su)
+
+        assert inv.available_loose_packets(self.product, self.w1) == 100
+
+    def test_a_custom_order_already_deleted_holds_no_stock(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_custom_order_already_deleted_holds_no_stock"""
+        self._count(loose_packets=100)
+        order = self._custom_order(packets=30)
+
+        CustomOrder.all_objects.filter(pk=order.pk).update(is_deleted=True)
+
+        assert inv.reserved_loose_packets(self.product, self.w1) == 0
+        assert inv.available_loose_packets(self.product, self.w1) == 100
+
+    def test_only_a_dispatched_custom_order_can_be_reverted_or_delivered(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_only_a_dispatched_custom_order_can_be_reverted_or_delivered"""
+        self._count(loose_packets=100)
+        order = self._custom_order(packets=30)
+
+        with self.assertRaisesMessage(ValidationError, "Cannot revert the dispatch of a custom order that is CONFIRMED"):
+            revert_dispatch(order)
+        with self.assertRaisesMessage(ValidationError, "Cannot deliver a custom order that is CONFIRMED"):
+            mark_delivered(order)
+
+        self._dispatch(order)
+        mark_delivered(order)
+        order.refresh_from_db()
+        assert order.status.code == "DELIVERED"
 
     def test_one_line_per_product_and_weight(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_one_line_per_product_and_weight"""
@@ -368,6 +487,18 @@ class CustomOrderOperationsTest(DMLTestCase):
         assert inv.consumed_loose_packets(self.product, self.w1) == 0
         assert inv.available_loose_packets(self.product, self.w1) == 70
 
+    def test_a_loose_count_line_under_reservations_cannot_be_deleted(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_loose_count_line_under_reservations_cannot_be_deleted"""
+        self._count(loose_packets=100)
+        self._custom_order(packets=30)
+        line = inv.loose_line(self.product, self.w1)
+
+        with self.assertRaisesMessage(ValidationError, "short by 30 packets"):
+            line.mark_deleted(self.stock_admin)
+        line.refresh_from_db()
+        assert not line.is_deleted
+        assert inv.available_loose_packets(self.product, self.w1) == 70
+
     def test_dispatch_before_count_not_subtracted_twice(self):
         """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_dispatch_before_count_not_subtracted_twice"""
         self._count(loose_packets=100)
@@ -376,6 +507,36 @@ class CustomOrderOperationsTest(DMLTestCase):
         # Dispatched before the count -> already gone, not subtracted again.
         assert inv.consumed_loose_packets(self.product, self.w1) == 0
         assert inv.available_loose_packets(self.product, self.w1) == 100
+
+    def test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice(self):
+        """Dispatched earlier today, then re-counted: the count already lacks them.
+
+        tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_same_day_dispatch_before_the_count_is_not_subtracted_twice
+        """
+        self._count(loose_packets=100)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._custom_order(packets=30)
+        self._dispatch(order)  # today
+
+        inv.record_loose_stock(
+            product=self.product, packet_weight=self.w1, packets=70, actor=self.stock_admin
+        )
+
+        assert inv.consumed_loose_packets(self.product, self.w1) == 0
+        assert inv.available_loose_packets(self.product, self.w1) == 70
+        # 70 on the floor + 30 on the road are still spent from raw material.
+        assert inv.raw_available_kg(self.product) == raw_before
+
+    def test_a_same_day_dispatch_after_the_count_is_consumed(self):
+        """tests/test_custom_order_operations.py::CustomOrderOperationsTest::test_a_same_day_dispatch_after_the_count_is_consumed"""
+        self._count(loose_packets=100)
+        raw_before = inv.raw_available_kg(self.product)
+        order = self._custom_order(packets=30)
+        self._dispatch(order)  # today, after the count
+
+        assert inv.consumed_loose_packets(self.product, self.w1) == 30
+        assert inv.available_loose_packets(self.product, self.w1) == 70
+        assert inv.raw_available_kg(self.product) == raw_before
 
     # -- both pools together ---------------------------------------------------
 

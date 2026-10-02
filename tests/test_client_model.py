@@ -146,6 +146,29 @@ class ClientModelTest(DMLTestCase):
         )
         assert primaries == [a2.id]
 
+    def test_set_or_update_primary_address_restores_a_removed_link(self):
+        """A removed (client, address) link is restored, not inserted a second time.
+
+        tests/test_client_model.py::ClientModelTest::test_set_or_update_primary_address_restores_a_removed_link
+        """
+        client = create_client(
+            company_name="Acme", gst_number="27AAPFU0939F1ZV", actor=self.sp_user
+        )
+        a1 = self._address("1 Main St")
+        a2 = self._address("2 Second St")
+        removed = add_client_address(client, a1, self.sp_user, is_primary=True)
+        set_or_update_primary_address(client, a2, self.sp_user)
+        removed.mark_deleted(self.sp_user)
+
+        restored = set_or_update_primary_address(client, a1, self.sp_user)
+
+        assert restored.pk == removed.pk
+        assert not restored.is_deleted
+        primaries = list(
+            client.client_addresses.filter(is_primary=True).values_list("address_id", flat=True)
+        )
+        assert primaries == [a1.id]
+
     # -- address geo-chain consistency --------------------------------------
 
     def _sync_item(self, **overrides):

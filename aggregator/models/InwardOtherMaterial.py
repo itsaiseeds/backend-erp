@@ -62,6 +62,15 @@ class InwardOtherMaterial(
             ),
         ]
 
+    def guard_soft_delete(self, perform):
+        """Refuse removing packing material the packed packets already use --
+        see ``InventoryOperations.guard_stock_deletion``."""
+        from aggregator import InventoryOperations
+
+        InventoryOperations.guard_stock_deletion(
+            perform, material_type_ids=[self.recipe.material_type_id]
+        )
+
     def __str__(self):
         return (
             f"{self.public_id}: {self.quantity} {self.recipe.material_type.name}"

@@ -1,6 +1,10 @@
+from collections.abc import Callable
+
 from django.db import models
 
 from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
+
+from ..credentials import revoke_user_credentials
 
 
 class SalesPerson(CreatedByModel, TimeStampedModel, SoftDeletedModel):
@@ -24,6 +28,11 @@ class SalesPerson(CreatedByModel, TimeStampedModel, SoftDeletedModel):
     class Meta:
         verbose_name = "sales person"
         verbose_name_plural = "sales people"
+
+    def guard_soft_delete(self, perform: Callable[[], None]) -> None:
+        """Losing the sales person role logs the user out of every session and token."""
+        perform()
+        revoke_user_credentials(self.user)
 
     def __str__(self):
         return f"SalesPerson: {self.user}"
