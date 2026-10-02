@@ -32,10 +32,8 @@ from aggregator.models import (
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
     QuerysetFilter,
-    RangeFilter,
     SortCatalogueEntrySerializer,
     SortOption,
-    parse_date,
     parse_str,
     public_id_filter,
 )
@@ -164,16 +162,6 @@ RAW_LOT_QUERYSET_FILTERS = (
             {"value": s.value, "label": s.label}
             for s in InwardRawMaterialStatus
         ],
-    ),
-    RangeFilter(
-        "effective_date",
-        label="Effective Date",
-        parse=parse_date,
-        suffixes=("gte", "lte"),
-        description=(
-            "Day the lot started counting toward stock (YYYY-MM-DD, inclusive). "
-            "Lots without an effective date are excluded."
-        ),
     ),
 )
 RAW_LOT_SORT_OPTIONS = (
@@ -431,15 +419,6 @@ OTHER_LOT_QUERYSET_FILTERS = (
         parse=parse_str,
         description="Product public id(s) (see the recipe; see options).",
         options=_products_with_other_material_lots,
-    ),
-    RangeFilter(
-        "effective_date",
-        label="Effective Date",
-        parse=parse_date,
-        suffixes=("gte", "lte"),
-        description=(
-            "Day the lot started counting toward stock (YYYY-MM-DD, inclusive)."
-        ),
     ),
 )
 OTHER_LOT_SORT_OPTIONS = (
