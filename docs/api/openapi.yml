@@ -686,7 +686,7 @@ paths:
       description: List (GET) or book (POST) inward other-material lots (godown manager
         only).
       summary: List inward other-material lots (filter by party / material type /
-        product, sortable)
+        product / effective date range, sortable)
       parameters:
       - in: query
         name: all
@@ -695,6 +695,20 @@ paths:
           default: false
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: effective_date_gte
+        schema:
+          type: string
+          format: date
+        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
+          Inclusive lower bound.
+      - in: query
+        name: effective_date_lte
+        schema:
+          type: string
+          format: date
+        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
+          Inclusive upper bound.
       - in: query
         name: material_type
         schema:
@@ -831,8 +845,8 @@ paths:
       operationId: android_api_v1_godown_inward_raw_materials_list
       description: List (GET) or book (POST) inward raw-material lots (godown manager
         only).
-      summary: List inward raw-material lots (filter by product / party / status,
-        sortable)
+      summary: List inward raw-material lots (filter by product / party / status /
+        effective date range, sortable)
       parameters:
       - in: query
         name: all
@@ -841,6 +855,20 @@ paths:
           default: false
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: effective_date_gte
+        schema:
+          type: string
+          format: date
+        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
+          Lots without an effective date are excluded. Inclusive lower bound.
+      - in: query
+        name: effective_date_lte
+        schema:
+          type: string
+          format: date
+        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
+          Lots without an effective date are excluded. Inclusive upper bound.
       - in: query
         name: page
         schema:
@@ -2778,7 +2806,7 @@ paths:
       description: List (GET) or create (POST) inward other-material lots (app admin
         only).
       summary: List inward other-material lots (filter by party / material type /
-        product, sortable)
+        product / effective date range, sortable)
       parameters:
       - in: query
         name: all
@@ -2787,6 +2815,20 @@ paths:
           default: false
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: effective_date_gte
+        schema:
+          type: string
+          format: date
+        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
+          Inclusive lower bound.
+      - in: query
+        name: effective_date_lte
+        schema:
+          type: string
+          format: date
+        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
+          Inclusive upper bound.
       - in: query
         name: material_type
         schema:
@@ -2923,8 +2965,8 @@ paths:
       operationId: sales_admin_inward_raw_materials_list
       description: List (GET) or create (POST) inward raw-material lots (app admin
         only).
-      summary: List inward raw-material lots (filter by product / party / status,
-        sortable)
+      summary: List inward raw-material lots (filter by product / party / status /
+        effective date range, sortable)
       parameters:
       - in: query
         name: all
@@ -2933,6 +2975,20 @@ paths:
           default: false
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: effective_date_gte
+        schema:
+          type: string
+          format: date
+        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
+          Lots without an effective date are excluded. Inclusive lower bound.
+      - in: query
+        name: effective_date_lte
+        schema:
+          type: string
+          format: date
+        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
+          Lots without an effective date are excluded. Inclusive upper bound.
       - in: query
         name: page
         schema:
@@ -3661,6 +3717,97 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
+  /api/sales-admin/raw-material-waste/{public_id}:
+    delete:
+      operationId: api_sales_admin_raw_material_waste_destroy
+      description: Soft-delete a raw-material waste row (app admin only).
+      summary: Delete a raw-material waste row
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin · Inward
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/raw-material-wastes:
+    get:
+      operationId: sales_admin_raw_material_wastes_list
+      description: List (GET) or record (POST) raw-material waste (app admin only).
+      summary: List raw-material waste (filter by product, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, product, quantity_kg);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Admin · Inward
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialWasteListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_raw_material_wastes_create
+      description: List (GET) or record (POST) raw-material waste (app admin only).
+      summary: Record raw-material waste
+      tags:
+      - Admin · Inward
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRawMaterialWasteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateRawMaterialWasteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateRawMaterialWasteRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialWastePayload'
           description: ''
   /api/sales-admin/reject-order/{public_id}:
     post:
@@ -5672,6 +5819,29 @@ components:
       - name
       - selling_price
       - stage
+    CreateRawMaterialWasteRequest:
+      type: object
+      description: |-
+        Request validation for recording raw-material waste.
+
+        There is no date field: waste is a standing deduction from the product's
+        unpacked raw pool from the moment it is recorded.
+      properties:
+        product:
+          type: string
+          minLength: 1
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms of raw material wasted.
+        reason:
+          type: string
+          default: ''
+          maxLength: 255
+      required:
+      - product
+      - quantity_kg
     CreateRecipeRequest:
       type: object
       description: Request validation for creating a new ``OtherMaterialRecipe``.
@@ -8471,9 +8641,12 @@ components:
         packed_kg:
           type: string
           description: KG already packed into bags or sample packets.
+        wasted_kg:
+          type: string
+          description: KG written off as waste (undated).
         available_kg:
           type: string
-          description: 'KG left to pack: incoming_kg minus packed_kg.'
+          description: 'KG left to pack: incoming_kg minus packed_kg minus wasted_kg.'
         rejected_kg:
           type: string
           description: Rejected KG with a reached effective date. Reported only, never
@@ -8485,6 +8658,69 @@ components:
       - packed_kg
       - product
       - rejected_kg
+      - wasted_kg
+    RawMaterialWasteListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RawMaterialWastePayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    RawMaterialWastePayload:
+      type: object
+      description: Output shape for one raw-material waste row.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/InwardRawMaterialProductRef'
+        quantity_kg:
+          type: string
+          description: Kilograms wasted.
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          description: When the waste was recorded.
+        created_by:
+          allOf:
+          - $ref: '#/components/schemas/InwardCreatedByRef'
+          nullable: true
+      required:
+      - created_at
+      - created_by
+      - product
+      - public_id
+      - quantity_kg
+      - reason
     ReauthenticateResponse:
       type: object
       description: |-

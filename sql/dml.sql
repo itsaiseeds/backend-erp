@@ -352,4 +352,286 @@ SELECT setval(pg_get_serial_sequence('public.aggregator_product', 'id'),        
 SELECT setval(pg_get_serial_sequence('public.aggregator_productpackaging', 'id'), (SELECT MAX(id) FROM public.aggregator_productpackaging));
 SELECT setval(pg_get_serial_sequence('public.aggregator_othermaterialtype', 'id'),    (SELECT MAX(id) FROM public.aggregator_othermaterialtype));
 
+
+-- >>> DUMMY DATA BEGIN (tests/conftest.py skips everything up to DUMMY DATA END)
+-- =========================================================================
+-- Dummy data for manual testing
+--   Sample rows for every table not seeded above, at most 5 rows per table,
+--   weighted towards SAI-33 (product 1) with a little SAI-3353 (product 2).
+--   Every date is relative to today (India time), so lots stay "reached" and
+--   the counts stay "today's" whenever the file is loaded. Public ids are
+--   readable (<PREFIX>DUMMY0000001).
+--
+--   Stock picture it produces (all derived at read time, nothing stored):
+--     SAI-33   raw 1900 kg in use (+300 kg rejected, not spendable) - 960 bagged - 80 loose
+--              - 37.5 wasted = 822.5 kg available; 20 bags counted, 5 reserved.
+--     SAI-3353 raw 400 kg in use - 330 packed (bags + loose) - 5.5 wasted = 64.5 kg.
+--     Packing material is stocked well above what the packed packets use.
+--   Orders cover every lifecycle state: BOOKED, CONFIRMED, DISPATCHED (agency),
+--   DELIVERED (own vehicle), ON_HOLD; custom orders: BOOKED, CONFIRMED, DISPATCHED.
+--   Relies on the seed ids above: users 1-5 (3 = sales person, 4 = admin),
+--   cities 1-5, crops 1-2, products 1-2, packagings 1-2, material types 1-3,
+--   statuses 1-16 (16 = Rejected raw lot), user 6 = godown manager.
+-- =========================================================================
+
+-- "Today" in the project's timezone, matching InventoryOperations.today().
+CREATE FUNCTION pg_temp.today_ist() RETURNS date LANGUAGE sql AS
+$$ SELECT (now() AT TIME ZONE 'Asia/Kolkata')::date $$;
+
+-- -------------------------------------------------------------------------
+-- Geography: pincodes + addresses
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_pincode (id, created_at, updated_at, is_deleted, created_by_id, code, city_id) VALUES
+(1, now(), now(), false, 1, '395003', 1),
+(2, now(), now(), false, 1, '380001', 2),
+(3, now(), now(), false, 1, '360001', 3),
+(4, now(), now(), false, 1, '302001', 4),
+(5, now(), now(), false, 1, '345001', 5);
+
+INSERT INTO public.aggregator_address (id, created_at, updated_at, is_deleted, created_by_id, address_line_1, address_line_2, city_id, state_id, country_id, pincode_id) VALUES
+(1, now(), now(), false, 1, '12 Ring Road Industrial Estate', 'Near Textile Market', 1, 1, 1, 1),
+(2, now(), now(), false, 1, '44 CG Road', 'Navrangpura', 2, 1, 1, 2),
+(3, now(), now(), false, 1, '7 Kalawad Road', 'Opp. Agro Mandi', 3, 1, 1, 3),
+(4, now(), now(), false, 1, '21 MI Road', 'Near Sindhi Camp', 4, 2, 1, 4),
+(5, now(), now(), false, 1, '5 Gadisar Marg', 'Fort Area', 5, 2, 1, 5);
+
+-- -------------------------------------------------------------------------
+-- Master data: transport agencies, contacts, parties, product descriptions
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_transportagency (id, created_at, updated_at, is_deleted, created_by_id, "name") VALUES
+(1, now(), now(), false, 1, 'Shree Maruti Courier'),
+(2, now(), now(), false, 1, 'VRL Logistics'),
+(3, now(), now(), false, 1, 'Gati Transport'),
+(4, now(), now(), false, 1, 'Patel Roadways'),
+(5, now(), now(), false, 1, 'Sai Cargo Movers');
+
+INSERT INTO public.aggregator_contact (id, created_at, updated_at, is_deleted, created_by_id, "name", phone_number) VALUES
+(1, now(), now(), false, 3, 'Mahesh Desai', '9825011001'),
+(2, now(), now(), false, 3, 'Kiran Shah', '9825011002'),
+(3, now(), now(), false, 3, 'Jayesh Patel', '9825011003'),
+(4, now(), now(), false, 3, 'Rakesh Sharma', '9829011004'),
+(5, now(), now(), false, 3, 'Bhanwar Singh', '9829011005');
+
+INSERT INTO public.aggregator_party (id, created_at, updated_at, is_deleted, created_by_id, "name", city_id, contact_number) VALUES
+(1, now(), now(), false, 4, 'Shree Agro Traders', 1, '9898100001'),
+(2, now(), now(), false, 4, 'Gujarat Seed Suppliers', 2, '9898100002'),
+(3, now(), now(), false, 4, 'Rajkot Packaging Co', 3, '9898100003'),
+(4, now(), now(), false, 4, 'Jaipur Poly Industries', 4, '9898100004'),
+(5, now(), now(), false, 4, 'Marwar Agro Inputs', 5, '9898100005');
+
+INSERT INTO public.aggregator_productdescriptionitem (id, created_at, updated_at, is_deleted, created_by_id, product_id, "text", sequence) VALUES
+(1, now(), now(), false, 1, 1, 'High-yielding castor hybrid', 1),
+(2, now(), now(), false, 1, 1, 'Tolerant to wilt and root rot', 2),
+(3, now(), now(), false, 1, 1, 'Matures in 150-160 days', 3),
+(4, now(), now(), false, 1, 2, 'Drought-tolerant bajari hybrid', 1),
+(5, now(), now(), false, 1, 2, 'Suited to sandy soils of Rajasthan', 2);
+
+-- -------------------------------------------------------------------------
+-- Clients (+ address / contact / transport agency links)
+--   Clients 1-4 verified; client 5 still VERIFICATION_PENDING (status 8).
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_client (id, created_at, updated_at, is_deleted, created_by_id, public_id, company_name, company_phone, gst_number, status_id, verified_by_id, verified_at) VALUES
+(1, now(), now(), false, 3, 'C-DUMMY0000001', 'Desai Agro Centre', '0261400001', '24AAACD1001A1Z1', 9, 4, now()),
+(2, now(), now(), false, 3, 'C-DUMMY0000002', 'Shah Krishi Bhandar', '0792500002', '24AAACS1002B1Z2', 9, 4, now()),
+(3, now(), now(), false, 3, 'C-DUMMY0000003', 'Patel Seeds & Fertilizers', '0281600003', '24AAACP1003C1Z3', 9, 4, now()),
+(4, now(), now(), false, 3, 'C-DUMMY0000004', 'Sharma Beej Bhandar', '0141700004', '08AAACS1004D1Z4', 9, 4, now()),
+(5, now(), now(), false, 3, 'C-DUMMY0000005', 'Marwar Kisan Sewa Kendra', '0299200005', '08AAACM1005E1Z5', 8, NULL, NULL);
+
+INSERT INTO public.aggregator_clientaddress (id, created_at, updated_at, is_deleted, created_by_id, client_id, address_id, label, is_primary) VALUES
+(1, now(), now(), false, 3, 1, 1, 'Head Office', true),
+(2, now(), now(), false, 3, 2, 2, 'Head Office', true),
+(3, now(), now(), false, 3, 3, 3, 'Warehouse', true),
+(4, now(), now(), false, 3, 4, 4, 'Head Office', true),
+(5, now(), now(), false, 3, 5, 5, 'Shop', true);
+
+INSERT INTO public.aggregator_clientcontact (id, created_at, updated_at, is_deleted, created_by_id, client_id, contact_id, "role", is_primary) VALUES
+(1, now(), now(), false, 3, 1, 1, 'Owner', true),
+(2, now(), now(), false, 3, 2, 2, 'Owner', true),
+(3, now(), now(), false, 3, 3, 3, 'Manager', true),
+(4, now(), now(), false, 3, 4, 4, 'Owner', true),
+(5, now(), now(), false, 3, 5, 5, 'Owner', true);
+
+INSERT INTO public.aggregator_clienttransportagency (id, created_at, updated_at, is_deleted, created_by_id, client_id, transport_agency_id, is_primary) VALUES
+(1, now(), now(), false, 3, 1, 1, true),
+(2, now(), now(), false, 3, 2, 2, true),
+(3, now(), now(), false, 3, 3, 3, true),
+(4, now(), now(), false, 3, 4, 4, true),
+(5, now(), now(), false, 3, 5, 5, true);
+
+-- -------------------------------------------------------------------------
+-- Inward raw material (SAI-33 gets four lots, SAI-3353 one)
+--   status 10 = Lab Testing (not in stock yet), 11 = In Use.
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_inwardrawmaterial (id, created_at, updated_at, is_deleted, created_by_id, public_id, lot_no, effective_date, lab_sampling_date, product_id, party_id, quantity_kg, status_id) VALUES
+(1, now(), now(), false, 6, 'IR-DUMMY0000001', 'SUP-LOT-A1', pg_temp.today_ist() - 24, pg_temp.today_ist() - 27, 1, 1, 1000.000, 11),
+(2, now(), now(), false, 6, 'IR-DUMMY0000002', 'SUP-LOT-A2', pg_temp.today_ist() - 14, pg_temp.today_ist() - 17, 1, 2, 500.000, 11),
+(3, now(), now(), false, 6, 'IR-DUMMY0000003', 'SUP-LOT-A3', pg_temp.today_ist() - 4, pg_temp.today_ist() - 7, 1, 1, 400.000, 11),
+(4, now(), now(), false, 6, 'IR-DUMMY0000004', 'SUP-LOT-A4', pg_temp.today_ist() - 6, pg_temp.today_ist() - 9, 1, 2, 300.000, 16),
+(5, now(), now(), false, 6, 'IR-DUMMY0000005', 'SUP-LOT-A5', pg_temp.today_ist() - 20, pg_temp.today_ist() - 23, 2, 5, 400.000, 11);
+
+-- Raw material written off as waste (undated)
+INSERT INTO public.aggregator_rawmaterialwaste (id, created_at, updated_at, is_deleted, created_by_id, public_id, product_id, quantity_kg, reason) VALUES
+(1, now(), now(), false, 4, 'WS-DUMMY0000001', 1, 20.000, 'Rain damage during storage'),
+(2, now(), now(), false, 4, 'WS-DUMMY0000002', 1, 12.500, 'Spillage while bagging'),
+(3, now(), now(), false, 4, 'WS-DUMMY0000003', 1, 5.000, 'Rodent damage'),
+(4, now(), now(), false, 4, 'WS-DUMMY0000004', 2, 5.000, 'Moisture / fungus'),
+(5, now(), now(), false, 4, 'WS-DUMMY0000005', 2, 0.500, 'Sampling loss');
+
+-- -------------------------------------------------------------------------
+-- Packing (other) material: recipes + inward lots
+--   Per packet: SAI-33 1kg = 1 leaflet + 0.010 kg packet cover + 0.005 kg bag cover;
+--               SAI-3353 1.5kg = 1 leaflet + 0.015 kg packet cover.
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_othermaterialrecipe (id, created_at, updated_at, is_deleted, created_by_id, public_id, product_id, material_type_id, packet_weight, quantity) VALUES
+(1, now(), now(), false, 4, 'OMR-DUMMY0000001', 1, 3, 1.000, 1.000),
+(2, now(), now(), false, 4, 'OMR-DUMMY0000002', 1, 2, 1.000, 0.010),
+(3, now(), now(), false, 4, 'OMR-DUMMY0000003', 1, 1, 1.000, 0.005),
+(4, now(), now(), false, 4, 'OMR-DUMMY0000004', 2, 3, 1.500, 1.000),
+(5, now(), now(), false, 4, 'OMR-DUMMY0000005', 2, 2, 1.500, 0.015);
+
+INSERT INTO public.aggregator_inwardothermaterial (id, created_at, updated_at, is_deleted, created_by_id, public_id, effective_date, party_id, recipe_id, quantity) VALUES
+(1, now(), now(), false, 6, 'IO-DUMMY0000001', pg_temp.today_ist() - 22, 3, 1, 1500.000),
+(2, now(), now(), false, 6, 'IO-DUMMY0000002', pg_temp.today_ist() - 8, 3, 1, 800.000),
+(3, now(), now(), false, 6, 'IO-DUMMY0000003', pg_temp.today_ist() - 22, 4, 2, 25.000),
+(4, now(), now(), false, 6, 'IO-DUMMY0000004', pg_temp.today_ist() - 22, 4, 3, 15.000),
+(5, now(), now(), false, 6, 'IO-DUMMY0000005', pg_temp.today_ist() - 8, 3, 5, 10.000);
+
+-- -------------------------------------------------------------------------
+-- Daily stock counts: bags (today is complete for both packagings) + loose
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_inventorysnapshot (id, created_at, updated_at, is_deleted, created_by_id, public_id, snapshot_date, product_packaging_id, bags, counted_at) VALUES
+(1, now(), now(), false, 5, 'INV-DUMMY0000001', pg_temp.today_ist(), 1, 20, now()),
+(2, now(), now(), false, 5, 'INV-DUMMY0000002', pg_temp.today_ist(), 2, 8, now()),
+(3, now(), now(), false, 5, 'INV-DUMMY0000003', pg_temp.today_ist() - 1, 1, 24, (pg_temp.today_ist() - 1) + time '09:00'),
+(4, now(), now(), false, 5, 'INV-DUMMY0000004', pg_temp.today_ist() - 1, 2, 9, (pg_temp.today_ist() - 1) + time '09:00'),
+(5, now(), now(), false, 5, 'INV-DUMMY0000005', pg_temp.today_ist() - 2, 1, 28, (pg_temp.today_ist() - 2) + time '09:00');
+
+INSERT INTO public.aggregator_loosestocksnapshot (id, created_at, updated_at, is_deleted, created_by_id, public_id, snapshot_date, product_id, packet_weight, packets, counted_at) VALUES
+(1, now(), now(), false, 5, 'LS-DUMMY0000001', pg_temp.today_ist(), 1, 1.000, 60, now()),
+(2, now(), now(), false, 5, 'LS-DUMMY0000002', pg_temp.today_ist(), 2, 1.500, 20, now()),
+(3, now(), now(), false, 5, 'LS-DUMMY0000003', pg_temp.today_ist() - 1, 1, 1.000, 75, (pg_temp.today_ist() - 1) + time '09:00'),
+(4, now(), now(), false, 5, 'LS-DUMMY0000004', pg_temp.today_ist() - 1, 2, 1.500, 15, (pg_temp.today_ist() - 1) + time '09:00'),
+(5, now(), now(), false, 5, 'LS-DUMMY0000005', pg_temp.today_ist() - 3, 1, 1.000, 50, (pg_temp.today_ist() - 3) + time '09:00');
+
+-- -------------------------------------------------------------------------
+-- Dispatch records (attached to the DISPATCHED / DELIVERED orders below)
+--   dispatchdetails 1 -> order 2 and 2 -> custom order 2 (agency / LR);
+--   privatedispatchdetails 1 -> order 4 (own vehicle, no LR).
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_dispatchdetails (id, created_at, updated_at, is_deleted, client_id, dispatched_by_id, dispatch_date, from_city_id, to_city_id, lr_number, driver_name, driver_number, vehicle_number) VALUES
+(1, now(), now(), false, 2, 4, pg_temp.today_ist() - 1, 1, 2, 'LR-GJ-100234', 'Ramesh Patel', '9726000001', 'GJ05AB1234'),
+(2, now(), now(), false, 2, 4, pg_temp.today_ist() - 1, 1, 2, '', 'Suresh Rathod', '9726000002', 'GJ05CD5678');
+
+INSERT INTO public.aggregator_privatedispatchdetails (id, created_at, updated_at, is_deleted, client_id, dispatched_by_id, dispatch_date, from_city_id, to_city_id, vehicle_number, driver_number, driver_name) VALUES
+(1, now(), now(), false, 4, 4, pg_temp.today_ist() - 3, 1, 4, 'GJ05EF9012', '9726000003', 'Dinesh Solanki');
+
+-- -------------------------------------------------------------------------
+-- Orders (bag orders): one per lifecycle state worth testing
+--   1 CONFIRMED (3)  reserves 5 bags      2 DISPATCHED (4) agency, yesterday
+--   3 BOOKED (1)                          4 DELIVERED (5)  own vehicle
+--   5 ON_HOLD (6)
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_order (id, created_at, updated_at, is_deleted, created_by_id, public_id, client_id, delivery_address_id, status_id, expected_delivery_date, actual_delivery_date, dispatch_details_id, private_dispatch_details_id, transport_agency_id, special_comments, verified_by_id, verified_at) VALUES
+(1, now(), now(), false, 3, 'ORD-DUMMY0000001', 1, 1, 3, pg_temp.today_ist() + 5, NULL, NULL, NULL, 1, 'Deliver before sowing season', 4, now()),
+(2, now(), now(), false, 3, 'ORD-DUMMY0000002', 2, 2, 4, pg_temp.today_ist() + 2, NULL, 1, NULL, 2, '', 4, now()),
+(3, now(), now(), false, 3, 'ORD-DUMMY0000003', 3, 3, 1, pg_temp.today_ist() + 9, NULL, NULL, NULL, 3, 'Call before dispatch', NULL, NULL),
+(4, now(), now(), false, 3, 'ORD-DUMMY0000004', 4, 4, 5, pg_temp.today_ist() - 1, pg_temp.today_ist() - 1, NULL, 1, NULL, '', 4, now()),
+(5, now(), now(), false, 3, 'ORD-DUMMY0000005', 1, 1, 6, pg_temp.today_ist() + 12, NULL, NULL, NULL, 1, 'Payment pending - hold', 4, now());
+
+INSERT INTO public.aggregator_orderitem (id, created_at, updated_at, is_deleted, created_by_id, order_id, product_packaging_id, negotiated_selling_price, quantity) VALUES
+(1, now(), now(), false, 3, 1, 1, 4800.00, 5),
+(2, now(), now(), false, 3, 2, 1, 4800.00, 4),
+(3, now(), now(), false, 3, 3, 1, 4750.00, 10),
+(4, now(), now(), false, 3, 3, 2, 5000.00, 3),
+(5, now(), now(), false, 3, 4, 2, 5000.00, 2);
+
+-- Custom (loose-packet) orders: BOOKED (3), CONFIRMED (1), DISPATCHED (2)
+INSERT INTO public.aggregator_customorder (id, created_at, updated_at, is_deleted, created_by_id, public_id, client_id, delivery_address_id, status_id, expected_delivery_date, actual_delivery_date, dispatch_details_id, private_dispatch_details_id, special_comments, verified_by_id, verified_at) VALUES
+(1, now(), now(), false, 3, 'CORD-DUMMY0000001', 1, 1, 3, pg_temp.today_ist() + 4, NULL, NULL, NULL, 'Trial packets for dealers', 4, now()),
+(2, now(), now(), false, 3, 'CORD-DUMMY0000002', 2, 2, 4, pg_temp.today_ist() + 2, NULL, 2, NULL, '', 4, now()),
+(3, now(), now(), false, 3, 'CORD-DUMMY0000003', 3, 3, 1, pg_temp.today_ist() + 8, NULL, NULL, NULL, 'Mixed sample packets', NULL, NULL);
+
+INSERT INTO public.aggregator_customorderitem (id, created_at, updated_at, is_deleted, created_by_id, custom_order_id, product_id, negotiated_selling_price, packet_weight, packets) VALUES
+(1, now(), now(), false, 3, 1, 1, 125.00, 1.000, 30),
+(2, now(), now(), false, 3, 2, 1, 125.00, 1.000, 20),
+(3, now(), now(), false, 3, 3, 1, 125.00, 1.000, 5),
+(4, now(), now(), false, 3, 3, 2, 260.00, 1.500, 10);
+
+-- -------------------------------------------------------------------------
+-- Dispatch challans for the three dispatched / delivered orders
+--   (the challan reads the delivery address as client_address_id)
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_dispatchentry (id, created_at, updated_at, is_deleted, public_id, challan_number, order_id, custom_order_id, dispatch_details_id, client_id, client_address_id, contact_name, contact_number, dispatched_at, from_city_id, to_city_id, vehicle_number, driver_name, driver_number) VALUES
+(1, now(), now(), false, 'DE-DUMMY0000001', to_char(pg_temp.today_ist() - 1, 'YYYYMMDD') || '-0001', 2, NULL, 1, 2, 2, 'Kiran Shah', '9825011002', (pg_temp.today_ist() - 1) + time '15:00', 1, 2, 'GJ05AB1234', 'Ramesh Patel', '9726000001'),
+(2, now(), now(), false, 'DE-DUMMY0000002', to_char(pg_temp.today_ist() - 3, 'YYYYMMDD') || '-0001', 4, NULL, NULL, 4, 4, 'Rakesh Sharma', '9829011004', (pg_temp.today_ist() - 3) + time '11:00', 1, 4, 'GJ05EF9012', 'Dinesh Solanki', '9726000003'),
+(3, now(), now(), false, 'DE-DUMMY0000003', to_char(pg_temp.today_ist() - 1, 'YYYYMMDD') || '-0002', NULL, 2, 2, 2, 2, 'Kiran Shah', '9825011002', (pg_temp.today_ist() - 1) + time '16:00', 1, 2, 'GJ05CD5678', 'Suresh Rathod', '9726000002');
+
+INSERT INTO public.aggregator_dispatchentryitem (id, created_at, updated_at, is_deleted, created_by_id, dispatch_entry_id, product_packaging_id, product_id, packet_weight, negotiated_selling_price, quantity, lot_number) VALUES
+(1, now(), now(), false, 4, 1, 1, NULL, NULL, 4800.00, 4, 'SAI33-LOT-001'),
+(2, now(), now(), false, 4, 2, 2, NULL, NULL, 5000.00, 2, 'SAI3353-LOT-001'),
+(3, now(), now(), false, 4, 3, NULL, 1, 1.000, 125.00, 20, 'SAI33-LOT-002');
+
+-- -------------------------------------------------------------------------
+-- Field trips by the seeded sales person (user 3): one per state
+--   status 12 Planned, 13 Approved, 14 In progress, 15 Completed
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_fieldtrip (id, created_at, updated_at, is_deleted, created_by_id, public_id, city_id, village, status_id, expected_start_at, expected_end_at, started_at, ended_at, approved_by_id, approved_at) VALUES
+(1, now(), now(), false, 3, 'FT-DUMMY0000001', 2, 'Sanand', 12, (pg_temp.today_ist() + 3) + time '09:00', (pg_temp.today_ist() + 3) + time '17:00', NULL, NULL, NULL, NULL),
+(2, now(), now(), false, 3, 'FT-DUMMY0000002', 3, 'Gondal', 13, (pg_temp.today_ist() + 1) + time '09:00', (pg_temp.today_ist() + 1) + time '17:00', NULL, NULL, 4, now()),
+(3, now(), now(), false, 3, 'FT-DUMMY0000003', 1, 'Bardoli', 14, pg_temp.today_ist() + time '09:00', pg_temp.today_ist() + time '17:00', pg_temp.today_ist() + time '09:30', NULL, 4, now()),
+(4, now(), now(), false, 3, 'FT-DUMMY0000004', 4, 'Chomu', 15, (pg_temp.today_ist() - 5) + time '09:00', (pg_temp.today_ist() - 5) + time '17:00', (pg_temp.today_ist() - 5) + time '09:15', (pg_temp.today_ist() - 5) + time '16:40', 4, now()),
+(5, now(), now(), false, 3, 'FT-DUMMY0000005', 5, 'Pokaran', 15, (pg_temp.today_ist() - 9) + time '09:00', (pg_temp.today_ist() - 9) + time '17:00', (pg_temp.today_ist() - 9) + time '09:20', (pg_temp.today_ist() - 9) + time '17:05', NULL, NULL);
+
+INSERT INTO public.aggregator_farmervisit (id, created_at, updated_at, is_deleted, created_by_id, public_id, field_trip_id, farmer_name, contact_number, village, land_area_bigha) VALUES
+(1, now(), now(), false, 3, 'FV-DUMMY0000001', 3, 'Bhikhabhai Chaudhary', '9099000001', 'Bardoli', 12.5000),
+(2, now(), now(), false, 3, 'FV-DUMMY0000002', 3, 'Ramanbhai Patel', '9099000002', 'Bardoli', 8.0000),
+(3, now(), now(), false, 3, 'FV-DUMMY0000003', 4, 'Gopal Meena', '9099000003', 'Chomu', 20.0000),
+(4, now(), now(), false, 3, 'FV-DUMMY0000004', 4, 'Hanuman Jat', '9099000004', 'Chomu', 15.2500),
+(5, now(), now(), false, 3, 'FV-DUMMY0000005', 5, 'Mohan Singh', '9099000005', 'Pokaran', 30.0000);
+
+INSERT INTO public.aggregator_farmervisitcrop (id, created_at, updated_at, is_deleted, created_by_id, farmer_visit_id, crop_id) VALUES
+(1, now(), now(), false, 3, 1, 1),
+(2, now(), now(), false, 3, 2, 1),
+(3, now(), now(), false, 3, 3, 2),
+(4, now(), now(), false, 3, 4, 2),
+(5, now(), now(), false, 3, 5, 2);
+
+INSERT INTO public.aggregator_farmervisitproduct (id, created_at, updated_at, is_deleted, created_by_id, farmer_visit_id, product_id) VALUES
+(1, now(), now(), false, 3, 1, 1),
+(2, now(), now(), false, 3, 2, 1),
+(3, now(), now(), false, 3, 3, 2),
+(4, now(), now(), false, 3, 4, 2),
+(5, now(), now(), false, 3, 5, 2);
+
+-- Sequence sync for the dummy tables
+SELECT setval(pg_get_serial_sequence('public.aggregator_pincode', 'id'),                (SELECT MAX(id) FROM public.aggregator_pincode));
+SELECT setval(pg_get_serial_sequence('public.aggregator_address', 'id'),                (SELECT MAX(id) FROM public.aggregator_address));
+SELECT setval(pg_get_serial_sequence('public.aggregator_transportagency', 'id'),        (SELECT MAX(id) FROM public.aggregator_transportagency));
+SELECT setval(pg_get_serial_sequence('public.aggregator_contact', 'id'),                (SELECT MAX(id) FROM public.aggregator_contact));
+SELECT setval(pg_get_serial_sequence('public.aggregator_party', 'id'),                  (SELECT MAX(id) FROM public.aggregator_party));
+SELECT setval(pg_get_serial_sequence('public.aggregator_productdescriptionitem', 'id'), (SELECT MAX(id) FROM public.aggregator_productdescriptionitem));
+SELECT setval(pg_get_serial_sequence('public.aggregator_client', 'id'),                 (SELECT MAX(id) FROM public.aggregator_client));
+SELECT setval(pg_get_serial_sequence('public.aggregator_clientaddress', 'id'),          (SELECT MAX(id) FROM public.aggregator_clientaddress));
+SELECT setval(pg_get_serial_sequence('public.aggregator_clientcontact', 'id'),          (SELECT MAX(id) FROM public.aggregator_clientcontact));
+SELECT setval(pg_get_serial_sequence('public.aggregator_clienttransportagency', 'id'),  (SELECT MAX(id) FROM public.aggregator_clienttransportagency));
+SELECT setval(pg_get_serial_sequence('public.aggregator_inwardrawmaterial', 'id'),      (SELECT MAX(id) FROM public.aggregator_inwardrawmaterial));
+SELECT setval(pg_get_serial_sequence('public.aggregator_rawmaterialwaste', 'id'),       (SELECT MAX(id) FROM public.aggregator_rawmaterialwaste));
+SELECT setval(pg_get_serial_sequence('public.aggregator_othermaterialrecipe', 'id'),    (SELECT MAX(id) FROM public.aggregator_othermaterialrecipe));
+SELECT setval(pg_get_serial_sequence('public.aggregator_inwardothermaterial', 'id'),    (SELECT MAX(id) FROM public.aggregator_inwardothermaterial));
+SELECT setval(pg_get_serial_sequence('public.aggregator_inventorysnapshot', 'id'),      (SELECT MAX(id) FROM public.aggregator_inventorysnapshot));
+SELECT setval(pg_get_serial_sequence('public.aggregator_loosestocksnapshot', 'id'),     (SELECT MAX(id) FROM public.aggregator_loosestocksnapshot));
+SELECT setval(pg_get_serial_sequence('public.aggregator_dispatchdetails', 'id'),        (SELECT MAX(id) FROM public.aggregator_dispatchdetails));
+SELECT setval(pg_get_serial_sequence('public.aggregator_privatedispatchdetails', 'id'), (SELECT MAX(id) FROM public.aggregator_privatedispatchdetails));
+SELECT setval(pg_get_serial_sequence('public.aggregator_order', 'id'),                  (SELECT MAX(id) FROM public.aggregator_order));
+SELECT setval(pg_get_serial_sequence('public.aggregator_orderitem', 'id'),              (SELECT MAX(id) FROM public.aggregator_orderitem));
+SELECT setval(pg_get_serial_sequence('public.aggregator_customorder', 'id'),            (SELECT MAX(id) FROM public.aggregator_customorder));
+SELECT setval(pg_get_serial_sequence('public.aggregator_customorderitem', 'id'),        (SELECT MAX(id) FROM public.aggregator_customorderitem));
+SELECT setval(pg_get_serial_sequence('public.aggregator_dispatchentry', 'id'),          (SELECT MAX(id) FROM public.aggregator_dispatchentry));
+SELECT setval(pg_get_serial_sequence('public.aggregator_dispatchentryitem', 'id'),      (SELECT MAX(id) FROM public.aggregator_dispatchentryitem));
+SELECT setval(pg_get_serial_sequence('public.aggregator_fieldtrip', 'id'),              (SELECT MAX(id) FROM public.aggregator_fieldtrip));
+SELECT setval(pg_get_serial_sequence('public.aggregator_farmervisit', 'id'),            (SELECT MAX(id) FROM public.aggregator_farmervisit));
+SELECT setval(pg_get_serial_sequence('public.aggregator_farmervisitcrop', 'id'),        (SELECT MAX(id) FROM public.aggregator_farmervisitcrop));
+SELECT setval(pg_get_serial_sequence('public.aggregator_farmervisitproduct', 'id'),     (SELECT MAX(id) FROM public.aggregator_farmervisitproduct));
+-- <<< DUMMY DATA END
+
 COMMIT;

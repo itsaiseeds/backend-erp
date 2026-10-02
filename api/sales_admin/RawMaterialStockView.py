@@ -11,8 +11,9 @@ off). ``rejected_kg`` is the same dated-and-reached gate applied to
 
 ``incoming_kg`` is everything that has come in. ``packed_kg`` is what has
 since been packed into bags or sample packets via ``update-bag-stock`` /
-``update-sample-packet-stock``, and ``available_kg`` is what is left to pack
-(``incoming_kg - packed_kg``) -- see ``InventoryOperations.raw_available_kg``.
+``update-sample-packet-stock``, ``wasted_kg`` is what was written off via
+``raw-material-wastes``, and ``available_kg`` is what is left to pack
+(``incoming_kg - packed_kg - wasted_kg``) -- see ``InventoryOperations.raw_available_kg``.
 ``rejected_kg`` is reported only, never spendable: nothing in the packing path
 can consume it, and a product is listed whenever ``incoming_kg > 0`` or
 ``rejected_kg > 0``, so a product whose entire intake was rejected still
@@ -54,6 +55,7 @@ class RawMaterialStockView(AdminApiView):
                 "name": line["name"],
                 "incoming_kg": str(line["incoming_kg"]),
                 "packed_kg": str(line["packed_kg"]),
+                "wasted_kg": str(line["wasted_kg"]),
                 "available_kg": str(line["available_kg"]),
                 "rejected_kg": str(line["rejected_kg"]),
             }

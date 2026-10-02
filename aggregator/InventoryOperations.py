@@ -74,6 +74,7 @@ from .models import (
     OtherMaterialType,
     Product,
     ProductPackaging,
+    RawMaterialWaste,
     StatusIds,
 )
 
@@ -694,7 +695,8 @@ def available_loose_packets(
 # releases its kilograms straight back to raw. Nothing is stored -- the spent
 # figure is derived the same way ``consumed_bags``/``consumed_loose_packets``
 # derive dispatches, from the current count plus whatever left the floor
-# before that count was taken.
+# before that count was taken. Raw material written off as waste
+# (``RawMaterialWaste``) is spent from the same pool.
 
 
 def raw_inward_kg(product: Product, as_of: date | None = None) -> Decimal:
@@ -851,13 +853,32 @@ def raw_loose_kg(product: Product) -> Decimal:
     return total
 
 
+def raw_wasted_kg(product: Product) -> Decimal:
+    """Raw kilograms of ``product`` written off as waste (live rows only).
+
+    Undated: every waste row counts the moment it exists and stops counting
+    when it is soft-deleted (``RawMaterialWaste.objects`` hides deleted rows).
+    """
+    total = RawMaterialWaste.objects.filter(product=product).aggregate(
+        total=Sum("quantity_kg")
+    )["total"]
+    return total or Decimal("0.000")
+
+
 def raw_available_kg(product: Product) -> Decimal:
     """Raw kilograms of ``product`` not yet packed into a bag or loose packet.
 
-    ``inward - bagged - loose``. Writing a bag or loose count is rejected when
-    it would push this negative -- see ``_assert_raw_available``.
+    ``inward - bagged - loose - wasted``. Writing a bag or loose count, or a
+    waste entry, is rejected when it would push this negative -- see
+    ``_assert_raw_available``. Only ``In Use`` lots feed ``inward``, so a
+    ``Rejected`` lot never makes waste or packing possible.
     """
-    return raw_inward_kg(product) - raw_bagged_kg(product) - raw_loose_kg(product)
+    return (
+        raw_inward_kg(product)
+        - raw_bagged_kg(product)
+        - raw_loose_kg(product)
+        - raw_wasted_kg(product)
+    )
 
 
 def _assert_raw_available(product_ids) -> None:
@@ -876,6 +897,28 @@ def _assert_raw_available(product_ids) -> None:
                 f"Not enough raw material for '{product.name}': short by "
                 f"{-available} kg."
             )
+
+
+@transaction.atomic
+def record_raw_waste(
+    *, product: Product, quantity_kg: Decimal, reason: str, actor: User
+) -> RawMaterialWaste:
+    """Write off ``quantity_kg`` of ``product``'s raw material as waste.
+
+    Takes the product's raw-pool lock first, so a concurrent count cannot spend
+    the same kilograms. Rejected (and rolled back) with ``ValueError`` when
+    the product has fewer unpacked raw kilograms than the waste -- the same
+    convention the count writers use, which the view turns into a 400.
+    """
+    lock_raw_pools([product.id])
+    waste = RawMaterialWaste.objects.create(
+        product=product,
+        quantity_kg=quantity_kg,
+        reason=reason.strip(),
+        created_by=actor,
+    )
+    _assert_raw_available([product.id])
+    return waste
 
 
 # -- Packing (other) material backing -----------------------------------------

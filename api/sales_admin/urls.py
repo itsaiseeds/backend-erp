@@ -42,6 +42,7 @@ from .PartiesView import PartiesView
 from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
 from .RawMaterialStockView import RawMaterialStockView
+from .RawMaterialWastesView import RawMaterialWastesView
 from .RejectOrderView import RejectOrderView
 from .RevertCustomOrderDispatchView import RevertCustomOrderDispatchView
 from .RevertDispatchView import RevertDispatchView
@@ -64,6 +65,7 @@ from .UpdateOtherMaterialTypeView import UpdateOtherMaterialTypeView
 from .UpdatePartyView import UpdatePartyView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
+from .UpdateRawMaterialWasteView import UpdateRawMaterialWasteView
 from .UpdateSalesPersonView import UpdateSalesPersonView
 from .UpdateSamplePacketStockView import UpdateLooseStockView
 from .UploadLRNumberView import UploadLRNumberView
@@ -263,6 +265,16 @@ urlpatterns = [
         "inward-other-material/<str:public_id>",
         UpdateInwardOtherMaterialView.as_view(),
         name="update-inward-other-material",
+    ),
+    path(
+        "raw-material-wastes",
+        RawMaterialWastesView.as_view(),
+        name="raw-material-wastes",
+    ),
+    path(
+        "raw-material-waste/<str:public_id>",
+        UpdateRawMaterialWasteView.as_view(),
+        name="update-raw-material-waste",
     ),
     path(
         "raw-material-stock",
