@@ -79,6 +79,7 @@ class VerifyOTPTest(WebApiTestCase):
         self.assertEqual(response.data["user"]["phone_number"], self.superuser.phone_number)
         self.assertTrue(response.data["can_create_admin"])
         self.assertTrue(response.data["can_create_sales_person"])
+        self.assertTrue(response.data["can_create_godown_manager"])
         self.assertIn("sessionid", response.cookies)
 
     def test_only_a_superuser_with_a_valid_code_may_log_in(self):

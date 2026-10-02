@@ -276,6 +276,10 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
         return self._live_profile("salesperson_profile") is not None
 
     @property
+    def is_godown_manager(self):
+        return self._live_profile("godown_manager_profile") is not None
+
+    @property
     def is_admin_user(self):
         """'Admin' = a live Admin profile, NOT a Django superuser."""
         return self.live_admin_profile is not None
@@ -289,6 +293,8 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
             return "admin"
         if self.is_salesperson:
             return "salesperson"
+        if self.is_godown_manager:
+            return "godown_manager"
         return "user"
 
     @property

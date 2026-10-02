@@ -37,6 +37,11 @@ ExportInwardEntriesResponseSerializer = export_response_serializer(
 )
 
 
+def _without_created_by(payload: dict) -> dict:
+    """The export carries no audit keys, unlike the lot payloads the apps get."""
+    return {key: value for key, value in payload.items() if key != "created_by"}
+
+
 class ExportInwardEntriesView(AdminDateRangeExportView):
     """Export the inward entries booked in a date window, grouped by day."""
 
@@ -54,7 +59,10 @@ class ExportInwardEntriesView(AdminDateRangeExportView):
         )
         for raw in raw_entries:
             bucket(raw.created_at)["raw_materials"].append(
-                {**inward_raw_material_payload(raw), "created_at": raw.created_at.isoformat()}
+                {
+                    **_without_created_by(inward_raw_material_payload(raw)),
+                    "created_at": raw.created_at.isoformat(),
+                }
             )
 
         other_entries = (
@@ -65,7 +73,7 @@ class ExportInwardEntriesView(AdminDateRangeExportView):
         for other in other_entries:
             bucket(other.created_at)["other_materials"].append(
                 {
-                    **inward_other_material_payload(other),
+                    **_without_created_by(inward_other_material_payload(other)),
                     "created_at": other.created_at.isoformat(),
                 }
             )

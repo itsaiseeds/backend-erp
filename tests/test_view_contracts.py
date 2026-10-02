@@ -39,12 +39,24 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from aggregator.models import City, Country, State
-from android.api.base import AndroidBaseView
+from android.api.base import (
+    AndroidBaseView,
+    AndroidGodownBaseView,
+    AndroidSharedView,
+    AndroidTokenView,
+)
 from api.admin import AdminApiView
 from api.authentication import ExpiringTokenAuthentication, SessionAuthentication
-from api.permissions import HasDjangoPermission, IsAdminUser, IsSalesPerson, IsSuperUser
+from api.permissions import (
+    HasDjangoPermission,
+    IsAdminUser,
+    IsAndroidRole,
+    IsGodownManager,
+    IsSalesPerson,
+    IsSuperUser,
+)
 from api.views import BaseApiView
-from authentication.models import Admin, SalesPerson
+from authentication.models import Admin, GodownManager, SalesPerson
 from tests.android.common import AndroidApiTestCase
 from tests.common import WebApiTestCase
 
@@ -61,25 +73,31 @@ SESSION_ADMIN = "session:admin"
 SESSION_SUPERUSER = "session:superuser"
 TOKEN_AUTH = "token:auth"
 TOKEN_SALESPERSON = "token:salesperson"
+TOKEN_GODOWN = "token:godown"
+TOKEN_ANDROID = "token:android"  # either Android role
 
-_SCHEME_BASES = {"session": AdminApiView, "token": AndroidBaseView}
+_SCHEME_BASES = {"session": AdminApiView, "token": AndroidTokenView}
 _SCHEME_AUTHENTICATORS = {
     "session": SessionAuthentication,
     "token": ExpiringTokenAuthentication,
 }
+_ROLE_FLAG_NAMES = (
+    "admin_required",
+    "superuser_required",
+    "salesperson_required",
+    "godown_manager_required",
+    "android_role_required",
+)
 _ROLE_FLAGS = {
-    "auth": {"admin_required": False, "superuser_required": False, "salesperson_required": False},
-    "admin": {"admin_required": True, "superuser_required": False, "salesperson_required": False},
-    "superuser": {
-        "admin_required": False,
-        "superuser_required": True,
-        "salesperson_required": False,
-    },
-    "salesperson": {
-        "admin_required": False,
-        "superuser_required": False,
-        "salesperson_required": True,
-    },
+    role: {name: name == flag for name in _ROLE_FLAG_NAMES}
+    for role, flag in {
+        "auth": None,
+        "admin": "admin_required",
+        "superuser": "superuser_required",
+        "salesperson": "salesperson_required",
+        "godown": "godown_manager_required",
+        "android": "android_role_required",
+    }.items()
 }
 
 # Every routed endpoint that goes through BaseApiView, and the contract it must
@@ -90,7 +108,7 @@ EXPECTED_CONTRACTS = {
     # Logout deliberately does NOT require a SalesPerson profile: a token whose
     # profile was removed must still be revocable.
     "android/api/v1/auth/logout": ("LogoutView", TOKEN_AUTH),
-    "android/api/v1/auth/reauthenticate": ("ReauthenticateView", TOKEN_SALESPERSON),
+    "android/api/v1/auth/reauthenticate": ("ReauthenticateView", TOKEN_ANDROID),
     "android/api/v1/client/<public_id>": ("GetClientView", TOKEN_SALESPERSON),
     "android/api/v1/create-client": ("CreateClientView", TOKEN_SALESPERSON),
     "android/api/v1/create-multi-select-bag-order": (
@@ -104,19 +122,47 @@ EXPECTED_CONTRACTS = {
         TOKEN_SALESPERSON,
     ),
     "android/api/v1/update-client": ("UpdateClientView", TOKEN_SALESPERSON),
-    "android/api/v1/utilities/cities": ("CitiesView", TOKEN_SALESPERSON),
+    "android/api/v1/utilities/cities": ("CitiesView", TOKEN_ANDROID),
     "android/api/v1/utilities/client-addresses": (
         "ClientAddressesView",
-        TOKEN_SALESPERSON,
+        TOKEN_ANDROID,
     ),
     "android/api/v1/utilities/client-transport-agencies": (
         "ClientTransportAgenciesView",
-        TOKEN_SALESPERSON,
+        TOKEN_ANDROID,
     ),
-    "android/api/v1/utilities/countries": ("CountriesView", TOKEN_SALESPERSON),
-    "android/api/v1/utilities/states": ("StatesView", TOKEN_SALESPERSON),
-    "android/api/v1/utilities/crops": ("CropsView", TOKEN_SALESPERSON),
-    "android/api/v1/utilities/products": ("ProductsView", TOKEN_SALESPERSON),
+    "android/api/v1/utilities/parties": ("PartiesView", TOKEN_ANDROID),
+    "android/api/v1/utilities/other-material-types": ("OtherMaterialTypesView", TOKEN_ANDROID),
+    "android/api/v1/utilities/sales-admins": ("SalesAdminsView", TOKEN_ANDROID),
+    "android/api/v1/godown/raw-material-stock": ("GodownRawMaterialStockView", TOKEN_GODOWN),
+    "android/api/v1/godown/other-material-stock": (
+        "GodownOtherMaterialStockView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/inward-raw-materials": (
+        "GodownInwardRawMaterialsView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/inward-raw-material/<public_id>": (
+        "UpdateGodownInwardRawMaterialView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/inward-other-materials": (
+        "GodownInwardOtherMaterialsView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/inward-other-material/<public_id>": (
+        "UpdateGodownInwardOtherMaterialView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/other-material-recipes": (
+        "GodownOtherMaterialRecipesView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/utilities/countries": ("CountriesView", TOKEN_ANDROID),
+    "android/api/v1/utilities/states": ("StatesView", TOKEN_ANDROID),
+    "android/api/v1/utilities/crops": ("CropsView", TOKEN_ANDROID),
+    "android/api/v1/utilities/products": ("ProductsView", TOKEN_ANDROID),
     "android/api/v1/create-field-trip": ("CreateFieldTripView", TOKEN_SALESPERSON),
     "android/api/v1/get-field-trips": ("GetFieldTripsView", TOKEN_SALESPERSON),
     "android/api/v1/edit-field-trip/<public_id>": ("UpdateFieldTripView", TOKEN_SALESPERSON),
@@ -222,6 +268,8 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/products": ("ProductsView", SESSION_ADMIN),
     "api/sales-admin/products/<str:public_id>": ("UpdateProductView", SESSION_ADMIN),
     "api/sales-admin/raw-material-stock": ("RawMaterialStockView", SESSION_ADMIN),
+    "api/sales-admin/godown-managers": ("GodownManagersView", SESSION_ADMIN),
+    "api/sales-admin/godown-managers/<int:id>": ("UpdateGodownManagerView", SESSION_ADMIN),
     "api/sales-admin/sales-people": ("SalesPeopleView", SESSION_ADMIN),
     "api/sales-admin/sales-people/<int:id>": ("UpdateSalesPersonView", SESSION_ADMIN),
     "api/sales-admin/sample-packet-stock": ("LooseStockView", SESSION_ADMIN),
@@ -284,6 +332,8 @@ class BaseApiViewFlagTest(SimpleTestCase):
             ({"admin_required": True}, [IsAuthenticated, IsAdminUser]),
             ({"superuser_required": True}, [IsAuthenticated, IsSuperUser]),
             ({"salesperson_required": True}, [IsAuthenticated, IsSalesPerson]),
+            ({"godown_manager_required": True}, [IsAuthenticated, IsGodownManager]),
+            ({"android_role_required": True}, [IsAuthenticated, IsAndroidRole]),
             (
                 {"admin_required": True, "superuser_required": True},
                 [IsAuthenticated, IsAdminUser, IsSuperUser],
@@ -298,10 +348,10 @@ class BaseApiViewFlagTest(SimpleTestCase):
                 view = type("_View", (BaseApiView,), dict(flags))()
                 self.assertEqual([type(p) for p in view.get_permissions()], expected)
 
-    def test_the_two_concrete_bases_fix_one_credential_scheme_each(self):
+    def test_the_concrete_bases_fix_one_credential_scheme_each(self):
         """``AdminApiView`` is session-only and ``AndroidBaseView`` token-only.
 
-        tests/test_view_contracts.py::BaseApiViewFlagTest::test_the_two_concrete_bases_fix_one_credential_scheme_each
+        tests/test_view_contracts.py::BaseApiViewFlagTest::test_the_concrete_bases_fix_one_credential_scheme_each
         """
         self.assertEqual(AdminApiView.authentication_classes, [SessionAuthentication])
         self.assertEqual(AndroidBaseView.authentication_classes, [ExpiringTokenAuthentication])
@@ -309,6 +359,13 @@ class BaseApiViewFlagTest(SimpleTestCase):
         # Android view only opts *out* of it deliberately (e.g. logout).
         self.assertTrue(AndroidBaseView.salesperson_required)
         self.assertFalse(AdminApiView.salesperson_required)
+        # The other Android bases each pin exactly one role requirement.
+        self.assertTrue(AndroidGodownBaseView.godown_manager_required)
+        self.assertFalse(AndroidGodownBaseView.salesperson_required)
+        self.assertTrue(AndroidSharedView.android_role_required)
+        self.assertFalse(AndroidSharedView.salesperson_required)
+        for base in (AndroidBaseView, AndroidGodownBaseView, AndroidSharedView):
+            self.assertEqual(base.authentication_classes, [ExpiringTokenAuthentication])
 
 
 class ViewContractRegistryTest(SimpleTestCase):
@@ -531,7 +588,9 @@ class TokenAuthContractTest(AndroidApiTestCase):
     tests/test_view_contracts.py::TokenAuthContractTest
     """
 
-    SALESPERSON_URL = "/android/api/v1/utilities/countries"
+    SALESPERSON_URL = "/android/api/v1/sales-person-catalogue"
+    GODOWN_URL = "/android/api/v1/godown/raw-material-stock"
+    SHARED_URL = "/android/api/v1/utilities/countries"
     AUTH_ONLY_URL = "/android/api/v1/auth/logout"
 
     @classmethod
@@ -556,28 +615,63 @@ class TokenAuthContractTest(AndroidApiTestCase):
             city=city,
             created_by=cls.superuser,
         )
+        cls.godown_manager = GodownManager.objects.create(
+            user=User.objects.create_user(
+                phone_number="7777777778",
+                name="godown manager",
+                is_verified=True,
+                created_by=cls.superuser,
+                verified_by=cls.superuser,
+            ),
+            created_by=cls.superuser,
+        )
+        cls.both = User.objects.create_user(
+            phone_number="7777777779",
+            name="both roles",
+            is_verified=True,
+            created_by=cls.superuser,
+            verified_by=cls.superuser,
+        )
+        SalesPerson.objects.create(user=cls.both, city=city, created_by=cls.superuser)
+        GodownManager.objects.create(user=cls.both, created_by=cls.superuser)
 
     def test_anonymous_callers_get_401(self):
         """tests/test_view_contracts.py::TokenAuthContractTest::test_anonymous_callers_get_401"""
-        self.assertEqual(self.client.get(self.SALESPERSON_URL).status_code, 401)
+        for url in (self.SALESPERSON_URL, self.GODOWN_URL, self.SHARED_URL):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 401)
         self.assertEqual(self.client.post(self.AUTH_ONLY_URL).status_code, 401)
 
-    def test_a_token_without_a_salesperson_profile_is_forbidden(self):
-        """The superuser has no ``SalesPerson`` profile, so mobile refuses it (403)...
+    def test_a_token_without_an_android_role_is_forbidden_everywhere(self):
+        """The superuser has no Android role profile, so mobile refuses it (403)...
 
-        ...but logout, which drops ``salesperson_required``, still accepts it so
+        ...but logout, which drops the role requirement, still accepts it so
         the token can always be revoked.
 
-        tests/test_view_contracts.py::TokenAuthContractTest::test_a_token_without_a_salesperson_profile_is_forbidden
+        tests/test_view_contracts.py::TokenAuthContractTest::test_a_token_without_an_android_role_is_forbidden_everywhere
         """
         self.login_as(self.superuser)
-        self.assertEqual(self.client.get(self.SALESPERSON_URL).status_code, 403)
+        for url in (self.SALESPERSON_URL, self.GODOWN_URL, self.SHARED_URL):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
         self.assertEqual(self.client.post(self.AUTH_ONLY_URL).status_code, 204)
 
-    def test_a_salesperson_token_is_accepted(self):
-        """tests/test_view_contracts.py::TokenAuthContractTest::test_a_salesperson_token_is_accepted"""
-        self.login_as(self.salesperson.user)
-        self.assertEqual(self.client.get(self.SALESPERSON_URL).status_code, 200)
+    def test_each_android_role_reaches_exactly_its_own_routes(self):
+        """Sales person: salesperson + shared. Godown manager: godown + shared. Both: all.
+
+        tests/test_view_contracts.py::TokenAuthContractTest::test_each_android_role_reaches_exactly_its_own_routes
+        """
+        expected = {
+            "salesperson": (self.salesperson.user, (200, 403, 200)),
+            "godown manager": (self.godown_manager.user, (403, 200, 200)),
+            "both roles": (self.both, (200, 200, 200)),
+        }
+        urls = (self.SALESPERSON_URL, self.GODOWN_URL, self.SHARED_URL)
+        for label, (user, statuses) in expected.items():
+            self.login_as(user)
+            for url, status in zip(urls, statuses, strict=True):
+                with self.subTest(role=label, url=url):
+                    self.assertEqual(self.client.get(url).status_code, status)
 
     def test_a_browser_session_never_authenticates_the_android_side(self):
         """tests/test_view_contracts.py::TokenAuthContractTest::test_a_browser_session_never_authenticates_the_android_side"""

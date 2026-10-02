@@ -19,6 +19,10 @@ class Admin(CreatedByModel, TimeStampedModel, SoftDeletedModel):
     )
 
     can_update_stock_count = models.BooleanField(default=False)
+    share_contact = models.BooleanField(
+        default=False,
+        help_text="List this admin's name and phone number to the Android apps.",
+    )
 
     class Meta:
         verbose_name = "admin"

@@ -38,6 +38,16 @@ The Android app is served under `/android/api/<version>/…`. **`v1` is the curr
 | `POST` | `/android/api/v1/auth/logout` | Logout: revoke the token server-side |
 | `GET`  | `/android/api/v1/auth/reauthenticate` | On startup / resume, "is my token still valid?" |
 | `GET`  | `/android/api/v1/utilities/cities` | Grouped state → city picker data |
+| `GET`  | `/android/api/v1/utilities/parties` | Flat supplier list (either role) |
+| `GET`  | `/android/api/v1/utilities/other-material-types` | Flat material-type list (either role) |
+| `GET`  | `/android/api/v1/utilities/sales-admins` | `[{name, phone_number}]` of admins who opted in to share their contact (either role) |
+| `GET`  | `/android/api/v1/godown/raw-material-stock` | Godown manager: incoming raw-material position per product |
+| `GET`  | `/android/api/v1/godown/other-material-stock` | Godown manager: on-hand position per material type |
+| `GET/POST` | `/android/api/v1/godown/inward-raw-materials` | Godown manager: list / book raw-material lots |
+| `PATCH/DELETE` | `/android/api/v1/godown/inward-raw-material/<public_id>` | Godown manager: move a lot through its status lifecycle / delete it |
+| `GET/POST` | `/android/api/v1/godown/inward-other-materials` | Godown manager: list / book other-material lots |
+| `PATCH/DELETE` | `/android/api/v1/godown/inward-other-material/<public_id>` | Godown manager: confirm / delete a lot |
+| `GET`  | `/android/api/v1/godown/other-material-recipes` | Godown manager: recipes (view-only; `?all=true` for the picker) |
 
 More endpoints will land here as the app grows. All of them will follow the same `Authorization: Token …` rules.
 
@@ -61,14 +71,18 @@ Content-Type: application/json
     "id": 42,
     "name": "Salesperson Name",
     "phone_number": "7777777777",
-    "role": "salesperson"
+    "role": "salesperson",
+    "is_sales_person": true,
+    "is_godown_manager": false
   }
 }
 ```
 
+**Two Android roles.** The same login serves a **sales person** and a **godown manager**. `user.is_sales_person` and `user.is_godown_manager` are independent flags — a user may hold both — so pick your navigation from the flags, not from `role` (which is only the single highest role). `GET /auth/reauthenticate` returns the same two flags. Sales-person routes answer `403` to a godown-manager-only token and the `godown/…` routes answer `403` to a sales-person-only token; everything under `utilities/…` and `auth/…` is open to both.
+
 **Store `token` securely** — Android Keystore, `EncryptedSharedPreferences`, or your platform's secure-storage equivalent. Do **not** put it in plain `SharedPreferences`, in a file, or in a log line.
 
-**Failure (400):** `{"detail": "Invalid phone number or TOTP code."}` — same generic body whether the phone is unknown, the account isn't a sales-person, the code is wrong, or the account is locked. Do not try to distinguish them from the client.
+**Failure (400):** `{"detail": "Invalid phone number or TOTP code."}` — same generic body whether the phone is unknown, the account holds neither Android role, the code is wrong, or the account is locked. Do not try to distinguish them from the client.
 
 **Rate limit (429):** the endpoint is throttled per source IP. Surface a "Too many attempts, try again later" message.
 
@@ -112,7 +126,7 @@ Authorization: Token <stored>
 ```
 
 - `200` with `{"user": {...}}` → token valid; hydrate state and go to the home screen.
-- `401` → token expired or was revoked (e.g. the user logged in on another device, or an admin soft-deleted their sales-person profile). **Clear the stored token** and show the login screen.
+- `401` → token expired or was revoked (e.g. the user logged in on another device, or an admin soft-deleted their last Android role profile). **Clear the stored token** and show the login screen.
 
 The server auto-deletes expired tokens on the request that discovers them, so no client-side cleanup call is needed for expired-token hygiene.
 

@@ -30,6 +30,7 @@ from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
+from .GodownManagersView import GodownManagersView
 from .HoldOrderView import HoldOrderView
 from .InwardOtherMaterialsView import InwardOtherMaterialsView
 from .InwardRawMaterialsView import InwardRawMaterialsView
@@ -55,6 +56,7 @@ from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
 from .UpdateCustomOrderView import UpdateCustomOrderView
 from .UpdateFieldTripView import UpdateFieldTripView
+from .UpdateGodownManagerView import UpdateGodownManagerView
 from .UpdateInwardOtherMaterialView import UpdateInwardOtherMaterialView
 from .UpdateInwardRawMaterialView import UpdateInwardRawMaterialView
 from .UpdateOrderView import UpdateOrderView
@@ -111,6 +113,12 @@ urlpatterns = [
         "sales-people/<int:id>",
         UpdateSalesPersonView.as_view(),
         name="update-sales-person",
+    ),
+    path("godown-managers", GodownManagersView.as_view(), name="godown-managers"),
+    path(
+        "godown-managers/<int:id>",
+        UpdateGodownManagerView.as_view(),
+        name="update-godown-manager",
     ),
     # The client *verb* routes keep a trailing slash; ``client/<public_id>`` is
     # a collection item, named like ``products/<public_id>`` above.

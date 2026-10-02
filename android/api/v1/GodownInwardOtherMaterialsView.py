@@ -1,16 +1,8 @@
-"""Inward other material endpoint: ``GET``/``POST`` ``/api/sales-admin/inward-other-materials``.
+"""Godown inward other-material lots: GET/POST ``godown/inward-other-materials``.
 
-Only an application Admin may view or create lots (``admin_required``). A lot
-records a packing-material delivery: how much of a recipe's material a
-``Party`` supplied. ``quantity`` is measured in the recipe's material unit
-(count / kg / litre -- see the recipe's ``material_type.unit_type``).
-
-Like raw-material lots, ``effective_date`` is **not** accepted here; booking
-stamps it with today, which is what starts the entry counting toward
-``other-material-stock`` on the day it arrives.
-
-Every lot is exposed by its ``public_id`` (``IO-…``); the primary key is never
-sent out.
+The Android counterpart of ``api.sales_admin.InwardOtherMaterialsView``: same
+shapes and filters (``api.inward_serializers``); booking stamps
+``effective_date`` with today. Godown-manager token only.
 """
 
 from __future__ import annotations
@@ -21,11 +13,9 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.InwardOperations import (
-    inward_other_material_payload,
-    today,
-)
+from aggregator.InwardOperations import inward_other_material_payload, today
 from aggregator.models import InwardOtherMaterial
+from android.api.paginated_views import AndroidGodownPaginatedDateRangeListView
 from api.inward_serializers import (
     OTHER_LOT_QUERYSET_FILTERS,
     OTHER_LOT_SORT_OPTIONS,
@@ -33,14 +23,11 @@ from api.inward_serializers import (
     InwardOtherMaterialListPageSerializer,
     InwardOtherMaterialPayloadSerializer,
 )
-from api.paginated_views import AdminPaginatedDateRangeListView
-from common.views.paginated_date_range import (
-    list_query_parameters,
-)
+from common.views.paginated_date_range import list_query_parameters
 
 
-class InwardOtherMaterialsView(AdminPaginatedDateRangeListView):
-    """List (GET) or create (POST) inward other-material lots (app admin only)."""
+class GodownInwardOtherMaterialsView(AndroidGodownPaginatedDateRangeListView):
+    """List (GET) or book (POST) inward other-material lots (godown manager only)."""
 
     serializer_class = CreateInwardOtherMaterialSerializer
     enforce_date_range_filters = False
@@ -49,10 +36,9 @@ class InwardOtherMaterialsView(AdminPaginatedDateRangeListView):
     sort_options = OTHER_LOT_SORT_OPTIONS
 
     @extend_schema(
-        operation_id="sales_admin_inward_other_materials_list",
+        operation_id="android_api_v1_godown_inward_other_materials_list",
         summary=(
-            "List inward other-material lots (filter by party / material "
-            "type / product, sortable)"
+            "List inward other-material lots (filter by party / material type / product, sortable)"
         ),
         parameters=list_query_parameters(
             queryset_filters=OTHER_LOT_QUERYSET_FILTERS,
@@ -73,11 +59,12 @@ class InwardOtherMaterialsView(AdminPaginatedDateRangeListView):
         return [inward_other_material_payload(entry) for entry in page_items]
 
     @extend_schema(
-        summary="Create an inward other-material lot",
+        operation_id="android_api_v1_godown_inward_other_materials_create",
+        summary="Book an inward other-material lot",
         request=CreateInwardOtherMaterialSerializer,
         responses={201: InwardOtherMaterialPayloadSerializer},
     )
-    def post(self, request):
+    def post(self, request: Request) -> Response:
         serializer = CreateInwardOtherMaterialSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

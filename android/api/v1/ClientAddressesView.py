@@ -24,7 +24,7 @@ from rest_framework.response import Response
 
 from aggregator.AddressOperations import address_payload
 from aggregator.models import Client
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 
 CLIENT_PUBLIC_ID_PARAM = OpenApiParameter(
     "client_public_id",
@@ -91,7 +91,7 @@ def client_address_link_payload(link) -> dict:
     }
 
 
-class ClientAddressesView(AndroidBaseView):
+class ClientAddressesView(AndroidSharedView):
     """List one of the caller's clients' address links."""
 
     @extend_schema(

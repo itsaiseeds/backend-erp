@@ -9,7 +9,7 @@ paths:
     post:
       operationId: android_api_v1_auth_login_create
       description: Validate a TOTP code, then issue a bearer token for that sales
-        person.
+        person or godown manager.
       tags:
       - Android · Auth
       requestBody:
@@ -588,6 +588,357 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderListPage'
           description: ''
+  /android/api/v1/godown/inward-other-material/{public_id}:
+    patch:
+      operationId: android_api_v1_godown_inward_other_material_partial_update
+      description: Confirm a lot unchanged or soft-delete it (godown manager only).
+      summary: Update an inward other-material lot (no writable fields)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialPayload'
+          description: ''
+    delete:
+      operationId: android_api_v1_godown_inward_other_material_destroy
+      description: Confirm a lot unchanged or soft-delete it (godown manager only).
+      summary: Delete an inward other-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /android/api/v1/godown/inward-other-materials:
+    get:
+      operationId: android_api_v1_godown_inward_other_materials_list
+      description: List (GET) or book (POST) inward other-material lots (godown manager
+        only).
+      summary: List inward other-material lots (filter by party / material type /
+        product, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: material_type
+        schema:
+          type: string
+        description: Material type id(s) (see the recipe; see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see the recipe; see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, party, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialListPage'
+          description: ''
+    post:
+      operationId: android_api_v1_godown_inward_other_materials_create
+      description: List (GET) or book (POST) inward other-material lots (godown manager
+        only).
+      summary: Book an inward other-material lot
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialPayload'
+          description: ''
+  /android/api/v1/godown/inward-raw-material/{public_id}:
+    patch:
+      operationId: android_api_v1_godown_inward_raw_material_partial_update
+      description: Update the lifecycle or soft-delete a raw-material lot (godown
+        manager only).
+      summary: Update an inward raw-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: ''
+    delete:
+      operationId: android_api_v1_godown_inward_raw_material_destroy
+      description: Update the lifecycle or soft-delete a raw-material lot (godown
+        manager only).
+      summary: Delete an inward raw-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /android/api/v1/godown/inward-raw-materials:
+    get:
+      operationId: android_api_v1_godown_inward_raw_materials_list
+      description: List (GET) or book (POST) inward raw-material lots (godown manager
+        only).
+      summary: List inward raw-material lots (filter by product / party / status,
+        sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, product, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Lot status (Lab Testing / In Use / Rejected). Comma-separated
+          (any match); AND-ed with the other filters.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialListPage'
+          description: ''
+    post:
+      operationId: android_api_v1_godown_inward_raw_materials_create
+      description: List (GET) or book (POST) inward raw-material lots (godown manager
+        only).
+      summary: Book an inward raw-material lot
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: ''
+  /android/api/v1/godown/other-material-recipes:
+    get:
+      operationId: android_api_v1_godown_other_material_recipes_list
+      description: List other-material recipes (godown manager only).
+      summary: List other material recipes (filter by product / material type, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: material_type
+        schema:
+          type: string
+        description: Material type id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (product, packet_weight, created_at);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeListPage'
+          description: ''
+  /android/api/v1/godown/other-material-stock:
+    get:
+      operationId: android_api_v1_godown_other_material_stock_retrieve
+      description: Read the other-material on-hand position (godown manager only).
+      summary: Other-material on-hand stock, per material type
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtherMaterialStock'
+          description: ''
+  /android/api/v1/godown/raw-material-stock:
+    get:
+      operationId: android_api_v1_godown_raw_material_stock_retrieve
+      description: Read the incoming raw-material position (godown manager only).
+      summary: Raw-material incoming stock, per product
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
   /android/api/v1/sales-person-catalogue:
     get:
       operationId: android_api_v1_sales_person_catalogue_list
@@ -827,6 +1178,42 @@ paths:
                 items:
                   $ref: '#/components/schemas/UtilityCrop'
           description: ''
+  /android/api/v1/utilities/other-material-types:
+    get:
+      operationId: android_api_v1_utilities_other_material_types_list
+      description: List every other-material type.
+      summary: List every other-material type (not paginated)
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UtilityOtherMaterialType'
+          description: ''
+  /android/api/v1/utilities/parties:
+    get:
+      operationId: android_api_v1_utilities_parties_list
+      description: List every party.
+      summary: List every party (not paginated)
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UtilityParty'
+          description: ''
   /android/api/v1/utilities/products:
     get:
       operationId: android_api_v1_utilities_products_list
@@ -852,6 +1239,24 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/UtilityProduct'
+          description: ''
+  /android/api/v1/utilities/sales-admins:
+    get:
+      operationId: android_api_v1_utilities_sales_admins_list
+      description: List the sales admins who share their contact.
+      summary: List sales admins who share their contact (name and phone only)
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SalesAdminContact'
           description: ''
   /android/api/v1/utilities/states:
     get:
@@ -2103,6 +2508,101 @@ paths:
               schema:
                 $ref: '#/components/schemas/StockPosition'
           description: ''
+  /api/sales-admin/godown-managers:
+    get:
+      operationId: api_sales_admin_godown_managers_list
+      description: List (GET) or create (POST) godown managers (app admin only).
+      summary: List godown managers
+      tags:
+      - Admin · Users
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GodownManagerPayload'
+          description: ''
+    post:
+      operationId: api_sales_admin_godown_managers_create
+      description: List (GET) or create (POST) godown managers (app admin only).
+      summary: Create a godown manager
+      tags:
+      - Admin · Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGodownManagerRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateGodownManagerRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateGodownManagerRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GodownManagerPayload'
+          description: ''
+  /api/sales-admin/godown-managers/{id}:
+    patch:
+      operationId: api_sales_admin_godown_managers_partial_update
+      description: Update or delete a godown manager (app admin only).
+      summary: Update a godown manager
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin · Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateGodownManagerRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateGodownManagerRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateGodownManagerRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GodownManagerPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_godown_managers_destroy
+      description: Update or delete a godown manager (app admin only).
+      summary: Delete a godown manager
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin · Users
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/sales-admin/hold-order/{public_id}:
     post:
       operationId: api_sales_admin_hold_order_create
@@ -3792,6 +4292,8 @@ components:
           format: date-time
         can_update_stock_count:
           type: boolean
+        share_contact:
+          type: boolean
         totp:
           $ref: '#/components/schemas/Totp'
       required:
@@ -3801,6 +4303,7 @@ components:
       - name
       - phone_number
       - role
+      - share_contact
     AdminUpdateClientRequest:
       type: object
       description: Request validation for an admin's client update -- every field
@@ -3880,8 +4383,14 @@ components:
           type: string
         role:
           type: string
+        is_sales_person:
+          type: boolean
+        is_godown_manager:
+          type: boolean
       required:
       - id
+      - is_godown_manager
+      - is_sales_person
       - name
       - phone_number
       - role
@@ -4624,6 +5133,9 @@ components:
         can_update_stock_count:
           type: boolean
           default: false
+        share_contact:
+          type: boolean
+          default: false
         city:
           type: integer
           description: City for the fallback salesperson profile created with this
@@ -4750,6 +5262,28 @@ components:
       - farmer_name
       - field_trip_public_id
       - land_area_bigha
+    CreateGodownManagerRequest:
+      type: object
+      description: Request validation for creating a new ``GodownManager``.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+      required:
+      - name
+      - phone_number
     CreateInwardOtherMaterialRequest:
       type: object
       description: |-
@@ -6348,9 +6882,51 @@ components:
       required:
       - label
       - value
+    GodownManagerPayload:
+      type: object
+      description: Swagger schema for one godown manager row (no location, no audit
+        keys).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phone_number:
+          type: string
+        role:
+          type: string
+        created_by:
+          allOf:
+          - $ref: '#/components/schemas/UserRef'
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        totp:
+          $ref: '#/components/schemas/Totp'
+      required:
+      - created_at
+      - id
+      - name
+      - phone_number
+      - role
     IdName:
       type: object
       description: An ``{id, name}`` reference (a city, a crop).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    InwardCreatedByRef:
+      type: object
+      description: Output shape for the ``created_by`` reference on a lot.
       properties:
         id:
           type: integer
@@ -6421,7 +6997,13 @@ components:
           type: string
           format: date
           nullable: true
+        created_by:
+          allOf:
+          - $ref: '#/components/schemas/InwardCreatedByRef'
+          nullable: true
+          description: Who booked the lot.
       required:
+      - created_by
       - effective_date
       - party
       - public_id
@@ -6539,7 +7121,13 @@ components:
           type: string
           format: date
           nullable: true
+        created_by:
+          allOf:
+          - $ref: '#/components/schemas/InwardCreatedByRef'
+          nullable: true
+          description: Who booked the lot.
       required:
+      - created_by
       - effective_date
       - lab_sampling_date
       - lot_no
@@ -6586,7 +7174,7 @@ components:
       - user
     LoginUser:
       type: object
-      description: The authenticated sales person, as returned by the login flow.
+      description: The authenticated user, as returned by the login flow.
       properties:
         id:
           type: integer
@@ -6596,8 +7184,14 @@ components:
           type: string
         role:
           type: string
+        is_sales_person:
+          type: boolean
+        is_godown_manager:
+          type: boolean
       required:
       - id
+      - is_godown_manager
+      - is_sales_person
       - name
       - phone_number
       - role
@@ -7268,6 +7862,8 @@ components:
           maxLength: 10
         can_update_stock_count:
           type: boolean
+        share_contact:
+          type: boolean
     PatchedUpdateCropRequest:
       type: object
       description: Request validation for updating a ``Crop`` (name only).
@@ -7303,6 +7899,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CustomOrderItemWriteRequest'
+    PatchedUpdateGodownManagerRequest:
+      type: object
+      description: |-
+        Request validation for updating a ``GodownManager`` (name/email/phone).
+
+        Callers pass the ``GodownManager`` being edited as ``instance=`` so the
+        phone uniqueness check excludes that user's own row.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
     PatchedUpdateInwardRawMaterialRequest:
       type: object
       description: |-
@@ -7649,8 +8268,11 @@ components:
           type: boolean
         can_create_sales_person:
           type: boolean
+        can_create_godown_manager:
+          type: boolean
       required:
       - can_create_admin
+      - can_create_godown_manager
       - can_create_sales_person
       - user
     ReauthenticateUser:
@@ -7750,6 +8372,17 @@ components:
       required:
       - name
       - public_id
+    SalesAdminContact:
+      type: object
+      description: Output shape for one shared admin contact (schema only).
+      properties:
+        name:
+          type: string
+        phone_number:
+          type: string
+      required:
+      - name
+      - phone_number
     SalesPersonPayload:
       type: object
       description: Swagger schema for one sales person row (city only).
@@ -8047,6 +8680,51 @@ components:
       - id
       - is_deleted
       - name
+    UtilityOtherMaterialType:
+      type: object
+      description: Output shape for one material type row (schema only).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+          description: Count / kg / litre.
+      required:
+      - id
+      - name
+      - unit_type
+    UtilityParty:
+      type: object
+      description: Output shape for one party row (schema only).
+      properties:
+        id:
+          type: integer
+          description: Send this as party.
+        name:
+          type: string
+        city:
+          $ref: '#/components/schemas/UtilityPartyCityRef'
+        contact_number:
+          type: string
+          nullable: true
+      required:
+      - city
+      - contact_number
+      - id
+      - name
+    UtilityPartyCityRef:
+      type: object
+      description: Output shape for the ``city`` reference on a party (schema only).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     UtilityProduct:
       type: object
       description: Output shape for one product row (schema only).
@@ -8109,8 +8787,11 @@ components:
           type: boolean
         can_create_sales_person:
           type: boolean
+        can_create_godown_manager:
+          type: boolean
       required:
       - can_create_admin
+      - can_create_godown_manager
       - can_create_sales_person
       - user
     VerifyOTPUser:
@@ -8145,7 +8826,7 @@ tags:
 - name: Admin · Auth
   description: Sales-admin website sign-in and session.
 - name: Admin · Users
-  description: Admin and sales-person accounts.
+  description: Admin, sales-person and godown-manager accounts.
 - name: Admin · Clients
   description: Client records and verification.
 - name: Admin · Orders
@@ -8168,7 +8849,7 @@ tags:
 - name: Admin · Utilities
   description: Geography look-ups for the admin website.
 - name: Android · Auth
-  description: Sales-person app sign-in and session.
+  description: Android app sign-in and session (either role).
 - name: Android · Clients
   description: The sales person's clients, addresses, transport.
 - name: Android · Orders
@@ -8177,7 +8858,10 @@ tags:
   description: Products the sales person can sell.
 - name: Android · Field trips
   description: Planning, running and ending field trips, and recording farmers met.
+- name: Android · Godown
+  description: 'Godown manager: inward lots, stock positions and recipes.'
 - name: Android · Utilities
-  description: 'Look-ups for the app: geography, crops and products.'
+  description: 'Look-ups for the app (either role): geography, crops, products, parties,
+    material types and sales-admin contacts.'
 - name: Developer tools
   description: Internal debugging endpoints.

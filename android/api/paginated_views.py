@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from common.views.paginated_date_range import _PaginatedDateRangeListMixin
 
-from .base import AndroidBaseView
+from .base import AndroidBaseView, AndroidGodownBaseView
 
 
 class AndroidPaginatedDateRangeListView(_PaginatedDateRangeListMixin, AndroidBaseView):
@@ -25,4 +25,15 @@ class AndroidPaginatedDateRangeListView(_PaginatedDateRangeListMixin, AndroidBas
     (each filter is its own ``?<name>=<csv>`` param, AND-ed) and sortable
     (``?sort=<-?name,...>``). Responses then carry ``available_filters`` /
     ``available_sorts``; a bare request just gets the first page.
+    """
+
+
+class AndroidGodownPaginatedDateRangeListView(
+    _PaginatedDateRangeListMixin, AndroidGodownBaseView
+):
+    """Godown-manager Android app ``GET`` list view, paginated + date-range filtered.
+
+    Same contract as :class:`AndroidPaginatedDateRangeListView`, but gated on
+    ``godown_manager_required`` (inherited from ``AndroidGodownBaseView``): a
+    sales-person token is a ``403``.
     """

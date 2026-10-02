@@ -18,7 +18,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator.models import Product
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 from common.views.paginated_date_range import query_flag
 
 from .CropsView import SHOW_DELETED_PARAMETER
@@ -35,7 +35,7 @@ class UtilityProductSerializer(serializers.Serializer):
     is_deleted = serializers.BooleanField()
 
 
-class ProductsView(AndroidBaseView):
+class ProductsView(AndroidSharedView):
     """List every product with its crop, optionally including soft-deleted ones."""
 
     @extend_schema(

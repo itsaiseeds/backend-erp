@@ -21,7 +21,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 
 from .ClientAddressesView import CLIENT_PUBLIC_ID_PARAM, client_of_caller
 
@@ -48,7 +48,7 @@ def client_transport_agency_link_payload(link) -> dict:
     }
 
 
-class ClientTransportAgenciesView(AndroidBaseView):
+class ClientTransportAgenciesView(AndroidSharedView):
     """List one of the caller's clients' transport-agency links."""
 
     @extend_schema(
