@@ -686,7 +686,7 @@ paths:
       description: List (GET) or book (POST) inward other-material lots (godown manager
         only).
       summary: List inward other-material lots (filter by party / material type /
-        product / effective date range, sortable)
+        product, sortable)
       parameters:
       - in: query
         name: all
@@ -695,20 +695,6 @@ paths:
           default: false
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
-      - in: query
-        name: effective_date_gte
-        schema:
-          type: string
-          format: date
-        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
-          Inclusive lower bound.
-      - in: query
-        name: effective_date_lte
-        schema:
-          type: string
-          format: date
-        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
-          Inclusive upper bound.
       - in: query
         name: material_type
         schema:
@@ -845,8 +831,8 @@ paths:
       operationId: android_api_v1_godown_inward_raw_materials_list
       description: List (GET) or book (POST) inward raw-material lots (godown manager
         only).
-      summary: List inward raw-material lots (filter by product / party / status /
-        effective date range, sortable)
+      summary: List inward raw-material lots (filter by product / party / status,
+        sortable)
       parameters:
       - in: query
         name: all
@@ -855,20 +841,6 @@ paths:
           default: false
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
-      - in: query
-        name: effective_date_gte
-        schema:
-          type: string
-          format: date
-        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
-          Lots without an effective date are excluded. Inclusive lower bound.
-      - in: query
-        name: effective_date_lte
-        schema:
-          type: string
-          format: date
-        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
-          Lots without an effective date are excluded. Inclusive upper bound.
       - in: query
         name: page
         schema:
@@ -2806,7 +2778,7 @@ paths:
       description: List (GET) or create (POST) inward other-material lots (app admin
         only).
       summary: List inward other-material lots (filter by party / material type /
-        product / effective date range, sortable)
+        product, sortable)
       parameters:
       - in: query
         name: all
@@ -2815,20 +2787,6 @@ paths:
           default: false
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
-      - in: query
-        name: effective_date_gte
-        schema:
-          type: string
-          format: date
-        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
-          Inclusive lower bound.
-      - in: query
-        name: effective_date_lte
-        schema:
-          type: string
-          format: date
-        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
-          Inclusive upper bound.
       - in: query
         name: material_type
         schema:
@@ -2965,8 +2923,8 @@ paths:
       operationId: sales_admin_inward_raw_materials_list
       description: List (GET) or create (POST) inward raw-material lots (app admin
         only).
-      summary: List inward raw-material lots (filter by product / party / status /
-        effective date range, sortable)
+      summary: List inward raw-material lots (filter by product / party / status,
+        sortable)
       parameters:
       - in: query
         name: all
@@ -2975,20 +2933,6 @@ paths:
           default: false
         description: When true, ignore page / page_size and return every row matching
           the filters as a single page (total_pages 1, page numbers null).
-      - in: query
-        name: effective_date_gte
-        schema:
-          type: string
-          format: date
-        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
-          Lots without an effective date are excluded. Inclusive lower bound.
-      - in: query
-        name: effective_date_lte
-        schema:
-          type: string
-          format: date
-        description: Day the lot started counting toward stock (YYYY-MM-DD, inclusive).
-          Lots without an effective date are excluded. Inclusive upper bound.
       - in: query
         name: page
         schema:
