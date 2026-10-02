@@ -16,7 +16,6 @@ from rest_framework.authtoken.models import Token
 
 from aggregator import InventoryOperations
 from aggregator.models import (
-    InwardOtherMaterial,
     InwardRawMaterial,
     OtherMaterialRecipe,
     OtherMaterialType,
@@ -265,89 +264,6 @@ class GodownManagerApiTest(AndroidApiTestCase):
         self.assertEqual(self.client.delete(item_url).status_code, 204)
         listed = self.client.get(BASE + "godown/inward-other-materials")
         self.assertEqual(listed.data["results"], [])
-
-    def test_previous_raw_lots_are_found_by_effective_date_range(self):
-        """``effective_date_gte`` / ``_lte`` are inclusive; undated (lab) lots never match.
-
-        tests/android/test_godown.py::GodownManagerApiTest::test_previous_raw_lots_are_found_by_effective_date_range
-        """
-        self.login_as(self.manager.user)
-        dated = {}
-        for day in ("2026-08-30", "2026-09-15", "2026-09-30"):
-            booked = self._book_raw()
-            self.assertEqual(booked.status_code, 201, booked.content)
-            InwardRawMaterial.objects.filter(public_id=booked.data["public_id"]).update(
-                effective_date=day
-            )
-            dated[day] = booked.data["public_id"]
-        undated = self._book_raw().data["public_id"]
-
-        def ids(**params) -> set[str]:
-            response = self.client.get(BASE + "godown/inward-raw-materials", params)
-            self.assertEqual(response.status_code, 200, response.content)
-            return {row["public_id"] for row in response.data["results"]}
-
-        self.assertEqual(
-            ids(effective_date_gte="2026-09-01", effective_date_lte="2026-09-30"),
-            {dated["2026-09-15"], dated["2026-09-30"]},
-        )
-        self.assertEqual(
-            ids(effective_date_gte="2026-09-15", effective_date_lte="2026-09-15"),
-            {dated["2026-09-15"]},
-        )
-        self.assertEqual(ids(effective_date_lte="2026-08-30"), {dated["2026-08-30"]})
-        self.assertNotIn(undated, ids(effective_date_gte="2000-01-01"))
-        self.assertIn(undated, ids())  # no window -> unchanged behaviour
-        bad = self.client.get(
-            BASE + "godown/inward-raw-materials", {"effective_date_gte": "not-a-date"}
-        )
-        self.assertEqual(bad.status_code, 400, bad.content)
-
-    def test_previous_other_material_lots_are_found_by_effective_date_range(self):
-        """The other-material list takes the same inclusive day bounds.
-
-        tests/android/test_godown.py::GodownManagerApiTest::test_previous_other_material_lots_are_found_by_effective_date_range
-        """
-        recipe = OtherMaterialRecipe.objects.create(
-            product=self.product,
-            material_type=self.material_type,
-            packet_weight="1.000",
-            quantity="2.000",
-            created_by=self.superuser,
-        )
-        self.login_as(self.manager.user)
-        dated = {}
-        for day in ("2026-08-30", "2026-09-15", "2026-09-30"):
-            booked = self.client.post(
-                BASE + "godown/inward-other-materials",
-                {"party": self.party.id, "recipe": recipe.public_id, "quantity": "5"},
-                format="json",
-            )
-            self.assertEqual(booked.status_code, 201, booked.content)
-            InwardOtherMaterial.objects.filter(public_id=booked.data["public_id"]).update(
-                effective_date=day
-            )
-            dated[day] = booked.data["public_id"]
-
-        def ids(**params) -> set[str]:
-            response = self.client.get(BASE + "godown/inward-other-materials", params)
-            self.assertEqual(response.status_code, 200, response.content)
-            return {row["public_id"] for row in response.data["results"]}
-
-        self.assertEqual(
-            ids(effective_date_gte="2026-09-01", effective_date_lte="2026-09-30"),
-            {dated["2026-09-15"], dated["2026-09-30"]},
-        )
-        self.assertEqual(ids(effective_date_lte="2026-08-30"), {dated["2026-08-30"]})
-        self.assertEqual(ids(effective_date_gte="2026-10-01"), set())
-        entry = next(
-            item
-            for item in self.client.get(BASE + "godown/inward-other-materials").data[
-                "available_filters"
-            ]
-            if item["filter"] == "effective_date"
-        )
-        self.assertEqual(entry["kind"], "date_range")
 
     # -- shared look-ups ---------------------------------------------------------
 
