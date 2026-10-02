@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -8,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/widgets/buttons/primary_button.dart';
+import '../../../../core/widgets/buttons/secondary_button.dart';
 import '../../data/models/dispatch_challan_model.dart';
 import '../../utils/challan_generator.dart';
 
@@ -33,12 +35,30 @@ class ChallanPreviewDialog extends StatefulWidget {
 }
 
 class _ChallanPreviewDialogState extends State<ChallanPreviewDialog> {
+  final FocusNode _shortcutFocus = FocusNode();
+
   Future<Uint8List>? _pdf;
   bool _isDownloading = false;
+  bool _isPrinting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Takes focus so Ctrl+P reaches the dialog instead of the page behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _shortcutFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _shortcutFocus.dispose();
+    super.dispose();
+  }
 
   String get _fileName =>
       '${AppStrings.CHALLAN_FILE_PREFIX}'
-      '${widget.challan.dispatchPublicId}.pdf';
+      '${widget.challan.fileReference}.pdf';
 
   // Built once and reused, so previewing then downloading does not lay the
   // document out twice.
@@ -60,10 +80,43 @@ class _ChallanPreviewDialogState extends State<ChallanPreviewDialog> {
     }
   }
 
+  Future<void> _print() async {
+    if (_isPrinting) return;
+    setState(() => _isPrinting = true);
+
+    try {
+      final Uint8List bytes = await _buildPdf();
+      if (!mounted) return;
+      await Printing.layoutPdf(
+        onLayout: (_) => bytes,
+        name: _fileName,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ToastUtils.showError(context, AppStrings.CHALLAN_PRINT_FAILED);
+    } finally {
+      if (mounted) setState(() => _isPrinting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Size viewport = MediaQuery.sizeOf(context);
 
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyP, control: true): _print,
+        const SingleActivator(LogicalKeyboardKey.keyP, meta: true): _print,
+      },
+      child: Focus(
+        focusNode: _shortcutFocus,
+        autofocus: true,
+        child: _buildDialog(viewport),
+      ),
+    );
+  }
+
+  Widget _buildDialog(Size viewport) {
     return Dialog(
       backgroundColor: AppColors.BACKGROUND,
       insetPadding: const EdgeInsets.all(AppSpacing.xl),
@@ -119,6 +172,13 @@ class _ChallanPreviewDialogState extends State<ChallanPreviewDialog> {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
+          SecondaryButton(
+            label: AppStrings.PRINT,
+            icon: Icons.print_outlined,
+            isLoading: _isPrinting,
+            onPressed: _isPrinting ? null : _print,
+          ),
+          const SizedBox(width: AppSpacing.sm),
           PrimaryButton(
             label: AppStrings.DOWNLOAD,
             icon: Icons.download_outlined,

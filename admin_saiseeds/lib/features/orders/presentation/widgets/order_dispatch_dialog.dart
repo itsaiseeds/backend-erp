@@ -100,6 +100,8 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
     super.dispose();
   }
 
+  bool get _isOwnVehicle => _order.transportAgency == null;
+
   bool _validateTransport() {
     final bool isFormValid = _formKey.currentState?.validate() ?? false;
     final bool isCityValid = _fromCity != null;
@@ -217,6 +219,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
         RecordFieldRow(
           left: CityPickerField(
             value: _fromCity,
+            fieldLabel: AppStrings.FIELD_FROM_CITY,
             enabled: !_isSubmitting,
             errorText: _cityError,
             onSelected: (city) => setState(() {
@@ -229,7 +232,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
             label: AppStrings.FIELD_VEHICLE_NUMBER,
             hint: AppStrings.FIELD_VEHICLE_NUMBER_HINT,
             enabled: !_isSubmitting,
-            validator: FormValidators.requiredField,
+            validator: _isOwnVehicle ? FormValidators.requiredField : null,
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -239,7 +242,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
             label: AppStrings.FIELD_DRIVER_NAME,
             hint: AppStrings.FIELD_DRIVER_NAME_HINT,
             enabled: !_isSubmitting,
-            validator: FormValidators.requiredField,
+            validator: _isOwnVehicle ? FormValidators.requiredField : null,
           ),
           right: AppTextField(
             controller: _driverNumberController,
@@ -253,7 +256,9 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
                 FormValidators.PHONE_NUMBER_LENGTH,
               ),
             ],
-            validator: FormValidators.phoneNumber,
+            validator: _isOwnVehicle
+                ? FormValidators.phoneNumber
+                : FormValidators.optionalPhoneNumber,
           ),
         ),
       ],

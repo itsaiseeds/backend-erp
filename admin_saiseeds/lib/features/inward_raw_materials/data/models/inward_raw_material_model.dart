@@ -37,17 +37,20 @@ class InwardStatus {
 
   static const String LAB_TESTING = 'lab_testing';
   static const String IN_USE = 'in_use';
+  static const String REJECTED = 'rejected';
 
   // The API compares against the display label, not the slug: a PATCH with
   // "in_use" comes back as `"in_use" is not a valid choice`.
   static const String LAB_TESTING_WIRE = 'Lab Testing';
   static const String IN_USE_WIRE = 'In Use';
+  static const String REJECTED_WIRE = 'Rejected';
 }
 
 class InwardRawMaterialModel {
   final String publicId;
   final InwardProductRef? product;
   final InwardPartyRef? party;
+  final String lotNo;
   final String quantityKg;
   final String status;
   final String labSamplingDate;
@@ -57,6 +60,7 @@ class InwardRawMaterialModel {
     required this.publicId,
     this.product,
     this.party,
+    this.lotNo = '',
     this.quantityKg = '',
     this.status = '',
     this.labSamplingDate = '',
@@ -75,6 +79,7 @@ class InwardRawMaterialModel {
       party: party is Map
           ? InwardPartyRef.fromJson(Map<String, dynamic>.from(party))
           : null,
+      lotNo: '${json['lot_no'] ?? ''}',
       quantityKg: _decimalOf(json['quantity_kg']),
       status: '${json['status'] ?? ''}',
       labSamplingDate: _dateOf(json['lab_sampling_date']),
@@ -94,6 +99,20 @@ class InwardRawMaterialModel {
       status.trim().toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_');
 
   bool get isInUse => _statusKey == InwardStatus.IN_USE;
+
+  bool get isRejected => _statusKey == InwardStatus.REJECTED;
+
+  bool get isLabTesting => !isInUse && !isRejected;
+
+  /// The statuses this lot may move to. Lab Testing is the hub of the
+  /// workflow, so a settled lot can only revert to it, never cross over to
+  /// the other settled state.
+  List<String> get allowedNextStatuses {
+    if (isLabTesting) {
+      return const [InwardStatus.IN_USE_WIRE, InwardStatus.REJECTED_WIRE];
+    }
+    return const [InwardStatus.LAB_TESTING_WIRE];
+  }
 
   String get statusLabel {
     final String raw = status.trim();

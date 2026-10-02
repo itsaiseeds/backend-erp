@@ -3,6 +3,7 @@ import '../../../../core/bloc/safe_cubit.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
+import '../../../../core/widgets/inputs/date_range_field.dart';
 import '../../../clients/data/models/client_filter_model.dart';
 import '../../data/inward_raw_materials_repository.dart';
 import '../../data/models/inward_raw_material_model.dart';
@@ -133,6 +134,7 @@ class InwardRawMaterialsCubit extends SafeCubit<InwardRawMaterialsState> {
   Future<bool> createLot({
     required String productPublicId,
     required int partyId,
+    required String lotNo,
     required String quantityKg,
     required String labSamplingDate,
   }) {
@@ -140,6 +142,7 @@ class InwardRawMaterialsCubit extends SafeCubit<InwardRawMaterialsState> {
       () => _repository.createInwardRawMaterial(
         productPublicId: productPublicId,
         partyId: partyId,
+        lotNo: lotNo,
         quantityKg: quantityKg,
         labSamplingDate: labSamplingDate,
       ),
@@ -185,12 +188,32 @@ class InwardRawMaterialsCubit extends SafeCubit<InwardRawMaterialsState> {
     }
   }
 
+  ClientFilterModel? _filterFor(String key) {
+    for (final ClientFilterModel filter in state.availableFilters) {
+      if (filter.key == key) return filter;
+    }
+    return null;
+  }
+
   Map<String, dynamic> _buildQueryParams(int page) {
     final Map<String, dynamic> params = {'page': page, 'page_size': PAGE_SIZE};
 
     state.filters.forEach((key, value) {
       final String trimmed = value.trim();
       if (trimmed.isEmpty) return;
+
+      // A range arrives as one "from|to" value but the API wants it as two
+      // bound params, named by the filter itself.
+      final ClientFilterModel? filter = _filterFor(key);
+      if (filter != null && filter.kind == ClientFilterKind.datetimeRange) {
+        final List<String> bounds = trimmed.split(DateRangeValue.SEPARATOR);
+        final String lower = bounds.isNotEmpty ? bounds.first.trim() : '';
+        final String upper = bounds.length > 1 ? bounds[1].trim() : '';
+        if (lower.isNotEmpty) params[filter.lowerBoundParam] = lower;
+        if (upper.isNotEmpty) params[filter.upperBoundParam] = upper;
+        return;
+      }
+
       params[key] = trimmed;
     });
 

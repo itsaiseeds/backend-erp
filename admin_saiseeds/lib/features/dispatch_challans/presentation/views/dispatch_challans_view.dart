@@ -73,7 +73,7 @@ class _DispatchChallansContentState extends State<_DispatchChallansContent> {
       await Printing.sharePdf(
         bytes: bytes,
         filename: '${AppStrings.CHALLAN_FILE_PREFIX}'
-            '${challan.dispatchPublicId}.pdf',
+            '${challan.fileReference}.pdf',
       );
     } catch (_) {
       if (!mounted) return;

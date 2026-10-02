@@ -3,6 +3,7 @@ class RawMaterialStockLineModel {
   final String name;
   final String incomingKg;
   final String packedKg;
+  final String rejectedKg;
   final String availableKg;
 
   const RawMaterialStockLineModel({
@@ -10,6 +11,7 @@ class RawMaterialStockLineModel {
     this.name = '',
     this.incomingKg = '',
     this.packedKg = '',
+    this.rejectedKg = '',
     this.availableKg = '',
   });
 
@@ -19,6 +21,7 @@ class RawMaterialStockLineModel {
       name: json['name'] as String? ?? '',
       incomingKg: _decimalOf(json['incoming_kg']),
       packedKg: _decimalOf(json['packed_kg']),
+      rejectedKg: _decimalOf(json['rejected_kg']),
       availableKg: _decimalOf(json['available_kg']),
     );
   }
@@ -26,6 +29,8 @@ class RawMaterialStockLineModel {
   num? get incomingValue => num.tryParse(incomingKg);
 
   num? get packedValue => num.tryParse(packedKg);
+
+  num? get rejectedValue => num.tryParse(rejectedKg);
 
   num? get availableValue => num.tryParse(availableKg);
 

@@ -60,7 +60,10 @@ class ClientFilterModel {
         return ClientFilterKind.select;
       case 'text':
         return ClientFilterKind.text;
+      // Both spellings reach us: clients send "datetime_range", the inward
+      // endpoints send "date_range". Either way it is a two-ended picker.
       case 'datetime_range':
+      case 'date_range':
         return ClientFilterKind.datetimeRange;
       default:
         return ClientFilterKind.unsupported;

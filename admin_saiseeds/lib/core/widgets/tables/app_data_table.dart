@@ -1087,6 +1087,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
                 ? const _LoadMoreRow()
                 : _TableRow<T>(
               item: data[index],
+              rowIndex: index,
               stickyColumns: stickyCols,
               scrollableColumns: scrollCols,
               scaleFactor: scaleFactor,
@@ -1302,6 +1303,7 @@ class _TableRow<T> extends StatefulWidget {
   final double rowHeight;
   final double stickyWidth;
   final List<AppDataColumn> trailingColumns;
+  final int rowIndex;
   final double viewportWidth;
   final bool isBusy;
   final ScrollController scrollController;
@@ -1316,6 +1318,7 @@ class _TableRow<T> extends StatefulWidget {
 
   const _TableRow({
     required this.item,
+    required this.rowIndex,
     required this.stickyColumns,
     required this.scrollableColumns,
     required this.scaleFactor,
@@ -1348,9 +1351,13 @@ class _TableRowState<T> extends State<_TableRow<T>> {
 
   @override
   Widget build(BuildContext context) {
+    final Color resting = widget.rowIndex.isOdd
+        ? AppColors.TABLE_ROW_STRIPE
+        : AppColors.SURFACE;
+
     final Color background = _isHovered && _isInteractive
         ? AppColors.TABLE_ROW_HOVER
-        : AppColors.SURFACE;
+        : resting;
 
     return MouseRegion(
       cursor: _isInteractive

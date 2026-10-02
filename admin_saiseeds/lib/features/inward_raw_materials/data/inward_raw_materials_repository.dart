@@ -30,6 +30,7 @@ class InwardRawMaterialsRepository {
   Future<void> createInwardRawMaterial({
     required String productPublicId,
     required int partyId,
+    required String lotNo,
     required String quantityKg,
     required String labSamplingDate,
   }) async {
@@ -38,6 +39,7 @@ class InwardRawMaterialsRepository {
       body: {
         'product': productPublicId,
         'party': partyId,
+        'lot_no': lotNo,
         'quantity_kg': quantityKg,
         'lab_sampling_date': labSamplingDate,
       },

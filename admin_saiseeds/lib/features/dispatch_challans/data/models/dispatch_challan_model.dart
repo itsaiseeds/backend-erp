@@ -141,6 +141,7 @@ class ChallanAgencyRef {
 
 class ChallanDispatchModel {
   final String publicId;
+  final String challanNumber;
   final String lrNumber;
   final String dispatchDate;
   final bool isPrivate;
@@ -153,6 +154,7 @@ class ChallanDispatchModel {
 
   const ChallanDispatchModel({
     this.publicId = '',
+    this.challanNumber = '',
     this.lrNumber = '',
     this.dispatchDate = '',
     this.isPrivate = false,
@@ -169,6 +171,7 @@ class ChallanDispatchModel {
 
     return ChallanDispatchModel(
       publicId: '${json['public_id'] ?? ''}',
+      challanNumber: '${json['challan_number'] ?? ''}',
       lrNumber: '${json['lr_number'] ?? ''}',
       dispatchDate: '${json['dispatch_date'] ?? ''}',
       isPrivate: json['is_private'] == true,
@@ -241,6 +244,18 @@ class ChallanItemModel {
       negotiatedSellingPrice: _decimalOf(json['negotiated_selling_price']),
       lineTotal: _decimalOf(json['line_total']),
     );
+  }
+
+  /// Weight actually shipped: packet weight x packets x bags.
+  ///
+  /// Derived rather than read from `total_weight`, which a custom order's
+  /// line omits and which counts one bag only where it is present.
+  String get shippedWeight {
+    final double? unit = double.tryParse(packetWeight.trim());
+    if (unit == null) return '';
+    final int bags = quantity <= 0 ? 1 : quantity;
+    final double total = unit * packets * bags;
+    return total.toStringAsFixed(3);
   }
 
   static String _decimalOf(dynamic value) {
@@ -317,6 +332,15 @@ class DispatchChallanModel {
   }
 
   String get dispatchPublicId => dispatch?.publicId ?? '';
+
+  String get challanNumber => dispatch?.challanNumber ?? '';
+
+  /// What the saved PDF is named by: the challan number when the API has
+  /// issued one, else the internal dispatch id.
+  String get fileReference {
+    final String number = challanNumber.trim();
+    return number.isEmpty ? dispatchPublicId : number;
+  }
 
   String get receiverName => receiver?.companyName ?? '';
 

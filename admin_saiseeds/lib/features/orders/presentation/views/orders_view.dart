@@ -215,10 +215,8 @@ class _OrdersContentState extends State<_OrdersContent> {
             onDispatch: _onDispatch,
             onRevertDispatch: _onRevertDispatch,
             onUploadLr: _onUploadLr,
-            searchBarTrailing: StockStatusChip(
-              isComplete: state.isTodaysStockComplete,
-            ),
             searchBarActions: [
+              StockStatusChip(isComplete: state.isTodaysStockComplete),
               IconActionButton(
                 expand: true,
                 icon: Icons.refresh_rounded,

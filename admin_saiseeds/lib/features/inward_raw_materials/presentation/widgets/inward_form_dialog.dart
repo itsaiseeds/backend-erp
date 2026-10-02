@@ -17,6 +17,8 @@ import '../../../parties/data/models/party_model.dart';
 import '../../../products/data/models/product_model.dart';
 import '../bloc/inward_raw_materials_cubit.dart';
 
+const int _LOT_NO_MAX_LENGTH = 64;
+
 class InwardFormDialog extends StatefulWidget {
   const InwardFormDialog({super.key});
 
@@ -42,6 +44,7 @@ class InwardFormDialog extends StatefulWidget {
 
 class _InwardFormDialogState extends State<InwardFormDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _lotNoController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
 
   ProductModel? _product;
@@ -62,6 +65,7 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
 
   @override
   void dispose() {
+    _lotNoController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
@@ -94,6 +98,7 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
     final bool succeeded = await cubit.createLot(
       productPublicId: _product!.publicId,
       partyId: _party!.id,
+      lotNo: _lotNoController.text.trim(),
       quantityKg: _quantityController.text.trim(),
       labSamplingDate: InwardFormDialog.isoDate.format(_labSamplingDate!),
     );
@@ -148,6 +153,17 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
                 _party = party;
                 _partyError = null;
               }),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              controller: _lotNoController,
+              label: AppStrings.FIELD_LOT_NO,
+              hint: AppStrings.FIELD_LOT_NO_HINT,
+              enabled: !_isSubmitting,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(_LOT_NO_MAX_LENGTH),
+              ],
+              validator: FormValidators.requiredField,
             ),
             const SizedBox(height: AppSpacing.md),
             AppTextField(
