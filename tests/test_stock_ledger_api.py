@@ -340,3 +340,33 @@ class StockLedgerCommandsTest(LedgerWorldTestCase):
         line.save()
         with self.assertRaises(CommandError):
             call_command("check_stock_ledger", stdout=StringIO(), stderr=StringIO())
+
+
+class StockLedgerAdminTest(LedgerWorldTestCase, WebApiTestCase):
+    """The ledger is visible in the Django admin, and read-only even for a superuser."""
+
+    def setUp(self):
+        super().setUp()
+        self.raw(self.product, "1000")
+        self.count_everything({self.pp1: 5})
+        self.event = StockEvent.objects.filter(product=self.product).first()
+        self.login_as(self.su)
+
+    def test_the_changelist_and_detail_render_with_the_lines_inline(self):
+        """tests/test_stock_ledger_api.py::StockLedgerAdminTest::test_the_changelist_and_detail_render_with_the_lines_inline"""
+        listing = self.client.get("/admin/aggregator/stockevent/")
+        self.assertEqual(listing.status_code, 200)
+        self.assertContains(listing, "PACKED")
+
+        detail = self.client.get(f"/admin/aggregator/stockevent/{self.event.pk}/change/")
+        self.assertEqual(detail.status_code, 200)
+
+        self.assertEqual(self.client.get("/admin/aggregator/packedrecipelayer/").status_code, 200)
+
+    def test_nobody_can_add_change_or_delete_a_ledger_row(self):
+        """tests/test_stock_ledger_api.py::StockLedgerAdminTest::test_nobody_can_add_change_or_delete_a_ledger_row"""
+        base = "/admin/aggregator/stockevent/"
+        self.assertEqual(self.client.get(base + "add/").status_code, 403)
+        self.assertEqual(self.client.post(base + f"{self.event.pk}/change/", {}).status_code, 403)
+        self.assertEqual(self.client.get(base + f"{self.event.pk}/delete/").status_code, 403)
+        self.assertTrue(StockEvent.objects.filter(pk=self.event.pk).exists())

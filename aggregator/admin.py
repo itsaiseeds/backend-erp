@@ -36,6 +36,7 @@ from .models import (
     OrderItem,
     OtherMaterialRecipe,
     OtherMaterialType,
+    PackedRecipeLayer,
     Party,
     Pincode,
     PrivateDispatchDetails,
@@ -47,7 +48,9 @@ from .models import (
     State,
     Status,
     StatusIds,
+    StockEvent,
     StockEventDetail,
+    StockEventLine,
     StockEventType,
     TransportAgency,
 )
@@ -978,3 +981,148 @@ class FarmerVisitProductAdmin(SoftDeleteModelAdmin):
     list_display = ("farmer_visit", "product", "created_at")
     autocomplete_fields = ("farmer_visit", "product")
     list_select_related = ("farmer_visit", "product")
+
+
+# -- Stock ledger ---------------------------------------------------------------
+#
+# The product stock ledger is append-only and written only by
+# ``StockLedgerOperations.recording``. Nobody edits or deletes it by hand -- not
+# even a superuser -- because a hand-edited delta makes it disagree with the live
+# figures (``manage.py check_stock_ledger`` would then report the drift). These
+# admins are therefore strictly read-only, for inspection and support.
+
+
+class ReadOnlyLedgerAdminMixin:
+    """No add, change or delete for anyone."""
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class StockEventLineInline(ReadOnlyLedgerAdminMixin, admin.TabularInline):
+    """What one event moved in each pool, as signed deltas."""
+
+    model = StockEventLine
+    extra = 0
+    can_delete = False
+    fields = (
+        "pool_kind",
+        "product_packaging",
+        "packet_weight",
+        "material_type",
+        "d_on_hand",
+        "d_reserved",
+        "d_consumed",
+        "d_incoming",
+        "d_packed",
+        "d_rejected",
+        "d_wasted",
+    )
+    readonly_fields = fields
+
+
+@admin.register(StockEvent)
+class StockEventAdmin(ReadOnlyLedgerAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "id",
+        "occurred_at",
+        "product",
+        "event",
+        "detail_name",
+        "source",
+        "actor",
+        "line_count",
+    )
+    list_filter = ("event_type", "detail", "occurred_at")
+    search_fields = (
+        "product__name",
+        "product__public_id",
+        "order__public_id",
+        "custom_order__public_id",
+        "inward_raw_material__public_id",
+        "inward_raw_material__lot_no",
+        "inward_other_material__public_id",
+        "raw_material_waste__public_id",
+        "inventory_snapshot__public_id",
+        "loose_stock_snapshot__public_id",
+        "actor__name",
+    )
+    date_hierarchy = "occurred_at"
+    ordering = ("-occurred_at", "-id")
+    inlines = (StockEventLineInline,)
+    list_select_related = (
+        "product",
+        "actor",
+        "order",
+        "custom_order",
+        "inward_raw_material",
+        "inward_other_material",
+        "raw_material_waste",
+        "inventory_snapshot",
+        "loose_stock_snapshot",
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("lines")
+
+    @admin.display(description="event", ordering="event_type")
+    def event(self, obj):
+        return StockEventType(obj.event_type).name
+
+    @admin.display(description="detail", ordering="detail")
+    def detail_name(self, obj):
+        return StockEventDetail(obj.detail).name
+
+    @admin.display(description="source")
+    def source(self, obj):
+        for name in (
+            "order",
+            "custom_order",
+            "inward_raw_material",
+            "inward_other_material",
+            "raw_material_waste",
+            "inventory_snapshot",
+            "loose_stock_snapshot",
+        ):
+            row = getattr(obj, name)
+            if row is not None:
+                return row.public_id
+        return "-"
+
+    @admin.display(description="lines")
+    def line_count(self, obj):
+        return len(obj.lines.all())
+
+
+@admin.register(PackedRecipeLayer)
+class PackedRecipeLayerAdmin(ReadOnlyLedgerAdminMixin, admin.ModelAdmin):
+    """Packets of a count row packed under one recipe (frozen packing-material usage)."""
+
+    list_display = (
+        "id",
+        "inventory_snapshot",
+        "loose_stock_snapshot",
+        "material_type",
+        "recipe",
+        "packets",
+        "opened_at",
+    )
+    list_filter = ("material_type",)
+    search_fields = (
+        "inventory_snapshot__public_id",
+        "loose_stock_snapshot__public_id",
+        "recipe__public_id",
+    )
+    ordering = ("-opened_at", "-id")
+    list_select_related = (
+        "inventory_snapshot__product_packaging__product",
+        "loose_stock_snapshot__product",
+        "material_type",
+        "recipe",
+    )

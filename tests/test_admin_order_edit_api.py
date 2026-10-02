@@ -22,6 +22,7 @@ from aggregator.ClientOperations import (
 from aggregator.models import (
     City,
     Country,
+    InventorySnapshot,
     OrderItem,
     Product,
     ProductPackaging,
@@ -500,7 +501,10 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
         tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest::test_shrinking_a_confirmed_order_is_never_refused
         """
         self._confirm(bags=5)
-        self._count_stock(bags=0)
+        # Stock "has since run short". A count can no longer be lowered under what
+        # orders hold, so the shortage is written straight to the row (as a lost
+        # or damaged-stock correction outside the count API would be).
+        InventorySnapshot.objects.update(bags=0)
 
         response = self._patch({"items": [self._line(self.alpha_bag, 1)]})
 
