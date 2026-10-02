@@ -214,7 +214,10 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
         ),
         (ANDROID_CLIENTS,),
     ),
-    (_route(_ANDROID, "create-multi-select-bag-order", "get-orders"), (ANDROID_ORDERS,)),
+    (
+        _route(_ANDROID, "create-multi-select-bag-order", "get-orders", "analytics"),
+        (ANDROID_ORDERS,),
+    ),
     (_route(_ANDROID, "sales-person-catalogue"), (ANDROID_CATALOGUE,)),
     (_route(_ANDROID, "godown"), (ANDROID_GODOWN,)),
     (

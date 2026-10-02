@@ -38,6 +38,7 @@ The Android app is served under `/android/api/<version>/…`. **`v1` is the curr
 | `POST` | `/android/api/v1/auth/logout` | Logout: revoke the token server-side |
 | `GET`  | `/android/api/v1/auth/reauthenticate` | On startup / resume, "is my token still valid?" |
 | `GET`  | `/android/api/v1/utilities/cities` | Grouped state → city picker data |
+| `GET`  | `/android/api/v1/analytics` | Sales person: order / client / per-client order counts by status for `?start_date_time=&end_date_time=` (both required) |
 | `GET`  | `/android/api/v1/utilities/parties` | Flat supplier list (either role) |
 | `GET`  | `/android/api/v1/utilities/other-material-types` | Flat material-type list (either role) |
 | `GET`  | `/android/api/v1/utilities/sales-admins` | `[{name, phone_number}]` of admins who opted in to share their contact (either role) |
