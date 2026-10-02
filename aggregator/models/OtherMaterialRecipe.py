@@ -22,8 +22,10 @@ class OtherMaterialRecipe(
     get their own recipe row (2.000 vs 4.000).
 
     A recipe is never edited in place: changing ``quantity`` means soft-deleting
-    the old row and creating a new one, so inward entries keep referencing the
-    version they were booked against.
+    the old row and creating a new one, so inward entries and the stock ledger's
+    packed-recipe layers keep referencing the version they were booked against.
+    The uniqueness of ``(product, material_type, packet_weight)`` therefore
+    covers **live** recipes only -- a deleted one must not block its replacement.
     """
 
     public_id_prefix = "OMR-"
@@ -63,6 +65,7 @@ class OtherMaterialRecipe(
         constraints = [
             models.UniqueConstraint(
                 fields=["product", "material_type", "packet_weight"],
+                condition=models.Q(is_deleted=False),
                 name="uniq_othermaterrecipe_product_type_weight",
             ),
             models.CheckConstraint(

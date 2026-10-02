@@ -527,7 +527,7 @@ class CreateRecipeSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"quantity": "Quantity must be greater than zero."}
             )
-        qs = OtherMaterialRecipe.all_objects.filter(
+        qs = OtherMaterialRecipe.objects.filter(
             product=attrs["product"],
             material_type=attrs["material_type"],
             packet_weight=attrs["packet_weight"],

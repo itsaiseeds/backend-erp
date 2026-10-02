@@ -24,6 +24,7 @@ from .Order import Order
 from .OrderItem import OrderItem
 from .OtherMaterialRecipe import OtherMaterialRecipe
 from .OtherMaterialType import OtherMaterialType, OtherMaterialUnitType
+from .PackedRecipeLayer import PackedRecipeLayer
 from .Party import Party
 from .Pincode import Pincode
 from .PrivateDispatchDetails import PrivateDispatchDetails
@@ -35,6 +36,13 @@ from .SamplePacketStockSnapshot import LooseStockSnapshot
 from .Stage import Stage, StageIds
 from .State import State
 from .Status import Status, StatusIds
+from .StockEvent import (
+    VALID_DETAILS,
+    StockEvent,
+    StockEventDetail,
+    StockEventType,
+)
+from .StockEventLine import StockEventLine, StockPoolKind
 from .TransportAgency import TransportAgency
 
 __all__ = [
@@ -80,4 +88,11 @@ __all__ = [
     "FarmerVisit",
     "FarmerVisitCrop",
     "FarmerVisitProduct",
+    "StockEvent",
+    "StockEventType",
+    "StockEventDetail",
+    "VALID_DETAILS",
+    "StockEventLine",
+    "StockPoolKind",
+    "PackedRecipeLayer",
 ]

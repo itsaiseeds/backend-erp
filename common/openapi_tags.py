@@ -169,6 +169,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "get-stock",
             "raw-material-stock",
             "other-material-stock",
+            "product-stock-ledger",
         ),
         (ADMIN_STOCK_LEVELS,),
     ),

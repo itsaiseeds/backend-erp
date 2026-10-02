@@ -40,6 +40,7 @@ from .OtherMaterialStockView import OtherMaterialStockView
 from .OtherMaterialTypesView import OtherMaterialTypesView
 from .PartiesView import PartiesView
 from .ProductPackagingsView import ProductPackagingsView
+from .ProductStockLedgerView import ProductStockLedgerView
 from .ProductsView import ProductsView
 from .RawMaterialStockView import RawMaterialStockView
 from .RawMaterialWastesView import RawMaterialWastesView
@@ -102,6 +103,11 @@ urlpatterns = [
     ),
     path("sample-packet-stock", LooseStockView.as_view(), name="sample-packet-stock"),
     path("get-stock/<str:public_id>", StockView.as_view(), name="get-stock"),
+    path(
+        "product-stock-ledger/<str:public_id>",
+        ProductStockLedgerView.as_view(),
+        name="product-stock-ledger",
+    ),
     path("products", ProductsView.as_view(), name="products"),
     path("products/<str:public_id>", UpdateProductView.as_view(), name="update-product"),
     path("product-packagings", ProductPackagingsView.as_view(), name="product-packagings"),

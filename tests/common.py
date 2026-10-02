@@ -54,6 +54,10 @@ class DMLTestCase(TestCase):
     # setUpClass and replayed in setUp. See _restore_sequences.
     _sequence_baseline: ClassVar[list[list[str] | list[int] | list[bool]]] = []
 
+    # Whether to assert the stock ledger equals the live figures once the test
+    # ends. Opt out only for a test that seeds stock through raw ORM on purpose.
+    stock_ledger_guard: ClassVar[bool] = True
+
     @classmethod
     def setUpClass(cls):
         """Record the sequence positions left by this class's ``setUpTestData``.
@@ -79,6 +83,25 @@ class DMLTestCase(TestCase):
         # rolls back: without this, one test's requests count against the next
         # test's per-IP budget on the shared 127.0.0.1 origin.
         cache.clear()
+        if self.stock_ledger_guard:
+            self.addCleanup(self._assert_stock_ledger_in_sync)
+
+    def _assert_stock_ledger_in_sync(self) -> None:
+        """Fail a test that moved stock without recording it in the stock ledger.
+
+        Runs inside the test's transaction (cleanups run before the rollback)
+        and only for tests that wrote ledger rows: a stock write that bypassed
+        the operations layer leaves the ledger disagreeing with the live
+        figures, which is exactly what this catches. A test that seeds stock
+        through raw ORM on purpose opts out with ``stock_ledger_guard = False``.
+        """
+        from aggregator import StockLedgerOperations
+        from aggregator.models import StockEvent
+
+        if not StockEvent.objects.exists():
+            return
+        problems = StockLedgerOperations.check_ledger()
+        self.assertEqual(problems, [], "the stock ledger drifted from the live figures")
 
     def _restore_sequences(self) -> None:
         """Rewind every sequence to the position captured in ``setUpClass``.
@@ -169,19 +192,28 @@ def book_raw_material(product, quantity_kg, *, actor, effective_date=None, booke
     """
     from datetime import date
 
-    from aggregator.models import InwardRawMaterial, Party, StatusIds
+    from aggregator import InwardOperations
+    from aggregator.models import InwardRawMaterial, Party, Status, StatusIds
 
     party, _ = Party.objects.get_or_create(
         name="Test Raw Material Party", city_id=1, defaults={"created_by": actor}
     )
-    lot = InwardRawMaterial.objects.create(
+    # Through the operations layer, so the stock ledger records the lot.
+    lot = InwardOperations.create_raw_lot(
         product=product,
         party=party,
         lot_no="TEST-LOT",
         quantity_kg=quantity_kg,
-        status_id=StatusIds.IN_USE.value,
-        effective_date=effective_date or date.today(),
-        created_by=actor,
+        lab_sampling_date=date.today(),
+        actor=actor,
+    )
+    lot = InwardOperations.update_raw_lot(
+        lot,
+        {
+            "status": Status.by_id(StatusIds.IN_USE),
+            "effective_date": effective_date or date.today(),
+        },
+        actor,
     )
     if booked_on is not None:
         InwardRawMaterial.all_objects.filter(id=lot.id).update(created_at=booked_on)

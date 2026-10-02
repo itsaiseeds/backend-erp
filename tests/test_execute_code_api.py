@@ -52,6 +52,23 @@ class ExecuteCodeApiTest(WebApiTestCase):
         self.assertEqual(data["result"], "1")
         self.assertIsNone(data["error"])
 
+    def test_the_stock_ledger_seed_script_runs_once_and_leaves_the_ledger_in_sync(self):
+        """tests/test_execute_code_api.py::ExecuteCodeApiTest::test_the_stock_ledger_seed_script_runs_once_and_leaves_the_ledger_in_sync"""
+        from pathlib import Path
+
+        code = (
+            Path(__file__).resolve().parents[1] / "scripts" / "seed_stock_ledger_execute_code.py"
+        ).read_text(encoding="utf-8")
+
+        first = self._run(code)
+        self.assertTrue(first["success"], first["error"])
+        self.assertIn("check_stock_ledger: in sync", first["stdout"])
+        self.assertIn("'seeded_products':", first["result"])
+
+        second = self._run(code)  # a second run is refused, and rolls back
+        self.assertFalse(second["success"])
+        self.assertIn("already been seeded", second["error"])
+
     def test_model_enums_are_in_scope(self):
         """tests/test_execute_code_api.py::ExecuteCodeApiTest::test_model_enums_are_in_scope"""
         data = self._run(

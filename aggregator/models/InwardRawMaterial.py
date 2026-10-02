@@ -9,6 +9,7 @@ from common.models import (
 
 from .InwardEntryMixin import InwardEntryMixin
 from .Status import StatusIds
+from .StockEvent import StockEventDetail, StockEventType
 
 
 class InwardRawMaterialStatus(models.TextChoices):
@@ -115,14 +116,21 @@ class InwardRawMaterial(
         """
         from django.core.exceptions import ValidationError
 
-        from aggregator import InventoryOperations, InwardOperations
+        from aggregator import InventoryOperations, InwardOperations, StockLedgerOperations
 
-        InventoryOperations.lock_raw_pools([self.product_id])
-        try:
-            InwardOperations.assert_raw_lot_removable(self)
-        except ValueError as exc:
-            raise ValidationError(str(exc)) from None
-        perform()
+        with StockLedgerOperations.recording(
+            StockEventType.INWARD_OPERATIONS,
+            StockEventDetail.RAW_LOT_DELETED,
+            [self.product_id],
+            source=self,
+        ) as rec:
+            InventoryOperations.lock_raw_pools([self.product_id])
+            try:
+                InwardOperations.assert_raw_lot_removable(self)
+            except ValueError as exc:
+                raise ValidationError(str(exc)) from None
+            perform()
+            rec.actor = self.deleted_by
 
     def __str__(self):
         return f"{self.public_id}: {self.product} {self.quantity_kg} kg"

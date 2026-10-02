@@ -53,6 +53,12 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
     tests/test_admin_order_edit_api.py::SalesAdminOrderEditApiTest
     """
 
+    # Seeds stock through raw ORM on purpose (dispatches, lots and status flips written
+    # directly), so the stock ledger is not expected to follow -- see
+    # DMLTestCase.stock_ledger_guard.
+    stock_ledger_guard = False
+
+
     @classmethod
     def setUpTestData(cls):
         """One sales person, two clients (so a foreign link id exists), two bags."""

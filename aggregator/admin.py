@@ -8,6 +8,7 @@ from common.models import indian_now
 from common.storage import delete_image, upload_image
 
 from .CustomOrderOperations import assert_loose_stock_covers
+from .InwardOperations import raw_status_detail
 from .models import (
     Address,
     City,
@@ -46,8 +47,11 @@ from .models import (
     State,
     Status,
     StatusIds,
+    StockEventDetail,
+    StockEventType,
     TransportAgency,
 )
+from .StockLedgerOperations import products_with_pools, recording
 
 # An order's lifecycle and verification: moved only by the lifecycle verbs
 # (verify / dispatch / revert / hold / reject ...), which carry the status
@@ -59,6 +63,45 @@ ORDER_LIFECYCLE_FIELDS = (
     "dispatch_details",
     "private_dispatch_details",
 )
+
+
+class StockLedgerAdminMixin:
+    """Record the stock an admin add/change form moves in the stock ledger.
+
+    The admin form is parsed after the view starts, so which products it will
+    touch is unknown up front: every product with a pool is tracked, which is
+    affordable because these forms are rare, superuser-only maintenance. The
+    whole add/change POST runs inside one recording, so the parent row and its
+    inlines are covered together and a form that fails records nothing.
+
+    ``ledger_event_type`` ``None`` means a count write (classified by packed
+    packets). ``ledger_refine`` may set the detail once the saved row is known.
+    """
+
+    ledger_event_type: StockEventType | None = None
+    ledger_detail: StockEventDetail = StockEventDetail.NONE
+
+    def ledger_refine(self, rec, obj, change: bool) -> None:
+        """Hook: adjust ``rec.detail`` for the row just saved."""
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        if request.method != "POST":
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        with recording(
+            self.ledger_event_type,
+            self.ledger_detail,
+            products_with_pools(),
+            actor=request.user,
+        ) as rec:
+            request._stock_ledger_recording = rec
+            return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        rec = getattr(request, "_stock_ledger_recording", None)
+        if rec is not None:
+            rec.source = obj
+            self.ledger_refine(rec, obj, change)
 
 
 class CreatedByStampInlineMixin:
@@ -569,7 +612,9 @@ class OrderItemAdmin(ViewOnlyAdminMixin, SoftDeleteModelAdmin):
 
 
 @admin.register(InventorySnapshot)
-class InventorySnapshotAdmin(SoftDeleteModelAdmin):
+class InventorySnapshotAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_detail = StockEventDetail.BAG_COUNT
+
     list_display = (
         "public_id",
         "snapshot_date",
@@ -595,7 +640,9 @@ class InventorySnapshotAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(LooseStockSnapshot)
-class LooseStockSnapshotAdmin(SoftDeleteModelAdmin):
+class LooseStockSnapshotAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_detail = StockEventDetail.LOOSE_COUNT
+
     list_display = (
         "public_id",
         "snapshot_date",
@@ -669,7 +716,10 @@ class CustomOrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):
 
 
 @admin.register(CustomOrder)
-class CustomOrderAdmin(SoftDeleteParentAdmin):
+class CustomOrderAdmin(StockLedgerAdminMixin, SoftDeleteParentAdmin):
+    ledger_event_type = StockEventType.ORDER_CONFIRMED
+    ledger_detail = StockEventDetail.CUSTOM_ORDER_CREATED
+
     list_display = (
         "public_id",
         "client",
@@ -755,7 +805,13 @@ class PartyAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(InwardRawMaterial)
-class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
+class InwardRawMaterialAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_event_type = StockEventType.INWARD_OPERATIONS
+    ledger_detail = StockEventDetail.RAW_LOT_IN_USE
+
+    def ledger_refine(self, rec, obj, change):
+        rec.detail = raw_status_detail(obj)
+
     list_display = (
         "public_id",
         "product",
@@ -783,7 +839,14 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(RawMaterialWaste)
-class RawMaterialWasteAdmin(SoftDeleteModelAdmin):
+class RawMaterialWasteAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_event_type = StockEventType.RAW_WASTED
+    ledger_detail = StockEventDetail.WASTE_RECORDED
+
+    def ledger_refine(self, rec, obj, change):
+        if change:
+            rec.detail = StockEventDetail.WASTE_EDITED
+
     list_display = (
         "public_id",
         "product",
@@ -824,7 +887,14 @@ class OtherMaterialRecipeAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(InwardOtherMaterial)
-class InwardOtherMaterialAdmin(SoftDeleteModelAdmin):
+class InwardOtherMaterialAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_event_type = StockEventType.INWARD_OPERATIONS
+    ledger_detail = StockEventDetail.OTHER_MATERIAL_RECEIVED
+
+    def ledger_refine(self, rec, obj, change):
+        if change:
+            rec.detail = StockEventDetail.OTHER_MATERIAL_EDITED
+
     list_display = (
         "public_id",
         "recipe",
