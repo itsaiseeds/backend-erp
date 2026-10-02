@@ -56,8 +56,8 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
-from django.db.models import Q, Sum
+from django.db import models, transaction
+from django.db.models import F, Q, Sum
 
 from common.models import indian_now
 
@@ -72,10 +72,14 @@ from .models import (
     OrderItem,
     OtherMaterialRecipe,
     OtherMaterialType,
+    PackedRecipeLayer,
     Product,
     ProductPackaging,
     RawMaterialWaste,
     StatusIds,
+    StockEventDetail,
+    StockEventType,
+    StockPoolKind,
 )
 
 if TYPE_CHECKING:
@@ -128,17 +132,28 @@ def record_stock_count(
     earlier figures rather than adding a second row. Rejected (and rolled back)
     when the product's raw material or packing material cannot cover the bags.
     """
+    from . import StockLedgerOperations
+
     _assert_can_update_stock_count(actor)
-    lock_raw_pools([product_packaging.product_id])
-    materials_before = _material_guard([product_packaging.product_id])
-    snapshot = _write_stock_count(
-        product_packaging=product_packaging,
-        bags=bags,
+    snapshot_date = snapshot_date or today()
+    with StockLedgerOperations.recording(
+        None,
+        StockEventDetail.BAG_COUNT,
+        [product_packaging.product_id],
         actor=actor,
-        snapshot_date=snapshot_date or today(),
-    )
-    _assert_raw_available([product_packaging.product_id])
-    _assert_material_available(materials_before)
+        new_bag_date=snapshot_date,
+    ) as rec:
+        lock_raw_pools([product_packaging.product_id])
+        materials_before = _material_guard([product_packaging.product_id])
+        snapshot = _write_stock_count(
+            product_packaging=product_packaging,
+            bags=bags,
+            actor=actor,
+            snapshot_date=snapshot_date,
+        )
+        _assert_raw_available([product_packaging.product_id])
+        _assert_material_available(materials_before)
+        rec.sources = {product_packaging.product_id: snapshot}
     return snapshot
 
 
@@ -155,15 +170,15 @@ def _write_stock_count(
     order's availability read and its reservation.
     """
     lock_bag_pools([product_packaging])
-    snapshot = InventorySnapshot.all_objects.filter(
+    existing = InventorySnapshot.all_objects.filter(
         snapshot_date=snapshot_date, product_packaging=product_packaging
     ).first()
-    if snapshot is None:
-        snapshot = InventorySnapshot(
-            snapshot_date=snapshot_date,
-            product_packaging=product_packaging,
-            created_by=actor,
-        )
+    is_new = existing is None
+    snapshot = existing or InventorySnapshot(
+        snapshot_date=snapshot_date,
+        product_packaging=product_packaging,
+        created_by=actor,
+    )
     snapshot.bags = bags
     snapshot.counted_at = indian_now()
     snapshot.is_deleted = False
@@ -171,6 +186,16 @@ def _write_stock_count(
     snapshot.deleted_by = None
     snapshot.full_clean()
     snapshot.save()
+    if is_new:
+        previous = (
+            InventorySnapshot.objects.filter(
+                product_packaging=product_packaging, snapshot_date__lt=snapshot_date
+            )
+            .order_by("-snapshot_date")
+            .first()
+        )
+        if previous is not None:
+            copy_recipe_layers(previous, snapshot)
     return snapshot
 
 
@@ -180,6 +205,7 @@ def record_stock_counts(
     counts: Mapping[ProductPackaging, int],
     actor: User,
     snapshot_date: date | None = None,
+    carry_forward: bool = False,
 ) -> list[InventorySnapshot]:
     """Upload a whole day's bag count in one transaction.
 
@@ -192,32 +218,309 @@ def record_stock_counts(
 
     Every line is written; earlier days' counts are kept as history.
 
+    ``carry_forward=True`` is for a **partial** upload (PATCH): when it opens a
+    new date, every packaging counted on the previous latest date that the
+    upload does not name gets a row on the new date too, holding its physical
+    figure (last count minus what was dispatched since). Without it those
+    packagings would read 0 bags on hand at the new date and silently return
+    their raw and packing material. A full upload (POST) names every packaging,
+    so it carries nothing. The carried rows are not returned.
+
     The raw-material check runs once, after every line is written, so one
     upload may raise one packaging of a product and lower another: only the
     net kilograms per product must fit its raw pool. The packing-material
     check works the same way, per material type. Any shortfall rolls the
     whole upload back.
     """
+    from . import StockLedgerOperations
+
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
     product_ids = {packaging.product_id for packaging in counts}
-    lock_raw_pools(product_ids)
-    # All up front and in pk order; _write_stock_count re-takes each as a no-op.
-    lock_bag_pools(counts)
-    materials_before = _material_guard(product_ids)
+    with StockLedgerOperations.recording(
+        None,
+        StockEventDetail.BAG_COUNT,
+        product_ids,
+        actor=actor,
+        new_bag_date=snapshot_date,
+    ) as rec:
+        lock_raw_pools(product_ids)
+        # All up front and in pk order; _write_stock_count re-takes each as a no-op.
+        lock_bag_pools(counts)
+        materials_before = _material_guard(product_ids)
+        if carry_forward:
+            carried = _carry_forward_bag_counts(counts, snapshot_date, actor)
+            rec.carried |= {
+                (row.product_packaging.product_id, (StockPoolKind.BAG, row.product_packaging_id))
+                for row in carried
+            }
 
-    snapshots = [
-        _write_stock_count(
-            product_packaging=product_packaging,
-            bags=bags,
-            actor=actor,
-            snapshot_date=snapshot_date,
-        )
-        for product_packaging, bags in counts.items()
-    ]
-    _assert_raw_available(product_ids)
-    _assert_material_available(materials_before)
+        snapshots = [
+            _write_stock_count(
+                product_packaging=product_packaging,
+                bags=bags,
+                actor=actor,
+                snapshot_date=snapshot_date,
+            )
+            for product_packaging, bags in counts.items()
+        ]
+        _assert_raw_available(product_ids)
+        _assert_material_available(materials_before)
+        rec.sources = {
+            snapshot.product_packaging.product_id: snapshot
+            for snapshot in reversed(snapshots)
+        }
     return snapshots
+
+
+def _carry_forward_bag_counts(
+    named: Iterable[ProductPackaging], snapshot_date: date, actor: User
+) -> list[InventorySnapshot]:
+    """Count every unnamed packaging onto a newly opened date, at its physical figure.
+
+    Only acts when ``snapshot_date`` is later than the latest bag count date.
+    Packed and available are unchanged by it: the count drops by what was
+    dispatched since the last count, and those dispatches now precede the new
+    count instead.
+    """
+    latest = latest_snapshot_date()
+    if latest is None or snapshot_date <= latest:
+        return []
+    named_ids = {packaging.pk for packaging in named}
+    carried = []
+    rows = InventorySnapshot.objects.filter(snapshot_date=latest).exclude(
+        product_packaging_id__in=named_ids
+    )
+    for row in rows.select_related("product_packaging"):
+        packaging = row.product_packaging
+        if packaging.is_deleted:
+            continue
+        physical = max(row.bags - consumed_bags(packaging, latest), 0)
+        carried.append(
+            _write_stock_count(
+                product_packaging=packaging,
+                bags=physical,
+                actor=actor,
+                snapshot_date=snapshot_date,
+            )
+        )
+    return carried
+
+
+def _carry_forward_loose_counts(
+    named: Iterable[tuple[Product, Decimal]], snapshot_date: date, actor: User
+) -> list[LooseStockSnapshot]:
+    """The loose-pool counterpart of :func:`_carry_forward_bag_counts`."""
+    latest = latest_loose_snapshot_date()
+    if latest is None or snapshot_date <= latest:
+        return []
+    named_pairs = {(product.pk, Decimal(weight)) for product, weight in named}
+    carried = []
+    for row in LooseStockSnapshot.objects.filter(snapshot_date=latest).select_related(
+        "product"
+    ):
+        if (row.product_id, row.packet_weight) in named_pairs or row.product.is_deleted:
+            continue
+        physical = max(
+            row.packets
+            - consumed_loose_packets(row.product, row.packet_weight, latest),
+            0,
+        )
+        carried.append(
+            _write_loose_stock(
+                product=row.product,
+                packet_weight=row.packet_weight,
+                packets=physical,
+                actor=actor,
+                snapshot_date=snapshot_date,
+            )
+        )
+    return carried
+
+
+# -- Recipe layers ------------------------------------------------------------
+#
+# Packing material is spent when a packet is packed, at the recipe in force
+# *then*. Each count row therefore carries ``PackedRecipeLayer`` rows -- how many
+# of its packed packets were packed under which recipe -- so a later recipe
+# change (delete + create) never re-values packets that are already packed.
+# Layers are kept in step with each pool's packed packets by
+# ``StockLedgerOperations.recording`` (:func:`add_packed_packets`,
+# :func:`remove_packed_packets`, :func:`clamp_recipe_layers`), which is the one
+# place a write's change in packed packets is known.
+
+CountRow = InventorySnapshot | LooseStockSnapshot
+
+
+def _layer_field(row: CountRow) -> str:
+    return (
+        "inventory_snapshot"
+        if isinstance(row, InventorySnapshot)
+        else "loose_stock_snapshot"
+    )
+
+
+def recipe_layers(row: CountRow):
+    """``row``'s layers, oldest first."""
+    return PackedRecipeLayer.objects.filter(**{_layer_field(row): row})
+
+
+def copy_recipe_layers(source: CountRow, target: CountRow) -> None:
+    """Give a new count row its predecessor's layers, ``opened_at`` preserved."""
+    field = _layer_field(target)
+    PackedRecipeLayer.objects.bulk_create(
+        PackedRecipeLayer(
+            **{field: target},
+            material_type_id=layer.material_type_id,
+            recipe_id=layer.recipe_id,
+            packets=layer.packets,
+            opened_at=layer.opened_at,
+        )
+        for layer in recipe_layers(source)
+    )
+
+
+def _add_layer(
+    row: CountRow, material_type_id: int, recipe_id: int | None, packets: int
+) -> None:
+    """Add ``packets`` to the newest layer of the type if it is the same recipe."""
+    newest = (
+        recipe_layers(row)
+        .filter(material_type_id=material_type_id)
+        .order_by("-opened_at", "-id")
+        .first()
+    )
+    if newest is not None and newest.recipe_id == recipe_id:
+        newest.packets += packets
+        newest.save(update_fields=["packets"])
+        return
+    PackedRecipeLayer.objects.create(
+        **{_layer_field(row): row},
+        material_type_id=material_type_id,
+        recipe_id=recipe_id,
+        packets=packets,
+        opened_at=indian_now(),
+    )
+
+
+def add_packed_packets(row: CountRow, product_id: int, packet_weight, packets: int) -> None:
+    """Record ``packets`` newly packed into ``row``'s pool, at today's live recipes.
+
+    A material type that already has layers on this row but no live recipe
+    for the pool any more gets a NULL-recipe layer: packed while no recipe
+    existed, so it spends nothing but still counts as packed.
+    """
+    if packets <= 0:
+        return
+    covered: set[int] = set()
+    for recipe in OtherMaterialRecipe.objects.filter(
+        product_id=product_id, packet_weight=packet_weight
+    ):
+        _add_layer(row, recipe.material_type_id, recipe.pk, packets)
+        covered.add(recipe.material_type_id)
+    layered = set(recipe_layers(row).values_list("material_type_id", flat=True))
+    for material_type_id in layered - covered:
+        _add_layer(row, material_type_id, None, packets)
+
+
+def remove_packed_packets(row: CountRow, packets: int) -> None:
+    """Unpack ``packets`` from ``row``, newest layer first, per material type.
+
+    Whatever a type's layers cannot cover comes off the implicit "unlayered"
+    packets at the bottom -- those packed before the type's first recipe.
+    """
+    if packets <= 0:
+        return
+    for material_type_id in set(
+        recipe_layers(row).values_list("material_type_id", flat=True)
+    ):
+        _unpack_type(row, material_type_id, packets)
+
+
+def clamp_recipe_layers(row: CountRow, packed_packets: int) -> bool:
+    """Enforce: per material type, layered packets never exceed packed packets.
+
+    Returns whether any layer had to be trimmed.
+    """
+    totals = list(
+        recipe_layers(row)
+        .values("material_type_id")
+        .annotate(total=Sum("packets"))
+        .filter(total__gt=packed_packets)
+    )
+    for entry in totals:
+        _unpack_type(row, entry["material_type_id"], entry["total"] - packed_packets)
+    return bool(totals)
+
+
+def seed_recipe_layers() -> int:
+    """Seed layers for the latest count rows at the current recipes (go-live).
+
+    Each latest bag and loose row gets one layer per live recipe of its pool,
+    holding all of the pool's packed packets (count plus dispatched before it).
+    Rows that already have layers are left alone. Returns the layers created.
+    """
+    created = 0
+    bag_date = latest_snapshot_date()
+    if bag_date is not None:
+        bag_rows = InventorySnapshot.objects.filter(snapshot_date=bag_date)
+        for bag_row in bag_rows.select_related("product_packaging"):
+            if recipe_layers(bag_row).exists():
+                continue
+            packaging = bag_row.product_packaging
+            packed = (
+                bag_row.bags + _bags_dispatched_before(packaging, bag_date)
+            ) * packaging.packets
+            created += _seed_row(
+                bag_row, packaging.product_id, packaging.packet_weight, packed
+            )
+    loose_snapshot_date = latest_loose_snapshot_date()
+    if loose_snapshot_date is not None:
+        loose_rows = LooseStockSnapshot.objects.filter(snapshot_date=loose_snapshot_date)
+        for loose_row in loose_rows:
+            if recipe_layers(loose_row).exists():
+                continue
+            packed = loose_row.packets + _loose_dispatched_before(
+                loose_row.product, loose_row.packet_weight, loose_snapshot_date
+            )
+            created += _seed_row(
+                loose_row, loose_row.product_id, loose_row.packet_weight, packed
+            )
+    return created
+
+
+def _seed_row(row: CountRow, product_id: int, packet_weight, packed: int) -> int:
+    if packed <= 0:
+        return 0
+    recipes = list(
+        OtherMaterialRecipe.objects.filter(product_id=product_id, packet_weight=packet_weight)
+    )
+    PackedRecipeLayer.objects.bulk_create(
+        PackedRecipeLayer(
+            **{_layer_field(row): row},
+            material_type_id=recipe.material_type_id,
+            recipe_id=recipe.pk,
+            packets=packed,
+            opened_at=indian_now(),
+        )
+        for recipe in recipes
+    )
+    return len(recipes)
+
+
+def _unpack_type(row: CountRow, material_type_id: int, packets: int) -> None:
+    remaining = packets
+    layers = recipe_layers(row).filter(material_type_id=material_type_id)
+    for layer in layers.order_by("-opened_at", "-id"):
+        take = min(layer.packets, remaining)
+        if take == layer.packets:
+            layer.delete()
+        else:
+            layer.packets -= take
+            layer.save(update_fields=["packets"])
+        remaining -= take
+        if remaining == 0:
+            break
 
 
 # -- Reading the count --------------------------------------------------------
@@ -494,18 +797,29 @@ def record_loose_stock(
     back) when the product's raw material or packing material cannot cover
     the packets.
     """
+    from . import StockLedgerOperations
+
     _assert_can_update_stock_count(actor)
-    lock_raw_pools([product.id])
-    materials_before = _material_guard([product.id])
-    snapshot = _write_loose_stock(
-        product=product,
-        packet_weight=packet_weight,
-        packets=packets,
+    snapshot_date = snapshot_date or today()
+    with StockLedgerOperations.recording(
+        None,
+        StockEventDetail.LOOSE_COUNT,
+        [product.id],
         actor=actor,
-        snapshot_date=snapshot_date or today(),
-    )
-    _assert_raw_available([product.id])
-    _assert_material_available(materials_before)
+        new_loose_date=snapshot_date,
+    ) as rec:
+        lock_raw_pools([product.id])
+        materials_before = _material_guard([product.id])
+        snapshot = _write_loose_stock(
+            product=product,
+            packet_weight=packet_weight,
+            packets=packets,
+            actor=actor,
+            snapshot_date=snapshot_date,
+        )
+        _assert_raw_available([product.id])
+        _assert_material_available(materials_before)
+        rec.sources = {product.id: snapshot}
     return snapshot
 
 
@@ -523,16 +837,16 @@ def _write_loose_stock(
     custom order's availability read and its reservation.
     """
     lock_loose_pools([product.id])
-    snapshot = LooseStockSnapshot.all_objects.filter(
+    existing_loose = LooseStockSnapshot.all_objects.filter(
         snapshot_date=snapshot_date, product=product, packet_weight=packet_weight
     ).first()
-    if snapshot is None:
-        snapshot = LooseStockSnapshot(
-            snapshot_date=snapshot_date,
-            product=product,
-            packet_weight=packet_weight,
-            created_by=actor,
-        )
+    is_new = existing_loose is None
+    snapshot = existing_loose or LooseStockSnapshot(
+        snapshot_date=snapshot_date,
+        product=product,
+        packet_weight=packet_weight,
+        created_by=actor,
+    )
     snapshot.packets = packets
     snapshot.counted_at = indian_now()
     snapshot.is_deleted = False
@@ -540,6 +854,18 @@ def _write_loose_stock(
     snapshot.deleted_by = None
     snapshot.full_clean()
     snapshot.save()
+    if is_new:
+        previous = (
+            LooseStockSnapshot.objects.filter(
+                product=product,
+                packet_weight=packet_weight,
+                snapshot_date__lt=snapshot_date,
+            )
+            .order_by("-snapshot_date")
+            .first()
+        )
+        if previous is not None:
+            copy_recipe_layers(previous, snapshot)
     return snapshot
 
 
@@ -549,6 +875,7 @@ def record_loose_stocks(
     counts: Mapping[tuple[Product, Decimal], int],
     actor: User,
     snapshot_date: date | None = None,
+    carry_forward: bool = False,
 ) -> list[LooseStockSnapshot]:
     """Upload a whole loose count in one transaction.
 
@@ -560,27 +887,51 @@ def record_loose_stocks(
     written daily, or at all. Like the bag count, the net kilograms per product
     must fit its raw pool, and the net units per packing material its
     material pool, or the whole upload rolls back.
+
+    ``carry_forward=True`` carries every loose pool the upload does not name
+    onto a newly opened date, exactly as :func:`record_stock_counts` does.
     """
+    from . import StockLedgerOperations
+
     _assert_can_update_stock_count(actor)
     snapshot_date = snapshot_date or today()
     product_ids = {product.id for product, _ in counts}
-    lock_raw_pools(product_ids)
-    # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
-    lock_loose_pools(product_ids)
-    materials_before = _material_guard(product_ids)
+    with StockLedgerOperations.recording(
+        None,
+        StockEventDetail.LOOSE_COUNT,
+        product_ids,
+        actor=actor,
+        new_loose_date=snapshot_date,
+    ) as rec:
+        lock_raw_pools(product_ids)
+        # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
+        lock_loose_pools(product_ids)
+        materials_before = _material_guard(product_ids)
+        if carry_forward:
+            carried = _carry_forward_loose_counts(counts, snapshot_date, actor)
+            rec.carried |= {
+                (
+                    row.product_id,
+                    (StockPoolKind.LOOSE, row.packet_weight.quantize(Decimal("0.001"))),
+                )
+                for row in carried
+            }
 
-    snapshots = [
-        _write_loose_stock(
-            product=product,
-            packet_weight=packet_weight,
-            packets=packets,
-            actor=actor,
-            snapshot_date=snapshot_date,
-        )
-        for (product, packet_weight), packets in counts.items()
-    ]
-    _assert_raw_available(product_ids)
-    _assert_material_available(materials_before)
+        snapshots = [
+            _write_loose_stock(
+                product=product,
+                packet_weight=packet_weight,
+                packets=packets,
+                actor=actor,
+                snapshot_date=snapshot_date,
+            )
+            for (product, packet_weight), packets in counts.items()
+        ]
+        _assert_raw_available(product_ids)
+        _assert_material_available(materials_before)
+        rec.sources = {
+            snapshot.product_id: snapshot for snapshot in reversed(snapshots)
+        }
     return snapshots
 
 
@@ -910,14 +1261,23 @@ def record_raw_waste(
     the product has fewer unpacked raw kilograms than the waste -- the same
     convention the count writers use, which the view turns into a 400.
     """
-    lock_raw_pools([product.id])
-    waste = RawMaterialWaste.objects.create(
-        product=product,
-        quantity_kg=quantity_kg,
-        reason=reason.strip(),
-        created_by=actor,
-    )
-    _assert_raw_available([product.id])
+    from . import StockLedgerOperations
+
+    with StockLedgerOperations.recording(
+        StockEventType.RAW_WASTED,
+        StockEventDetail.WASTE_RECORDED,
+        [product.id],
+        actor=actor,
+    ) as rec:
+        lock_raw_pools([product.id])
+        waste = RawMaterialWaste.objects.create(
+            product=product,
+            quantity_kg=quantity_kg,
+            reason=reason.strip(),
+            created_by=actor,
+        )
+        _assert_raw_available([product.id])
+        rec.source = waste
     return waste
 
 
@@ -977,25 +1337,42 @@ def other_material_inward(
 
 def other_material_used(
     material_type_ids: Iterable[int] | None = None,
+    *,
+    product: Product | None = None,
 ) -> dict[int, Decimal]:
     """Units per material type spent on the packets currently packed.
 
-    Each live recipe charges ``quantity`` per packed packet of its product at
-    its packet weight; packets of a weight with no recipe for the type use none.
+    Read from the recipe layers of the latest bag and loose count rows: each
+    layer charges ``recipe.quantity`` per packet it holds, at the recipe that was
+    live when those packets were packed. A NULL-recipe layer spends nothing.
+    ``product`` narrows it to one product's own usage.
     """
-    recipes = OtherMaterialRecipe.objects.all()
+    layers = PackedRecipeLayer.objects.filter(recipe__isnull=False)
     if material_type_ids is not None:
-        recipes = recipes.filter(material_type_id__in=list(material_type_ids))
-    used: dict[int, Decimal] = {}
-    packed_by_product: dict[int, dict[Decimal, int]] = {}
-    for recipe in recipes.select_related("product"):
-        if recipe.product_id not in packed_by_product:
-            packed_by_product[recipe.product_id] = packed_packets(recipe.product)
-        packets = packed_by_product[recipe.product_id].get(recipe.packet_weight, 0)
-        used[recipe.material_type_id] = (
-            used.get(recipe.material_type_id, Decimal("0")) + recipe.quantity * packets
-        )
-    return used
+        layers = layers.filter(material_type_id__in=list(material_type_ids))
+    bag_date = latest_snapshot_date()
+    loose_snapshot_date = latest_loose_snapshot_date()
+    bag_rows = Q(
+        inventory_snapshot__is_deleted=False,
+        inventory_snapshot__snapshot_date=bag_date,
+    )
+    loose_rows = Q(
+        loose_stock_snapshot__is_deleted=False,
+        loose_stock_snapshot__snapshot_date=loose_snapshot_date,
+    )
+    if product is not None:
+        bag_rows &= Q(inventory_snapshot__product_packaging__product=product)
+        loose_rows &= Q(loose_stock_snapshot__product=product)
+    if bag_date is None:
+        bag_rows = Q(pk__in=[])
+    if loose_snapshot_date is None:
+        loose_rows = Q(pk__in=[])
+    rows = (
+        layers.filter(bag_rows | loose_rows)
+        .values("material_type_id")
+        .annotate(total=Sum(F("recipe__quantity") * F("packets")))
+    )
+    return {row["material_type_id"]: row["total"] for row in rows}
 
 
 def other_material_available(material_type_ids: Iterable[int]) -> dict[int, Decimal]:
@@ -1043,6 +1420,55 @@ def _material_guard(product_ids) -> dict[int, Decimal]:
 
 
 def guard_stock_deletion(
+    perform: Callable[[], None],
+    *,
+    product_ids: Iterable[int] = (),
+    packagings: Iterable[ProductPackaging] = (),
+    loose_pools: Iterable[tuple[Product, Decimal]] = (),
+    material_type_ids: Iterable[int] = (),
+    ledger: tuple[StockEventType, StockEventDetail, models.Model] | None = None,
+) -> None:
+    """Run ``perform`` -- soft-deleting a count line or an inward lot -- or refuse it.
+
+    ``ledger`` is ``(event_type, detail, source)``: the stock ledger records the
+    deletion as one event for ``source`` (the row being deleted), attributed to
+    whoever ``source.deleted_by`` ends up being. See :func:`_guard_stock_deletion`
+    for the guard itself.
+    """
+    from . import StockLedgerOperations
+
+    product_ids = set(product_ids)
+    packagings = list(packagings)
+    loose_pools = list(loose_pools)
+    if ledger is None:
+        _guard_stock_deletion(
+            perform,
+            product_ids=product_ids,
+            packagings=packagings,
+            loose_pools=loose_pools,
+            material_type_ids=material_type_ids,
+        )
+        return
+    event_type, detail, source = ledger
+    tracked = (
+        product_ids
+        | {packaging.product_id for packaging in packagings}
+        | {product.id for product, _ in loose_pools}
+    )
+    with StockLedgerOperations.recording(
+        event_type, detail, tracked, source=source
+    ) as rec:
+        _guard_stock_deletion(
+            perform,
+            product_ids=product_ids,
+            packagings=packagings,
+            loose_pools=loose_pools,
+            material_type_ids=material_type_ids,
+        )
+        rec.actor = getattr(source, "deleted_by", None)
+
+
+def _guard_stock_deletion(
     perform: Callable[[], None],
     *,
     product_ids: Iterable[int] = (),

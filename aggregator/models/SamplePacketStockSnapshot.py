@@ -10,6 +10,7 @@ from common.models import (
 )
 
 from .BagStockSnapshot import default_snapshot_date
+from .StockEvent import StockEventDetail, StockEventType
 
 
 class LooseStockSnapshot(
@@ -102,6 +103,11 @@ class LooseStockSnapshot(
             perform,
             product_ids=[self.product_id],
             loose_pools=[(self.product, self.packet_weight)],
+            ledger=(
+                StockEventType.STOCK_ADJUSTED,
+                StockEventDetail.COUNT_DELETED,
+                self,
+            ),
         )
 
     def __str__(self):

@@ -13,7 +13,7 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.InwardOperations import inward_other_material_payload, today
+from aggregator.InwardOperations import create_other_lot, inward_other_material_payload
 from aggregator.models import InwardOtherMaterial
 from android.api.paginated_views import AndroidGodownPaginatedDateRangeListView
 from api.inward_serializers import (
@@ -68,11 +68,10 @@ class GodownInwardOtherMaterialsView(AndroidGodownPaginatedDateRangeListView):
         serializer = CreateInwardOtherMaterialSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        entry = InwardOtherMaterial.objects.create(
+        entry = create_other_lot(
             party=data["party"],
             recipe=data["recipe"],
             quantity=data["quantity"],
-            effective_date=today(),
-            created_by=request.user,
+            actor=request.user,
         )
         return Response(inward_other_material_payload(entry), status=status.HTTP_201_CREATED)

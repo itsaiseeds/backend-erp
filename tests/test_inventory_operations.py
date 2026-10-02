@@ -43,6 +43,12 @@ from tests.common import DMLTestCase, book_raw_material, book_raw_material_for_e
 
 
 class InventoryOperationsTest(DMLTestCase):
+
+    # Seeds stock through raw ORM on purpose (dispatches, lots and status flips written
+    # directly), so the stock ledger is not expected to follow -- see
+    # DMLTestCase.stock_ledger_guard.
+    stock_ledger_guard = False
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()

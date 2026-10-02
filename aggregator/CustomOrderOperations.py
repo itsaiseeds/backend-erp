@@ -40,7 +40,10 @@ from .models import (
     Product,
     Status,
     StatusIds,
+    StockEventDetail,
+    StockEventType,
 )
+from .StockLedgerOperations import custom_order_product_ids, recording
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -137,31 +140,38 @@ def create_custom_order(
     confirms immediately, availability is checked *before* it reserves.
     """
     items = list(items)
-    assert_loose_stock_covers(loose_requirements(items))
+    with recording(
+        StockEventType.ORDER_CONFIRMED,
+        StockEventDetail.CUSTOM_ORDER_CREATED,
+        {item["product"].pk for item in items},
+        actor=actor,
+    ) as rec:
+        assert_loose_stock_covers(loose_requirements(items))
 
-    order = CustomOrder(
-        client=client,
-        delivery_address=delivery_address,
-        status=Status.by_id(StatusIds.CONFIRMED),
-        created_by=actor,
-        verified_by=actor,
-        verified_at=indian_now(),
-        special_comments=special_comments,
-    )
-    if expected_delivery_date is not None:
-        order.expected_delivery_date = expected_delivery_date
-    order.full_clean()
-    order.save()
-
-    for item in items:
-        add_custom_order_item(
-            order,
-            product=item["product"],
-            packet_weight=item["packet_weight"],
-            negotiated_selling_price=item.get("negotiated_selling_price"),
-            packets=item["packets"],
-            actor=actor,
+        order = CustomOrder(
+            client=client,
+            delivery_address=delivery_address,
+            status=Status.by_id(StatusIds.CONFIRMED),
+            created_by=actor,
+            verified_by=actor,
+            verified_at=indian_now(),
+            special_comments=special_comments,
         )
+        if expected_delivery_date is not None:
+            order.expected_delivery_date = expected_delivery_date
+        order.full_clean()
+        order.save()
+        rec.source = order
+
+        for item in items:
+            add_custom_order_item(
+                order,
+                product=item["product"],
+                packet_weight=item["packet_weight"],
+                negotiated_selling_price=item.get("negotiated_selling_price"),
+                packets=item["packets"],
+                actor=actor,
+            )
     return order
 
 
@@ -324,28 +334,36 @@ def dispatch_custom_order(
 
     dispatched_at = indian_now()
     to_city = order.delivery_address.city
-    attach_private_dispatch_details(
-        order,
-        dispatched_by=actor,
-        dispatch_date=dispatched_at.date(),
-        from_city=from_city,
-        to_city=to_city,
-        driver_name=driver_name,
-        driver_number=driver_number,
-        vehicle_number=vehicle_number,
-    )
-    sync_custom_dispatch_entry(
-        order,
+    with recording(
+        StockEventType.ORDER_DISPATCHED,
+        StockEventDetail.FULL,
+        custom_order_product_ids(order),
+        source=order,
         actor=actor,
-        dispatched_at=dispatched_at,
-        from_city=from_city,
-        to_city=to_city,
-        driver_name=driver_name,
-        driver_number=driver_number,
-        vehicle_number=vehicle_number,
-        lot_numbers=lot_numbers,
-    )
-    return update_custom_order_status(order, StatusIds.DISPATCHED)
+    ):
+        attach_private_dispatch_details(
+            order,
+            dispatched_by=actor,
+            dispatch_date=dispatched_at.date(),
+            from_city=from_city,
+            to_city=to_city,
+            driver_name=driver_name,
+            driver_number=driver_number,
+            vehicle_number=vehicle_number,
+        )
+        sync_custom_dispatch_entry(
+            order,
+            actor=actor,
+            dispatched_at=dispatched_at,
+            from_city=from_city,
+            to_city=to_city,
+            driver_name=driver_name,
+            driver_number=driver_number,
+            vehicle_number=vehicle_number,
+            lot_numbers=lot_numbers,
+        )
+        update_custom_order_status(order, StatusIds.DISPATCHED)
+    return order
 
 
 def _assert_dispatched(order: CustomOrder, action: str) -> None:
@@ -389,10 +407,16 @@ def revert_dispatch(order: CustomOrder) -> CustomOrder:
 
     _assert_dispatched(order, "revert the dispatch of")
     assert_dispatched_today(order)
-    order.status = Status.by_id(StatusIds.CONFIRMED)
-    order.actual_delivery_date = None
-    order.full_clean()
-    order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
+    with recording(
+        StockEventType.DISPATCH_REVERTED,
+        StockEventDetail.NONE,
+        custom_order_product_ids(order),
+        source=order,
+    ):
+        order.status = Status.by_id(StatusIds.CONFIRMED)
+        order.actual_delivery_date = None
+        order.full_clean()
+        order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
     return order
 
 
@@ -471,6 +495,26 @@ def update_custom_order_core(order: CustomOrder, **fields: object) -> CustomOrde
 
 @transaction.atomic
 def sync_custom_order_items(
+    order: CustomOrder, items: list[dict], actor: User
+) -> list[CustomOrderItem]:
+    """Replace ``order``'s lines with ``items``, recording the stock it moves.
+
+    See :func:`_sync_custom_order_items` for the rules. Editing a CONFIRMED
+    custom order moves reserved loose packets, which the stock ledger records
+    as ``ORDER_EDITED``.
+    """
+    products = {item["product"].pk for item in items if "product" in item}
+    with recording(
+        StockEventType.ORDER_EDITED,
+        StockEventDetail.CUSTOM_ORDER_LINES_CHANGED,
+        custom_order_product_ids(order, products),
+        source=order,
+        actor=actor,
+    ):
+        return _sync_custom_order_items(order, items, actor)
+
+
+def _sync_custom_order_items(
     order: CustomOrder, items: list[dict], actor: User
 ) -> list[CustomOrderItem]:
     """Replace ``order``'s lines with ``items`` (full declarative replacement).
@@ -559,10 +603,17 @@ def delete_custom_order(order: CustomOrder, actor: User) -> None:
     them as live.
     """
     assert_custom_order_status(order, DELETABLE_CUSTOM_ORDER_STATUS_CODES, "delete")
-    update_custom_order_status(order, StatusIds.REJECTED)
-    for line in CustomOrderItem.objects.filter(custom_order=order):
-        line.mark_deleted(actor)
-    order.mark_deleted(actor)
+    with recording(
+        StockEventType.ORDER_RELEASED,
+        StockEventDetail.CUSTOM_ORDER_WITHDRAWN,
+        custom_order_product_ids(order),
+        source=order,
+        actor=actor,
+    ):
+        update_custom_order_status(order, StatusIds.REJECTED)
+        for line in CustomOrderItem.objects.filter(custom_order=order):
+            line.mark_deleted(actor)
+        order.mark_deleted(actor)
 
 
 def custom_order_payload(order: CustomOrder) -> dict:

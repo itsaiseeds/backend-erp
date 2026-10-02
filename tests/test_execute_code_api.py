@@ -52,6 +52,7 @@ class ExecuteCodeApiTest(WebApiTestCase):
         self.assertEqual(data["result"], "1")
         self.assertIsNone(data["error"])
 
+
     def test_model_enums_are_in_scope(self):
         """tests/test_execute_code_api.py::ExecuteCodeApiTest::test_model_enums_are_in_scope"""
         data = self._run(

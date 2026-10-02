@@ -3551,6 +3551,53 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/product-stock-ledger/{public_id}:
+    get:
+      operationId: api_sales_admin_product_stock_ledger_retrieve
+      description: One product's stock ledger over a date range (app admin only).
+      summary: Product stock ledger over a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 50, max 200).
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - Admin · Stock levels
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockLedger'
+          description: ''
   /api/sales-admin/products:
     get:
       operationId: api_sales_admin_products_list
@@ -7458,6 +7505,246 @@ components:
       required:
       - name
       - public_id
+    LedgerActor:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    LedgerBagPool:
+      type: object
+      properties:
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        consumed:
+          type: integer
+        available:
+          type: integer
+        packaging:
+          $ref: '#/components/schemas/LedgerPackaging'
+        change:
+          $ref: '#/components/schemas/LedgerCountChange'
+      required:
+      - available
+      - change
+      - consumed
+      - on_hand
+      - packaging
+      - reserved
+    LedgerCountChange:
+      type: object
+      properties:
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        consumed:
+          type: integer
+        available:
+          type: integer
+      required:
+      - available
+      - consumed
+      - on_hand
+      - reserved
+    LedgerMaterialType:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+      required:
+      - id
+      - name
+      - unit_type
+    LedgerOtherChange:
+      type: object
+      properties:
+        incoming:
+          type: string
+        packed:
+          type: string
+        used_by_other_products:
+          type: string
+        available:
+          type: string
+      required:
+      - available
+      - incoming
+      - packed
+      - used_by_other_products
+    LedgerOtherMaterial:
+      type: object
+      properties:
+        incoming:
+          type: string
+        packed:
+          type: string
+        used_by_other_products:
+          type: string
+        available:
+          type: string
+        material_type:
+          $ref: '#/components/schemas/LedgerMaterialType'
+        change:
+          $ref: '#/components/schemas/LedgerOtherChange'
+      required:
+      - available
+      - change
+      - incoming
+      - material_type
+      - packed
+      - used_by_other_products
+    LedgerPackaging:
+      type: object
+      properties:
+        public_id:
+          type: string
+        packet_weight:
+          type: string
+        packets:
+          type: integer
+      required:
+      - packet_weight
+      - packets
+      - public_id
+    LedgerPacketPool:
+      type: object
+      properties:
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        consumed:
+          type: integer
+        available:
+          type: integer
+        packet_weight:
+          type: string
+        change:
+          $ref: '#/components/schemas/LedgerCountChange'
+      required:
+      - available
+      - change
+      - consumed
+      - on_hand
+      - packet_weight
+      - reserved
+    LedgerProduct:
+      type: object
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
+    LedgerRawChange:
+      type: object
+      properties:
+        incoming:
+          type: string
+        packed:
+          type: string
+        rejected:
+          type: string
+        wasted:
+          type: string
+        available:
+          type: string
+      required:
+      - available
+      - incoming
+      - packed
+      - rejected
+      - wasted
+    LedgerRawMaterial:
+      type: object
+      properties:
+        incoming:
+          type: string
+        packed:
+          type: string
+        rejected:
+          type: string
+        wasted:
+          type: string
+        available:
+          type: string
+        change:
+          $ref: '#/components/schemas/LedgerRawChange'
+      required:
+      - available
+      - change
+      - incoming
+      - packed
+      - rejected
+      - wasted
+    LedgerRow:
+      type: object
+      properties:
+        event:
+          type: string
+        detail:
+          type: string
+          nullable: true
+        occurred_at:
+          type: string
+        source:
+          allOf:
+          - $ref: '#/components/schemas/LedgerSource'
+          nullable: true
+        actor:
+          allOf:
+          - $ref: '#/components/schemas/LedgerActor'
+          nullable: true
+        bag_pools:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerBagPool'
+        packet_pools:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerPacketPool'
+        raw_material:
+          $ref: '#/components/schemas/LedgerRawMaterial'
+        other_materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerOtherMaterial'
+      required:
+      - actor
+      - bag_pools
+      - detail
+      - event
+      - occurred_at
+      - other_materials
+      - packet_pools
+      - raw_material
+      - source
+    LedgerSource:
+      type: object
+      properties:
+        kind:
+          type: string
+        public_id:
+          type: string
+        label:
+          type: string
+      required:
+      - kind
+      - label
+      - public_id
     LoginRequest:
       type: object
       properties:
@@ -8554,6 +8841,35 @@ components:
       required:
       - name
       - public_id
+    ProductStockLedger:
+      type: object
+      properties:
+        product:
+          $ref: '#/components/schemas/LedgerProduct'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerRow'
+      required:
+      - count
+      - end_date
+      - page
+      - page_size
+      - product
+      - results
+      - start_date
     RawMaterialStock:
       type: object
       description: Output shape for the whole incoming raw-material position.

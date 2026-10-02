@@ -1295,9 +1295,12 @@ CREATE TABLE IF NOT EXISTS public.aggregator_othermaterialrecipe (
 	quantity numeric(10, 3) NOT NULL,
 	CONSTRAINT aggregator_othermaterialrecipe_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_othermaterialrecipe_public_id_key UNIQUE (public_id),
-	CONSTRAINT uniq_othermaterrecipe_product_type_weight UNIQUE (product_id, material_type_id, packet_weight),
 	CONSTRAINT ck_othermaterrecipe_positive CHECK (packet_weight > 0 AND quantity > 0)
 );
+-- Uniqueness covers live recipes only: a change is delete-old + create-new, and
+-- the deleted row must not block its replacement (the stock ledger's
+-- packed-recipe layers keep pointing at it).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_othermaterrecipe_product_type_weight ON public.aggregator_othermaterialrecipe USING btree (product_id, material_type_id, packet_weight) WHERE is_deleted = false;
 CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_public_id_like ON public.aggregator_othermaterialrecipe USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_product_id_idx ON public.aggregator_othermaterialrecipe USING btree (product_id);
 CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_material_type_id_idx ON public.aggregator_othermaterialrecipe USING btree (material_type_id);
@@ -1632,3 +1635,94 @@ CREATE INDEX IF NOT EXISTS authentication_user_email_trgm_idx
 
 CREATE INDEX IF NOT EXISTS authtoken_token_created_idx
     ON public.authtoken_token (created);
+
+
+-- =============================================================================
+-- Product stock ledger (docs/prd/product-stock-ledger.md)
+-- =============================================================================
+-- Append-only delta ledger: one stock_event header per product per write, one
+-- stock_event_line per changed pool. Only signed deltas are stored; running
+-- figures are rebuilt at read time. event_type / detail / pool_kind are
+-- smallint enums defined in aggregator/models/StockEvent.py.
+
+-- aggregator_stockevent -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.aggregator_stockevent (
+	id bigserial NOT NULL,
+	event_type int2 NOT NULL,
+	detail int2 NOT NULL,
+	occurred_at timestamptz NOT NULL,
+	product_id int8 NOT NULL,
+	actor_id int8 NULL,
+	order_id int8 NULL,
+	custom_order_id int8 NULL,
+	inward_raw_material_id int8 NULL,
+	inward_other_material_id int8 NULL,
+	raw_material_waste_id int8 NULL,
+	inventory_snapshot_id int8 NULL,
+	loose_stock_snapshot_id int8 NULL,
+	CONSTRAINT aggregator_stockevent_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_stockevent_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_actor_id_fk FOREIGN KEY (actor_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_order_id_fk FOREIGN KEY (order_id) REFERENCES public.aggregator_order(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_custom_order_id_fk FOREIGN KEY (custom_order_id) REFERENCES public.aggregator_customorder(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_inward_raw_material_id_fk FOREIGN KEY (inward_raw_material_id) REFERENCES public.aggregator_inwardrawmaterial(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_inward_other_material_id_fk FOREIGN KEY (inward_other_material_id) REFERENCES public.aggregator_inwardothermaterial(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_raw_material_waste_id_fk FOREIGN KEY (raw_material_waste_id) REFERENCES public.aggregator_rawmaterialwaste(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_inventory_snapshot_id_fk FOREIGN KEY (inventory_snapshot_id) REFERENCES public.aggregator_inventorysnapshot(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_loose_stock_snapshot_id_fk FOREIGN KEY (loose_stock_snapshot_id) REFERENCES public.aggregator_loosestocksnapshot(id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX IF NOT EXISTS ix_stock_event_product_time ON public.aggregator_stockevent USING btree (product_id, occurred_at, id);
+
+-- aggregator_stockeventline ---------------------------------------------------
+-- pool_kind: 1 BAG, 2 LOOSE, 3 RAW, 4 OTHER. Unused delta columns stay NULL.
+CREATE TABLE IF NOT EXISTS public.aggregator_stockeventline (
+	id bigserial NOT NULL,
+	event_id int8 NOT NULL,
+	pool_kind int2 NOT NULL,
+	product_packaging_id int8 NULL,
+	packet_weight numeric(8,3) NULL,
+	material_type_id int8 NULL,
+	d_on_hand numeric(14,3) NULL,
+	d_reserved numeric(14,3) NULL,
+	d_consumed numeric(14,3) NULL,
+	d_incoming numeric(14,3) NULL,
+	d_packed numeric(14,3) NULL,
+	d_rejected numeric(14,3) NULL,
+	d_wasted numeric(14,3) NULL,
+	CONSTRAINT aggregator_stockeventline_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_stockeventline_event_id_fk FOREIGN KEY (event_id) REFERENCES public.aggregator_stockevent(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockeventline_product_packaging_id_fk FOREIGN KEY (product_packaging_id) REFERENCES public.aggregator_productpackaging(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockeventline_material_type_id_fk FOREIGN KEY (material_type_id) REFERENCES public.aggregator_othermaterialtype(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT ck_stockeventline_pool_kind CHECK (pool_kind IN (1, 2, 3, 4)),
+	CONSTRAINT ck_stockeventline_pool_ref CHECK (
+		(pool_kind = 1 AND product_packaging_id IS NOT NULL AND packet_weight IS NULL AND material_type_id IS NULL)
+		OR (pool_kind = 2 AND product_packaging_id IS NULL AND packet_weight IS NOT NULL AND material_type_id IS NULL)
+		OR (pool_kind = 3 AND product_packaging_id IS NULL AND packet_weight IS NULL AND material_type_id IS NULL)
+		OR (pool_kind = 4 AND product_packaging_id IS NULL AND packet_weight IS NULL AND material_type_id IS NOT NULL)
+	)
+);
+CREATE INDEX IF NOT EXISTS ix_stock_event_line_event ON public.aggregator_stockeventline USING btree (event_id);
+CREATE INDEX IF NOT EXISTS ix_stock_event_line_material ON public.aggregator_stockeventline USING btree (material_type_id, event_id) WHERE material_type_id IS NOT NULL;
+
+-- aggregator_packedrecipelayer ------------------------------------------------
+-- Freezes packing-material usage: how many packets of a count row were packed
+-- under which recipe. recipe_id NULL = packed while no recipe existed. Layers
+-- are consumed newest-first (opened_at) when packets are unpacked.
+CREATE TABLE IF NOT EXISTS public.aggregator_packedrecipelayer (
+	id bigserial NOT NULL,
+	inventory_snapshot_id int8 NULL,
+	loose_stock_snapshot_id int8 NULL,
+	material_type_id int8 NOT NULL,
+	recipe_id int8 NULL,
+	packets int8 NOT NULL,
+	opened_at timestamptz NOT NULL,
+	CONSTRAINT aggregator_packedrecipelayer_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_packedrecipelayer_inventory_snapshot_id_fk FOREIGN KEY (inventory_snapshot_id) REFERENCES public.aggregator_inventorysnapshot(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_packedrecipelayer_loose_stock_snapshot_id_fk FOREIGN KEY (loose_stock_snapshot_id) REFERENCES public.aggregator_loosestocksnapshot(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_packedrecipelayer_material_type_id_fk FOREIGN KEY (material_type_id) REFERENCES public.aggregator_othermaterialtype(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_packedrecipelayer_recipe_id_fk FOREIGN KEY (recipe_id) REFERENCES public.aggregator_othermaterialrecipe(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT ck_packedrecipelayer_packets_positive CHECK (packets > 0),
+	CONSTRAINT ck_packedrecipelayer_one_snapshot CHECK ((inventory_snapshot_id IS NULL) <> (loose_stock_snapshot_id IS NULL))
+);
+CREATE INDEX IF NOT EXISTS ix_packedlayer_inventory ON public.aggregator_packedrecipelayer USING btree (inventory_snapshot_id) WHERE inventory_snapshot_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_packedlayer_loose ON public.aggregator_packedrecipelayer USING btree (loose_stock_snapshot_id) WHERE loose_stock_snapshot_id IS NOT NULL;
