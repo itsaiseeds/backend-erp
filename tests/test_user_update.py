@@ -100,6 +100,7 @@ class UserUpdateTest(WebApiTestCase):
             ("email", "updated@example.com", "updated@example.com", "user", "email"),
             ("phone_number", "9999999998", "9999999998", "user", "phone_number"),
             ("can_update_stock_count", False, False, "profile", "can_update_stock_count"),
+            ("share_contact", True, True, "profile", "share_contact"),
         ]
         for field, sent, expected, row, attribute in cases:
             with self.subTest(field=field):

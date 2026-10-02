@@ -19,7 +19,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
 
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 
 
 class AndroidReauthenticateUserSerializer(serializers.Serializer):
@@ -27,13 +27,15 @@ class AndroidReauthenticateUserSerializer(serializers.Serializer):
     name = serializers.CharField()
     phone_number = serializers.CharField()
     role = serializers.CharField()
+    is_sales_person = serializers.BooleanField()
+    is_godown_manager = serializers.BooleanField()
 
 
 class AndroidReauthenticateResponseSerializer(serializers.Serializer):
     user = AndroidReauthenticateUserSerializer()
 
 
-class ReauthenticateView(AndroidBaseView):
+class ReauthenticateView(AndroidSharedView):
     """Confirm the caller's bearer token is still valid."""
 
     @extend_schema(
@@ -52,6 +54,8 @@ class ReauthenticateView(AndroidBaseView):
                     "name": user.name,
                     "phone_number": user.phone_number,
                     "role": user.role,
+                    "is_sales_person": user.is_salesperson,
+                    "is_godown_manager": user.is_godown_manager,
                 },
             }
         )

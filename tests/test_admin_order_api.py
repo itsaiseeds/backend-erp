@@ -198,6 +198,7 @@ class SalesAdminOrderReadApiTest(WebApiTestCase):
         self.assertEqual(
             [(f["filter"], f["kind"]) for f in response.data["available_filters"]],
             [
+                ("public_id", "text"),
                 ("created_by", "select"),
                 ("client", "select"),
                 ("product", "select"),

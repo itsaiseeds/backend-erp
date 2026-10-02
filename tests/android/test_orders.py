@@ -167,6 +167,59 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         )
         self.login_as(self.sales_person)
 
+    def test_analytics_counts_orders_clients_and_orders_per_client_in_the_window(self):
+        """Counts are the caller's own, inside the window, zero-filled by status.
+
+        tests/android/test_orders.py::AndroidOrderListApiTest::test_analytics_counts_orders_clients_and_orders_per_client_in_the_window
+        """
+        self._seed_orders()
+        url = "/android/api/v1/analytics"
+        everything = {
+            "start_date_time": "2000-01-01T00:00:00Z",
+            "end_date_time": "2999-01-01T00:00:00Z",
+        }
+
+        data = self.client.get(url, everything).data
+        self.assertEqual(data["orders"]["total"], 3)
+        self.assertEqual(
+            data["orders"]["by_status"],
+            {
+                "BOOKED": 2,
+                "UNDER_REVIEW": 0,
+                "CONFIRMED": 0,
+                "DISPATCHED": 0,
+                "DELIVERED": 0,
+                "ON_HOLD": 1,
+                "REJECTED": 0,
+            },
+        )
+        self.assertEqual(data["clients"]["total"], 2)  # the rival's client is not ours
+        self.assertEqual(
+            data["clients"]["by_status"], {"VERIFICATION_PENDING": 2, "VERIFIED": 0}
+        )
+        self.assertEqual(
+            [(row["client"]["company_name"], row["total"]) for row in data["client_orders"]],
+            [("Acme Seeds", 2), ("Beta Seeds", 1)],
+        )
+        beta = data["client_orders"][1]
+        self.assertEqual(beta["client"]["public_id"], self.beta.public_id)
+        self.assertEqual(beta["by_status"]["ON_HOLD"], 1)
+        self.assertEqual(beta["by_status"]["BOOKED"], 0)
+
+        # A window that closed before anything was created is all zeros.
+        empty = self.client.get(
+            url,
+            {"start_date_time": "2000-01-01T00:00:00Z", "end_date_time": "2000-01-02T00:00:00Z"},
+        ).data
+        self.assertEqual(empty["orders"]["total"], 0)
+        self.assertEqual(empty["clients"]["total"], 0)
+        self.assertEqual(empty["client_orders"], [])
+
+        # Both bounds are required, in order.
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_400_BAD_REQUEST)
+        inverted = {**everything, "start_date_time": "2999-01-02T00:00:00Z"}
+        self.assertEqual(self.client.get(url, inverted).status_code, status.HTTP_400_BAD_REQUEST)
+
     def _ids(self, response):
         return [row["public_id"] for row in response.data["results"]]
 
@@ -191,6 +244,7 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         self.assertEqual(
             [(f["filter"], f["kind"]) for f in response.data["available_filters"]],
             [
+                ("public_id", "text"),
                 ("client", "select"),
                 ("product", "select"),
                 ("city_id", "select"),

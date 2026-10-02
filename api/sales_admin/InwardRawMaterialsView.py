@@ -18,157 +18,22 @@ from __future__ import annotations
 
 from django.db.models import QuerySet
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator.InwardOperations import inward_raw_material_payload, today
-from aggregator.models import InwardRawMaterial, InwardRawMaterialStatus, Party, Product
+from aggregator.models import InwardRawMaterial
+from api.inward_serializers import (
+    RAW_LOT_QUERYSET_FILTERS,
+    RAW_LOT_SORT_OPTIONS,
+    CreateInwardRawMaterialSerializer,
+    InwardRawMaterialListPageSerializer,
+    InwardRawMaterialPayloadSerializer,
+)
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
-    FilterCatalogueEntrySerializer,
-    QuerysetFilter,
-    SortCatalogueEntrySerializer,
-    SortOption,
     list_query_parameters,
-    parse_str,
-)
-
-
-class InwardRawMaterialProductRefSerializer(serializers.Serializer):
-    """Output shape for the ``product`` reference on a lot."""
-
-    public_id = serializers.CharField()
-    name = serializers.CharField()
-
-
-class InwardRawMaterialPartyRefSerializer(serializers.Serializer):
-    """Output shape for the ``party`` reference on a lot."""
-
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-
-
-class InwardRawMaterialPayloadSerializer(serializers.Serializer):
-    """Output shape for one raw-material lot."""
-
-    public_id = serializers.CharField()
-    product = InwardRawMaterialProductRefSerializer()
-    party = InwardRawMaterialPartyRefSerializer()
-    lot_no = serializers.CharField(help_text="The supplier's own batch number.")
-    quantity_kg = serializers.CharField(help_text="Kilograms received.")
-    status = serializers.CharField()
-    lab_sampling_date = serializers.DateField(allow_null=True)
-    effective_date = serializers.DateField(allow_null=True)
-
-
-class CreateInwardRawMaterialSerializer(serializers.Serializer):
-    """Request validation for booking a new raw-material lot.
-
-    ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
-    ``In Use`` or ``Rejected`` later with ``PATCH``. ``effective_date`` is
-    stamped (today) at that flip and is deliberately absent here.
-    ``lab_sampling_date`` may be given explicitly; left out, it defaults to
-    today -- a lot never starts with no sampling date, since it arrives for
-    lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
-    number on the consignment -- is required.
-    """
-
-    product = serializers.SlugRelatedField(
-        slug_field="public_id",
-        queryset=Product.objects.all(),
-        error_messages={"required": "Product is required."},
-    )
-    party = serializers.PrimaryKeyRelatedField(
-        queryset=Party.objects.all(),
-        error_messages={"required": "Party is required."},
-    )
-    lot_no = serializers.CharField(
-        max_length=64,
-        error_messages={"required": "Lot number is required.", "blank": "Lot number is required."},
-        help_text="The supplier's own batch number for this consignment.",
-    )
-    quantity_kg = serializers.DecimalField(
-        max_digits=10,
-        decimal_places=3,
-        min_value=0,
-        error_messages={"required": "Quantity in kg is required."},
-        help_text="Kilograms received from the party.",
-    )
-    lab_sampling_date = serializers.DateField(required=False, allow_null=True)
-
-
-class InwardRawMaterialListPageSerializer(serializers.Serializer):
-    """Output shape for the paginated envelope (schema only)."""
-
-    total_count = serializers.IntegerField()
-    total_pages = serializers.IntegerField()
-    next_page_number = serializers.IntegerField(allow_null=True)
-    previous_page_number = serializers.IntegerField(allow_null=True)
-    results = InwardRawMaterialPayloadSerializer(many=True)
-    available_filters = FilterCatalogueEntrySerializer(many=True)
-    available_sorts = SortCatalogueEntrySerializer(many=True)
-
-
-def _products_with_raw_material_lots(request: Request) -> list[dict]:
-    """Every distinct product that has an inward raw-material lot.
-
-    The eligible value set for the ``product`` filter: the picker only ever
-    needs to offer a product that actually has a lot behind it.
-    """
-    rows = (
-        InwardRawMaterial.objects.values_list("product__public_id", "product__name")
-        .distinct()
-        .order_by("product__name")
-    )
-    return [{"value": public_id, "label": name} for public_id, name in rows]
-
-
-_QUERYSET_FILTERS = (
-    QuerysetFilter(
-        "product",
-        label="Product",
-        lookup="product__public_id__in",
-        parse=parse_str,
-        description="Product public id(s) (see options).",
-        options=_products_with_raw_material_lots,
-    ),
-    QuerysetFilter(
-        "party",
-        label="Party",
-        lookup="party_id__in",
-        description="Party id(s).",
-    ),
-    QuerysetFilter(
-        "status",
-        label="Status",
-        lookup="status__name",
-        parse=parse_str,
-        description="Lot status (Lab Testing / In Use / Rejected).",
-        options=[
-            {"value": s.value, "label": s.label}
-            for s in InwardRawMaterialStatus
-        ],
-    ),
-)
-_SORT_OPTIONS = (
-    SortOption(
-        "created_at",
-        label="Created",
-        description="When the lot was booked (default: newest first).",
-    ),
-    SortOption(
-        "product",
-        label="Product",
-        fields=("product__name",),
-        description="Product name, A->Z.",
-    ),
-    SortOption(
-        "effective_date",
-        label="Effective Date",
-        fields=("effective_date",),
-        description="Soonest effective date first (undated lots last).",
-    ),
 )
 
 
@@ -178,15 +43,18 @@ class InwardRawMaterialsView(AdminPaginatedDateRangeListView):
     serializer_class = CreateInwardRawMaterialSerializer
     enforce_date_range_filters = False
     default_sort = ("-created_at", "pk")
-    queryset_filters = _QUERYSET_FILTERS
-    sort_options = _SORT_OPTIONS
+    queryset_filters = RAW_LOT_QUERYSET_FILTERS
+    sort_options = RAW_LOT_SORT_OPTIONS
 
     @extend_schema(
         operation_id="sales_admin_inward_raw_materials_list",
-        summary="List inward raw-material lots (filter by product / party / status, sortable)",
+        summary=(
+            "List inward raw-material lots (filter by product / party / status / "
+            "effective date range, sortable)"
+        ),
         parameters=list_query_parameters(
-            queryset_filters=_QUERYSET_FILTERS,
-            sort_options=_SORT_OPTIONS,
+            queryset_filters=RAW_LOT_QUERYSET_FILTERS,
+            sort_options=RAW_LOT_SORT_OPTIONS,
             date_window="none",
         ),
         responses={200: InwardRawMaterialListPageSerializer},
@@ -195,7 +63,7 @@ class InwardRawMaterialsView(AdminPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        return InwardRawMaterial.objects.select_related("product", "party", "status")
+        return InwardRawMaterial.objects.select_related("product", "party", "status", "created_by")
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:
         return [inward_raw_material_payload(entry) for entry in page_items]

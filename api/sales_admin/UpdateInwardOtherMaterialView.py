@@ -17,23 +17,16 @@ from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.response import Response
 
 from aggregator.InwardOperations import inward_other_material_payload
 from aggregator.models import InwardOtherMaterial
 from api.admin import AdminApiView
-
-from .InwardOtherMaterialsView import InwardOtherMaterialPayloadSerializer
-
-
-class UpdateInwardOtherMaterialSerializer(serializers.Serializer):
-    """Request validation for updating an other-material lot.
-
-    Nothing is writable: ``effective_date`` was stamped with today at booking,
-    and ``party`` / ``recipe`` / ``quantity`` are immutable -- correct a wrong
-    booking by soft-deleting and re-booking.
-    """
+from api.inward_serializers import (
+    InwardOtherMaterialPayloadSerializer,
+    UpdateInwardOtherMaterialSerializer,
+)
 
 
 class UpdateInwardOtherMaterialView(AdminApiView):

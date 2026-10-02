@@ -50,6 +50,8 @@ class UpdateAdminView(AdminApiView):
                 setattr(user, field, data[field])
         if "can_update_stock_count" in data:
             admin.can_update_stock_count = data["can_update_stock_count"]
+        if "share_contact" in data:
+            admin.share_contact = data["share_contact"]
 
         admin.save()
         user.save(

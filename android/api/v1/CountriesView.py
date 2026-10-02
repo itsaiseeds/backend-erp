@@ -15,7 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator.models import Country
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 
 
 class AndroidCountrySerializer(serializers.Serializer):
@@ -26,7 +26,7 @@ class AndroidCountrySerializer(serializers.Serializer):
     iso_code = serializers.CharField()
 
 
-class CountriesView(AndroidBaseView):
+class CountriesView(AndroidSharedView):
     """List the countries available for a client address."""
 
     @extend_schema(

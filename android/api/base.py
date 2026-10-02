@@ -1,8 +1,8 @@
-"""Base view for the sales-person Android app.
+"""Base views for the Android app (sales person and godown manager).
 
 Android views authenticate via an expiring DRF bearer token
 (``ExpiringTokenAuthentication`` -- 24h TTL), which the client persists across
-requests, and require a ``SalesPerson`` profile.
+requests, and require an Android role profile (``SalesPerson``, ``GodownManager``, or either).
 
 Android never touches sessions: no view in this app may import ``login``/
 ``logout``, read ``request.session``, or use ``SessionAuthentication`` -- that
@@ -15,15 +15,35 @@ from api.authentication import ExpiringTokenAuthentication
 from api.views import BaseApiView
 
 
-class AndroidBaseView(BaseApiView):
-    """Base for every Android app endpoint.
+class AndroidTokenView(BaseApiView):
+    """Fixes the Android credential scheme; declares no role.
 
-    - Authenticates via a bearer token (browser sessions don't exist on mobile);
-      the token is rejected once it is older than ``TOKEN_TTL_HOURS``.
+    Authenticates via a bearer token (browser sessions don't exist on mobile);
+    the token is rejected once it is older than ``TOKEN_TTL_HOURS``. Concrete
+    views use one of the role bases below.
+    """
+
+    authentication_classes = [ExpiringTokenAuthentication]
+
+
+class AndroidBaseView(AndroidTokenView):
+    """Base for every sales-person Android endpoint.
+
     - Requires an authenticated user with a ``SalesPerson`` profile
       (``salesperson_required`` on ``BaseApiView``).
     - Set ``superuser_required = True`` to further restrict (rare on mobile).
     """
 
-    authentication_classes = [ExpiringTokenAuthentication]
     salesperson_required = True
+
+
+class AndroidGodownBaseView(AndroidTokenView):
+    """Base for the godown-manager-only Android endpoints (``godown/...``)."""
+
+    godown_manager_required = True
+
+
+class AndroidSharedView(AndroidTokenView):
+    """Base for Android endpoints open to either role (look-ups, reauthenticate)."""
+
+    android_role_required = True

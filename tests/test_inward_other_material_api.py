@@ -235,6 +235,56 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
         self.assertEqual(empty.status_code, status.HTTP_200_OK)
         self.assertEqual(empty.data["total_count"], 0)
 
+    def test_effective_date_range_filter_selects_previous_inward_lots(self):
+        """``effective_date_gte`` / ``effective_date_lte`` are inclusive day bounds.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_effective_date_range_filter_selects_previous_inward_lots
+        """
+        self.login_as(self.seed_admin)
+        dated = {}
+        for day in ("2026-08-30", "2026-09-01", "2026-09-15", "2026-09-30", "2026-10-02"):
+            created = self._create_lot()
+            self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
+            InwardOtherMaterial.objects.filter(public_id=created.data["public_id"]).update(
+                effective_date=day
+            )
+            dated[day] = created.data["public_id"]
+
+        def ids(**params):
+            response = self.client.get(LOTS_URL, params)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+            return {row["public_id"] for row in response.data["results"]}
+
+        self.assertEqual(
+            ids(effective_date_gte="2026-09-01", effective_date_lte="2026-09-30"),
+            {dated["2026-09-01"], dated["2026-09-15"], dated["2026-09-30"]},
+        )
+        self.assertEqual(
+            ids(effective_date_gte="2026-09-15", effective_date_lte="2026-09-15"),
+            {dated["2026-09-15"]},
+        )
+        self.assertEqual(
+            ids(effective_date_lte="2026-09-01"),
+            {dated["2026-08-30"], dated["2026-09-01"]},
+        )
+        self.assertEqual(
+            ids(effective_date_gte="2026-09-30"),
+            {dated["2026-09-30"], dated["2026-10-02"]},
+        )
+        self.assertEqual(
+            ids(effective_date_gte="2026-09-01", product="P-DOES-NOT-EXIST"), set()
+        )
+
+        bad = self.client.get(LOTS_URL, {"effective_date_gte": "not-a-date"})
+        self.assertEqual(bad.status_code, status.HTTP_400_BAD_REQUEST, bad.content)
+
+        entry = next(
+            item
+            for item in self.client.get(LOTS_URL).data["available_filters"]
+            if item["filter"] == "effective_date"
+        )
+        self.assertEqual(entry["kind"], "date_range")
+
     # -- deletion -------------------------------------------------------------
 
     def test_a_lot_the_counted_packets_already_use_cannot_be_deleted(self):

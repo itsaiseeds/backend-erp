@@ -429,6 +429,23 @@ class QuerysetFilter(ListFilter):
         return [OpenApiParameter(self.name, OpenApiTypes.STR, description=f"{hint} {shape}")]
 
 
+def public_id_filter(prefix: str) -> QuerysetFilter:
+    """The ``?public_id=`` text filter every list of a public-id model carries.
+
+    A case-insensitive substring match on the row's own ``public_id`` -- a free
+    text box, so it has no ``options``. ``prefix`` (the model's
+    ``public_id_prefix``, e.g. ``"ORD-"``) only feeds the description.
+    """
+    return QuerysetFilter(
+        "public_id",
+        label="Public ID",
+        lookup="public_id__icontains",
+        parse=parse_str,
+        multi=False,
+        description=f"Case-insensitive substring of the public id ({prefix}XXXXXXXXXXXX).",
+    )
+
+
 class RangeFilter(ListFilter):
     """A two-bound filter: ``?<name>_after=`` / ``?<name>_before=`` (inclusive).
 

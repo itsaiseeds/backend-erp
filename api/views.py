@@ -19,7 +19,14 @@ from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from .permissions import HasDjangoPermission, IsAdminUser, IsSalesPerson, IsSuperUser
+from .permissions import (
+    HasDjangoPermission,
+    IsAdminUser,
+    IsAndroidRole,
+    IsGodownManager,
+    IsSalesPerson,
+    IsSuperUser,
+)
 
 
 def fire_and_forget(func: Callable[[], object]) -> None:
@@ -43,6 +50,9 @@ class BaseApiView(APIView):
     * ``admin_required``   - additionally require an ``Admin`` profile.
     * ``superuser_required`` - additionally require a Django superuser.
     * ``salesperson_required`` - additionally require a ``SalesPerson`` profile.
+    * ``godown_manager_required`` - additionally require a ``GodownManager`` profile.
+    * ``android_role_required`` - additionally require *either* Android role
+      (a ``SalesPerson`` or a ``GodownManager`` profile).
     * ``required_permission`` - additionally require this Django permission
       (``"<app_label>.<codename>"``), regardless of role; ``None`` for none.
 
@@ -62,6 +72,8 @@ class BaseApiView(APIView):
     admin_required = False
     superuser_required = False
     salesperson_required = False
+    godown_manager_required = False
+    android_role_required = False
     required_permission: str | None = None
 
     def get_permissions(self):
@@ -74,6 +86,10 @@ class BaseApiView(APIView):
             permissions.append(IsSuperUser())
         if self.salesperson_required:
             permissions.append(IsSalesPerson())
+        if self.godown_manager_required:
+            permissions.append(IsGodownManager())
+        if self.android_role_required:
+            permissions.append(IsAndroidRole())
         if self.required_permission is not None:
             permissions.append(HasDjangoPermission())
         return permissions

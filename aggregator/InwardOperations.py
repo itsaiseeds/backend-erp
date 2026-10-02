@@ -34,16 +34,18 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from django.db.models import Sum
+from django.db.models import QuerySet, Sum
+from django.http import Http404
 
 from . import InventoryOperations
-from .InventoryOperations import today
+from .InventoryOperations import lock_raw_pools, today
 from .models import (
     InwardOtherMaterial,
     InwardRawMaterial,
     InwardRawMaterialStatus,
     OtherMaterialType,
     Product,
+    RawMaterialWaste,
     Status,
     StatusIds,
 )
@@ -199,6 +201,30 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
         "effective_date": (
             entry.effective_date.isoformat() if entry.effective_date is not None else None
         ),
+        "created_by": (
+            {"id": entry.created_by_id, "name": entry.created_by.display_name}
+            if entry.created_by_id is not None
+            else None
+        ),
+    }
+
+
+def raw_waste_payload(entry: RawMaterialWaste) -> dict:
+    """Frontend-facing dict for one ``RawMaterialWaste`` row (``WS-…``)."""
+    return {
+        "public_id": entry.public_id,
+        "product": {
+            "public_id": entry.product.public_id,
+            "name": entry.product.name,
+        },
+        "quantity_kg": str(entry.quantity_kg),
+        "reason": entry.reason,
+        "created_at": entry.created_at.isoformat(),
+        "created_by": (
+            {"id": entry.created_by_id, "name": entry.created_by.display_name}
+            if entry.created_by_id is not None
+            else None
+        ),
     }
 
 
@@ -224,6 +250,11 @@ def inward_other_material_payload(entry: InwardOtherMaterial) -> dict:
         "quantity": str(entry.quantity),
         "effective_date": (
             entry.effective_date.isoformat() if entry.effective_date is not None else None
+        ),
+        "created_by": (
+            {"id": entry.created_by_id, "name": entry.created_by.display_name}
+            if entry.created_by_id is not None
+            else None
         ),
     }
 
@@ -269,8 +300,9 @@ def raw_incoming_stock(
     the same way, count toward ``rejected_kg``. ``packed_kg`` is what has
     since been packed into bags or sample packets
     (``InventoryOperations.raw_bagged_kg`` + ``raw_loose_kg``, read as of now
-    -- a count has no "as of" of its own) and ``available_kg`` is what is left
-    to pack; rejected kilograms are never counted there -- a rejected lot is
+    -- a count has no "as of" of its own), ``wasted_kg`` is what was written
+    off (``raw_wasted_kg``, undated) and ``available_kg`` is what is left to
+    pack; rejected kilograms are never counted there -- a rejected lot is
     invisible to the packing check regardless of its date. A product is
     listed whenever it has incoming or rejected kilograms, so a product whose
     entire intake was rejected still appears. The list is ready for display:
@@ -293,6 +325,7 @@ def raw_incoming_stock(
         packed_kg = InventoryOperations.raw_bagged_kg(
             product
         ) + InventoryOperations.raw_loose_kg(product)
+        wasted_kg = InventoryOperations.raw_wasted_kg(product)
         row = incoming[product_id] if product_id in incoming else rejected[product_id]
         lines.append(
             {
@@ -301,7 +334,8 @@ def raw_incoming_stock(
                 "name": row["name"],
                 "incoming_kg": incoming_kg,
                 "packed_kg": packed_kg,
-                "available_kg": incoming_kg - packed_kg,
+                "wasted_kg": wasted_kg,
+                "available_kg": incoming_kg - packed_kg - wasted_kg,
                 "rejected_kg": rejected_kg,
             }
         )
@@ -347,3 +381,33 @@ def other_material_on_hand(
             id__in=active
         ).order_by("name")
     ]
+
+
+def locked_raw_lot(queryset: QuerySet, public_id: str) -> InwardRawMaterial:
+    """Load a lot with its product's raw pool locked, for a revert or delete.
+
+    Removing a lot is checked against the raw pool (``assert_raw_lot_removable``)
+    and stock counts are written against that same pool under
+    ``lock_raw_pools``. Taking the same lock here, *before* the lot is read,
+    stops a count and a removal from interleaving and stranding bags with no
+    raw material behind them. The lot itself is then read -- and locked --
+    after the pool, so its status is the one the check will act on and every
+    caller acquires the rows in the same order.
+
+    The lot's own lock is taken on the bare row and the joined load runs
+    afterwards: a locking query that waited re-checks its joins against the
+    changed row, so locking through the ``status`` join would drop a lot whose
+    status had just changed and 404 (see ``GetOrderView.get_locked_order``).
+
+    Must be called inside ``transaction.atomic``.
+    """
+    lots = InwardRawMaterial.objects.filter(public_id=public_id)
+    product_id = lots.values_list("product_id", flat=True).first()
+    if product_id is None:
+        raise Http404("No InwardRawMaterial matches the given query.")
+    lock_raw_pools([product_id])
+    # Soft-deleted by a request that held the lock before us: gone, so a 404.
+    pk = lots.select_for_update().values_list("pk", flat=True).first()
+    if pk is None:
+        raise Http404("No InwardRawMaterial matches the given query.")
+    return queryset.get(pk=pk)

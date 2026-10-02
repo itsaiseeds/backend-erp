@@ -55,6 +55,7 @@ from common.views.paginated_date_range import (
     list_query_parameters,
     parse_datetime,
     parse_str,
+    public_id_filter,
 )
 
 _CLIENT_STATUS_CODES = [status.name for status in StatusIds.client_statuses()]
@@ -172,6 +173,7 @@ def _by_primary_address_text(queryset: QuerySet, terms: list[str]) -> QuerySet:
 
 
 _QUERYSET_FILTERS = (
+    public_id_filter("C-"),
     QuerysetFilter(
         "created_by",
         label="Created By",

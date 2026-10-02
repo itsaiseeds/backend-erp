@@ -47,6 +47,7 @@ class CreateAdminSerializer(serializers.Serializer):
         },
     )
     can_update_stock_count = serializers.BooleanField(default=False)
+    share_contact = serializers.BooleanField(default=False)
     city = serializers.PrimaryKeyRelatedField(
         queryset=City.objects.all(),
         error_messages={"required": "City is required."},
@@ -90,6 +91,7 @@ class AdminsView(AdminApiView):
             admin = Admin.objects.create(
                 user=user,
                 can_update_stock_count=data["can_update_stock_count"],
+                share_contact=data["share_contact"],
                 created_by=request.user,
             )
             # Fallback salesperson so the account can always use the sales app.

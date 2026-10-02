@@ -7,6 +7,7 @@ declares the same key in its own ``ROUTES``.
 
 from __future__ import annotations
 
+from .AnalyticsView import AnalyticsView
 from .CitiesView import CitiesView
 from .ClientAddressesView import ClientAddressesView
 from .ClientTransportAgenciesView import ClientTransportAgenciesView
@@ -23,15 +24,25 @@ from .GetClientView import GetClientView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
+from .GodownInwardOtherMaterialsView import GodownInwardOtherMaterialsView
+from .GodownInwardRawMaterialsView import GodownInwardRawMaterialsView
+from .GodownOtherMaterialRecipesView import GodownOtherMaterialRecipesView
+from .GodownOtherMaterialStockView import GodownOtherMaterialStockView
+from .GodownRawMaterialStockView import GodownRawMaterialStockView
 from .LoginView import LoginView
 from .LogoutView import LogoutView
+from .OtherMaterialTypesView import OtherMaterialTypesView
+from .PartiesView import PartiesView
 from .ProductsView import ProductsView
 from .ReauthenticateView import ReauthenticateView
+from .SalesAdminsView import SalesAdminsView
 from .SalesPersonCatalogueView import SalesPersonCatalogueView
 from .StartFieldTripView import StartFieldTripView
 from .StatesView import StatesView
 from .UpdateClientView import UpdateClientView
 from .UpdateFieldTripView import UpdateFieldTripView
+from .UpdateGodownInwardOtherMaterialView import UpdateGodownInwardOtherMaterialView
+from .UpdateGodownInwardRawMaterialView import UpdateGodownInwardRawMaterialView
 
 ROUTES: dict[str, type] = {
     "auth/login": LoginView,
@@ -44,6 +55,10 @@ ROUTES: dict[str, type] = {
     "utilities/client-transport-agencies": ClientTransportAgenciesView,
     "utilities/crops": CropsView,
     "utilities/products": ProductsView,
+    "utilities/parties": PartiesView,
+    "utilities/other-material-types": OtherMaterialTypesView,
+    "utilities/sales-admins": SalesAdminsView,
+    "analytics": AnalyticsView,
     "get-clients": GetClientsView,
     "get-orders": GetOrdersView,
     "client/<public_id>": GetClientView,
@@ -59,4 +74,11 @@ ROUTES: dict[str, type] = {
     "delete-field-trip/<public_id>": DeleteFieldTripView,
     "field-trip-farmer-visits/<public_id>": GetFieldTripFarmerVisitsView,
     "create-farmer-visit": CreateFarmerVisitView,
+    "godown/raw-material-stock": GodownRawMaterialStockView,
+    "godown/other-material-stock": GodownOtherMaterialStockView,
+    "godown/inward-raw-materials": GodownInwardRawMaterialsView,
+    "godown/inward-raw-material/<public_id>": UpdateGodownInwardRawMaterialView,
+    "godown/inward-other-materials": GodownInwardOtherMaterialsView,
+    "godown/inward-other-material/<public_id>": UpdateGodownInwardOtherMaterialView,
+    "godown/other-material-recipes": GodownOtherMaterialRecipesView,
 }

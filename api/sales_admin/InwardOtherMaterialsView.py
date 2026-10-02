@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from django.db.models import QuerySet
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -25,175 +25,17 @@ from aggregator.InwardOperations import (
     inward_other_material_payload,
     today,
 )
-from aggregator.models import InwardOtherMaterial, OtherMaterialRecipe, Party
+from aggregator.models import InwardOtherMaterial
+from api.inward_serializers import (
+    OTHER_LOT_QUERYSET_FILTERS,
+    OTHER_LOT_SORT_OPTIONS,
+    CreateInwardOtherMaterialSerializer,
+    InwardOtherMaterialListPageSerializer,
+    InwardOtherMaterialPayloadSerializer,
+)
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
-    FilterCatalogueEntrySerializer,
-    QuerysetFilter,
-    SortCatalogueEntrySerializer,
-    SortOption,
     list_query_parameters,
-    parse_str,
-)
-
-
-class InwardOtherMaterialProductRefSerializer(serializers.Serializer):
-    """Output shape for the ``product`` reference inside a recipe ref."""
-
-    public_id = serializers.CharField()
-    name = serializers.CharField()
-
-
-class InwardOtherMaterialTypeRefSerializer(serializers.Serializer):
-    """Output shape for the ``material_type`` reference inside a recipe ref."""
-
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-
-
-class InwardOtherMaterialRecipeRefSerializer(serializers.Serializer):
-    """Output shape for the ``recipe`` reference on a lot."""
-
-    public_id = serializers.CharField()
-    material_type = InwardOtherMaterialTypeRefSerializer()
-    product = InwardOtherMaterialProductRefSerializer()
-    packet_weight = serializers.CharField(help_text="Weight of the covered packet, in kg.")
-
-
-class InwardOtherMaterialPartyRefSerializer(serializers.Serializer):
-    """Output shape for the ``party`` reference on a lot."""
-
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-
-
-class InwardOtherMaterialPayloadSerializer(serializers.Serializer):
-    """Output shape for one inward-other-material lot."""
-
-    public_id = serializers.CharField()
-    recipe = InwardOtherMaterialRecipeRefSerializer()
-    party = InwardOtherMaterialPartyRefSerializer()
-    quantity = serializers.CharField(help_text="Amount received, in the recipe's unit.")
-    effective_date = serializers.DateField(allow_null=True)
-
-
-class CreateInwardOtherMaterialSerializer(serializers.Serializer):
-    """Request validation for booking a new other-material lot.
-
-    ``effective_date`` is absent on purpose: booking stamps it with today
-    (see ``InwardOtherMaterialsView.post``).
-    """
-
-    party = serializers.PrimaryKeyRelatedField(
-        queryset=Party.objects.all(),
-        error_messages={"required": "Party is required."},
-    )
-    recipe = serializers.SlugRelatedField(
-        slug_field="public_id",
-        queryset=OtherMaterialRecipe.objects.all(),
-        error_messages={"required": "Recipe is required."},
-    )
-    quantity = serializers.DecimalField(
-        max_digits=10,
-        decimal_places=3,
-        min_value=0,
-        error_messages={"required": "Quantity is required."},
-        help_text="Amount received, in the recipe's material unit.",
-    )
-
-    def validate(self, attrs):
-        if attrs["quantity"] <= 0:
-            raise serializers.ValidationError(
-                {"quantity": "Quantity must be greater than zero."}
-            )
-        return attrs
-
-
-class InwardOtherMaterialListPageSerializer(serializers.Serializer):
-    """Output shape for the paginated envelope (schema only)."""
-
-    total_count = serializers.IntegerField()
-    total_pages = serializers.IntegerField()
-    next_page_number = serializers.IntegerField(allow_null=True)
-    previous_page_number = serializers.IntegerField(allow_null=True)
-    results = InwardOtherMaterialPayloadSerializer(many=True)
-    available_filters = FilterCatalogueEntrySerializer(many=True)
-    available_sorts = SortCatalogueEntrySerializer(many=True)
-
-
-def _material_types_with_other_material_lots(request: Request) -> list[dict]:
-    """Every distinct material type that has an inward other-material lot.
-
-    The eligible value set for the ``material_type`` filter: the picker only
-    ever needs to offer a material type that actually has a lot behind it.
-    """
-    rows = (
-        InwardOtherMaterial.objects.values_list(
-            "recipe__material_type_id", "recipe__material_type__name"
-        )
-        .distinct()
-        .order_by("recipe__material_type__name")
-    )
-    return [{"value": material_type_id, "label": name} for material_type_id, name in rows]
-
-
-def _products_with_other_material_lots(request: Request) -> list[dict]:
-    """Every distinct product that has an inward other-material lot (via its recipe).
-
-    The eligible value set for the ``product`` filter: the picker only ever
-    needs to offer a product that actually has a lot behind it.
-    """
-    rows = (
-        InwardOtherMaterial.objects.values_list(
-            "recipe__product__public_id", "recipe__product__name"
-        )
-        .distinct()
-        .order_by("recipe__product__name")
-    )
-    return [{"value": public_id, "label": name} for public_id, name in rows]
-
-
-_QUERYSET_FILTERS = (
-    QuerysetFilter(
-        "party",
-        label="Party",
-        lookup="party_id__in",
-        description="Party id(s).",
-    ),
-    QuerysetFilter(
-        "material_type",
-        label="Material Type",
-        lookup="recipe__material_type_id__in",
-        description="Material type id(s) (see the recipe; see options).",
-        options=_material_types_with_other_material_lots,
-    ),
-    QuerysetFilter(
-        "product",
-        label="Product",
-        lookup="recipe__product__public_id__in",
-        parse=parse_str,
-        description="Product public id(s) (see the recipe; see options).",
-        options=_products_with_other_material_lots,
-    ),
-)
-_SORT_OPTIONS = (
-    SortOption(
-        "created_at",
-        label="Created",
-        description="When the lot was booked (default: newest first).",
-    ),
-    SortOption(
-        "party",
-        label="Party",
-        fields=("party__name",),
-        description="Party name, A->Z.",
-    ),
-    SortOption(
-        "effective_date",
-        label="Effective Date",
-        fields=("effective_date",),
-        description="Soonest effective date first (undated lots last).",
-    ),
 )
 
 
@@ -203,18 +45,18 @@ class InwardOtherMaterialsView(AdminPaginatedDateRangeListView):
     serializer_class = CreateInwardOtherMaterialSerializer
     enforce_date_range_filters = False
     default_sort = ("-created_at", "pk")
-    queryset_filters = _QUERYSET_FILTERS
-    sort_options = _SORT_OPTIONS
+    queryset_filters = OTHER_LOT_QUERYSET_FILTERS
+    sort_options = OTHER_LOT_SORT_OPTIONS
 
     @extend_schema(
         operation_id="sales_admin_inward_other_materials_list",
         summary=(
             "List inward other-material lots (filter by party / material "
-            "type / product, sortable)"
+            "type / product / effective date range, sortable)"
         ),
         parameters=list_query_parameters(
-            queryset_filters=_QUERYSET_FILTERS,
-            sort_options=_SORT_OPTIONS,
+            queryset_filters=OTHER_LOT_QUERYSET_FILTERS,
+            sort_options=OTHER_LOT_SORT_OPTIONS,
             date_window="none",
         ),
         responses={200: InwardOtherMaterialListPageSerializer},
@@ -224,7 +66,7 @@ class InwardOtherMaterialsView(AdminPaginatedDateRangeListView):
 
     def get_queryset(self, request: Request) -> QuerySet:
         return InwardOtherMaterial.objects.select_related(
-            "party", "recipe__product", "recipe__material_type"
+            "party", "recipe__product", "recipe__material_type", "created_by"
         )
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:

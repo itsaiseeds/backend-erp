@@ -30,6 +30,7 @@ from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
+from .GodownManagersView import GodownManagersView
 from .HoldOrderView import HoldOrderView
 from .InwardOtherMaterialsView import InwardOtherMaterialsView
 from .InwardRawMaterialsView import InwardRawMaterialsView
@@ -41,6 +42,7 @@ from .PartiesView import PartiesView
 from .ProductPackagingsView import ProductPackagingsView
 from .ProductsView import ProductsView
 from .RawMaterialStockView import RawMaterialStockView
+from .RawMaterialWastesView import RawMaterialWastesView
 from .RejectOrderView import RejectOrderView
 from .RevertCustomOrderDispatchView import RevertCustomOrderDispatchView
 from .RevertDispatchView import RevertDispatchView
@@ -55,6 +57,7 @@ from .UpdateClientView import UpdateClientView
 from .UpdateCropView import UpdateCropView
 from .UpdateCustomOrderView import UpdateCustomOrderView
 from .UpdateFieldTripView import UpdateFieldTripView
+from .UpdateGodownManagerView import UpdateGodownManagerView
 from .UpdateInwardOtherMaterialView import UpdateInwardOtherMaterialView
 from .UpdateInwardRawMaterialView import UpdateInwardRawMaterialView
 from .UpdateOrderView import UpdateOrderView
@@ -62,6 +65,7 @@ from .UpdateOtherMaterialTypeView import UpdateOtherMaterialTypeView
 from .UpdatePartyView import UpdatePartyView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
+from .UpdateRawMaterialWasteView import UpdateRawMaterialWasteView
 from .UpdateSalesPersonView import UpdateSalesPersonView
 from .UpdateSamplePacketStockView import UpdateLooseStockView
 from .UploadLRNumberView import UploadLRNumberView
@@ -111,6 +115,12 @@ urlpatterns = [
         "sales-people/<int:id>",
         UpdateSalesPersonView.as_view(),
         name="update-sales-person",
+    ),
+    path("godown-managers", GodownManagersView.as_view(), name="godown-managers"),
+    path(
+        "godown-managers/<int:id>",
+        UpdateGodownManagerView.as_view(),
+        name="update-godown-manager",
     ),
     # The client *verb* routes keep a trailing slash; ``client/<public_id>`` is
     # a collection item, named like ``products/<public_id>`` above.
@@ -255,6 +265,16 @@ urlpatterns = [
         "inward-other-material/<str:public_id>",
         UpdateInwardOtherMaterialView.as_view(),
         name="update-inward-other-material",
+    ),
+    path(
+        "raw-material-wastes",
+        RawMaterialWastesView.as_view(),
+        name="raw-material-wastes",
+    ),
+    path(
+        "raw-material-waste/<str:public_id>",
+        UpdateRawMaterialWasteView.as_view(),
+        name="update-raw-material-waste",
     ),
     path(
         "raw-material-stock",
