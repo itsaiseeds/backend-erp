@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_strings.dart';
 import '../../constants/font_sizes.dart';
-import '../../models/sidebar_group_model.dart';
+import '../../models/sidebar_workspace_model.dart';
 import '../../models/sidebar_item_model.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
@@ -10,11 +10,14 @@ import '../../utils/formatters/initials_formatter.dart';
 import '../loaders/shimmer_box.dart';
 import 'overflow_tooltip.dart';
 import 'sidebar_group_section.dart';
+import 'sidebar_workspace_switcher.dart';
 
 class AppSidebar extends StatefulWidget {
-  final List<ResolvedSidebarGroup> groups;
+  final List<ResolvedSidebarWorkspace> workspaces;
+  final String activeWorkspaceId;
   final String activeItemId;
   final ValueChanged<String> onItemSelected;
+  final ValueChanged<String> onWorkspaceSelected;
   final bool isCollapsed;
   final VoidCallback? onToggleCollapse;
   final Widget profileCard;
@@ -22,9 +25,11 @@ class AppSidebar extends StatefulWidget {
 
   const AppSidebar({
     super.key,
-    required this.groups,
+    required this.workspaces,
+    required this.activeWorkspaceId,
     required this.activeItemId,
     required this.onItemSelected,
+    required this.onWorkspaceSelected,
     required this.profileCard,
     this.isCollapsed = false,
     this.onToggleCollapse,
@@ -36,8 +41,6 @@ class AppSidebar extends StatefulWidget {
 }
 
 class _AppSidebarState extends State<AppSidebar> {
-  final Set<String> _collapsedGroupIds = {};
-
   bool get isCollapsed => widget.isCollapsed;
 
   String get activeItemId => widget.activeItemId;
@@ -50,20 +53,27 @@ class _AppSidebarState extends State<AppSidebar> {
 
   Widget get profileCard => widget.profileCard;
 
-  // A group opens by default and stays open unless the user shuts it, so a
-  // freshly added tab is never hidden behind a closed header.
-  bool _isExpanded(ResolvedSidebarGroup section) {
-    final String? id = section.group?.id;
-    if (id == null) return true;
-    return !_collapsedGroupIds.contains(id);
+  final Set<String> _collapsedGroupIds = {};
+
+  List<ResolvedSidebarGroup> get _activeGroups {
+    for (final ResolvedSidebarWorkspace entry in widget.workspaces) {
+      if (entry.id == widget.activeWorkspaceId) return entry.groups;
+    }
+    return widget.workspaces.isEmpty
+        ? const []
+        : widget.workspaces.first.groups;
   }
 
-  void _toggle(ResolvedSidebarGroup section) {
-    final String? id = section.group?.id;
-    if (id == null) return;
+  // A group opens by default and stays open unless the user shuts it, so a
+  // freshly added tab is never hidden behind a closed header.
+  bool _isExpanded(ResolvedSidebarGroup section) =>
+      !_collapsedGroupIds.contains(section.id);
 
+  void _toggle(ResolvedSidebarGroup section) {
     setState(() {
-      if (!_collapsedGroupIds.remove(id)) _collapsedGroupIds.add(id);
+      if (!_collapsedGroupIds.remove(section.id)) {
+        _collapsedGroupIds.add(section.id);
+      }
     });
   }
 
@@ -112,15 +122,27 @@ class _AppSidebarState extends State<AppSidebar> {
           const SizedBox(height: AppSpacing.md),
           const SidebarDivider(),
           const SizedBox(height: AppSpacing.md),
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isCollapsed ? AppSpacing.sm : AppSpacing.smd,
+            ),
+            child: SidebarWorkspaceSwitcher(
+              workspaces: widget.workspaces,
+              activeWorkspaceId: widget.activeWorkspaceId,
+              isCollapsed: isCollapsed,
+              onWorkspaceSelected: widget.onWorkspaceSelected,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
           Expanded(
             child: ClipRect(
               child: ListView.builder(
                 padding: EdgeInsets.symmetric(
                   horizontal: isCollapsed ? AppSpacing.sm : AppSpacing.smd,
                 ),
-                itemCount: widget.groups.length,
+                itemCount: _activeGroups.length,
                 itemBuilder: (context, index) {
-                  final ResolvedSidebarGroup section = widget.groups[index];
+                  final ResolvedSidebarGroup section = _activeGroups[index];
                   return SidebarGroupSection(
                     section: section,
                     activeItemId: activeItemId,
@@ -217,7 +239,7 @@ class SidebarBrandingSection extends StatelessWidget {
         Padding(
           padding: EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
-            vertical: isCollapsed ? AppSpacing.smd : AppSpacing.lgs,
+            vertical: isCollapsed ? AppSpacing.sm : AppSpacing.smd,
           ),
           child: Center(
             child: AnimatedContainer(

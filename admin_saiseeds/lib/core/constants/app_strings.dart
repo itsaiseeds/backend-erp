@@ -711,7 +711,6 @@ class AppStrings {
   static const String ORDER_NO_ITEMS = 'This order has no lines.';
   static const String TIMEZONE_IST = 'IST';
 
-  static const String GROUP_ORDERS = 'Order Management';
   static const String DISPATCH_CHALLANS = 'Dispatch Orders';
   static const String COLUMN_DISPATCH_ID = 'Dispatch ID';
   static const String COLUMN_LR_NUMBER = 'LR Number';
@@ -767,12 +766,18 @@ class AppStrings {
   static const String SORT_LABEL_CREATED = 'Created';
   static const String SORT_BY_DISPATCH_DATE = 'dispatch_date';
 
-  static const String GROUP_USER_MANAGEMENT = 'User Management';
-  static const String GROUP_ONBOARDING = 'Client & Party';
-  static const String GROUP_CATALOGUE = 'Product Configuration';
-  static const String GROUP_INWARD = 'Inward Operations';
+  static const String WORKSPACE_OPERATIONS = 'Operations';
+  static const String WORKSPACE_OPERATIONS_HINT = 'Day-to-day work';
+  static const String WORKSPACE_SETUP = 'Setup';
+  static const String WORKSPACE_SETUP_HINT = 'Configuration & masters';
+  static const String WORKSPACE_SWITCH_LABEL = 'Workspace';
+  static const String GROUP_ORDERS = 'Order Management';
   static const String GROUP_DAILY_STOCK = 'Daily Stock Update';
   static const String GROUP_STOCK_ANALYSIS = 'Stock Analysis';
+  static const String GROUP_INWARD = 'Inward Operations';
+  static const String GROUP_CATALOGUE = 'Product Configuration';
+  static const String GROUP_ONBOARDING = 'Client & Party';
+  static const String GROUP_USER_MANAGEMENT = 'User Management';
 
   static const String ORDER_DISPATCH = 'Dispatch';
   static const String ORDER_DISPATCH_TITLE = 'Dispatch order';
@@ -808,7 +813,7 @@ class AppStrings {
   static const String DISPATCH_SUMMARY_ITEMS = 'Bags';
 
   static const String PRODUCT_STOCK = 'Product Stock';
-  static const String RAW_MATERIAL_STOCK = 'Raw Material';
+  static const String RAW_MATERIAL_STOCK = 'Raw Material Stock';
 
   static const String OTHER_MATERIAL_STOCK = 'Material Stock';
   static const String PACKETS_PER_BAG_SUFFIX = 'packets / bag';
@@ -855,9 +860,9 @@ class AppStrings {
       'Could not load raw material stock';
   static const String STOCK_AS_OF_PREFIX = 'As of';
 
-  static const String INWARD_RAW_MATERIALS = 'Raw Material';
+  static const String INWARD_RAW_MATERIALS = 'Raw Material Inward';
   static const String OTHER_RAW_MATERIALS = 'Material Recipes';
-  static const String OTHER_MATERIAL_INWARD = 'Other Material Inward';
+  static const String OTHER_MATERIAL_INWARD = 'Other Mat. Inward';
 
   static const String COLUMN_RECIPE = 'Recipe';
 

@@ -211,20 +211,7 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
             size: AppSizes.iconLg,
           ),
           const SizedBox(width: AppSpacing.smd),
-          Expanded(
-            child: Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (widget.showFilters) ..._buildFilterChips(),
-                if (widget.showFilters && _activeFilterField != null)
-                  _buildInlineFilterEditor(),
-                if (widget.showFilters) _buildAddFilterButton(),
-                _buildSearchField(),
-              ],
-            ),
-          ),
+          Expanded(child: _buildFilterAndSearch()),
           const SizedBox(width: AppSpacing.smd),
           _buildSearchButton(),
           if (widget.showSort && widget.sortByOptions.isNotEmpty) ...[
@@ -237,6 +224,29 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
             const SizedBox(width: AppSpacing.smd),
             _buildSortControl(),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterAndSearch() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          if (widget.showFilters) ...[
+            for (final Widget chip in _buildFilterChips()) ...[
+              chip,
+              const SizedBox(width: AppSpacing.sm),
+            ],
+            if (_activeFilterField != null) ...[
+              _buildInlineFilterEditor(),
+              const SizedBox(width: AppSpacing.sm),
+            ],
+            _buildAddFilterButton(),
+            const SizedBox(width: AppSpacing.sm),
+          ],
+          _buildSearchField(),
         ],
       ),
     );
@@ -453,47 +463,41 @@ class _AppFilterSearchBarState extends State<AppFilterSearchBar> {
   Widget _buildSearchField() {
     return SizedBox(
       height: AppSizes.tableControlHeight,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: AppSizes.tableSearchFieldMinWidth,
-        ),
-        child: IntrinsicWidth(
-          child: TextField(
-            controller: widget.controller,
-            focusNode: _searchFocusNode,
-            textAlignVertical: TextAlignVertical.center,
-            style: AppTypography.bodyMedium,
-            onSubmitted: (_) => _performSearch(),
-            decoration: InputDecoration(
-              hintText: _localFilters.isEmpty
-                  ? widget.hintText
-                  : AppStrings.TABLE_SEARCH_WITHIN_RESULTS,
-              hintStyle: AppTypography.bodyMedium.copyWith(
-                color: AppColors.TEXT_DISABLED,
-              ),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              isDense: true,
-              filled: false,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: AppSpacing.sm,
-              ),
-              suffixIcon: widget.controller.text.isEmpty
-                  ? null
-                  : _InlineIconButton(
-                      icon: Icons.close_rounded,
-                      color: AppColors.TEXT_SECONDARY,
-                      tooltip: AppStrings.TABLE_CLEAR_SEARCH,
-                      onTap: () {
-                        widget.controller.clear();
-                        _performSearch();
-                      },
-                    ),
-              suffixIconConstraints: const BoxConstraints(
-                minWidth: AppSizes.iconXl,
-                minHeight: AppSizes.iconXl,
-              ),
+      child: SizedBox(
+        width: AppSizes.tableSearchFieldMinWidth,
+        child: TextField(
+          controller: widget.controller,
+          focusNode: _searchFocusNode,
+          textAlignVertical: TextAlignVertical.center,
+          style: AppTypography.bodyMedium,
+          onSubmitted: (_) => _performSearch(),
+          decoration: InputDecoration(
+            hintText: _localFilters.isEmpty
+                ? widget.hintText
+                : AppStrings.TABLE_SEARCH_WITHIN_RESULTS,
+            hintStyle: AppTypography.bodyMedium.copyWith(
+              color: AppColors.TEXT_DISABLED,
+            ),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            isDense: true,
+            filled: false,
+            contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            suffixIcon: widget.controller.text.isEmpty
+                ? null
+                : _InlineIconButton(
+                    icon: Icons.close_rounded,
+                    color: AppColors.TEXT_SECONDARY,
+                    tooltip: AppStrings.TABLE_CLEAR_SEARCH,
+                    onTap: () {
+                      widget.controller.clear();
+                      _performSearch();
+                    },
+                  ),
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: AppSizes.iconXl,
+              minHeight: AppSizes.iconXl,
             ),
           ),
         ),

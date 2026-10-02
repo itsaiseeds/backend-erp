@@ -2,24 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/tab_ids.dart';
-import '../../../../core/models/sidebar_group_model.dart';
+import '../../../../core/models/sidebar_workspace_model.dart';
 import '../../../../core/utils/formatters/role_formatter.dart';
 import '../../../../core/widgets/layout/app_sidebar.dart';
 import '../../../auth/presentation/bloc/session_cubit.dart';
 import '../../../auth/presentation/logout_action.dart';
 
 class DashboardSidebar extends StatelessWidget {
-  final List<ResolvedSidebarGroup> groups;
+  final List<ResolvedSidebarWorkspace> workspaces;
+  final String activeWorkspaceId;
   final String activeItemId;
   final ValueChanged<String> onItemSelected;
+  final ValueChanged<String> onWorkspaceSelected;
   final bool isCollapsed;
   final VoidCallback? onToggleCollapse;
 
   const DashboardSidebar({
     super.key,
-    required this.groups,
+    required this.workspaces,
+    required this.activeWorkspaceId,
     required this.activeItemId,
     required this.onItemSelected,
+    required this.onWorkspaceSelected,
     required this.isCollapsed,
     this.onToggleCollapse,
   });
@@ -27,9 +31,11 @@ class DashboardSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppSidebar(
-      groups: groups,
+      workspaces: workspaces,
+      activeWorkspaceId: activeWorkspaceId,
       activeItemId: activeItemId,
       onItemSelected: onItemSelected,
+      onWorkspaceSelected: onWorkspaceSelected,
       isCollapsed: isCollapsed,
       onToggleCollapse: onToggleCollapse,
       onLogout: () => LogoutAction.run(context),

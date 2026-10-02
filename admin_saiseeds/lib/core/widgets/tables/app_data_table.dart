@@ -167,7 +167,7 @@ class AppDataTable<T> extends StatefulWidget {
     this.requireExpandableColumnWidth = true,
     this.requireColumnSettings = true,
     this.requireSearchBar = true,
-    this.pinActionsColumn = true,
+    this.pinActionsColumn = false,
     this.isInfiniteScroll = false,
     this.hasMore = false,
     this.onLoadMore,
@@ -196,6 +196,10 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
 
   final Map<String, String> _selection = {};
   final Map<String, double> _columnWidthOverrides = {};
+
+  /// The width each column had when the user first dragged it. A column may
+  /// be widened and walked back to this, but never narrowed past it.
+  final Map<String, double> _columnWidthFloors = {};
 
   List<String> _pinnedColumns = [];
   List<String> _hiddenColumns = [];
@@ -496,14 +500,20 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     if (index == -1) return;
 
     setState(() {
+      // Baked before the floor is read: a stretched table shows a wider
+      // column than it declares, and the floor must be what the user sees.
       _bakeScaledWidths();
       _hasResized = true;
       final double current =
           _columnWidthOverrides[columnId] ?? _allColumns[index].width;
+      final double floor = _columnWidthFloors.putIfAbsent(columnId, () {
+        final double hardMin = ColumnResizeHandle.minWidthFor(columnId);
+        return current < hardMin ? hardMin : current;
+      });
       _columnWidthOverrides[columnId] = ColumnResizeHandle.clampWidth(
         current,
         delta,
-        minWidth: ColumnResizeHandle.minWidthFor(columnId),
+        minWidth: floor,
       );
     });
   }
@@ -886,7 +896,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
                     border: Border(
                       right: BorderSide(
                         color: AppColors.TABLE_HEADER_DIVIDER,
-                        width: AppSizes.borderMedium,
+                        width: AppSizes.borderThin,
                       ),
                     ),
                   ),
@@ -913,7 +923,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
                       border: Border(
                         left: BorderSide(
                           color: AppColors.TABLE_HEADER_DIVIDER,
-                          width: AppSizes.borderMedium,
+                          width: AppSizes.borderThin,
                         ),
                       ),
                     ),
@@ -955,8 +965,13 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
               else
                 Container(
                   alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.smd,
+                  padding: EdgeInsets.only(
+                    left: AppSpacing.smd,
+                    // The pin floats over the cell's right edge, so the label
+                    // keeps clear of its gutter instead of running underneath.
+                    right: showPinControl
+                        ? AppSizes.tablePinGutter
+                        : AppSpacing.smd,
                   ),
                   child: Text(
                     col.label,
@@ -1389,8 +1404,8 @@ class _TableRowState<T> extends State<_TableRow<T>> {
                           color: background,
                           border: const Border(
                             right: BorderSide(
-                              color: AppColors.BORDER_STRONG,
-                              width: AppSizes.borderMedium,
+                              color: AppColors.TABLE_ROW_DIVIDER,
+                              width: AppSizes.borderThin,
                             ),
                           ),
                         ),
@@ -1429,8 +1444,8 @@ class _TableRowState<T> extends State<_TableRow<T>> {
                           color: background,
                           border: const Border(
                             left: BorderSide(
-                              color: AppColors.BORDER_STRONG,
-                              width: AppSizes.borderMedium,
+                              color: AppColors.TABLE_ROW_DIVIDER,
+                              width: AppSizes.borderThin,
                             ),
                           ),
                         ),

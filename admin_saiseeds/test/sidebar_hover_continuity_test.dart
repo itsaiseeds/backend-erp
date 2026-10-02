@@ -1,4 +1,4 @@
-import 'package:admin_saiseeds/core/models/sidebar_group_model.dart';
+import 'package:admin_saiseeds/core/models/sidebar_workspace_model.dart';
 import 'package:admin_saiseeds/core/models/sidebar_item_model.dart';
 import 'package:admin_saiseeds/core/theme/app_colors.dart';
 import 'package:admin_saiseeds/core/widgets/layout/app_sidebar.dart';
@@ -24,11 +24,26 @@ const List<SidebarItemModel> _items = [
   ),
 ];
 
-// The hover behaviour under test belongs to the rows, so each item is passed
-// as its own ungrouped section.
-final List<ResolvedSidebarGroup> _groups = [
-  for (final SidebarItemModel item in _items)
-    ResolvedSidebarGroup(items: [item]),
+// The hover behaviour under test belongs to the rows, so every item sits in
+// one workspace and the switcher stays out of the way.
+const SidebarGroupModel _group = SidebarGroupModel(
+  id: 'ops-all',
+  itemIds: ['dashboard', 'clients', 'orders'],
+);
+
+const SidebarWorkspaceModel _workspace = SidebarWorkspaceModel(
+  id: 'operations',
+  label: 'Operations',
+  hint: 'Day-to-day work',
+  icon: Icons.bolt_outlined,
+  groups: [_group],
+);
+
+final List<ResolvedSidebarWorkspace> _workspaces = [
+  ResolvedSidebarWorkspace(
+    workspace: _workspace,
+    groups: [ResolvedSidebarGroup(group: _group, items: _items)],
+  ),
 ];
 
 Future<void> _pumpSidebar(WidgetTester tester) async {
@@ -40,9 +55,11 @@ Future<void> _pumpSidebar(WidgetTester tester) async {
     MaterialApp(
       home: Scaffold(
         body: AppSidebar(
-          groups: _groups,
+          workspaces: _workspaces,
+          activeWorkspaceId: 'operations',
           activeItemId: 'dashboard',
           onItemSelected: (_) {},
+          onWorkspaceSelected: (_) {},
           profileCard: const SizedBox(height: 60),
         ),
       ),
