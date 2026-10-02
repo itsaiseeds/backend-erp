@@ -350,6 +350,12 @@ paths:
         description: The public id of one of your field trips, e.g. FT-E79QA0E2OIHF.
         required: true
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (FV-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -428,6 +434,12 @@ paths:
           type: integer
         description: Rows per page (default 10, max 100).
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (C-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -494,6 +506,12 @@ paths:
         schema:
           type: integer
         description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (FT-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -565,6 +583,12 @@ paths:
           type: string
         description: Product public id(s) the order contains (see options). Comma-separated
           (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (ORD-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -670,6 +694,12 @@ paths:
           type: string
         description: Product public id(s) (see the recipe; see options). Comma-separated
           (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (IO-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -805,6 +835,12 @@ paths:
         description: Product public id(s) (see options). Comma-separated (any match);
           AND-ed with the other filters.
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (IR-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -890,6 +926,12 @@ paths:
           type: string
         description: Product public id(s) (see options). Comma-separated (any match);
           AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (OMR-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -993,6 +1035,12 @@ paths:
           type: string
         description: Product public id(s), e.g. P-E79QA0E2OIHF (see options). Comma-separated
           (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (PP-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -1760,6 +1808,12 @@ paths:
         description: Product id(s) the custom order contains (see options). Comma-separated
           (any match); AND-ed with the other filters.
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (CORD-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -1831,6 +1885,12 @@ paths:
         schema:
           type: integer
         description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (DE-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -2252,6 +2312,12 @@ paths:
         description: The field trip's public id, e.g. FT-E79QA0E2OIHF.
         required: true
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (FV-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -2367,6 +2433,12 @@ paths:
           type: integer
         description: Rows per page (default 10, max 100).
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (FT-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -2456,6 +2528,12 @@ paths:
         schema:
           type: integer
         description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (C-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
       - in: query
         name: sort
         schema:
@@ -2709,6 +2787,12 @@ paths:
         description: Product public id(s) (see the recipe; see options). Comma-separated
           (any match); AND-ed with the other filters.
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (IO-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -2843,6 +2927,12 @@ paths:
         description: Product public id(s) (see options). Comma-separated (any match);
           AND-ed with the other filters.
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (IR-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -2966,6 +3056,12 @@ paths:
         description: Product id(s) the order contains (see options). Comma-separated
           (any match); AND-ed with the other filters.
       - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (ORD-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
         name: sort
         schema:
           type: string
@@ -3041,6 +3137,12 @@ paths:
           type: string
         description: Product public id(s) (see options). Comma-separated (any match);
           AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (OMR-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
       - in: query
         name: sort
         schema:

@@ -191,6 +191,7 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         self.assertEqual(
             [(f["filter"], f["kind"]) for f in response.data["available_filters"]],
             [
+                ("public_id", "text"),
                 ("client", "select"),
                 ("product", "select"),
                 ("city_id", "select"),

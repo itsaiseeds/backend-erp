@@ -65,6 +65,7 @@ from common.views.paginated_date_range import (
     list_query_parameters,
     parse_int,
     parse_str,
+    public_id_filter,
 )
 
 ORDER_STATUS_CODES = [status.name for status in StatusIds.order_statuses()]
@@ -221,6 +222,7 @@ def _by_product(queryset: QuerySet, product_ids: list[int]) -> QuerySet:
 
 
 _QUERYSET_FILTERS = (
+    public_id_filter("ORD-"),
     QuerysetFilter(
         "created_by",
         label="Sales Person",

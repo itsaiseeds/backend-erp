@@ -34,6 +34,7 @@ from common.views.paginated_date_range import (
     SortCatalogueEntrySerializer,
     SortOption,
     parse_str,
+    public_id_filter,
 )
 
 
@@ -135,6 +136,7 @@ def _products_with_raw_material_lots(request: Request) -> list[dict]:
 
 
 RAW_LOT_QUERYSET_FILTERS = (
+    public_id_filter("IR-"),
     QuerysetFilter(
         "product",
         label="Product",
@@ -300,6 +302,7 @@ def _products_with_other_material_lots(request: Request) -> list[dict]:
 
 
 OTHER_LOT_QUERYSET_FILTERS = (
+    public_id_filter("IO-"),
     QuerysetFilter(
         "party",
         label="Party",
@@ -457,6 +460,7 @@ def _material_types_with_recipes(request: Request) -> list[dict]:
 
 
 RECIPE_QUERYSET_FILTERS = (
+    public_id_filter("OMR-"),
     QuerysetFilter(
         "product",
         label="Product",

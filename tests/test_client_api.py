@@ -344,6 +344,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
                 for f in response.data["available_filters"]
             ],
             [
+                ("public_id", "Public ID", "text"),
                 ("created_by", "Created By", "select"),
                 ("verified_by", "Verified By", "select"),
                 ("city_id", "City", "select"),
