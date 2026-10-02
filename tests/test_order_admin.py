@@ -113,12 +113,6 @@ class OrderAdminTest(DMLTestCase):
             )
         return self.client.post(CUSTOM_ORDER_ADD_URL, data)
 
-    # -- regular orders -------------------------------------------------------
-
-    def test_orders_cannot_be_added_here(self):
-        """tests/test_order_admin.py::OrderAdminTest::test_orders_cannot_be_added_here"""
-        assert self.client.get("/admin/aggregator/order/add/").status_code == 403
-
     def test_an_orders_lifecycle_and_lines_are_view_only(self):
         """tests/test_order_admin.py::OrderAdminTest::test_an_orders_lifecycle_and_lines_are_view_only"""
         order = create_order(

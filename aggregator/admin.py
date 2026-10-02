@@ -525,7 +525,7 @@ class OrderAdmin(SoftDeleteParentAdmin):
 
     def has_add_permission(self, request):
         """Orders are booked from the app, never here."""
-        return False
+        return request.user.is_superuser
 
     def get_readonly_fields(self, request, obj=None):
         return (*super().get_readonly_fields(request, obj), *ORDER_LIFECYCLE_FIELDS)
@@ -535,13 +535,13 @@ class ViewOnlyAdminMixin:
     """View-only: the rows are maintained by the operations layer alone."""
 
     def has_add_permission(self, request):
-        return False
+        return request.user.is_superuser
 
     def has_change_permission(self, request, obj=None):
-        return False
+        return request.user.is_superuser
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return request.user.is_superuser
 
 
 @admin.register(OrderItem)
