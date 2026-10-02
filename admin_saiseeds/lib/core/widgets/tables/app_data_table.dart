@@ -1083,7 +1083,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
                   (_effectiveColumnsWidth(stickyCols) * scaleFactor) +
                   _dividerTotal(stickyCols.length),
               trailingColumns: _trailingColumns,
-              viewportWidth: maxWidth,
+              viewportWidth: maxWidth - (AppSizes.borderThin * 2),
               cellBuilder: _buildDataCell,
             ),
           ),

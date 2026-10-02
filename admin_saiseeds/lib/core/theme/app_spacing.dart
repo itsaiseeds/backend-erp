@@ -32,6 +32,7 @@ class AppSizes {
   static const double borderMedium = 1.5;
   static const double borderThick = 2.0;
 
+  static const double iconXs = 14.0;
   static const double iconSm = 16.0;
   static const double iconMd = 18.0;
 

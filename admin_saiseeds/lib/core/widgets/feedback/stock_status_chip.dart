@@ -18,35 +18,42 @@ class StockStatusChip extends StatelessWidget {
         ? AppColors.SUCCESS_LIGHT
         : AppColors.SURFACE_VARIANT;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      decoration: BoxDecoration(
-        color: background,
-        border: Border.all(
-          color: isComplete ? AppColors.SUCCESS_BORDER : AppColors.BORDER,
+    // Centred rather than stretched: the chip is a label beside the search
+    // bar, so it keeps its own height instead of matching the row's.
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
         ),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isComplete
-                ? Icons.check_circle_outline_rounded
-                : Icons.pending_outlined,
-            size: AppSizes.iconSm,
-            color: accent,
+        decoration: BoxDecoration(
+          color: background,
+          border: Border.all(
+            color: isComplete ? AppColors.SUCCESS_BORDER : AppColors.BORDER,
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            isComplete
-                ? AppStrings.STOCK_UPDATED
-                : AppStrings.STOCK_NOT_UPDATED,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.button.copyWith(color: accent),
-          ),
-        ],
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isComplete
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.pending_outlined,
+              size: AppSizes.iconXs,
+              color: accent,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              isComplete
+                  ? AppStrings.STOCK_UPDATED
+                  : AppStrings.STOCK_NOT_UPDATED,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.caption.copyWith(color: accent),
+            ),
+          ],
+        ),
       ),
     );
   }
