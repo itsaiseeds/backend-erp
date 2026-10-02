@@ -145,6 +145,7 @@ def record_stock_count(
     ) as rec:
         lock_raw_pools([product_packaging.product_id])
         materials_before = _material_guard([product_packaging.product_id])
+        bags_before = _bag_availability([product_packaging])
         snapshot = _write_stock_count(
             product_packaging=product_packaging,
             bags=bags,
@@ -153,6 +154,7 @@ def record_stock_count(
         )
         _assert_raw_available([product_packaging.product_id])
         _assert_material_available(materials_before)
+        _assert_bags_not_overreserved(bags_before)
         rec.sources = {product_packaging.product_id: snapshot}
     return snapshot
 
@@ -248,6 +250,7 @@ def record_stock_counts(
         # All up front and in pk order; _write_stock_count re-takes each as a no-op.
         lock_bag_pools(counts)
         materials_before = _material_guard(product_ids)
+        bags_before = _bag_availability(counts)
         if carry_forward:
             carried = _carry_forward_bag_counts(counts, snapshot_date, actor)
             rec.carried |= {
@@ -266,6 +269,7 @@ def record_stock_counts(
         ]
         _assert_raw_available(product_ids)
         _assert_material_available(materials_before)
+        _assert_bags_not_overreserved(bags_before)
         rec.sources = {
             snapshot.product_packaging.product_id: snapshot
             for snapshot in reversed(snapshots)
@@ -521,6 +525,72 @@ def _unpack_type(row: CountRow, material_type_id: int, packets: int) -> None:
         remaining -= take
         if remaining == 0:
             break
+
+
+# -- Counts may not undercut what is already promised --------------------------
+#
+# A count only ever *states* what is on the floor, so on its own it does not
+# check the orders already holding that stock. These guards close that gap, the
+# same way the raw and packing-material checks do: a count is refused when it
+# leaves a pool's available stock negative **and lower than it was** -- so a
+# pool that was already short, and a count that keeps or raises it, are never
+# blocked. They run after the write, inside the same transaction, so a refusal
+# rolls the whole upload back (and the ledger with it).
+
+
+def _bag_availability(packagings: Iterable[ProductPackaging]) -> dict[ProductPackaging, int]:
+    """Available bags of each packaging at the latest count date, before a write."""
+    latest = latest_snapshot_date()
+    return {packaging: available_bags(packaging, latest) for packaging in packagings}
+
+
+def _loose_availability(
+    pools: Iterable[tuple[Product, Decimal]],
+) -> dict[tuple[Product, Decimal], int]:
+    """Available loose packets of each ``(product, packet_weight)`` pool, before a write."""
+    latest = latest_loose_snapshot_date()
+    return {
+        (product, weight): available_loose_packets(product, weight, latest)
+        for product, weight in pools
+    }
+
+
+def _assert_bags_not_overreserved(before: Mapping[ProductPackaging, int]) -> None:
+    """Raise ``ValueError`` if a bag count left a packaging short of what orders hold."""
+    latest = latest_snapshot_date()
+    short = []
+    for packaging, was in before.items():
+        now = available_bags(packaging, latest)
+        if now < 0 and now < was:
+            short.append(
+                f"'{packaging}' would be short by {-now} bags "
+                f"({reserved_bags(packaging)} reserved by orders, "
+                f"{consumed_bags(packaging, latest)} already dispatched)"
+            )
+    if short:
+        raise ValueError(
+            "Cannot lower the count below what orders already hold: " + "; ".join(short) + "."
+        )
+
+
+def _assert_loose_not_overreserved(before: Mapping[tuple[Product, Decimal], int]) -> None:
+    """Raise ``ValueError`` if a loose count left a pool short of what custom orders hold."""
+    latest = latest_loose_snapshot_date()
+    short = []
+    for (product, weight), was in before.items():
+        now = available_loose_packets(product, weight, latest)
+        if now < 0 and now < was:
+            short.append(
+                f"'{product.name}' loose {weight}kg packets would be short by {-now} "
+                f"({reserved_loose_packets(product, weight)} reserved by custom orders, "
+                f"{consumed_loose_packets(product, weight, latest)} already dispatched)"
+            )
+    if short:
+        raise ValueError(
+            "Cannot lower the count below what custom orders already hold: "
+            + "; ".join(short)
+            + "."
+        )
 
 
 # -- Reading the count --------------------------------------------------------
@@ -810,6 +880,7 @@ def record_loose_stock(
     ) as rec:
         lock_raw_pools([product.id])
         materials_before = _material_guard([product.id])
+        loose_before = _loose_availability([(product, packet_weight)])
         snapshot = _write_loose_stock(
             product=product,
             packet_weight=packet_weight,
@@ -819,6 +890,7 @@ def record_loose_stock(
         )
         _assert_raw_available([product.id])
         _assert_material_available(materials_before)
+        _assert_loose_not_overreserved(loose_before)
         rec.sources = {product.id: snapshot}
     return snapshot
 
@@ -907,6 +979,7 @@ def record_loose_stocks(
         # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
         lock_loose_pools(product_ids)
         materials_before = _material_guard(product_ids)
+        loose_before = _loose_availability(counts)
         if carry_forward:
             carried = _carry_forward_loose_counts(counts, snapshot_date, actor)
             rec.carried |= {
@@ -929,6 +1002,7 @@ def record_loose_stocks(
         ]
         _assert_raw_available(product_ids)
         _assert_material_available(materials_before)
+        _assert_loose_not_overreserved(loose_before)
         rec.sources = {
             snapshot.product_id: snapshot for snapshot in reversed(snapshots)
         }

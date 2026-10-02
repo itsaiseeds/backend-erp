@@ -160,3 +160,112 @@ class StockCountCarryForwardApiTest(LedgerWorldTestCase, WebApiTestCase):
         )
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(inv.on_hand_bags(self.qq1, TODAY), 0)
+
+
+class StockCountReservationGuardTest(LedgerWorldTestCase):
+    """A count may not be lowered below what orders already hold.
+
+    The rule is the same one the raw and packing-material checks follow: refuse a
+    count that leaves a pool's available stock negative **and lower than it was**.
+    A pool that was already short, or a count that keeps or raises availability, is
+    never blocked.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.raw(self.product, "100000")
+        self.raw(self.other_product, "100000")
+        self.pouches("100000")
+        self.count_everything({self.pp1: 50, self.qq1: 30})
+        self.count_loose(self.product, 40)
+
+    def test_a_bag_count_below_the_reserved_bags_is_refused_and_writes_nothing(self):
+        """tests/test_stock_count_carry_forward.py::StockCountReservationGuardTest::test_a_bag_count_below_the_reserved_bags_is_refused_and_writes_nothing"""
+        self.order(self.pp1, 10)
+        mark = self.marker()
+
+        with self.assertRaisesRegex(ValueError, "10 reserved by orders"):
+            self.count_bags({self.pp1: 4})
+
+        self.assertEqual(inv.on_hand_bags(self.pp1), 50)
+        self.assertEqual(inv.available_bags(self.pp1), 40)
+        self.assertEqual(self.kinds_since(mark), [], "a refused count leaves no ledger rows")
+
+    def test_a_count_down_to_exactly_what_is_reserved_is_allowed(self):
+        """tests/test_stock_count_carry_forward.py::StockCountReservationGuardTest::test_a_count_down_to_exactly_what_is_reserved_is_allowed"""
+        self.order(self.pp1, 10)
+        self.count_bags({self.pp1: 10})
+        self.assertEqual(inv.available_bags(self.pp1), 0)
+
+    def test_dispatched_bags_count_too(self):
+        """tests/test_stock_count_carry_forward.py::StockCountReservationGuardTest::test_dispatched_bags_count_too"""
+        order = self.order(self.pp1, 6)
+        self.dispatch(order, self.pp1)
+        self.count_bags({self.pp1: 50})  # a fresh count re-bases consumed to 0
+        self.order(self.pp1, 20)
+        with self.assertRaises(ValueError):
+            self.count_bags({self.pp1: 19})
+
+    def test_a_loose_count_below_what_custom_orders_hold_is_refused(self):
+        """tests/test_stock_count_carry_forward.py::StockCountReservationGuardTest::test_a_loose_count_below_what_custom_orders_hold_is_refused"""
+        self.custom_order(self.product, 25)
+        with self.assertRaisesRegex(ValueError, "25 reserved by custom orders"):
+            self.count_loose(self.product, 10)
+        self.count_loose(self.product, 25)  # exactly what is held
+
+    def test_a_full_count_that_zeroes_a_reserved_packaging_is_refused(self):
+        """tests/test_stock_count_carry_forward.py::StockCountReservationGuardTest::test_a_full_count_that_zeroes_a_reserved_packaging_is_refused"""
+        self.order(self.pp1, 10)
+        with self.assertRaises(ValueError):
+            self.count_everything({self.qq1: 30})  # names only Q: P's packaging becomes 0
+        self.assertEqual(inv.on_hand_bags(self.pp1), 50)
+
+    def test_the_api_answers_a_400_naming_the_shortfall(self):
+        """tests/test_stock_count_carry_forward.py::StockCountReservationGuardTest::test_the_api_answers_a_400_naming_the_shortfall"""
+        from rest_framework.test import APIClient
+
+        from authentication.models import Admin, User
+
+        admin = User.objects.create_user(
+            "9540000001", "Guard Admin", created_by=self.su, verified_by=self.su, is_verified=True
+        )
+        Admin.objects.create(user=admin, created_by=self.su, can_update_stock_count=True)
+        client = APIClient()
+        client.force_login(admin)
+        self.order(self.pp1, 10)
+
+        response = client.patch(
+            "/api/sales-admin/update-bag-stock",
+            {"counts": {self.pp1.public_id: 4}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("10 reserved by orders", str(response.data))
+
+
+class StockCountAlreadyShortTest(LedgerWorldTestCase):
+    """A pool that is already short must not block a count that does not worsen it."""
+
+    # The shortage is written straight to the row (no API can create it any more),
+    # so the stock ledger is not expected to follow.
+    stock_ledger_guard = False
+
+    def setUp(self):
+        super().setUp()
+        self.raw(self.product, "100000")
+        self.raw(self.other_product, "100000")
+        self.pouches("100000")
+        self.count_everything({self.pp1: 50, self.qq1: 30})
+
+    def test_a_pool_that_was_already_short_does_not_block_a_count_that_does_not_worsen_it(self):
+        """tests/test_stock_count_carry_forward.py::StockCountReservationGuardTest::test_a_pool_that_was_already_short_does_not_block_a_count_that_does_not_worsen_it"""
+        from aggregator.models import InventorySnapshot
+
+        self.order(self.pp1, 10)
+        InventorySnapshot.objects.filter(product_packaging=self.pp1).update(bags=4)  # now -6
+        self.assertEqual(inv.available_bags(self.pp1), -6)
+
+        self.count_bags({self.pp1: 4})  # no worse: allowed
+        self.count_bags({self.pp1: 9})  # better but still short: allowed
+        with self.assertRaises(ValueError):
+            self.count_bags({self.pp1: 2})  # worse: refused
