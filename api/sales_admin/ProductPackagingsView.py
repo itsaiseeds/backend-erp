@@ -9,12 +9,12 @@ Soft-deleted packagings are never returned.
 from __future__ import annotations
 
 from django.db import transaction
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from aggregator.models import Product, ProductPackaging
-from aggregator.ProductOperations import assert_products_usable
+from aggregator.ProductOperations import assert_products_usable, usability_filter
 from api.admin import AdminApiView
 from api.order_serializers import ProductRefSerializer
 
@@ -107,11 +107,31 @@ class ProductPackagingsView(AdminApiView):
 
     @extend_schema(
         summary="List product packagings",
+        description=(
+            "Packagings of usable products only by default, so this list is safe to use "
+            "as a dropdown. ``?is_usable=all`` (or ``false``) also returns the "
+            "packagings of frozen products, for a management screen."
+        ),
+        parameters=[
+            OpenApiParameter(
+                "is_usable",
+                str,
+                enum=["true", "false", "all"],
+                description=(
+                    "Usability of the packaging's product: ``true`` (default) usable "
+                    "only, ``false`` frozen only, ``all`` both."
+                ),
+            )
+        ],
         responses={200: ProductPackagingPayloadSerializer(many=True)},
     )
     def get(self, request):
-        packagings = ProductPackaging.objects.select_related("product").order_by(
-            "product__name", "packet_weight"
+        packagings = usability_filter(
+            ProductPackaging.objects.select_related("product").order_by(
+                "product__name", "packet_weight"
+            ),
+            request.query_params.get("is_usable"),
+            field="product__is_usable",
         )
         return Response([packaging_payload(p) for p in packagings])
 

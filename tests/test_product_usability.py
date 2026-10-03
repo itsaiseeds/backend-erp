@@ -560,7 +560,10 @@ class ProductUsabilityApiTest(WebApiTestCase):
 
         self.assertNotIn("SAI-33", names(is_usable="true"))
         self.assertEqual(names(is_usable="false"), {"SAI-33"})
-        self.assertIn("SAI-33", names())  # no filter -> everything
+        # The default is dropdown-safe: a frozen product is not offered.
+        self.assertNotIn("SAI-33", names())
+        # The product management page asks for everything, to re-enable it.
+        self.assertIn("SAI-33", names(is_usable="all"))
         self.assertEqual(
             self.client.get(self.PRODUCTS, {"is_usable": "maybe"}).status_code,
             status.HTTP_400_BAD_REQUEST,
@@ -568,6 +571,27 @@ class ProductUsabilityApiTest(WebApiTestCase):
 
         on = self._patch(is_usable=True)
         self.assertTrue(on.data["is_usable"])
+
+    def test_a_frozen_products_packagings_are_not_offered_by_default(self):
+        """The packaging list is a dropdown source too; ?is_usable=all shows them.
+
+        tests/test_product_usability.py::ProductUsabilityApiTest::test_a_frozen_products_packagings_are_not_offered_by_default
+        """
+        packaging = ProductPackaging.objects.get(product=self.product)
+
+        def listed(**params):
+            response = self.client.get(self.PACKAGINGS, params)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+            return {row["public_id"] for row in response.data}
+
+        self.assertIn(packaging.public_id, listed())
+        self._patch(is_usable=False)
+        self.assertNotIn(packaging.public_id, listed())
+        self.assertIn(packaging.public_id, listed(is_usable="all"))
+        self.assertEqual(
+            self.client.get(self.PACKAGINGS, {"is_usable": "maybe"}).status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     def test_a_frozen_product_stays_editable_and_new_products_start_usable(self):
         """Its own fields can change; POST ignores is_usable.
