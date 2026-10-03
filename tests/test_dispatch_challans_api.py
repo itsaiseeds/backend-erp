@@ -260,7 +260,7 @@ class DispatchChallansApiTest(WebApiTestCase):
         tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_delivered_order_can_still_take_its_lr
         """
         order = self._dispatched_order()
-        mark_delivered(order)
+        mark_delivered(order, actor=self.admin_user)
 
         response = self._upload_lr(order)
 
@@ -408,7 +408,7 @@ class DispatchChallansApiTest(WebApiTestCase):
         order = self._dispatched_order()
         self._upload_lr(order)
 
-        mark_delivered(order)
+        mark_delivered(order, actor=self.admin_user)
 
         self.assertEqual(self._challans().data["total_count"], 1)
 

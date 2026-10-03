@@ -21,6 +21,9 @@ Two wrinkles the directory hands us, both handled here:
 * Spellings drift: ``Detroj- Rampura``, ``Detroj Rampura`` and
   ``Detroj-rampura`` are the same place. Names are matched case- and
   whitespace-insensitively, and the most frequent spelling of a name wins.
+* A pincode is unique on its own, so the one serving two taluks is stored once,
+  under the alphabetically first of them -- a row per taluk would break the
+  uniqueness the postal code actually has.
 
 Loading is idempotent and re-runnable: existing cities and pincodes are
 reused, soft-deleted ones are restored rather than duplicated, and nothing that
@@ -74,7 +77,12 @@ class PostalRecord:
 
 @dataclass
 class GeoLoadPlan:
-    """What a directory file resolves to, before anything is written."""
+    """What a directory file resolves to, before anything is written.
+
+    ``pincodes`` holds one ``(state, city, pincode)`` triple per code --
+    ``Pincode.code`` is unique on its own, so a code the directory reports under
+    two taluks is planned once, under the first of them.
+    """
 
     cities: list[tuple[str, str]] = field(default_factory=list)
     pincodes: list[tuple[str, str, str]] = field(default_factory=list)
@@ -201,9 +209,11 @@ def _resolve_place_names(
 ) -> tuple[list[tuple[str, str]], list[tuple[str, str, str]], list[str], int]:
     """Fold taluk spellings and district clashes into one city name per row.
 
-    Returns the distinct ``(state, city)`` pairs, the distinct
-    ``(state, city, pincode)`` triples, the taluks that needed a district
-    suffix, and how many pincodes ended up under more than one city.
+    Returns the distinct ``(state, city)`` pairs, the ``(state, city, pincode)``
+    triples to write, the taluks that needed a district suffix, and how many
+    pincodes serve more than one city. A pincode is unique on its own, so each
+    code is planned once -- under the first city that claimed it, which is the
+    alphabetically first, so the choice does not depend on row order.
     """
     spellings: dict[str, Counter[str]] = defaultdict(Counter)
     districts: dict[str, set[str]] = defaultdict(set)
@@ -219,21 +229,22 @@ def _resolve_place_names(
         return label
 
     cities: set[tuple[str, str]] = set()
-    pincodes: set[tuple[str, str, str]] = set()
-    pincode_cities: dict[str, set[str]] = defaultdict(set)
+    claims: dict[str, set[tuple[str, str]]] = defaultdict(set)
     for record in records:
         name = city_name(record.taluk.casefold(), record.district)
         cities.add((record.state, name))
-        pincodes.add((record.state, name, record.pincode))
-        pincode_cities[record.pincode].add(name)
+        claims[record.pincode].add((record.state, name))
+
+    homes = {pincode: min(found) for pincode, found in claims.items()}
+    pincodes = sorted((state, name, pincode) for pincode, (state, name) in homes.items())
 
     ambiguous = sorted(
         _canonical_spelling(spellings[key])
         for key, found in districts.items()
         if len(found) > 1
     )
-    shared = sum(1 for cities_for in pincode_cities.values() if len(cities_for) > 1)
-    return sorted(cities), sorted(pincodes), ambiguous, shared
+    shared = sum(1 for found in claims.values() if len(found) > 1)
+    return sorted(cities), pincodes, ambiguous, shared
 
 
 def _india() -> Country:
@@ -285,6 +296,22 @@ def _existing_cities(states: dict[str, State]) -> dict[str, dict[str, City]]:
     }
 
 
+def _stored_pincodes(codes: list[str]) -> dict[str, Pincode]:
+    """Code -> stored pincode, for the codes a plan is about to write.
+
+    Chunked like the inserts, since a state's directory holds thousands of
+    codes and one statement cannot carry them all.
+    """
+    stored: dict[str, Pincode] = {}
+    for start in range(0, len(codes), BATCH_SIZE):
+        rows = Pincode.all_objects.filter(code__in=codes[start : start + BATCH_SIZE]).only(
+            "city_id", "code", "is_deleted"
+        )
+        for row in rows:
+            stored[_clean(row.code)] = row
+    return stored
+
+
 def load_geo_data(
     plan: GeoLoadPlan,
     actor: User | None = None,
@@ -332,25 +359,14 @@ def load_geo_data(
         if pending and not dry_run:
             City.all_objects.bulk_create(pending, batch_size=BATCH_SIZE)
 
-        # One query for every pincode already attached to a city we touched,
-        # rather than one per (city, code) pair.
-        stored: dict[int, dict[str, Pincode]] = defaultdict(dict)
-        city_ids = [
-            city.pk
-            for bucket in buckets.values()
-            for city in bucket.values()
-            if city.pk is not None
-        ]
-        if city_ids:
-            for stored_row in Pincode.all_objects.filter(city_id__in=city_ids).only(
-                "city_id", "code", "is_deleted"
-            ):
-                stored[stored_row.city_id][_clean(stored_row.code)] = stored_row
+        # One query for every planned pincode already stored, whatever city it
+        # hangs off -- a code is unique on its own, so the city cannot narrow it.
+        stored = _stored_pincodes([pincode for _, _, pincode in plan.pincodes])
 
         new_pincodes: list[Pincode] = []
         for state_name, city_name, pincode in plan.pincodes:
             city = buckets[state_name][_clean(city_name).casefold()]
-            existing = stored.get(city.pk, {}).get(pincode) if city.pk is not None else None
+            existing = stored.get(pincode)
             if existing is None:
                 new_pincodes.append(Pincode(code=pincode, city=city, created_by=actor))
                 summary["pincodes_created"] += 1
@@ -386,5 +402,5 @@ def describe_plan(plan: GeoLoadPlan) -> Iterator[str]:
     if plan.pincodes_in_several_cities:
         yield (
             f"{plan.pincodes_in_several_cities} pincode(s) serve more than one taluk and "
-            "are stored under each, matching how the directory reports them."
+            "are stored once, under the first of them."
         )

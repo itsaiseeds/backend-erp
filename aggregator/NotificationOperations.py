@@ -10,7 +10,10 @@ the change.
 
 Every notification is one ``event`` (what happened), which fixes its title, its
 wording and the app ``screen`` to open; the ids that screen needs travel in
-``data``.
+``data``. The body names **who did it** -- "... was confirmed by Asha Rao." --
+because a sales person reading "was confirmed" cannot otherwise tell an admin's
+decision from anything else that might have moved the order, and the actor's
+name is snapshotted into the stored text at the moment of the change.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from django.utils import timezone
 
@@ -26,6 +30,9 @@ from common.background import fire_and_forget
 from common.push import send_push
 
 from .models import Client, Notification, Order, PushDevice, ReturnOrder
+
+if TYPE_CHECKING:
+    from authentication.models import User
 
 
 class NotificationEvent(StrEnum):
@@ -53,7 +60,12 @@ class Screen(StrEnum):
 
 @dataclass(frozen=True)
 class EventSpec:
-    """Per-event wording and destination: the body is "<subject> <outcome>."."""
+    """Per-event wording and destination.
+
+    ``outcome`` is a verb phrase that reads on after its subject and before the
+    actor's name -- "was confirmed", "has been dispatched" -- so every event
+    shares the body "<subject> <outcome> by <actor>."
+    """
 
     title: str
     outcome: str
@@ -64,7 +76,7 @@ _E = NotificationEvent
 _SPECS: dict[NotificationEvent, EventSpec] = {
     _E.ORDER_CONFIRMED: EventSpec("Order confirmed", "was confirmed", Screen.ORDER_DETAIL),
     _E.ORDER_UNDER_REVIEW: EventSpec(
-        "Order under review", "is back under review", Screen.ORDER_DETAIL
+        "Order under review", "was sent back under review", Screen.ORDER_DETAIL
     ),
     _E.ORDER_ON_HOLD: EventSpec("Order on hold", "was put on hold", Screen.ORDER_DETAIL),
     _E.ORDER_REJECTED: EventSpec("Order rejected", "was rejected", Screen.ORDER_DETAIL),
@@ -89,31 +101,32 @@ class Message:
     order_id: int | None = None
 
 
-def notify_order_event(order: Order, event: NotificationEvent) -> None:
-    """Tell the order's booking sales person that ``order`` just changed."""
+def notify_order_event(order: Order, event: NotificationEvent, *, actor: User) -> None:
+    """Tell the order's booking sales person that ``order`` just changed by ``actor``."""
     order_id = order.pk
-    _notify(event, lambda: _order_message(order_id))
+    _notify(event, actor, lambda: _order_message(order_id))
 
 
-def notify_client_event(client: Client, event: NotificationEvent) -> None:
-    """Tell the sales person who onboarded ``client`` what an admin did with it."""
+def notify_client_event(client: Client, event: NotificationEvent, *, actor: User) -> None:
+    """Tell the sales person who onboarded ``client`` what ``actor`` did with it."""
     client_id = client.pk
-    _notify(event, lambda: _client_message(client_id))
+    _notify(event, actor, lambda: _client_message(client_id))
 
 
-def notify_return_order_event(ret: ReturnOrder, event: NotificationEvent) -> None:
-    """Tell the sales person who raised ``ret`` what an admin decided."""
+def notify_return_order_event(ret: ReturnOrder, event: NotificationEvent, *, actor: User) -> None:
+    """Tell the sales person who raised ``ret`` what ``actor`` decided."""
     return_id = ret.pk
-    _notify(event, lambda: _return_order_message(return_id))
+    _notify(event, actor, lambda: _return_order_message(return_id))
 
 
-def _notify(event: NotificationEvent, build: Callable[[], Message]) -> None:
+def _notify(event: NotificationEvent, actor: User, build: Callable[[], Message]) -> None:
     """Queue the notification: it runs after commit, off the request thread.
 
     A notification that breaks must never break the change that triggered it, so
-    nothing here -- not even loading the subject -- happens before the queue.
+    nothing here -- not even loading the subject, or reading the actor's name --
+    happens before the queue.
     """
-    fire_and_forget(lambda: deliver_event(event, build))
+    fire_and_forget(lambda: deliver_event(event, actor.display_name, build))
 
 
 def _order_message(order_id: int) -> Message:
@@ -146,14 +159,16 @@ def _return_order_message(return_id: int) -> Message:
     )
 
 
-def deliver_event(event: NotificationEvent, build: Callable[[], Message]) -> Notification | None:
+def deliver_event(
+    event: NotificationEvent, actor_name: str, build: Callable[[], Message]
+) -> Notification | None:
     """Save the inbox row for ``event`` and push it; ``None`` when nobody is to be told."""
     message = build()
     if message.recipient_id is None:
         return None
 
     spec = _SPECS[event]
-    body = f"{message.subject} {spec.outcome}."
+    body = f"{message.subject} {spec.outcome} by {actor_name}."
     notification = Notification.objects.create(
         recipient_id=message.recipient_id,
         event_type=event.value,

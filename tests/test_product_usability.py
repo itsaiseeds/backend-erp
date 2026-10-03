@@ -412,7 +412,7 @@ class ProductUsabilityOperationsTest(DMLTestCase):
             vehicle_number="MH12AB1234",
             lot_numbers={self.pack.public_id: "L1"},
         ))
-        hold_order(confirmed)
+        hold_order(confirmed, actor=self.stock_admin)
         confirmed.refresh_from_db()
         self.assertEqual(confirmed.status.code, "ON_HOLD")
         self.assertEqual(inv.reserved_bags(self.pack), 0)

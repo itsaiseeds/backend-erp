@@ -154,11 +154,14 @@ class PincodeDirectoryParsingTest(DMLTestCase):
         self.assertNotIn("38001", stored)
         self.assertEqual(plan.rows_ignored, 1)
 
-    def test_pincode_under_two_cities_is_kept_under_each(self):
-        """Run: tests/test_load_geo_data.py::PincodeDirectoryParsingTest::test_pincode_under_two_cities_is_kept_under_each"""
+    def test_pincode_under_two_cities_is_planned_under_the_first(self):
+        """A code is unique on its own, so the two taluks it serves share one row.
+
+        Run: tests/test_load_geo_data.py::PincodeDirectoryParsingTest::test_pincode_under_two_cities_is_planned_under_the_first
+        """
         plan = GeoOperations.read_pincode_directory(self.csv_path, ["Gujarat"])
         serving = sorted(name for _, name, pincode in plan.pincodes if pincode == "384245")
-        self.assertEqual(serving, ["Unjha", "Visnagar"])
+        self.assertEqual(serving, ["Unjha"])
         self.assertEqual(plan.pincodes_in_several_cities, 1)
 
     def test_camel_case_headers_are_accepted(self):
@@ -219,6 +222,15 @@ class LoadGeoDataTest(DMLTestCase):
         # over, because the taluk-less row falls back to it as a district.
         self.assertEqual(summary["cities_reused"], 3)
         self.assertEqual(summary["cities_created"], len(self.plan.cities) - 3)
+
+    def test_a_pincode_serving_two_cities_is_stored_once(self):
+        """A code is unique, so the two taluks the directory gives it share a row.
+
+        Run: tests/test_load_geo_data.py::LoadGeoDataTest::test_a_pincode_serving_two_cities_is_stored_once
+        """
+        GeoOperations.load_geo_data(self.plan, actor=self.actor)
+
+        self.assertEqual(Pincode.all_objects.filter(code="384245").count(), 1)
 
     def test_baseline_city_is_reused_not_duplicated(self):
         """Run: tests/test_load_geo_data.py::LoadGeoDataTest::test_baseline_city_is_reused_not_duplicated"""
