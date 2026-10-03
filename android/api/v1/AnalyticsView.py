@@ -1,16 +1,18 @@
 """Sales-person analytics: ``GET /android/api/v1/analytics``.
 
-Counts of the caller's own business inside a window, for the app's dashboard:
+The caller's own business inside a window, for the app's dashboard:
 
 * ``orders`` -- orders booked in the window, by order status.
 * ``clients`` -- clients created in the window, by verification status.
-* ``client_orders`` -- per client, the orders booked in the window by status
-  (clients with no orders in the window are omitted), busiest first.
+* ``products`` -- per product, the kilograms booked in the window split by the
+  order's current status, heaviest first (products with no weight booked in the
+  window are omitted).
 
-Both ``start_date_time`` and ``end_date_time`` are required (ISO 8601,
-inclusive) and are matched against each row's ``created_at``; a missing or
-inverted pair is a ``400``. Every status bucket is always present, zero-filled.
-Scoped to the caller -- one sales person never sees another's numbers.
+Every status bucket is always present, zero-filled: a status nobody has reached
+reports ``0`` counts and ``"0.000"`` kg. Both ``start_date_time`` and
+``end_date_time`` are required (ISO 8601, inclusive) and are matched against
+each row's ``created_at``; a missing or inverted pair is a ``400``. Scoped to the
+caller -- one sales person never sees another's numbers.
 """
 
 from __future__ import annotations
@@ -33,6 +35,14 @@ OrderStatusCountsSerializer = type(
     (serializers.Serializer,),
     {code: serializers.IntegerField() for code in ORDER_STATUS_CODES},
 )
+OrderStatusKgSerializer = type(
+    "OrderStatusKgSerializer",
+    (serializers.Serializer,),
+    {
+        code: serializers.CharField(help_text="Kilograms of this product in this status.")
+        for code in ORDER_STATUS_CODES
+    },
+)
 ClientStatusCountsSerializer = type(
     "ClientStatusCountsSerializer",
     (serializers.Serializer,),
@@ -50,15 +60,15 @@ class ClientCountsSerializer(serializers.Serializer):
     by_status = ClientStatusCountsSerializer()
 
 
-class AnalyticsClientRefSerializer(serializers.Serializer):
+class AnalyticsProductRefSerializer(serializers.Serializer):
     public_id = serializers.CharField()
-    company_name = serializers.CharField()
+    name = serializers.CharField()
 
 
-class ClientOrderCountsSerializer(serializers.Serializer):
-    client = AnalyticsClientRefSerializer()
-    total = serializers.IntegerField()
-    by_status = OrderStatusCountsSerializer()
+class ProductKgSerializer(serializers.Serializer):
+    product = AnalyticsProductRefSerializer()
+    total_kg = serializers.CharField(help_text="Kilograms booked across every status.")
+    kg_by_status = OrderStatusKgSerializer()
 
 
 class AnalyticsResponseSerializer(serializers.Serializer):
@@ -66,14 +76,14 @@ class AnalyticsResponseSerializer(serializers.Serializer):
     end_date_time = serializers.DateTimeField()
     orders = OrderCountsSerializer()
     clients = ClientCountsSerializer()
-    client_orders = ClientOrderCountsSerializer(many=True)
+    products = ProductKgSerializer(many=True)
 
 
 class AnalyticsView(AndroidBaseView):
-    """Order, client and per-client order counts for the caller in a window."""
+    """Order / client counts and per-product kilograms for the caller in a window."""
 
     @extend_schema(
-        summary="Order / client counts by status within a date window",
+        summary="Order / client counts by status, and kg booked per product, in a window",
         parameters=[
             OpenApiParameter("start_date_time", str, required=True, description="ISO 8601."),
             OpenApiParameter("end_date_time", str, required=True, description="ISO 8601."),
