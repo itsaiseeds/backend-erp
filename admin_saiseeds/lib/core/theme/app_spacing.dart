@@ -57,7 +57,7 @@ class AppSizes {
   static const double iconXl = 24.0;
   static const double iconXxl = 40.0;
 
-  static const double sidebarExpandedWidth = 332.0;
+  static const double sidebarExpandedWidth = 341.0;
   static const double sidebarCollapsedWidth = 72.0;
   static const double sidebarBrandingHeight = 72.0;
   static const double sidebarItemHeight = 44.0;

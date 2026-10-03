@@ -8,8 +8,6 @@ class PartiesService {
 
   static final PartiesService instance = PartiesService._();
 
-  static const int _PAGE_SIZE = 30;
-  static const int _MAX_PAGES = 40;
 
   PartiesRepository? _repository;
   final List<PartyModel> _parties = [];
@@ -36,19 +34,11 @@ class PartiesService {
     if (_isLoaded && !forceRefresh) return true;
 
     try {
-      final List<PartyModel> collected = [];
-
-      for (int page = 1; page <= _MAX_PAGES; page++) {
-        final PaginatedPartiesModel result = await _resolvedRepository
-            .fetchParties(
-              queryParams: {'page': page, 'page_size': _PAGE_SIZE},
-            );
-
-        collected.addAll(result.results);
-
-        final int? next = result.nextPageNumber;
-        if (next == null || next <= page || result.results.isEmpty) break;
-      }
+      // One call with all=true instead of walking pages: the endpoint
+      // returns every row, so nothing is missed and nothing is capped.
+      final PaginatedPartiesModel result = await _resolvedRepository
+          .fetchParties(queryParams: const {'all': true});
+      final List<PartyModel> collected = result.results;
 
       _parties
         ..clear()

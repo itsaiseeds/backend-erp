@@ -48,9 +48,6 @@ class BagStockState extends Equatable {
 
   bool get hasDraft => draftCounts.isNotEmpty;
 
-  bool get isDraftComplete =>
-      allLines.isNotEmpty && draftCounts.length >= allLines.length;
-
   BagStockState copyWith({
     BagStockStatus? status,
     String? snapshotDate,
@@ -190,10 +187,13 @@ class BagStockCubit extends SafeCubit<BagStockState> {
     emit(state.copyWith(isSubmitting: true, clearError: true));
 
     try {
-      if (state.isDraftComplete) {
-        await _repository.replaceBagStock(draft);
-      } else {
+      final bool alreadyRecorded = await _repository
+          .fetchTodaysStockComplete();
+
+      if (alreadyRecorded) {
         await _repository.patchBagStock(draft);
+      } else {
+        await _repository.replaceBagStock(draft);
       }
       emit(state.copyWith(isSubmitting: false, draftCounts: const {}));
       await loadBagStock();
