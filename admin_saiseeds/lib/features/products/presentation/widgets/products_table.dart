@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/buttons/outlined_action_button.dart';
+import '../../../../core/widgets/feedback/app_badge.dart';
 import '../../../../core/widgets/tables/app_data_column.dart';
 import '../../../../core/widgets/tables/app_data_table.dart';
 import '../../data/models/product_model.dart';
@@ -15,6 +16,7 @@ class ProductsTable extends StatefulWidget {
   static const String COLUMN_STAGE = 'stage';
   static const String COLUMN_SELLING_PRICE = 'selling_price';
   static const String COLUMN_DESCRIPTION = 'description_items';
+  static const String COLUMN_USABLE = 'is_usable';
 
   final List<ProductModel> products;
   final bool isLoading;
@@ -74,6 +76,12 @@ class ProductsTableState extends State<ProductsTable> {
       id: ProductsTable.COLUMN_SELLING_PRICE,
       label: AppStrings.COLUMN_SELLING_PRICE,
       width: AppSizes.tableColumnWidthCompact,
+    ),
+    AppDataColumn(
+      id: ProductsTable.COLUMN_USABLE,
+      label: AppStrings.COLUMN_PRODUCT_USABLE,
+      width: AppSizes.tableColumnWidthCompact,
+      isCenter: true,
     ),
     AppDataColumn(
       id: AppStrings.TABLE_ACTIONS_COLUMN_LABEL,
@@ -166,6 +174,17 @@ class ProductsTableState extends State<ProductsTable> {
         return _textCell(product.stageName);
       case ProductsTable.COLUMN_SELLING_PRICE:
         return _textCell(product.sellingPrice);
+      case ProductsTable.COLUMN_USABLE:
+        return Center(
+          child: AppBadge(
+            label: product.isUsable
+                ? AppStrings.PRODUCT_USABLE_YES
+                : AppStrings.PRODUCT_USABLE_NO,
+            variant: product.isUsable
+                ? AppBadgeVariant.success
+                : AppBadgeVariant.error,
+          ),
+        );
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,

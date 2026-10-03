@@ -9,6 +9,10 @@ class ProductModel {
   final StageModel? stage;
   final String sellingPrice;
   final String imageUrl;
+
+  /// False freezes the product: it cannot be ordered, counted or packed
+  /// until switched back on, though its history stays visible.
+  final bool isUsable;
   final List<String> descriptionItems;
 
   const ProductModel({
@@ -18,6 +22,7 @@ class ProductModel {
     this.stage,
     this.sellingPrice = '',
     this.imageUrl = '',
+    this.isUsable = true,
     this.descriptionItems = const [],
   });
 
@@ -36,6 +41,7 @@ class ProductModel {
           : Stages.byId(stage is num ? stage.toInt() : null),
       sellingPrice: _priceOf(json['selling_price']),
       imageUrl: json['image_url'] as String? ?? '',
+      isUsable: json['is_usable'] != false,
       descriptionItems: _itemsOf(json['description_items']),
     );
   }

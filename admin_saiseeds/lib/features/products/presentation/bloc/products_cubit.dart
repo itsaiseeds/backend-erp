@@ -177,6 +177,7 @@ class ProductsCubit extends SafeCubit<ProductsState> {
     required String sellingPrice,
     ProductImageUpload? image,
     List<String> descriptionItems = const [],
+    bool? isUsable,
   }) {
     return _mutate(
       () => _repository.updateProduct(
@@ -187,6 +188,7 @@ class ProductsCubit extends SafeCubit<ProductsState> {
         sellingPrice: sellingPrice,
         image: image,
         descriptionItems: descriptionItems,
+        isUsable: isUsable,
       ),
     );
   }

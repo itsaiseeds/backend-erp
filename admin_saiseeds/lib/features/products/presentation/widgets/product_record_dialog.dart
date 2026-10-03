@@ -18,6 +18,7 @@ import '../../../../core/widgets/dialogs/app_record_dialog.dart';
 import '../../../../core/widgets/feedback/confirmation_dialog.dart';
 import '../../../../core/widgets/feedback/image_viewer_dialog.dart';
 import '../../../../core/widgets/inputs/crop_picker_field.dart';
+import '../../../../core/widgets/inputs/app_toggle_field.dart';
 import '../../../../core/widgets/inputs/record_field.dart';
 import '../../../../core/widgets/inputs/searchable_field.dart';
 import '../../../../core/widgets/layout/record_field_row.dart';
@@ -89,6 +90,8 @@ class _ProductRecordDialogState extends State<ProductRecordDialog> {
 
   ProductModel get _product => widget.product;
 
+  bool _isUsable = true;
+
   bool get _isEditing => _mode == RecordDialogMode.edit;
 
   bool get _isBusy => _isSubmitting || _isCreatingCrop;
@@ -116,6 +119,7 @@ class _ProductRecordDialogState extends State<ProductRecordDialog> {
     _crops = CropsService.instance.crops;
     _selectedCrop = _product.crop;
     _selectedStage = _product.stage;
+    _isUsable = _product.isUsable;
     _loadCrops();
   }
 
@@ -253,6 +257,7 @@ class _ProductRecordDialogState extends State<ProductRecordDialog> {
       sellingPrice: _sellingPriceController.text.trim(),
       image: _pickedImage,
       descriptionItems: _descriptionItems,
+      isUsable: _isUsable,
     );
 
     if (!mounted) return;
@@ -382,6 +387,17 @@ class _ProductRecordDialogState extends State<ProductRecordDialog> {
               _stageError = null;
             }),
           ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppToggleField(
+          label: AppStrings.FIELD_PRODUCT_USABLE,
+          description: _isUsable
+              ? AppStrings.FIELD_PRODUCT_USABLE_ON
+              : AppStrings.FIELD_PRODUCT_USABLE_OFF,
+          value: _isUsable,
+          onChanged: _canEdit
+              ? (next) => setState(() => _isUsable = next)
+              : null,
         ),
       ],
     );

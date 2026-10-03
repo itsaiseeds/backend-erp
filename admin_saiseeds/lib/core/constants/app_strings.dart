@@ -798,6 +798,14 @@ class AppStrings {
       'Bag and loose stock counts. Leave the dates empty for all history.';
   static const String EXPORT_WINDOW_OPTIONAL =
       'Optional for this report -- leave both empty for the full history.';
+  static const String COLUMN_PRODUCT_USABLE = 'Availability';
+  static const String PRODUCT_USABLE_YES = 'Available';
+  static const String PRODUCT_USABLE_NO = 'Frozen';
+  static const String FIELD_PRODUCT_USABLE = 'Available for use';
+  static const String FIELD_PRODUCT_USABLE_ON =
+      'Can be ordered, counted and packed.';
+  static const String FIELD_PRODUCT_USABLE_OFF =
+      'Frozen: nothing new can be created against it. Its history stays.';
   static const String PRINT = 'Print';
   static const String CUSTOM_ORDERS = 'Custom Orders';
   static const String COLUMN_CUSTOM_ORDER_CITY = 'City';

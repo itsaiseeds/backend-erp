@@ -160,6 +160,7 @@ class _SwitcherSegment extends StatelessWidget {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: onTap,
           child: SizedBox(
             height: AppSizes.sidebarWorkspaceSegmentHeight,
