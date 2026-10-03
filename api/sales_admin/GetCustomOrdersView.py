@@ -105,7 +105,7 @@ def _products_on_custom_orders(request: Request) -> list[dict]:
     relation does not pick up ``CustomOrder``'s default soft-delete manager.
     """
     rows = (
-        CustomOrderItem.objects.filter(custom_order__is_deleted=False)
+        CustomOrderItem.objects.filter(custom_order__is_deleted=False, product__is_usable=True)
         .values_list("product_id", "product__name")
         .distinct()
         .order_by("product__name")

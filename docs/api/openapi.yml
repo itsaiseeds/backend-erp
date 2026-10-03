@@ -10836,8 +10836,9 @@ components:
           type: boolean
         is_usable:
           type: boolean
-          description: 'False when the product is frozen. Only present in the display
-            mode (``?show_deleted=true``): the picker never lists a frozen product.'
+          description: 'False when the product is frozen (no stock or booking action
+            is available for it). It is still listed here: farmers and field trips
+            keep seeing it.'
       required:
       - crop
       - crop_id

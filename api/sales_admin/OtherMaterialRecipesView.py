@@ -34,7 +34,6 @@ from api.inward_serializers import (
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
     list_query_parameters,
-    query_flag,
 )
 
 
@@ -61,13 +60,11 @@ class OtherMaterialRecipesView(AdminPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        recipes = OtherMaterialRecipe.objects.select_related("product", "material_type")
-        if query_flag(request, "all"):
-            # ``?all=true`` is the picker the inward booking form uses; a frozen
-            # product cannot be booked, so it is not offered. The paginated
-            # management list keeps showing it.
-            recipes = recipes.filter(product__is_usable=True)
-        return recipes
+        # A frozen product (``Product.is_usable`` false) is not shown on the material
+        # side at all -- neither in the booking picker (``?all=true``) nor the list.
+        return OtherMaterialRecipe.objects.filter(product__is_usable=True).select_related(
+            "product", "material_type"
+        )
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:
         return [recipe_payload(recipe) for recipe in page_items]

@@ -236,21 +236,15 @@ class AndroidFieldTripApiTest(FieldTripFixtures, AndroidApiTestCase):
         row = next(p for p in products.json() if p["public_id"] == self.castor_seed.public_id)
         self.assertEqual((row["crop_id"], row["crop"]), (self.castor.id, "Castor"))
 
-    def test_a_frozen_product_is_not_in_the_picker_but_is_in_display_mode(self):
-        """is_usable false hides it from the picker; ?show_deleted=true still lists it, flagged.
+    def test_a_frozen_product_stays_in_the_farmer_picker_flagged(self):
+        """Farmers and field trips are the one place a frozen product stays visible.
 
-        tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_a_frozen_product_is_not_in_the_picker_but_is_in_display_mode
+        tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_a_frozen_product_stays_in_the_farmer_picker_flagged
         """
         Product.objects.filter(pk=self.castor_seed.pk).update(is_usable=False)
 
-        picker = self.client.get(PRODUCTS_URL).json()
-        self.assertNotIn(self.castor_seed.public_id, [row["public_id"] for row in picker])
-        self.assertTrue(all(row["is_usable"] for row in picker))
-
-        display = {
-            row["public_id"]: row for row in self.client.get(PRODUCTS_URL + "?show_deleted=true").json()
-        }
-        self.assertFalse(display[self.castor_seed.public_id]["is_usable"])
+        rows = {row["public_id"]: row for row in self.client.get(PRODUCTS_URL).json()}
+        self.assertFalse(rows[self.castor_seed.public_id]["is_usable"])
 
     def test_utilities_show_soft_deleted_rows_only_on_request(self):
         """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_utilities_show_soft_deleted_rows_only_on_request"""
