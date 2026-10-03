@@ -7,6 +7,7 @@ class TabIds {
   static const String CLIENTS = 'clients';
   static const String ORDERS = 'orders';
   static const String DISPATCH_CHALLANS = 'dispatch-challans';
+  static const String CUSTOM_ORDERS = 'custom-orders';
   static const String PRODUCTS = 'products';
   static const String PRODUCT_PACKAGINGS = 'product-packagings';
   static const String PARTIES = 'parties';

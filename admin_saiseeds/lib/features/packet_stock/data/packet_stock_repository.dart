@@ -28,6 +28,18 @@ class PacketStockRepository {
   const PacketStockRepository({required ApiClient apiClient})
     : _apiClient = apiClient;
 
+
+  /// Whether today's inventory has already been recorded. The first update of
+  /// the day creates it (POST); later ones amend it (PATCH).
+  Future<bool> fetchTodaysStockComplete() async {
+    final dynamic response = await _apiClient.get(
+      InventoryEndpoints.checkTodaysInventory,
+    );
+
+    if (response is! Map) return false;
+    return response['is_complete'] == true;
+  }
+
   Future<PacketStockSnapshotModel> fetchPacketStock() async {
     final dynamic response = await _apiClient.get(
       InventoryEndpoints.samplePacketStock,
