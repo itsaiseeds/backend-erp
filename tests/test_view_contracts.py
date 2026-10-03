@@ -204,6 +204,7 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/get-clients/": ("GetClientsView", SESSION_ADMIN),
     "api/sales-admin/dispatch-order/<str:public_id>": ("DispatchOrderView", SESSION_ADMIN),
     "api/sales-admin/dispatch-challans/": ("GetDispatchChallansView", SESSION_ADMIN),
+    "api/sales-admin/dispatch-lot-numbers/": ("GetDispatchLotNumbersView", SESSION_ADMIN),
     "api/sales-admin/edit-order/<str:public_id>": ("UpdateOrderView", SESSION_ADMIN),
     "api/sales-admin/export/custom-orders": ("ExportCustomOrdersView", SESSION_ADMIN),
     "api/sales-admin/export/dispatch-receipts": (

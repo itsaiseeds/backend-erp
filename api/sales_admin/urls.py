@@ -27,6 +27,7 @@ from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetCustomOrdersView import GetCustomOrdersView
 from .GetDispatchChallansView import GetDispatchChallansView
+from .GetDispatchLotNumbersView import GetDispatchLotNumbersView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
@@ -173,6 +174,11 @@ urlpatterns = [
         "dispatch-challans/",
         GetDispatchChallansView.as_view(),
         name="dispatch-challans",
+    ),
+    path(
+        "dispatch-lot-numbers/",
+        GetDispatchLotNumbersView.as_view(),
+        name="dispatch-lot-numbers",
     ),
     path("hold-order/<str:public_id>", HoldOrderView.as_view(), name="hold-order"),
     path("reject-order/<str:public_id>", RejectOrderView.as_view(), name="reject-order"),

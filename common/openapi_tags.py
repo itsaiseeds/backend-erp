@@ -150,6 +150,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "dispatch-order",
             "revert-dispatch",
             "dispatch-challans",
+            "dispatch-lot-numbers",
             "upload-lr-number",
             "dispatch-custom-order",
             "revert-custom-order-dispatch",
