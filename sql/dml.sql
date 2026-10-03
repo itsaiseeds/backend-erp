@@ -274,10 +274,10 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(195, 'Can change push device', 55, 'change_pushdevice');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(196, 'Can delete push device', 55, 'delete_pushdevice');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(197, 'Can view push device', 55, 'view_pushdevice');
-INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(198, 'Can add notification', 54, 'add_notification');
-INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(199, 'Can change notification', 54, 'change_notification');
-INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(200, 'Can delete notification', 54, 'delete_notification');
-INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(201, 'Can view notification', 54, 'view_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(198, 'Can add notification', 56, 'add_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(199, 'Can change notification', 56, 'change_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(200, 'Can delete notification', 56, 'delete_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(201, 'Can view notification', 56, 'view_notification');
 -- Custom permission (authentication.User.Meta.permissions): gates POST /api/execute-code/.
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(165, 'Can execute Python code on the server', 1, 'execute_python_code');
 
