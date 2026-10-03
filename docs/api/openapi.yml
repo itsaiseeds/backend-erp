@@ -78,7 +78,11 @@ paths:
     post:
       operationId: android_api_v1_auth_logout_create
       description: |-
-        Revoke the caller's bearer token.
+        Revoke the caller's bearer token and forget their push devices.
+
+        The token is one per user, so logging out signs the user out everywhere;
+        their FCM tokens go with it, or a logged-out phone would keep receiving
+        their notifications.
 
         Logout must succeed for anyone the token authentication accepts, so this
         view relaxes the ``salesperson_required`` gate inherited from
@@ -280,6 +284,34 @@ paths:
       responses:
         '204':
           description: No response body
+  /android/api/v1/devices/register:
+    post:
+      operationId: android_api_v1_devices_register_create
+      description: Register (or refresh) the caller's FCM token.
+      summary: Register this device for push notifications
+      tags:
+      - Android · Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: Device registered.
+          description: ''
   /android/api/v1/edit-field-trip/{public_id}:
     patch:
       operationId: android_api_v1_edit_field_trip_partial_update
@@ -1175,6 +1207,90 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
+  /android/api/v1/notification/{id}/read:
+    post:
+      operationId: android_api_v1_notification_read_create
+      description: Mark one of the caller's notifications read.
+      summary: Mark one notification read
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Android · Notifications
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: Marked read.
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                description: Unknown id.
+          description: ''
+  /android/api/v1/notifications:
+    get:
+      operationId: android_api_v1_get_notifications_list
+      description: List the caller's own notifications, newest first.
+      summary: List my notifications (filter by read state)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: is_read
+        schema:
+          type: string
+        description: Whether the notification has been marked read. Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      tags:
+      - Android · Notifications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListPage'
+          description: ''
+  /android/api/v1/notifications/read-all:
+    post:
+      operationId: android_api_v1_notifications_read_all_create
+      description: Mark every notification of the caller's read.
+      summary: Mark all my notifications read
+      tags:
+      - Android · Notifications
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: All marked read.
           description: ''
   /android/api/v1/return-order/{order_public_id}:
     get:
@@ -3781,8 +3897,21 @@ paths:
   /api/sales-admin/product-packagings:
     get:
       operationId: api_sales_admin_product_packagings_list
-      description: List (GET) or create (POST) product packagings (app admin only).
+      description: Packagings of usable products only by default, so this list is
+        safe to use as a dropdown. ``?is_usable=all`` (or ``false``) also returns
+        the packagings of frozen products, for a management screen.
       summary: List product packagings
+      parameters:
+      - in: query
+        name: is_usable
+        schema:
+          type: string
+          enum:
+          - all
+          - 'false'
+          - 'true'
+        description: 'Usability of the packaging''s product: ``true`` (default) usable
+          only, ``false`` frozen only, ``all`` both.'
       tags:
       - Admin · Master data
       security:
@@ -3923,14 +4052,22 @@ paths:
   /api/sales-admin/products:
     get:
       operationId: api_sales_admin_products_list
-      description: List (GET) or create (POST) products (app admin only).
+      description: 'Usable products only by default, so this list is safe to use as
+        a dropdown: a frozen product (``is_usable`` false) is never offered. The product
+        management page asks for the frozen ones with ``?is_usable=all`` (everything)
+        or ``?is_usable=false`` (only frozen), so an admin can switch one back on.'
       summary: List products
       parameters:
       - in: query
         name: is_usable
         schema:
-          type: boolean
-        description: Only usable (true) or only frozen (false) products.
+          type: string
+          enum:
+          - all
+          - 'false'
+          - 'true'
+        description: '``true`` (default): usable only. ``false``: frozen only. ``all``:
+          both.'
       tags:
       - Admin · Master data
       security:
@@ -8567,6 +8704,72 @@ components:
       required:
       - name
       - public_id
+    NotificationItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        event_type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        screen:
+          type: string
+          description: App screen to open on tap, e.g. order_detail.
+        data:
+          type: object
+          additionalProperties: {}
+          description: What the screen needs, e.g. {order_public_id}.
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - body
+      - created_at
+      - data
+      - event_type
+      - id
+      - is_read
+      - screen
+      - title
+    NotificationListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
     OrderCardPackaging:
       type: object
       description: |-
@@ -9803,6 +10006,19 @@ components:
       required:
       - name
       - public_id
+    RegisterDeviceRequest:
+      type: object
+      properties:
+        fcm_token:
+          type: string
+          minLength: 1
+          maxLength: 512
+        app_version:
+          type: string
+          default: ''
+          maxLength: 32
+      required:
+      - fcm_token
     ReturnClientRef:
       type: object
       description: Output shape for the client on a return.
@@ -10586,8 +10802,8 @@ components:
           type: boolean
         is_usable:
           type: boolean
-          description: False when the product is frozen. It is still listed (a farmer
-            can use it); no stock or booking action is available for it.
+          description: 'False when the product is frozen. Only present in the display
+            mode (``?show_deleted=true``): the picker never lists a frozen product.'
       required:
       - crop
       - crop_id
@@ -10701,6 +10917,8 @@ tags:
   description: The sales person's clients, addresses, transport.
 - name: Android · Orders
   description: Placing and listing the sales person's orders, and their returns.
+- name: Android · Notifications
+  description: Push-notification device registration and the in-app inbox.
 - name: Android · Catalogue
   description: Products the sales person can sell.
 - name: Android · Field trips

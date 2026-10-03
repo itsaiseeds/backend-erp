@@ -18,6 +18,7 @@ from aggregator.models import Crop, Product, ProductDescriptionItem, Stage
 from aggregator.ProductOperations import (
     description_items_payload,
     sync_product_description_items,
+    usability_filter,
 )
 from api.admin import AdminApiView
 from common.storage import upload_image
@@ -186,26 +187,30 @@ class ProductsView(AdminApiView):
 
     @extend_schema(
         summary="List products",
+        description=(
+            "Usable products only by default, so this list is safe to use as a "
+            "dropdown: a frozen product (``is_usable`` false) is never offered. The "
+            "product management page asks for the frozen ones with "
+            "``?is_usable=all`` (everything) or ``?is_usable=false`` (only frozen), "
+            "so an admin can switch one back on."
+        ),
         parameters=[
             OpenApiParameter(
                 "is_usable",
-                bool,
-                description="Only usable (true) or only frozen (false) products.",
+                str,
+                enum=["true", "false", "all"],
+                description=(
+                    "``true`` (default): usable only. ``false``: frozen only. "
+                    "``all``: both."
+                ),
             )
         ],
         responses={200: ProductPayloadSerializer(many=True)},
     )
     def get(self, request):
-        products = products_queryset().order_by("name")
-        raw = request.query_params.get("is_usable")
-        if raw is not None:
-            try:
-                wanted = serializers.BooleanField().to_internal_value(raw)
-            except serializers.ValidationError:
-                raise serializers.ValidationError(
-                    {"is_usable": "Must be true or false."}
-                ) from None
-            products = products.filter(is_usable=wanted)
+        products = usability_filter(
+            products_queryset().order_by("name"), request.query_params.get("is_usable")
+        )
         return Response([product_payload(product) for product in products])
 
     @extend_schema(
