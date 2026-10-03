@@ -20,7 +20,7 @@ from api.inward_serializers import (
     RECIPE_SORT_OPTIONS,
     RecipeListPageSerializer,
 )
-from common.views.paginated_date_range import list_query_parameters
+from common.views.paginated_date_range import list_query_parameters, query_flag
 
 
 class GodownOtherMaterialRecipesView(AndroidGodownPaginatedDateRangeListView):
@@ -45,7 +45,11 @@ class GodownOtherMaterialRecipesView(AndroidGodownPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        return OtherMaterialRecipe.objects.select_related("product", "material_type")
+        recipes = OtherMaterialRecipe.objects.select_related("product", "material_type")
+        if query_flag(request, "all"):
+            # The picker mode (``?all=true``) offers only products that can be booked.
+            recipes = recipes.filter(product__is_usable=True)
+        return recipes
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:
         return [recipe_payload(recipe) for recipe in page_items]

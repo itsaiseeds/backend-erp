@@ -117,6 +117,7 @@ class InwardRawMaterial(
         from django.core.exceptions import ValidationError
 
         from aggregator import InventoryOperations, InwardOperations, StockLedgerOperations
+        from aggregator.ProductOperations import assert_products_usable
 
         self.refuse_return_lot_change()
         with StockLedgerOperations.recording(
@@ -125,6 +126,7 @@ class InwardRawMaterial(
             [self.product_id],
             source=self,
         ) as rec:
+            assert_products_usable([self.product_id], action="have its inward lot deleted")
             InventoryOperations.lock_raw_pools([self.product_id])
             try:
                 InwardOperations.assert_raw_lot_removable(self)

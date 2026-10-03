@@ -29,6 +29,7 @@ from aggregator.models import (
     InwardOtherMaterial,
     InwardRawMaterial,
     OtherMaterialRecipe,
+    Product,
     ReturnOrder,
     ReturnOrderItem,
     StatusIds,
@@ -1054,3 +1055,68 @@ class ReturnOrderApiTest(ReturnWorldTestCase):
             self.web.get(f"{self.ADMIN}return-order-recipes/RET-NOSUCHRETURN").status_code,
             status.HTTP_404_NOT_FOUND,
         )
+
+
+class ReturnOrderFreezeTest(ReturnWorldTestCase):
+    """A frozen product (``is_usable = False``) takes no new return stock movement.
+
+    tests/test_return_orders.py::ReturnOrderFreezeTest
+    """
+
+    def freeze(self, product):
+        Product.objects.filter(pk=product.pk).update(is_usable=False)
+        product.refresh_from_db()
+
+    def test_a_return_cannot_be_raised_for_a_frozen_product(self):
+        """tests/test_return_orders.py::ReturnOrderFreezeTest::test_a_return_cannot_be_raised_for_a_frozen_product"""
+        order = self.dispatched_order()
+        self.freeze(self.product)
+        with self.assertRaises(ValidationError) as ctx:
+            self.new_return(order)
+        self.assertIn("not usable", str(ctx.exception))
+        self.assertFalse(ReturnOrder.all_objects.exists())
+
+    def test_a_pending_return_can_shrink_but_not_grow_or_be_accepted_while_frozen(self):
+        """Releases stay open: lowering and rejecting work; raising and accepting do not.
+
+        tests/test_return_orders.py::ReturnOrderFreezeTest::test_a_pending_return_can_shrink_but_not_grow_or_be_accepted_while_frozen
+        """
+        order = self.dispatched_order()
+        ret = self.new_return(order, 10)
+        self.freeze(self.product)
+
+        with self.assertRaises(ValidationError):
+            update_return_order(
+                ret, return_date=None, items=[self.item(self.product, 20)], actor=self.sp_user
+            )
+        update_return_order(
+            ret, return_date=None, items=[self.item(self.product, 5)], actor=self.sp_user
+        )
+        self.assertEqual(ret.items.get().packets, 5)
+
+        raw_before = InwardRawMaterial.objects.count()
+        with self.assertRaises(ValidationError) as ctx:
+            self.accept(ret)
+        self.assertIn("not usable", str(ctx.exception))
+        self.assertEqual(InwardRawMaterial.objects.count(), raw_before)
+
+        reject_return_order(ret, admin=self.admin_user)
+        ret.refresh_from_db()
+        self.assertEqual(ret.status_id, StatusIds.RETURN_REJECTED)
+
+    def test_an_accepted_return_cannot_be_reverted_while_its_product_is_frozen(self):
+        """Its inward lots are existing rows, so they are read-only until unfrozen.
+
+        tests/test_return_orders.py::ReturnOrderFreezeTest::test_an_accepted_return_cannot_be_reverted_while_its_product_is_frozen
+        """
+        ret = self.new_return(self.dispatched_order(), 10)
+        self.accept(ret)
+        self.freeze(self.product)
+
+        with self.assertRaises(ValidationError):
+            revert_accept_return_order(ret, admin=self.admin_user)
+        self.assertTrue(InwardRawMaterial.objects.filter(return_order=ret).exists())
+
+        Product.objects.filter(pk=self.product.pk).update(is_usable=True)
+        revert_accept_return_order(ret, admin=self.admin_user)
+        self.assertFalse(InwardRawMaterial.objects.filter(return_order=ret).exists())

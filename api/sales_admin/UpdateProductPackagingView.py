@@ -20,12 +20,14 @@ packaging and delete the old one.
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from aggregator.models import ProductPackaging
+from aggregator.ProductOperations import assert_products_usable
 from api.admin import AdminApiView
 from common.models.timestamped import indian_now
 
@@ -66,8 +68,10 @@ class UpdateProductPackagingView(AdminApiView):
         )
         serializer.is_valid(raise_exception=True)
         if "selling_price" in serializer.validated_data:
-            packaging.selling_price = serializer.validated_data["selling_price"]
-            packaging.save(update_fields=["selling_price", "updated_at"])
+            with transaction.atomic():
+                assert_products_usable([packaging.product_id], action="have its packaging changed")
+                packaging.selling_price = serializer.validated_data["selling_price"]
+                packaging.save(update_fields=["selling_price", "updated_at"])
 
         return Response(packaging_payload(packaging))
 
@@ -77,10 +81,12 @@ class UpdateProductPackagingView(AdminApiView):
     )
     def delete(self, request, public_id: str):
         packaging = get_object_or_404(ProductPackaging.objects.all(), public_id=public_id)
-        packaging.is_deleted = True
-        packaging.deleted_at = indian_now()
-        packaging.deleted_by = request.user
-        packaging.save(
-            update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"],
-        )
+        with transaction.atomic():
+            assert_products_usable([packaging.product_id], action="have its packaging deleted")
+            packaging.is_deleted = True
+            packaging.deleted_at = indian_now()
+            packaging.deleted_by = request.user
+            packaging.save(
+                update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"],
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)

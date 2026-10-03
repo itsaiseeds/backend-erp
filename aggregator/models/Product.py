@@ -23,6 +23,13 @@ class Product(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Created
     Carries a seed classification (``stage``) and an optional picture
     (``image_url``, written by ``common.storage``). Exposed to the frontend by
     its ``public_id`` (``P-…``); the primary key is never sent out.
+
+    ``is_usable`` freezes a product without deleting it. While it is false
+    nothing about the product may be created or changed -- no inward lots,
+    waste, packagings, recipes, counts or bookings (see
+    ``ProductOperations.assert_products_usable``, the single guard every writer
+    calls). Its history stays visible everywhere; it only drops out of the
+    pickers. Unlike ``is_deleted`` it is reversible and never cascades.
     """
 
     public_id_prefix = "P-"
@@ -61,6 +68,19 @@ class Product(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Created
             "Where the picture lives: an absolute Supabase Storage URL when "
             "deployed, a MEDIA_URL-relative path in development. Empty when no "
             "image is set. Written by common.storage.upload_image."
+        ),
+    )
+
+    is_usable = models.BooleanField(
+        "usable",
+        default=True,
+        # Mirrors ``DEFAULT true`` in sql/ddl.sql, so raw INSERTs (sql/dml.sql) that
+        # name no ``is_usable`` column still work against a model-built schema.
+        db_default=True,
+        db_index=True,
+        help_text=(
+            "False freezes the product: nothing about it can be created or "
+            "changed until it is switched back on. History stays visible."
         ),
     )
 

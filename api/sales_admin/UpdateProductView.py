@@ -50,6 +50,14 @@ class UpdateProductSerializer(serializers.Serializer):
         max_digits=12, decimal_places=2, required=False, min_value=0,
         help_text="Rate per kilogram; packet and bag prices derive from it and the weight sold.",
     )
+    is_usable = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "False freezes the product: nothing about it can be created or changed "
+            "until it is switched back on (its history stays visible). The other "
+            "fields stay editable while it is frozen."
+        ),
+    )
     image = serializers.ImageField(required=False)
     description_items = DescriptionItemsField()
 
@@ -101,6 +109,13 @@ class UpdateProductView(AdminApiView):
 
         rewrote_bullets = "description_items" in serializer.validated_data
         with transaction.atomic():
+            # Lock the row first (the same row every stock writer locks), so the
+            # switch either lands before a write's usability check or after that
+            # write has committed -- never in between. Re-read the flag under the
+            # lock: ``product.save()`` writes every column, and a stale value
+            # would undo a concurrent switch this request did not ask for.
+            locked = Product.all_objects.select_for_update().get(pk=product.pk)
+            product.is_usable = serializer.validated_data.get("is_usable", locked.is_usable)
             product.save()
             if rewrote_bullets:
                 sync_product_description_items(

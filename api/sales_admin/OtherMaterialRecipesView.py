@@ -14,6 +14,7 @@ at the version they were booked against. There is therefore no update verb here
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.db.models import QuerySet
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -22,6 +23,7 @@ from rest_framework.response import Response
 
 from aggregator.InwardOperations import recipe_payload
 from aggregator.models import OtherMaterialRecipe
+from aggregator.ProductOperations import assert_products_usable
 from api.inward_serializers import (
     RECIPE_QUERYSET_FILTERS,
     RECIPE_SORT_OPTIONS,
@@ -32,6 +34,7 @@ from api.inward_serializers import (
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
     list_query_parameters,
+    query_flag,
 )
 
 
@@ -58,9 +61,13 @@ class OtherMaterialRecipesView(AdminPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        return OtherMaterialRecipe.objects.select_related(
-            "product", "material_type"
-        )
+        recipes = OtherMaterialRecipe.objects.select_related("product", "material_type")
+        if query_flag(request, "all"):
+            # ``?all=true`` is the picker the inward booking form uses; a frozen
+            # product cannot be booked, so it is not offered. The paginated
+            # management list keeps showing it.
+            recipes = recipes.filter(product__is_usable=True)
+        return recipes
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:
         return [recipe_payload(recipe) for recipe in page_items]
@@ -74,11 +81,13 @@ class OtherMaterialRecipesView(AdminPaginatedDateRangeListView):
         serializer = CreateRecipeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        recipe = OtherMaterialRecipe.objects.create(
-            product=data["product"],
-            material_type=data["material_type"],
-            packet_weight=data["packet_weight"],
-            quantity=data["quantity"],
-            created_by=request.user,
-        )
+        with transaction.atomic():
+            assert_products_usable([data["product"]], action="get a recipe")
+            recipe = OtherMaterialRecipe.objects.create(
+                product=data["product"],
+                material_type=data["material_type"],
+                packet_weight=data["packet_weight"],
+                quantity=data["quantity"],
+                created_by=request.user,
+            )
         return Response(recipe_payload(recipe), status=status.HTTP_201_CREATED)
