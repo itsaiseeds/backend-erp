@@ -50,7 +50,7 @@ class GodownInwardRawMaterialsView(AndroidGodownPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        return InwardRawMaterial.objects.select_related(
+        return InwardRawMaterial.objects.filter(product__is_usable=True).select_related(
             "product", "party", "status", "created_by", "return_order__order"
         )
 

@@ -116,7 +116,7 @@ def _products_on_returns(request: Request) -> list[dict]:
     relation does not pick up ``ReturnOrder``'s default soft-delete manager.
     """
     rows = (
-        ReturnOrderItem.objects.filter(return_order__is_deleted=False)
+        ReturnOrderItem.objects.filter(return_order__is_deleted=False, product__is_usable=True)
         .values_list("product_id", "product__name")
         .distinct()
         .order_by("product__name")

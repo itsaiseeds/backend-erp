@@ -11,6 +11,7 @@ Authentication is owned by ``tests/test_view_contracts.py`` -- not repeated here
 from __future__ import annotations
 
 import datetime
+import json
 from decimal import Decimal
 
 from django.contrib import admin as django_admin
@@ -703,10 +704,10 @@ class ProductUsabilityApiTest(WebApiTestCase):
 
     # -- reads -------------------------------------------------------------------
 
-    def test_the_stock_report_keeps_a_frozen_products_figures_and_flags_it(self):
-        """History stays visible: same numbers, is_usable false.
+    def test_the_raw_stock_report_hides_a_frozen_product_and_restores_it_unchanged(self):
+        """Frozen: no line at all. Switched back on: the same figures return.
 
-        tests/test_product_usability.py::ProductUsabilityApiTest::test_the_stock_report_keeps_a_frozen_products_figures_and_flags_it
+        tests/test_product_usability.py::ProductUsabilityApiTest::test_the_raw_stock_report_hides_a_frozen_product_and_restores_it_unchanged
         """
         book_raw_material(self.product, Decimal("100"), actor=self.admin)
         inv.record_raw_waste(
@@ -716,15 +717,17 @@ class ProductUsabilityApiTest(WebApiTestCase):
         self.assertTrue(before["is_usable"])
 
         self._patch(is_usable=False)
-        after = self._line()
-        self.assertFalse(after["is_usable"])
-        for key in ("incoming_kg", "packed_kg", "wasted_kg", "available_kg"):
-            self.assertEqual(after[key], before[key], key)
+        hidden = self.client.get(self.RAW_STOCK, {"product": self.product.public_id})
+        self.assertEqual(hidden.status_code, status.HTTP_200_OK, hidden.content)
+        self.assertEqual(hidden.data["lines"], [])
 
-    def test_the_recipe_picker_hides_a_frozen_product_but_the_list_keeps_it(self):
-        """?all=true is the booking picker; the paginated management list is not.
+        self._patch(is_usable=True)
+        self.assertEqual(self._line(), before)
 
-        tests/test_product_usability.py::ProductUsabilityApiTest::test_the_recipe_picker_hides_a_frozen_product_but_the_list_keeps_it
+    def test_a_frozen_products_recipes_are_hidden_from_the_picker_and_the_list(self):
+        """Both ``?all=true`` (the booking picker) and the paginated list omit them.
+
+        tests/test_product_usability.py::ProductUsabilityApiTest::test_a_frozen_products_recipes_are_hidden_from_the_picker_and_the_list
         """
         recipe = self._make_recipe()
         self._patch(is_usable=False)
@@ -733,6 +736,10 @@ class ProductUsabilityApiTest(WebApiTestCase):
         self.assertEqual(picker.status_code, status.HTTP_200_OK, picker.content)
         self.assertNotIn(recipe.public_id, {r["public_id"] for r in picker.data["results"]})
 
+        listed = self.client.get(self.RECIPES)
+        self.assertNotIn(recipe.public_id, {r["public_id"] for r in listed.data["results"]})
+
+        self._patch(is_usable=True)
         listed = self.client.get(self.RECIPES)
         self.assertIn(recipe.public_id, {r["public_id"] for r in listed.data["results"]})
 
@@ -754,3 +761,73 @@ class ProductUsabilityApiTest(WebApiTestCase):
             self.BAG_COUNT, {"counts": {packaging.public_id: 4}}, format="json"
         )
         self.assertEqual(named.status_code, status.HTTP_400_BAD_REQUEST, named.content)
+
+    def test_a_frozen_product_is_hidden_from_every_material_and_stock_page(self):
+        """Lots, waste, recipes, stock pages, get-stock and filter dropdowns all omit it.
+
+        Orders, challans, returns and exports are documents and keep their lines; the
+        product page (``?is_usable=all``) still lists it. Switching back on restores
+        everything.
+
+        tests/test_product_usability.py::ProductUsabilityApiTest::test_a_frozen_product_is_hidden_from_every_material_and_stock_page
+        """
+        book_raw_material_for_every_product(actor=self.admin)
+        packaging = ProductPackaging.objects.get(product=self.product)
+        inv.record_stock_counts(
+            counts=dict.fromkeys(ProductPackaging.objects.all(), 5), actor=self.admin
+        )
+        inv.record_loose_stocks(
+            counts={(self.product, packaging.packet_weight): 3}, actor=self.admin
+        )
+        inv.record_raw_waste(
+            product=self.product, quantity_kg=Decimal("2"), reason="x", actor=self.admin
+        )
+        recipe = self._make_recipe()
+        create_other_lot(
+            party=self.party, recipe=recipe, quantity=Decimal("4"), actor=self.admin
+        )
+
+        pages = {
+            "raw lots": self.LOTS,
+            "other lots": self.OTHER_LOTS,
+            "waste": self.WASTES,
+            "recipes": self.RECIPES,
+            "raw stock": self.RAW_STOCK,
+            "bag stock": "/api/sales-admin/bag-stock",
+            "loose stock": "/api/sales-admin/sample-packet-stock",
+        }
+        ids = (self.product.public_id, packaging.public_id, recipe.public_id)
+
+        def seen_on(url: str) -> bool:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, (url, response.content))
+            body = json.dumps(response.data, default=str)
+            return any(public_id in body for public_id in ids)
+
+        for label, url in pages.items():
+            with self.subTest(page=label, frozen=False):
+                self.assertTrue(seen_on(url), "setup: the usable product should be listed")
+
+        self._patch(is_usable=False)
+
+        for label, url in pages.items():
+            with self.subTest(page=label, frozen=True):
+                self.assertFalse(seen_on(url), "a frozen product must not appear")
+        for public_id in (packaging.public_id, self.product.public_id):
+            with self.subTest(get_stock=public_id):
+                self.assertEqual(
+                    self.client.get(f"/api/sales-admin/get-stock/{public_id}").status_code,
+                    status.HTTP_404_NOT_FOUND,
+                )
+        # Filter dropdowns do not offer it either.
+        for url in (self.LOTS, self.WASTES, self.OTHER_LOTS, self.RECIPES):
+            with self.subTest(dropdown=url):
+                self.assertFalse(seen_on(url + "?page_size=1"))
+        # The product page still lists it.
+        everything = self.client.get(self.PRODUCTS, {"is_usable": "all"})
+        self.assertIn(self.product.public_id, {row["public_id"] for row in everything.data})
+
+        self._patch(is_usable=True)
+        for label, url in pages.items():
+            with self.subTest(page=label, restored=True):
+                self.assertTrue(seen_on(url))
