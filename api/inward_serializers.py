@@ -144,7 +144,8 @@ def _products_with_raw_material_lots(request: Request) -> list[dict]:
     needs to offer a product that actually has a lot behind it.
     """
     rows = (
-        InwardRawMaterial.objects.values_list("product__public_id", "product__name")
+        InwardRawMaterial.objects.filter(product__is_usable=True)
+        .values_list("product__public_id", "product__name")
         .distinct()
         .order_by("product__name")
     )
@@ -257,7 +258,8 @@ class RawMaterialWasteListPageSerializer(serializers.Serializer):
 def _products_with_waste(request: Request) -> list[dict]:
     """Every distinct product that has a waste row (the ``product`` filter's options)."""
     rows = (
-        RawMaterialWaste.objects.values_list("product__public_id", "product__name")
+        RawMaterialWaste.objects.filter(product__is_usable=True)
+        .values_list("product__public_id", "product__name")
         .distinct()
         .order_by("product__name")
     )
@@ -411,9 +413,8 @@ def _products_with_other_material_lots(request: Request) -> list[dict]:
     needs to offer a product that actually has a lot behind it.
     """
     rows = (
-        InwardOtherMaterial.objects.values_list(
-            "recipe__product__public_id", "recipe__product__name"
-        )
+        InwardOtherMaterial.objects.filter(recipe__product__is_usable=True)
+        .values_list("recipe__product__public_id", "recipe__product__name")
         .distinct()
         .order_by("recipe__product__name")
     )
@@ -561,7 +562,8 @@ def _products_with_recipes(request: Request) -> list[dict]:
     needs to offer a product that actually has a recipe behind it.
     """
     rows = (
-        OtherMaterialRecipe.objects.values_list("product__public_id", "product__name")
+        OtherMaterialRecipe.objects.filter(product__is_usable=True)
+        .values_list("product__public_id", "product__name")
         .distinct()
         .order_by("product__name")
     )

@@ -65,7 +65,9 @@ class InwardOtherMaterialsView(AdminPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        return InwardOtherMaterial.objects.select_related(
+        return InwardOtherMaterial.objects.filter(
+            recipe__product__is_usable=True
+        ).select_related(
             "party",
             "recipe__product",
             "recipe__material_type",
