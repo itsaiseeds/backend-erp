@@ -54,6 +54,7 @@ from .models import (
     StockEventDetail,
     StockEventType,
 )
+from .ProductOperations import assert_products_usable
 from .StockLedgerOperations import recording
 
 if TYPE_CHECKING:
@@ -189,6 +190,28 @@ def recipe_payload(recipe: OtherMaterialRecipe) -> dict:
     }
 
 
+def _party_ref(entry: InwardRawMaterial | InwardOtherMaterial) -> dict:
+    """The ``party`` block of a lot payload.
+
+    A lot an accepted return booked has no party: it reads
+    ``{"id": null, "name": "Return Order (<ORD-…>)"}`` so the list still shows
+    where the stock came from.
+    """
+    ret = entry.return_order
+    if ret is not None:
+        return {"id": None, "name": f"Return Order ({ret.order.public_id})"}
+    party = entry.party
+    return {"id": entry.party_id, "name": party.name if party is not None else ""}
+
+
+def _return_order_ref(entry: InwardRawMaterial | InwardOtherMaterial) -> dict | None:
+    """The ``return_order`` block of a lot payload; null for an ordinary lot."""
+    ret = entry.return_order
+    if ret is None:
+        return None
+    return {"public_id": ret.public_id, "order_public_id": ret.order.public_id}
+
+
 def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
     """Frontend-facing dict for one ``InwardRawMaterial`` lot (``IR-…``)."""
     return {
@@ -197,7 +220,8 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
             "public_id": entry.product.public_id,
             "name": entry.product.name,
         },
-        "party": {"id": entry.party_id, "name": entry.party.name},
+        "party": _party_ref(entry),
+        "return_order": _return_order_ref(entry),
         "lot_no": entry.lot_no,
         "quantity_kg": str(entry.quantity_kg),
         "status": raw_status_of(entry).value,
@@ -254,7 +278,8 @@ def inward_other_material_payload(entry: InwardOtherMaterial) -> dict:
             },
             "packet_weight": str(recipe.packet_weight),
         },
-        "party": {"id": entry.party_id, "name": entry.party.name},
+        "party": _party_ref(entry),
+        "return_order": _return_order_ref(entry),
         "quantity": str(entry.quantity),
         "effective_date": (
             entry.effective_date.isoformat() if entry.effective_date is not None else None
@@ -340,6 +365,7 @@ def raw_incoming_stock(
                 "product_id": product_id,
                 "public_id": row["public_id"],
                 "name": row["name"],
+                "is_usable": product.is_usable,
                 "incoming_kg": incoming_kg,
                 "packed_kg": packed_kg,
                 "wasted_kg": wasted_kg,
@@ -451,6 +477,7 @@ def create_raw_lot(
         [product.id],
         actor=actor,
     ) as rec:
+        assert_products_usable([product], action="receive an inward lot")
         entry = InwardRawMaterial.objects.create(
             product=product,
             party=party,
@@ -470,7 +497,11 @@ def update_raw_lot(
 
     Call inside ``transaction.atomic`` with the lot loaded through
     :func:`locked_raw_lot`. The event's detail is the status the lot ends in.
+
+    A lot an accepted return booked is refused (400): only reverting that
+    return's accept moves it.
     """
+    entry.refuse_return_lot_change()
     with recording(
         StockEventType.INWARD_OPERATIONS,
         StockEventDetail.RAW_LOT_IN_USE,
@@ -478,6 +509,9 @@ def update_raw_lot(
         source=entry,
         actor=actor,
     ) as rec:
+        assert_products_usable(
+            [entry.product_id], field="status", action="have its inward lot changed"
+        )
         for field in ("lab_sampling_date", "effective_date", "status"):
             if field in values:
                 setattr(entry, field, values[field])
@@ -496,6 +530,7 @@ def create_other_lot(
         [recipe.product_id],
         actor=actor,
     ) as rec:
+        assert_products_usable([recipe.product_id], field="recipe", action="receive an inward lot")
         entry = InwardOtherMaterial.objects.create(
             party=party,
             recipe=recipe,

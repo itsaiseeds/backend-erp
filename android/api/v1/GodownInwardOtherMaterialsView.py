@@ -52,7 +52,11 @@ class GodownInwardOtherMaterialsView(AndroidGodownPaginatedDateRangeListView):
 
     def get_queryset(self, request: Request) -> QuerySet:
         return InwardOtherMaterial.objects.select_related(
-            "party", "recipe__product", "recipe__material_type", "created_by"
+            "party",
+            "recipe__product",
+            "recipe__material_type",
+            "created_by",
+            "return_order__order",
         )
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:

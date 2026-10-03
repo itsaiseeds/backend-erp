@@ -48,7 +48,7 @@ class UpdateGodownInwardRawMaterialView(AndroidGodownBaseView):
         with transaction.atomic():
             entry = locked_raw_lot(
                 InwardRawMaterial.objects.select_related(
-                    "product", "party", "status", "created_by"
+                    "product", "party", "status", "created_by", "return_order__order"
                 ),
                 public_id,
             )

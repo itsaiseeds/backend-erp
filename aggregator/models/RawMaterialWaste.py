@@ -61,6 +61,7 @@ class RawMaterialWaste(
     def guard_soft_delete(self, perform):
         """Delete the waste row, recording the kilograms it gives back to raw."""
         from aggregator import StockLedgerOperations
+        from aggregator.ProductOperations import assert_products_usable
 
         with StockLedgerOperations.recording(
             StockEventType.RAW_WASTED,
@@ -68,6 +69,7 @@ class RawMaterialWaste(
             [self.product_id],
             source=self,
         ) as rec:
+            assert_products_usable([self.product_id], action="have its waste entry deleted")
             perform()
             rec.actor = self.deleted_by
 

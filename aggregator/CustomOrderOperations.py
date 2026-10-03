@@ -43,6 +43,7 @@ from .models import (
     StockEventDetail,
     StockEventType,
 )
+from .ProductOperations import assert_products_usable
 from .StockLedgerOperations import custom_order_product_ids, recording
 
 if TYPE_CHECKING:
@@ -146,6 +147,12 @@ def create_custom_order(
         {item["product"].pk for item in items},
         actor=actor,
     ) as rec:
+        assert_products_usable(
+            {item["product"].pk for item in items},
+            field="items",
+            action="be ordered",
+            subject="this custom order",
+        )
         assert_loose_stock_covers(loose_requirements(items))
 
         order = CustomOrder(
@@ -341,6 +348,12 @@ def dispatch_custom_order(
         source=order,
         actor=actor,
     ):
+        assert_products_usable(
+            custom_order_product_ids(order),
+            field="status",
+            action="be dispatched",
+            subject="this custom order",
+        )
         attach_private_dispatch_details(
             order,
             dispatched_by=actor,
@@ -380,9 +393,16 @@ def _assert_dispatched(order: CustomOrder, action: str) -> None:
         )
 
 
+@transaction.atomic
 def mark_delivered(order: CustomOrder, actual_delivery_date=None) -> CustomOrder:
-    """Mark a dispatched custom order delivered."""
+    """Mark a dispatched custom order delivered (refused while a product on it is frozen)."""
     _assert_dispatched(order, "deliver")
+    assert_products_usable(
+        custom_order_product_ids(order),
+        field="status",
+        action="be delivered",
+        subject="this custom order",
+    )
     order.status = Status.by_id(StatusIds.DELIVERED)
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
     order.full_clean()
@@ -549,6 +569,21 @@ def _sync_custom_order_items(
             "product"
         )
     }
+
+    # A frozen product's line may be removed or lowered (that releases stock) but
+    # not added back or raised. A soft-deleted line being restored counts as added.
+    assert_products_usable(
+        {
+            item["product"].pk
+            for item in items
+            if existing.get((item["product"].pk, item["packet_weight"])) is None
+            or existing[(item["product"].pk, item["packet_weight"])].is_deleted
+            or item["packets"] > existing[(item["product"].pk, item["packet_weight"])].packets
+        },
+        field="items",
+        action="have custom order lines added or raised",
+        subject="this custom order",
+    )
 
     if order.is_verified:
         held = loose_requirements(

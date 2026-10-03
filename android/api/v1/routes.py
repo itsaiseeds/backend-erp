@@ -23,7 +23,9 @@ from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
+from .GetNotificationsView import GetNotificationsView
 from .GetOrdersView import GetOrdersView
+from .GetReturnOrdersView import GetReturnOrdersView
 from .GodownInwardOtherMaterialsView import GodownInwardOtherMaterialsView
 from .GodownInwardRawMaterialsView import GodownInwardRawMaterialsView
 from .GodownOtherMaterialRecipesView import GodownOtherMaterialRecipesView
@@ -31,10 +33,16 @@ from .GodownOtherMaterialStockView import GodownOtherMaterialStockView
 from .GodownRawMaterialStockView import GodownRawMaterialStockView
 from .LoginView import LoginView
 from .LogoutView import LogoutView
+from .MarkNotificationsReadView import (
+    MarkAllNotificationsReadView,
+    MarkNotificationReadView,
+)
 from .OtherMaterialTypesView import OtherMaterialTypesView
 from .PartiesView import PartiesView
 from .ProductsView import ProductsView
 from .ReauthenticateView import ReauthenticateView
+from .RegisterDeviceView import RegisterDeviceView
+from .ReturnOrderView import ReturnOrderView
 from .SalesAdminsView import SalesAdminsView
 from .SalesPersonCatalogueView import SalesPersonCatalogueView
 from .StartFieldTripView import StartFieldTripView
@@ -59,8 +67,14 @@ ROUTES: dict[str, type] = {
     "utilities/other-material-types": OtherMaterialTypesView,
     "utilities/sales-admins": SalesAdminsView,
     "analytics": AnalyticsView,
+    "devices/register": RegisterDeviceView,
+    "notifications": GetNotificationsView,
+    "notifications/read-all": MarkAllNotificationsReadView,
+    "notification/<int:id>/read": MarkNotificationReadView,
     "get-clients": GetClientsView,
     "get-orders": GetOrdersView,
+    "return-order/<order_public_id>": ReturnOrderView,
+    "get-return-orders": GetReturnOrdersView,
     "client/<public_id>": GetClientView,
     "create-client": CreateClientView,
     "update-client": UpdateClientView,

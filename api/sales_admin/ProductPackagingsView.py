@@ -8,20 +8,28 @@ Soft-deleted packagings are never returned.
 
 from __future__ import annotations
 
+from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from aggregator.models import Product, ProductPackaging
+from aggregator.ProductOperations import assert_products_usable
 from api.admin import AdminApiView
 from api.order_serializers import ProductRefSerializer
+
+
+class PackagingProductRefSerializer(ProductRefSerializer):
+    """The product a packaging belongs to, with whether it is currently usable."""
+
+    is_usable = serializers.BooleanField()
 
 
 class ProductPackagingPayloadSerializer(serializers.Serializer):
     """Output shape for one packaging row."""
 
     public_id = serializers.CharField()
-    product = ProductRefSerializer()
+    product = PackagingProductRefSerializer()
     packet_weight = serializers.DecimalField(max_digits=8, decimal_places=3)
     packets = serializers.IntegerField(min_value=1)
     total_weight = serializers.DecimalField(max_digits=11, decimal_places=3)
@@ -82,6 +90,7 @@ def packaging_payload(packaging):
         "product": {
             "public_id": packaging.product.public_id,
             "name": packaging.product.name,
+            "is_usable": packaging.product.is_usable,
         },
         "packet_weight": packaging.packet_weight,
         "packets": packaging.packets,
@@ -119,11 +128,13 @@ class ProductPackagingsView(AdminApiView):
             "selling_price",
             data["packets"] * data["product"].price_for_weight(data["packet_weight"]),
         )
-        packaging = ProductPackaging.objects.create(
-            product=data["product"],
-            packet_weight=data["packet_weight"],
-            packets=data["packets"],
-            selling_price=selling_price,
-            created_by=request.user,
-        )
+        with transaction.atomic():
+            assert_products_usable([data["product"]], action="get a packaging")
+            packaging = ProductPackaging.objects.create(
+                product=data["product"],
+                packet_weight=data["packet_weight"],
+                packets=data["packets"],
+                selling_price=selling_price,
+                created_by=request.user,
+            )
         return Response(packaging_payload(packaging), status=status.HTTP_201_CREATED)

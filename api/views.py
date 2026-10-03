@@ -12,12 +12,10 @@ pagination all keep working).
 
 from __future__ import annotations
 
-import threading
-from collections.abc import Callable
-
-from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+
+from common.background import fire_and_forget  # noqa: F401  (long-standing import path)
 
 from .permissions import (
     HasDjangoPermission,
@@ -27,18 +25,6 @@ from .permissions import (
     IsSalesPerson,
     IsSuperUser,
 )
-
-
-def fire_and_forget(func: Callable[[], object]) -> None:
-    """Run ``func`` in a background thread after the current transaction commits.
-
-    Use this for low-priority, "nice to have" work that must never fail the API
-    response (audit logs, notifications, cache warming, ...). ``func`` runs
-    exactly once the surrounding transaction has committed, in a daemon thread,
-    and any exception it raises is swallowed and never propagated to the caller.
-    """
-    thread = threading.Thread(target=func, daemon=True, name="fire-and-forget")
-    transaction.on_commit(thread.start)
 
 
 class BaseApiView(APIView):

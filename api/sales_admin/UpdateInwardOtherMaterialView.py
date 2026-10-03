@@ -41,7 +41,12 @@ class UpdateInwardOtherMaterialView(AdminApiView):
         responses={200: InwardOtherMaterialPayloadSerializer},
     )
     def patch(self, request, public_id: str):
-        entry = get_object_or_404(InwardOtherMaterial.objects.all(), public_id=public_id)
+        entry = get_object_or_404(
+            InwardOtherMaterial.objects.select_related("return_order__order"),
+            public_id=public_id,
+        )
+        # A lot an accepted return booked is owned by that return.
+        entry.refuse_return_lot_change()
 
         serializer = UpdateInwardOtherMaterialSerializer(
             instance=entry, data=request.data, partial=True

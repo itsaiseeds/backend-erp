@@ -18,7 +18,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import connection
+from django.db import connection, transaction
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -33,6 +33,7 @@ from aggregator.models import (
     Order,
     Product,
     ProductPackaging,
+    RawMaterialWaste,
     Stage,
     StageIds,
     State,
@@ -301,3 +302,56 @@ class StockConcurrencyTest(DMLTransactionTestCase):
         self.assertEqual(
             inv.available_loose_packets(self.product, self.bag.packet_weight), 2
         )
+
+    def test_a_write_waits_for_the_usability_switch_and_is_refused_once_it_commits(self):
+        """The switch locks the product row; a racing write blocks, then sees it frozen.
+
+        Thread A holds the row lock with ``is_usable = False`` uncommitted. Thread B's
+        waste write must not slip through on the stale "usable" read: it waits for A to
+        commit and is then refused.
+
+        tests/test_stock_concurrency.py::StockConcurrencyTest::test_a_write_waits_for_the_usability_switch_and_is_refused_once_it_commits
+        """
+        locked, released = threading.Event(), threading.Event()
+        outcome: dict[str, object] = {}
+
+        def switch() -> None:
+            try:
+                with transaction.atomic():
+                    Product.all_objects.select_for_update().get(pk=self.product.pk)
+                    Product.objects.filter(pk=self.product.pk).update(is_usable=False)
+                    locked.set()
+                    released.wait(THREAD_TIMEOUT_SECONDS)
+            finally:
+                connection.close()
+
+        def write() -> None:
+            locked.wait(THREAD_TIMEOUT_SECONDS)
+            try:
+                outcome["result"] = inv.record_raw_waste(
+                    product=self.product,
+                    quantity_kg=Decimal("1"),
+                    reason="",
+                    actor=self.admin_user,
+                )
+            except Exception as exc:  # noqa: BLE001 -- the refusal is the result
+                outcome["result"] = exc
+            finally:
+                connection.close()
+
+        switcher = threading.Thread(target=switch)
+        writer = threading.Thread(target=write)
+        switcher.start()
+        writer.start()
+        self.assertTrue(locked.wait(THREAD_TIMEOUT_SECONDS))
+        writer.join(1.0)
+        self.assertTrue(writer.is_alive(), "The write should be blocked on the product lock.")
+
+        released.set()
+        switcher.join(THREAD_TIMEOUT_SECONDS)
+        writer.join(THREAD_TIMEOUT_SECONDS)
+        self.assertFalse(switcher.is_alive() or writer.is_alive(), "A contender hung.")
+
+        self.assertIsInstance(outcome["result"], ValidationError)
+        self.assertIn("not usable", str(outcome["result"]))
+        self.assertEqual(RawMaterialWaste.objects.filter(product=self.product).count(), 0)

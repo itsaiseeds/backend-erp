@@ -73,6 +73,7 @@ response and never stored. Every stored event has an `event_type` and a `detail`
 | `ORDER_RELEASED` | `UNVERIFIED`, `HELD`, `REJECTED`, `CUSTOM_ORDER_WITHDRAWN` | `unverify_order`, `hold_order`, `reject_order`, `delete_custom_order` |
 | `ORDER_DISPATCHED` | `FULL`, `PARTIAL` | `dispatch_order`, `dispatch_custom_order` |
 | `DISPATCH_REVERTED` | — | `revert_dispatch` (orders and custom orders) |
+| `RETURN_OPERATIONS` | `RETURN_ACCEPTED`, `RETURN_ACCEPT_REVERTED` | `accept_return_order`, `revert_accept_return_order` (`docs/prd/return-orders.md`; rejecting a return moves no stock and writes no row) |
 
 - **No change → no row.** A write that moves no figure writes no event. Examples:
   marking an order delivered, booking a raw lot into Lab Testing, a recount that finds
