@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime
 from decimal import Decimal
+from unittest import mock
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from rest_framework import status
@@ -28,8 +29,10 @@ from aggregator import InwardOperations, StockLedgerOperations
 from aggregator.models import (
     InwardOtherMaterial,
     InwardRawMaterial,
+    Notification,
     OtherMaterialRecipe,
     Product,
+    PushDevice,
     ReturnOrder,
     ReturnOrderItem,
     StatusIds,
@@ -627,6 +630,39 @@ class ReturnOrderOperationsTest(ReturnWorldTestCase):
         self.assertEqual(len(payload["inward_raw_materials"]), 1)
         self.assertEqual(len(payload["inward_other_materials"]), 1)
         self.assertEqual(documented_keys_mismatches(ReturnOrderPayloadSerializer(), payload), [])
+
+    def test_accepting_and_rejecting_notify_the_sales_person_who_raised_the_return(self):
+        """tests/test_return_orders.py::ReturnOrderOperationsTest::test_accepting_and_rejecting_notify_the_sales_person_who_raised_the_return"""
+        order = self.dispatched_order()
+        accepted = self.new_return(order, 10)
+        with (
+            mock.patch(
+                "aggregator.NotificationOperations.fire_and_forget",
+                side_effect=lambda func: func(),
+            ),
+            mock.patch("aggregator.NotificationOperations.send_push", return_value=[]) as send,
+        ):
+            PushDevice.objects.create(user=self.sp_user, fcm_token="phone-1")
+            self.accept(accepted)
+            accept_push = send.call_args.args
+            reject_return_order(self.new_return(self.dispatched_order(), 5), admin=self.admin_user)
+            reject_push = send.call_args.args
+
+        first, second = Notification.objects.filter(
+            recipient=self.sp_user, event_type__startswith="RETURN_"
+        ).order_by("id")
+        self.assertEqual((first.event_type, first.title), ("RETURN_ACCEPTED", "Return accepted"))
+        self.assertEqual((second.event_type, second.title), ("RETURN_REJECTED", "Return rejected"))
+        self.assertEqual(
+            first.data,
+            {"return_order_public_id": accepted.public_id, "order_public_id": order.public_id},
+        )
+        self.assertEqual(first.order, order)
+        self.assertIn(accepted.public_id, first.body)
+        self.assertIn(order.public_id, first.body)
+        self.assertTrue(first.body.endswith("was accepted."))
+        self.assertEqual(accept_push[3]["screen"], "return_order_detail")
+        self.assertEqual(reject_push[3]["type"], "RETURN_REJECTED")
 
 
 class ReturnOrderLedgerReportTest(ReturnWorldTestCase):

@@ -32,6 +32,7 @@ from .models import (
     TransportAgency,
 )
 from .models.ReturnOrder import LIVE_RETURN_STATUS_IDS
+from .NotificationOperations import NotificationEvent, notify_order_event
 from .ProductOperations import assert_products_usable, packaging_payload
 from .ReturnOrderOperations import order_return_payload
 from .StockLedgerOperations import dispatch_detail, order_product_ids, recording
@@ -424,7 +425,9 @@ def hold_order(order: Order) -> Order:
         order_product_ids(order),
         source=order,
     ):
-        return update_order_status(order, StatusIds.ON_HOLD)
+        update_order_status(order, StatusIds.ON_HOLD)
+    notify_order_event(order, NotificationEvent.ORDER_ON_HOLD)
+    return order
 
 
 def reject_order(order: Order) -> Order:
@@ -436,7 +439,9 @@ def reject_order(order: Order) -> Order:
         order_product_ids(order),
         source=order,
     ):
-        return update_order_status(order, StatusIds.REJECTED)
+        update_order_status(order, StatusIds.REJECTED)
+    notify_order_event(order, NotificationEvent.ORDER_REJECTED)
+    return order
 
 
 @transaction.atomic
@@ -563,6 +568,7 @@ def dispatch_order(
         )
         update_order_status(order, StatusIds.DISPATCHED)
         rec.detail = dispatch_detail(order)
+    notify_order_event(order, NotificationEvent.ORDER_DISPATCHED)
     return order
 
 
@@ -608,6 +614,7 @@ def verify_order(order: Order, admin: User) -> Order:
         order.verified_at = indian_now()
         order.full_clean()
         order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+    notify_order_event(order, NotificationEvent.ORDER_CONFIRMED)
     return order
 
 
@@ -633,6 +640,7 @@ def unverify_order(order: Order, *, status: StatusIds = StatusIds.UNDER_REVIEW) 
         order.verified_at = None
         order.full_clean()
         order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+    notify_order_event(order, NotificationEvent.ORDER_UNDER_REVIEW)
     return order
 
 
@@ -677,6 +685,7 @@ def revert_dispatch(order: Order) -> Order:
         order.actual_delivery_date = None
         order.full_clean()
         order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
+    notify_order_event(order, NotificationEvent.ORDER_DISPATCH_REVERTED)
     return order
 
 
@@ -691,6 +700,7 @@ def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
     order.full_clean()
     order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
+    notify_order_event(order, NotificationEvent.ORDER_DELIVERED)
     return order
 
 

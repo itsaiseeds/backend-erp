@@ -13,11 +13,16 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 
+from aggregator.models import PushDevice
 from android.api.base import AndroidBaseView
 
 
 class LogoutView(AndroidBaseView):
-    """Revoke the caller's bearer token.
+    """Revoke the caller's bearer token and forget their push devices.
+
+    The token is one per user, so logging out signs the user out everywhere;
+    their FCM tokens go with it, or a logged-out phone would keep receiving
+    their notifications.
 
     Logout must succeed for anyone the token authentication accepts, so this
     view relaxes the ``salesperson_required`` gate inherited from
@@ -39,4 +44,5 @@ class LogoutView(AndroidBaseView):
     )
     def post(self, request):
         Token.objects.filter(user=request.user).delete()
+        PushDevice.objects.filter(user=request.user).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

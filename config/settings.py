@@ -247,6 +247,16 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "product-images")
 
+# Push notifications (Firebase Cloud Messaging, HTTP v1 API)
+# ----------------------------------------------------------
+# FCM_SERVICE_ACCOUNT_JSON is the *contents* of a Firebase service-account key
+# (a secret: set it as a Render env var, never commit it). Unset -> pushes are
+# skipped with a log line; notifications are still saved to the in-app inbox.
+FCM_PROJECT_ID = os.environ.get("FCM_PROJECT_ID", "sales-saiseeds")
+FCM_SERVICE_ACCOUNT_JSON = os.environ.get("FCM_SERVICE_ACCOUNT_JSON", "")
+# Android notification channel the app creates for order updates.
+FCM_ANDROID_CHANNEL_ID = os.environ.get("FCM_ANDROID_CHANNEL_ID", "order_updates")
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

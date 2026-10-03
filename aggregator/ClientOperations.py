@@ -30,6 +30,7 @@ from .models import (
     StatusIds,
     TransportAgency,
 )
+from .NotificationOperations import NotificationEvent, notify_client_event
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -69,6 +70,7 @@ def verify_client(client: Client, admin: User) -> Client:
     client.verified_at = indian_now()
     client.full_clean()
     client.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+    notify_client_event(client, NotificationEvent.CLIENT_VERIFIED)
     return client
 
 

@@ -7,6 +7,9 @@ through ``ClientOperations`` directly.
 
 from __future__ import annotations
 
+import json
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
@@ -18,6 +21,8 @@ from aggregator.models import (
     ClientContact,
     ClientTransportAgency,
     Country,
+    Notification,
+    PushDevice,
     State,
     TransportAgency,
 )
@@ -131,6 +136,34 @@ class SalesAdminClientApiTest(WebApiTestCase):
         )
 
     # -- verification ---------------------------------------------------------
+
+    def test_verifying_notifies_the_sales_person_who_onboarded_the_client(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_verifying_notifies_the_sales_person_who_onboarded_the_client"""
+        self.login_as(self.admin_user)
+        with (
+            mock.patch(
+                "aggregator.NotificationOperations.fire_and_forget",
+                side_effect=lambda func: func(),
+            ),
+            mock.patch("aggregator.NotificationOperations.send_push", return_value=[]) as send,
+        ):
+            PushDevice.objects.create(user=self.sales_person, fcm_token="phone-1")
+            self.client.post(
+                VERIFY_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+            )
+
+        notification = Notification.objects.get(recipient=self.sales_person)
+        self.assertEqual(notification.event_type, "CLIENT_VERIFIED")
+        self.assertEqual(notification.title, "Client verified")
+        self.assertEqual(notification.body, "Acme Seeds was verified.")
+        self.assertEqual(notification.data, {"client_public_id": self.pending.public_id})
+        tokens, title, body, data = send.call_args.args
+        self.assertEqual(tokens, ["phone-1"])
+        self.assertEqual(data["screen"], "client_detail")
+        self.assertEqual(data["type"], "CLIENT_VERIFIED")
+        self.assertEqual(
+            json.loads(data["data"]), {"client_public_id": self.pending.public_id}
+        )
 
     def test_verifying_records_the_admin_and_cannot_be_repeated(self):
         """The first verify stamps who and when; a second one is a 400.
