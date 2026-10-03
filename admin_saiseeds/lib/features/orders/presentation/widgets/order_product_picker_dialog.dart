@@ -28,16 +28,22 @@ class OrderProductPickerDialog extends StatefulWidget {
   /// the same one, so they are shown as taken rather than offered again.
   final Set<String> existingPublicIds;
 
+  /// A custom order is sold loose, so the card prices and counts a single
+  /// packet instead of a whole bag.
+  final bool isPerPacket;
+
   const OrderProductPickerDialog({
     super.key,
     required this.repository,
     this.existingPublicIds = const {},
+    this.isPerPacket = false,
   });
 
   static Future<List<PickedPackaging>?> show(
     BuildContext context, {
     required ProductPackagingsRepository repository,
     Set<String> existingPublicIds = const {},
+    bool isPerPacket = false,
   }) {
     return showDialog<List<PickedPackaging>>(
       context: context,
@@ -45,6 +51,7 @@ class OrderProductPickerDialog extends StatefulWidget {
       builder: (_) => OrderProductPickerDialog(
         repository: repository,
         existingPublicIds: existingPublicIds,
+        isPerPacket: isPerPacket,
       ),
     );
   }
@@ -215,7 +222,9 @@ class _OrderProductPickerDialogState extends State<OrderProductPickerDialog> {
                 ),
                 const SizedBox(height: AppSpacing.xxs),
                 Text(
-                  AppStrings.ORDER_PICK_PRODUCTS_SUBTITLE,
+                  widget.isPerPacket
+                      ? AppStrings.ORDER_PICK_PRODUCTS_SUBTITLE_PACKETS
+                      : AppStrings.ORDER_PICK_PRODUCTS_SUBTITLE,
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.SIDEBAR_ON_PRIMARY_MUTED,
                   ),
@@ -305,6 +314,7 @@ class _OrderProductPickerDialogState extends State<OrderProductPickerDialog> {
 
             return _PackagingCard(
               packaging: packaging,
+              isPerPacket: widget.isPerPacket,
               quantity: _quantities[packaging.publicId] ?? 0,
               isTaken: isTaken,
               onAdd: isTaken ? _notifyAlreadyAdded : () => _add(packaging),
@@ -350,6 +360,7 @@ class _PackagingCard extends StatelessWidget {
   final ProductPackagingModel packaging;
   final int quantity;
   final bool isTaken;
+  final bool isPerPacket;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
 
@@ -359,7 +370,16 @@ class _PackagingCard extends StatelessWidget {
     required this.onAdd,
     required this.onRemove,
     this.isTaken = false,
+    this.isPerPacket = false,
   });
+
+  /// A bag's price divided by what it holds. The API prices a bag, but a
+  /// custom order buys single packets out of one.
+  num? get _packetPrice {
+    final num? bagPrice = packaging.sellingPriceValue;
+    if (bagPrice == null || packaging.packets <= 0) return null;
+    return bagPrice / packaging.packets;
+  }
 
   ProductModel? get _product =>
       ProductsService.instance.productByPublicId(packaging.productPublicId);
@@ -387,7 +407,9 @@ class _PackagingCard extends StatelessWidget {
   }
 
   Widget _buildImagePanel() {
-    final String weight = packaging.totalWeight.trim();
+    final String weight = isPerPacket
+        ? packaging.packetWeight.trim()
+        : packaging.totalWeight.trim();
 
     return SizedBox(
       height: AppSizes.pickerCardImage + AppSizes.pickerCardStepperOverlap,
@@ -461,7 +483,9 @@ class _PackagingCard extends StatelessWidget {
   Widget _buildDetails() {
     final ProductModel? product = _product;
     final String stage = product?.stageName ?? '';
-    final num? price = packaging.sellingPriceValue;
+    final num? price = isPerPacket
+        ? _packetPrice
+        : packaging.sellingPriceValue;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,21 +510,38 @@ class _PackagingCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.xxs),
-        Text(
-          price == null
-              ? packaging.sellingPrice
-              : CurrencyFormatter.rupees(price),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.bodySmall.copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.TEXT_PRIMARY,
-          ),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                price == null
+                    ? packaging.sellingPrice
+                    : CurrencyFormatter.rupees(price),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.TEXT_PRIMARY,
+                ),
+              ),
+            ),
+            if (isPerPacket) ...[
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                AppStrings.ORDER_PICK_PER_PACKET,
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.TEXT_SECONDARY,
+                ),
+              ),
+            ],
+          ],
         ),
         if (packaging.packets > 0) ...[
           const SizedBox(height: AppSpacing.xs),
           _PacketPill(
-            label: '${packaging.packets} x ${packaging.packetWeight} kg',
+            label: isPerPacket
+                ? '${packaging.packetWeight} kg'
+                : '${packaging.packets} x ${packaging.packetWeight} kg',
           ),
         ],
       ],

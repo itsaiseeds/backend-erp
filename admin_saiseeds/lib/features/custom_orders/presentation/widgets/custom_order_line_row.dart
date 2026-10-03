@@ -48,6 +48,13 @@ class CustomOrderLine {
 
   num get lineTotal => (num.tryParse(price.text.trim()) ?? 0) * packets;
 
+  /// Weight actually shipped on this line: packet weight x packets.
+  String get shippedWeight {
+    final double? unit = double.tryParse(packetWeight.trim());
+    if (unit == null) return '';
+    return (unit * packets).toStringAsFixed(3);
+  }
+
   /// Identifies the line: the same product may appear at several weights.
   String get key => '$productPublicId|$packetWeight';
 
@@ -107,11 +114,8 @@ class CustomOrderLineRow extends StatelessWidget {
                     runSpacing: AppSpacing.xs,
                     children: [
                       _Chip(label: '${line.packetWeight} kg'),
-                      if (line.packetsPerBag > 0)
-                        _Chip(
-                          label:
-                              '${line.packetsPerBag} x ${line.packetWeight} kg',
-                        ),
+                      if (line.shippedWeight.isNotEmpty)
+                        _Chip(label: '${line.shippedWeight} kg total'),
                     ],
                   ),
                 ],

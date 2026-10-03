@@ -8,6 +8,7 @@ import '../../../product_packagings/presentation/views/product_packagings_view.d
 import '../../../clients/presentation/views/clients_view.dart';
 import '../../../orders/presentation/views/orders_view.dart';
 import '../../../custom_orders/presentation/views/custom_orders_view.dart';
+import '../../../exports/presentation/views/exports_view.dart';
 import '../../../dispatch_challans/presentation/views/dispatch_challans_view.dart';
 import '../../../parties/presentation/views/parties_view.dart';
 import '../../../bag_stock/presentation/views/bag_stock_view.dart';
@@ -33,6 +34,8 @@ class DashboardContentSwitcher {
         return const ClientsView();
       case TabIds.ORDERS:
         return const OrdersView();
+      case TabIds.EXPORTS:
+        return const ExportsView();
       case TabIds.CUSTOM_ORDERS:
         return const CustomOrdersView();
       case TabIds.DISPATCH_CHALLANS:

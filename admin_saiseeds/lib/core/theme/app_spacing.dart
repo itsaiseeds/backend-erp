@@ -57,12 +57,14 @@ class AppSizes {
   static const double iconXl = 24.0;
   static const double iconXxl = 40.0;
 
-  static const double sidebarExpandedWidth = 341.0;
+  static const double sidebarExpandedWidth = 292.0;
   static const double sidebarCollapsedWidth = 72.0;
   static const double sidebarBrandingHeight = 72.0;
   static const double sidebarItemHeight = 44.0;
   static const double sidebarWorkspaceSegmentHeight = 34.0;
   static const double sidebarGroupDot = 6.0;
+  static const double exportIconTile = 40.0;
+  static const double exportHeaderTile = 52.0;
   static const double challanItemsHeight = 420.0;
   static const double sidebarGroupHeaderHeight = 34.0;
   static const double sidebarGroupHeaderTopGap = 10.0;
@@ -161,6 +163,11 @@ class AppSizes {
   static const double stepDotSize = 28.0;
   static const double productImagePreview = 200.0;
   static const double dateRangePopoverWidth = 640.0;
+
+  /// Roughly how tall the popover renders: month header, weekday row, six
+  /// week rows and the footer. Used only to decide whether it opens below
+  /// the field or above it.
+  static const double dateRangePopoverHeight = 380.0;
   static const double singleDatePopoverWidth = 320.0;
   static const double singleDatePopoverHeight = 294.0;
   static const double dateRangePresetsWidth = 140.0;
