@@ -20,6 +20,7 @@ from aggregator import InventoryOperations as inv
 from aggregator import StockLedgerOperations
 from aggregator.models import Product, StockEvent, StockEventLine
 from aggregator.StockLedgerReport import product_ledger_rows
+from api.export_views import MAX_EXPORT_RANGE_DAYS
 from api.sales_admin.ProductStockLedgerView import ProductStockLedgerSerializer
 from authentication.models import Admin, User
 from tests.common import WebApiTestCase
@@ -88,7 +89,11 @@ class StockLedgerApiTest(LedgerWorldTestCase, WebApiTestCase):
         before_live = (TODAY - datetime.timedelta(days=1)).isoformat()
         cases = [
             ("before go-live", {"start_date": before_live}, 400),
-            ("range over 31 days", {"end_date": (TODAY + datetime.timedelta(days=40)).isoformat()}, 400),
+            (
+                f"range over the {MAX_EXPORT_RANGE_DAYS}-day cap",
+                {"end_date": (TODAY + datetime.timedelta(days=MAX_EXPORT_RANGE_DAYS)).isoformat()},
+                400,
+            ),
             ("end before start", {"start_date": TODAY.isoformat(), "end_date": before_live}, 400),
             ("unparseable date", {"start_date": "not-a-date"}, 400),
             ("missing dates", {"start_date": "", "end_date": ""}, 400),
