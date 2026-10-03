@@ -53,6 +53,7 @@ class ProductsRepository {
     required String sellingPrice,
     ProductImageUpload? image,
     List<String> descriptionItems = const [],
+    bool? isUsable,
   }) async {
     await _apiClient.patch(
       ProductsEndpoints.detail(publicId),
@@ -63,6 +64,7 @@ class ProductsRepository {
         sellingPrice: sellingPrice,
         image: image,
         descriptionItems: descriptionItems,
+        isUsable: isUsable,
       ),
     );
   }
@@ -74,6 +76,8 @@ class ProductsRepository {
     required String sellingPrice,
     required ProductImageUpload? image,
     required List<String> descriptionItems,
+    // Update accepts it; create does not -- a new product starts usable.
+    bool? isUsable,
   }) {
     final List<String> items = descriptionItems
         .map((item) => item.trim())
@@ -87,6 +91,7 @@ class ProductsRepository {
         'stage': stageId,
         'selling_price': sellingPrice,
         'description_items': items,
+        if (isUsable != null) 'is_usable': isUsable,
       };
     }
 
@@ -98,6 +103,7 @@ class ProductsRepository {
       'stage': '$stageId',
       'selling_price': sellingPrice,
       'description_items': items,
+      if (isUsable != null) 'is_usable': '$isUsable',
       'image': MultipartFile.fromBytes(image.bytes, filename: image.filename),
     });
   }
