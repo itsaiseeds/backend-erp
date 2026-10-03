@@ -407,6 +407,114 @@ paths:
               schema:
                 $ref: '#/components/schemas/FarmerVisitPage'
           description: ''
+  /android/api/v1/get-challan/{order_public_id}:
+    get:
+      operationId: android_api_v1_get_challan_retrieve
+      description: The challan of one of the caller's dispatched or delivered orders.
+      summary: Get the dispatch challan of one of my orders
+      parameters:
+      - in: path
+        name: order_public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispatchChallanItem'
+          description: ''
+  /android/api/v1/get-challans:
+    get:
+      operationId: android_api_v1_get_challans_list
+      description: List the challans of the caller's dispatched or delivered orders.
+      summary: List my dispatch challans (filter by client / city / status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: challan_number
+        schema:
+          type: string
+        description: Case-insensitive substring of the challan number (YYYYMMDD-XXXX).
+          The date window still applies -- the number carries its own date. Single
+          value; AND-ed with the other filters.
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the goods were sent to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client public id(s) the goods were consigned to (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: end_date_time
+        schema:
+          type: string
+          format: date-time
+        description: ISO 8601. End date time of the window.
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (DE-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (dispatch_date, created_at); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: start_date_time
+        schema:
+          type: string
+          format: date-time
+        description: ISO 8601. Start date time of the window.
+        required: true
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Whether the order is still DISPATCHED or already DELIVERED. Comma-separated
+          (any match); AND-ed with the other filters.
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallanPage'
+          description: ''
   /android/api/v1/get-clients:
     get:
       operationId: android_api_v1_get_clients_list
@@ -5448,6 +5556,40 @@ components:
       - quantity
       - selling_price
       - total_weight
+    ChallanPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DispatchChallanItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
     ChallanParty:
       type: object
       description: Output shape for our own consignor block (schema only).

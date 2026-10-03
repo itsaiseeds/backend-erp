@@ -19,6 +19,8 @@ from .CreateMultiSelectBagOrderView import CreateMultiSelectBagOrderView
 from .CropsView import CropsView
 from .DeleteFieldTripView import DeleteFieldTripView
 from .EndFieldTripView import EndFieldTripView
+from .GetChallansView import GetChallansView
+from .GetChallanView import GetChallanView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
@@ -73,6 +75,8 @@ ROUTES: dict[str, type] = {
     "notification/<int:id>/read": MarkNotificationReadView,
     "get-clients": GetClientsView,
     "get-orders": GetOrdersView,
+    "get-challans": GetChallansView,
+    "get-challan/<order_public_id>": GetChallanView,
     "return-order/<order_public_id>": ReturnOrderView,
     "get-return-orders": GetReturnOrdersView,
     "client/<public_id>": GetClientView,

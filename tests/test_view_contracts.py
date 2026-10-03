@@ -118,6 +118,8 @@ EXPECTED_CONTRACTS = {
     ),
     "android/api/v1/get-clients": ("GetClientsView", TOKEN_SALESPERSON),
     "android/api/v1/get-orders": ("GetOrdersView", TOKEN_SALESPERSON),
+    "android/api/v1/get-challans": ("GetChallansView", TOKEN_SALESPERSON),
+    "android/api/v1/get-challan/<order_public_id>": ("GetChallanView", TOKEN_SALESPERSON),
     "android/api/v1/return-order/<order_public_id>": ("ReturnOrderView", TOKEN_SALESPERSON),
     "android/api/v1/get-return-orders": ("GetReturnOrdersView", TOKEN_SALESPERSON),
     "android/api/v1/devices/register": ("RegisterDeviceView", TOKEN_SALESPERSON),
