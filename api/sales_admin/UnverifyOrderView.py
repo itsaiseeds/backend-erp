@@ -39,4 +39,4 @@ class UnverifyOrderView(OrderTransitionView):
         return self.transition(request, public_id)
 
     def apply_transition(self, order: Order, request: Request) -> None:
-        unverify_order(order)
+        unverify_order(order, actor=request.user)

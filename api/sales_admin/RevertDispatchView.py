@@ -36,4 +36,4 @@ class RevertDispatchView(OrderTransitionView):
         return self.transition(request, public_id)
 
     def apply_transition(self, order: Order, request: Request) -> None:
-        revert_dispatch(order)
+        revert_dispatch(order, actor=request.user)

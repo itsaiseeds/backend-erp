@@ -4,9 +4,13 @@ from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
 
 
 class Pincode(TimeStampedModel, SoftDeletedModel, CreatedByModel):
-    """A postal/pin code, tied to a city."""
+    """A postal/pin code, tied to a city.
 
-    code = models.CharField("code", max_length=10, db_index=True)
+    A code identifies one post office, so it is unique on its own -- the same
+    code never appears under two cities.
+    """
+
+    code = models.CharField("code", max_length=10, unique=True)
     city = models.ForeignKey(
         "aggregator.City",
         verbose_name="city",
@@ -18,12 +22,6 @@ class Pincode(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         verbose_name = "pincode"
         verbose_name_plural = "pincodes"
         ordering = ["code"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["city", "code"],
-                name="uniq_pincode_city_code",
-            ),
-        ]
 
     def __str__(self):
         return f"{self.code} – {self.city}" if self.city_id else self.code

@@ -36,4 +36,4 @@ class RejectOrderView(OrderTransitionView):
         return self.transition(request, public_id)
 
     def apply_transition(self, order: Order, request: Request) -> None:
-        reject_order(order)
+        reject_order(order, actor=request.user)

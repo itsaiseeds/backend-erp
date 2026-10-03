@@ -39,4 +39,4 @@ class HoldOrderView(OrderTransitionView):
         return self.transition(request, public_id)
 
     def apply_transition(self, order: Order, request: Request) -> None:
-        hold_order(order)
+        hold_order(order, actor=request.user)

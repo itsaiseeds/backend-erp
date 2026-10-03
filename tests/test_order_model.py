@@ -287,7 +287,7 @@ class OrderModelTest(DMLTestCase):
         self._count_stock()
         order = self._order()
         verify_order(order, self.adm_user)
-        unverify_order(order)
+        unverify_order(order, actor=self.adm_user)
         assert order.status.code == "UNDER_REVIEW"
         assert order.verified_by_id is None
         assert order.verified_at is None

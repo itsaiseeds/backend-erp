@@ -158,3 +158,46 @@ class FarmerVisitPageSerializer(serializers.Serializer):
     results = FarmerVisitPayloadSerializer(many=True)
     available_filters = FilterCatalogueEntrySerializer(many=True)
     available_sorts = SortCatalogueEntrySerializer(many=True)
+
+
+class FarmerPayloadSerializer(serializers.Serializer):
+    """Output shape for one farmer across every trip.
+
+    A farmer is one ``contact_number``, whatever the number of trips they were
+    recorded on: ``farmer_name`` / ``village`` / ``city`` / ``land_area_bigha``
+    come from their latest visit, while ``crops`` / ``products`` are merged over
+    all of them and ``visits`` lists the meetings behind the row.
+    ``FieldTripOperations.farmer_payload`` builds it.
+    """
+
+    contact_number = serializers.CharField(help_text="The farmer's identity across trips.")
+    farmer_name = serializers.CharField(help_text="Name given at the latest visit.")
+    village = serializers.CharField(help_text="Village of the latest visit.")
+    city = IdNameSerializer(help_text="City of the latest visit's field trip.")
+    land_area_bigha = serializers.CharField(help_text="Land held at the latest visit, in bigha.")
+    crops = IdNameSerializer(many=True, help_text="Every crop they grow, merged over visits.")
+    uses_our_products = serializers.BooleanField()
+    products = ProductRefSerializer(
+        many=True, help_text="Every product of ours they use, merged over visits."
+    )
+    visit_count = serializers.IntegerField(help_text="How many visits they have in all.")
+    last_visited_at = serializers.DateTimeField(help_text="When they were last recorded.")
+    sales_people = UserContactRefSerializer(
+        many=True, help_text="Sales people who have recorded a visit of theirs."
+    )
+    visits = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="Their visits, newest first: public_id, field_trip_public_id, created_at.",
+    )
+
+
+class FarmerPageSerializer(serializers.Serializer):
+    """Output shape for a paginated page of farmers (all trips)."""
+
+    total_count = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+    next_page_number = serializers.IntegerField(allow_null=True)
+    previous_page_number = serializers.IntegerField(allow_null=True)
+    results = FarmerPayloadSerializer(many=True)
+    available_filters = FilterCatalogueEntrySerializer(many=True)
+    available_sorts = SortCatalogueEntrySerializer(many=True)

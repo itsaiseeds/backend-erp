@@ -80,7 +80,7 @@ class ReturnWorldTestCase(LedgerWorldTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.admin_user = User.objects.create_user(
-            "9530000001", "Return Admin", created_by=cls.su, verified_by=cls.su, is_verified=True
+            "9530000001", "Meera Desai", created_by=cls.su, verified_by=cls.su, is_verified=True
         )
         Admin.objects.create(user=cls.admin_user, created_by=cls.su, can_update_stock_count=True)
         cls.other_sp = User.objects.create_user(
@@ -196,7 +196,7 @@ class ReturnOrderOperationsTest(ReturnWorldTestCase):
                 self.new_return(order)
 
         delivered = self.dispatched_order()
-        mark_delivered(delivered)
+        mark_delivered(delivered, actor=self.admin_user)
         ret = self.new_return(delivered)
         self.assertEqual(ret.order_id, delivered.pk)
 
@@ -453,14 +453,14 @@ class ReturnOrderOperationsTest(ReturnWorldTestCase):
             with self.subTest(case=label):
                 prepare()
                 with self.assertRaises(ValidationError) as caught:
-                    revert_dispatch(order)
+                    revert_dispatch(order, actor=self.admin_user)
                 self.assertIn(ret.public_id, " ".join(caught.exception.messages))
                 order.refresh_from_db()
                 self.assertEqual(order.status_id, StatusIds.DISPATCHED)
 
         revert_accept_return_order(ret, admin=self.admin_user)
         reject_return_order(ret, admin=self.admin_user)
-        revert_dispatch(order)  # a rejected return does not hold the order
+        revert_dispatch(order, actor=self.admin_user)  # a rejected return does not hold the order
         order.refresh_from_db()
         self.assertEqual(order.status_id, StatusIds.CONFIRMED)
 
@@ -658,9 +658,12 @@ class ReturnOrderOperationsTest(ReturnWorldTestCase):
             {"return_order_public_id": accepted.public_id, "order_public_id": order.public_id},
         )
         self.assertEqual(first.order, order)
-        self.assertIn(accepted.public_id, first.body)
-        self.assertIn(order.public_id, first.body)
-        self.assertTrue(first.body.endswith("was accepted."))
+        self.assertEqual(
+            first.body,
+            f"{accepted.public_id} against {order.public_id} for Ledger Traders "
+            "was accepted by Meera Desai.",
+        )
+        self.assertTrue(second.body.endswith("was rejected by Meera Desai."))
         self.assertEqual(accept_push[3]["screen"], "return_order_detail")
         self.assertEqual(reject_push[3]["type"], "RETURN_REJECTED")
 
