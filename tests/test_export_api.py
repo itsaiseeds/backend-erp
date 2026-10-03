@@ -32,6 +32,7 @@ from aggregator.models import (
     State,
 )
 from aggregator.OrderOperations import create_order
+from api.export_views import MAX_EXPORT_RANGE_DAYS
 from api.sales_admin.ExportCustomOrdersView import ExportCustomOrdersResponseSerializer
 from api.sales_admin.ExportInventorySnapshotsView import (
     ExportInventorySnapshotsPageSerializer,
@@ -222,15 +223,17 @@ class ExportApiTest(WebApiTestCase):
 
     def test_the_window_is_validated(self):
         """tests/test_export_api.py::ExportApiTest::test_the_window_is_validated"""
-        start = self.today - timedelta(days=30)
+        # Derived from the cap, not hard-coded: widening the window must not leave
+        # the test asserting a boundary the view no longer enforces.
+        at_cap = self.today - timedelta(days=MAX_EXPORT_RANGE_DAYS - 1)
         cases = {
             "missing": {},
             "end before start": {
                 "start_date": self.today.isoformat(),
                 "end_date": (self.today - timedelta(days=1)).isoformat(),
             },
-            "32 days": {
-                "start_date": (start - timedelta(days=1)).isoformat(),
+            f"one day over the {MAX_EXPORT_RANGE_DAYS}-day cap": {
+                "start_date": (at_cap - timedelta(days=1)).isoformat(),
                 "end_date": self.today.isoformat(),
             },
         }
@@ -239,7 +242,8 @@ class ExportApiTest(WebApiTestCase):
                 resp = self.client.get(ORDERS_URL, params)
                 self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.data)
 
-        resp = self._export(ORDERS_URL, start, self.today)  # exactly 31 days
+        # Exactly at the cap is allowed, so the cap is inclusive.
+        resp = self._export(ORDERS_URL, at_cap, self.today)
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
 
     def test_the_window_is_inclusive_ist_days(self):
