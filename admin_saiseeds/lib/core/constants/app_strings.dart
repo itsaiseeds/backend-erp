@@ -630,6 +630,9 @@ class AppStrings {
   static const String ORDER_PICK_PRODUCTS_TITLE = 'Add products';
   static const String ORDER_PICK_PRODUCTS_SUBTITLE =
       'Choose the bags to add to this order.';
+  static const String ORDER_PICK_PRODUCTS_SUBTITLE_PACKETS =
+      'Choose the packets to add to this order.';
+  static const String ORDER_PICK_PER_PACKET = 'per packet';
   static const String ORDER_PICK_SEARCH_HINT = 'Search products...';
   static const String ORDER_PICK_EMPTY = 'No packagings match your search.';
   static const String ORDER_PICK_ADD = 'ADD';
@@ -741,6 +744,60 @@ class AppStrings {
   static const String CHALLAN_VIEW = 'View challan';
   static const String CHALLAN_PREVIEW_TITLE = 'Delivery challan';
   static const String CHALLAN_FILE_PREFIX = 'challan-';
+  static const String EXPORTS = 'Exports';
+  static const String EXPORT = 'Export';
+  static const String EXPORT_SUBTITLE =
+      'Pick a report, choose the days it covers, and download it as a '
+      'spreadsheet.';
+  static const String EXPORT_CARD_ACTION = 'Choose dates';
+  static const String EXPORT_BUILDING = 'Building...';
+  static const String EXPORT_HINT_TITLE = 'Good to know';
+  static const String EXPORT_HINT_WINDOW =
+      'A window can cover up to 31 days.';
+  static const String EXPORT_HINT_ROWS =
+      'Every report lands as one row per line, ready to filter or pivot.';
+  static const String EXPORT_HINT_HISTORY =
+      'Inventory Snapshots can run without dates for the full history.';
+  static const String EXPORT_DIALOG_TITLE = 'Export report';
+  static const String EXPORT_DIALOG_SUBTITLE =
+      'Choose the days to include, then download.';
+  static const String EXPORT_FORMAT_LABEL = 'Format';
+  static const String EXPORT_FORMAT_SHEET = 'Spreadsheet';
+  static const String EXPORT_FORMAT_SHEET_BODY = 'One row per line item';
+  static const String EXPORT_FORMAT_RECEIPTS = 'Delivery challans';
+  static const String EXPORT_FORMAT_RECEIPTS_BODY = 'A PDF each, in a zip';
+  static const String EXPORT_RECEIPTS_DONE = 'Challans downloaded';
+  static const String EXPORT_RANGE_LABEL = 'Date range';
+  static const String EXPORT_RANGE_HINT = 'Choose the days to include';
+  static const String EXPORT_START_DATE = 'Start date';
+  static const String EXPORT_END_DATE = 'End date';
+  static const String EXPORT_RANGE_REQUIRED = 'Choose both dates.';
+  static const String EXPORT_RANGE_BACKWARDS =
+      'The end date cannot be before the start date.';
+  static const String EXPORT_RANGE_TOO_LONG =
+      'A window can span at most 31 days.';
+  static const String EXPORT_EMPTY = 'Nothing to export for those dates.';
+  static const String EXPORT_FAILED = 'Could not build the export.';
+  static const String EXPORT_DONE = 'Export downloaded';
+  static const String EXPORT_ROWS_ONE = 'row';
+  static const String EXPORT_ROWS_MANY = 'rows';
+  static const String EXPORT_ORDERS = 'Orders';
+  static const String EXPORT_ORDERS_BODY =
+      'Orders booked in the window, one row per line item.';
+  static const String EXPORT_CUSTOM_ORDERS = 'Custom Orders';
+  static const String EXPORT_CUSTOM_ORDERS_BODY =
+      'Loose-packet orders booked in the window, one row per line item.';
+  static const String EXPORT_DISPATCH_RECEIPTS = 'Dispatch Receipts';
+  static const String EXPORT_DISPATCH_RECEIPTS_BODY =
+      'Challans for orders and custom orders booked in the window.';
+  static const String EXPORT_INWARD_ENTRIES = 'Inward Entries';
+  static const String EXPORT_INWARD_ENTRIES_BODY =
+      'Raw and other material received in the window, grouped by day.';
+  static const String EXPORT_INVENTORY_SNAPSHOTS = 'Inventory Snapshots';
+  static const String EXPORT_INVENTORY_SNAPSHOTS_BODY =
+      'Bag and loose stock counts. Leave the dates empty for all history.';
+  static const String EXPORT_WINDOW_OPTIONAL =
+      'Optional for this report -- leave both empty for the full history.';
   static const String PRINT = 'Print';
   static const String CUSTOM_ORDERS = 'Custom Orders';
   static const String COLUMN_CUSTOM_ORDER_CITY = 'City';
@@ -868,7 +925,7 @@ class AppStrings {
   static const String DISPATCH_SUMMARY_ITEMS = 'Bags';
 
   static const String PRODUCT_STOCK = 'Product Stock';
-  static const String RAW_MATERIAL_STOCK = 'Raw Material Stock';
+  static const String RAW_MATERIAL_STOCK = 'Raw Material';
 
   static const String OTHER_MATERIAL_STOCK = 'Material Stock';
   static const String PACKETS_PER_BAG_SUFFIX = 'packets / bag';
@@ -916,9 +973,9 @@ class AppStrings {
       'Could not load raw material stock';
   static const String STOCK_AS_OF_PREFIX = 'As of';
 
-  static const String INWARD_RAW_MATERIALS = 'Raw Material Inward';
-  static const String OTHER_RAW_MATERIALS = 'Other Material Recipes';
-  static const String OTHER_MATERIAL_INWARD = 'Other Mat. Inward';
+  static const String INWARD_RAW_MATERIALS = 'Raw Material';
+  static const String OTHER_RAW_MATERIALS = 'Material Recipes';
+  static const String OTHER_MATERIAL_INWARD = 'Other Material';
 
   static const String COLUMN_RECIPE = 'Recipe';
 

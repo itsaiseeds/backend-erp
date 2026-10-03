@@ -29,6 +29,7 @@ from rest_framework.response import Response
 
 from aggregator import InventoryOperations
 from aggregator.models import ProductPackaging
+from aggregator.ProductOperations import usable_packagings
 from api.admin import AdminApiView
 
 
@@ -94,21 +95,36 @@ class UpdateTodaysInventoryView(AdminApiView):
         ids = set(counts)
         packagings = {
             p.public_id: p
-            for p in ProductPackaging.objects.filter(public_id__in=ids)
+            for p in ProductPackaging.objects.select_related("product").filter(public_id__in=ids)
         }
         unknown = ids - set(packagings)
         if unknown:
             raise serializers.ValidationError(
                 {"counts": f"Unknown product packagings: {', '.join(sorted(unknown))}."}
             )
+        frozen = sorted(
+            p.product.name for p in packagings.values() if not p.product.is_usable
+        )
+        if frozen:
+            raise serializers.ValidationError(
+                {
+                    "counts": (
+                        "Stock cannot be counted for unusable product(s): "
+                        + ", ".join(dict.fromkeys(frozen))
+                        + "."
+                    )
+                }
+            )
         return {packagings[pid]: value for pid, value in counts.items()}
 
     @extend_schema(
         summary="Replace today's entire stock count",
         description=(
-            "Sealed-bag counts only: every active packaging receives a snapshot "
-            "row for today, and packagings absent from ``counts`` are recorded as "
-            "zero bags. Loose packets are not accepted here -- record them at "
+            "Sealed-bag counts only: every active packaging of a usable product "
+            "receives a snapshot row for today, and packagings absent from "
+            "``counts`` are recorded as zero bags. Packagings of an unusable "
+            "product cannot be counted (naming one is a 400); their last figure "
+            "is carried forward. Loose packets are not accepted here -- record them at "
             "``/api/sales-admin/update-sample-packet-stock``."
         ),
         request=UpdateTodaysInventorySerializer,
@@ -133,11 +149,13 @@ class UpdateTodaysInventoryView(AdminApiView):
 
         full_counts = {
             packaging: provided.get(packaging, 0)
-            for packaging in ProductPackaging.objects.all()
+            for packaging in usable_packagings()
         }  # noqa: C420 -- provided.get() varies per key, not a constant fill
         try:
+            # Packagings of an unusable product cannot be counted; carry their last
+            # figure forward so freezing a product never moves its stock.
             snapshots = InventoryOperations.record_stock_counts(
-                counts=full_counts, actor=request.user
+                counts=full_counts, actor=request.user, carry_frozen=True
             )
         except ValueError as exc:
             raise serializers.ValidationError({"counts": str(exc)}) from None

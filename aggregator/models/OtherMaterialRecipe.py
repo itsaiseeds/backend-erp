@@ -74,6 +74,16 @@ class OtherMaterialRecipe(
             ),
         ]
 
+    def guard_soft_delete(self, perform):
+        """Refuse deleting a recipe of an unusable product (``assert_products_usable``).
+
+        A recipe is never edited in place, so removing one is how it is changed.
+        """
+        from aggregator.ProductOperations import assert_products_usable
+
+        assert_products_usable([self.product_id], action="have its recipe deleted")
+        perform()
+
     def __str__(self):
         return (
             f"{self.product}: {self.quantity} {self.material_type.unit_type} "

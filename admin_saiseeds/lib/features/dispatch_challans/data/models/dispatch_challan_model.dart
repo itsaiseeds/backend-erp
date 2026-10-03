@@ -246,6 +246,19 @@ class ChallanItemModel {
     );
   }
 
+  /// Bags on this line, or 1 for a loose custom-order line which has none.
+  int get effectiveBags => quantity <= 0 ? 1 : quantity;
+
+  /// Packets actually shipped: packets per bag x bags.
+  ///
+  /// A custom order sells loose packets and sends no `quantity`, so the raw
+  /// multiplication would zero the line out.
+  int get shippedPackets => packets * effectiveBags;
+
+  /// Whether this line came from a bagged order. A custom-order line has no
+  /// bag count, so the Bags column has nothing to show for it.
+  bool get hasBags => quantity > 0;
+
   /// Weight actually shipped: packet weight x packets x bags.
   ///
   /// Derived rather than read from `total_weight`, which a custom order's
@@ -253,8 +266,7 @@ class ChallanItemModel {
   String get shippedWeight {
     final double? unit = double.tryParse(packetWeight.trim());
     if (unit == null) return '';
-    final int bags = quantity <= 0 ? 1 : quantity;
-    final double total = unit * packets * bags;
+    final double total = unit * shippedPackets;
     return total.toStringAsFixed(3);
   }
 

@@ -740,6 +740,10 @@ CREATE TABLE IF NOT EXISTS public.aggregator_product (
 	stage_id int8 NOT NULL,
 	selling_price numeric(12, 2) NOT NULL,
 	image_url varchar(500) NOT NULL DEFAULT '',
+	-- False freezes the product: no inward, waste, packaging, recipe, count or
+	-- booking may touch it (ProductOperations.assert_products_usable). Production
+	-- (Neon) needs: ALTER TABLE public.aggregator_product ADD COLUMN is_usable bool NOT NULL DEFAULT true;
+	is_usable bool NOT NULL DEFAULT true,
 	CONSTRAINT aggregator_product_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_product_public_id_key UNIQUE (public_id),
 	CONSTRAINT uniq_product_name_crop UNIQUE (name, crop_id),
@@ -749,6 +753,7 @@ CREATE INDEX IF NOT EXISTS aggregator_product_public_id_like ON public.aggregato
 CREATE INDEX IF NOT EXISTS aggregator_product_crop_id_idx ON public.aggregator_product USING btree (crop_id);
 CREATE INDEX IF NOT EXISTS aggregator_product_stage_id_idx ON public.aggregator_product USING btree (stage_id);
 CREATE INDEX IF NOT EXISTS aggregator_product_is_deleted_idx ON public.aggregator_product USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_product_is_usable_idx ON public.aggregator_product USING btree (is_usable);
 CREATE INDEX IF NOT EXISTS aggregator_product_created_by_id_idx ON public.aggregator_product USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_product_deleted_by_id_idx ON public.aggregator_product USING btree (deleted_by_id);
 
@@ -1817,3 +1822,40 @@ CREATE TABLE IF NOT EXISTS public.aggregator_packedrecipelayer (
 );
 CREATE INDEX IF NOT EXISTS ix_packedlayer_inventory ON public.aggregator_packedrecipelayer USING btree (inventory_snapshot_id) WHERE inventory_snapshot_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix_packedlayer_loose ON public.aggregator_packedrecipelayer USING btree (loose_stock_snapshot_id) WHERE loose_stock_snapshot_id IS NOT NULL;
+
+-- aggregator_pushdevice -------------------------------------------------------
+-- One installed copy of the Android app, reachable by an FCM token. The token is
+-- unique: a phone that logs in as someone else moves to the new user.
+CREATE TABLE IF NOT EXISTS public.aggregator_pushdevice (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	user_id int8 NOT NULL,
+	fcm_token varchar(512) NOT NULL,
+	app_version varchar(32) NOT NULL,
+	CONSTRAINT aggregator_pushdevice_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_pushdevice_fcm_token_key UNIQUE (fcm_token),
+	CONSTRAINT aggregator_pushdevice_user_id_fk FOREIGN KEY (user_id) REFERENCES public.authentication_user(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX IF NOT EXISTS aggregator_pushdevice_user_id_idx ON public.aggregator_pushdevice USING btree (user_id);
+
+-- aggregator_notification -----------------------------------------------------
+-- In-app inbox: one row per event reported to a user, written in the same
+-- transaction as the change itself, whether or not the push reaches the phone.
+CREATE TABLE IF NOT EXISTS public.aggregator_notification (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	recipient_id int8 NOT NULL,
+	event_type varchar(32) NOT NULL,
+	title varchar(120) NOT NULL,
+	body varchar(255) NOT NULL,
+	data jsonb NOT NULL,
+	order_id int8 NULL,
+	read_at timestamptz NULL,
+	CONSTRAINT aggregator_notification_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_notification_recipient_id_fk FOREIGN KEY (recipient_id) REFERENCES public.authentication_user(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_notification_order_id_fk FOREIGN KEY (order_id) REFERENCES public.aggregator_order(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX IF NOT EXISTS ix_notification_recipient ON public.aggregator_notification USING btree (recipient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS aggregator_notification_order_id_idx ON public.aggregator_notification USING btree (order_id);

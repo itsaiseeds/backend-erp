@@ -169,6 +169,9 @@ Read by `config/settings.py` (fallbacks exist for `SECRET_KEY`/`DEBUG`/`ALLOWED_
 | `CORS_ALLOWED_ORIGINS` | (empty) | admin web origin |
 | `DJANGO_SUPERUSER_*` | (dev fallback) | from Render dashboard |
 | `SUPABASE_URL` | (empty → local disk) | Supabase project URL |
+| `FCM_SERVICE_ACCOUNT_JSON` | (empty → pushes skipped) | Contents of the Firebase service-account key; enables order push notifications to the Android app (secret) |
+| `FCM_PROJECT_ID` | `sales-saiseeds` | Firebase project id |
+| `FCM_ANDROID_CHANNEL_ID` | `order_updates` | Notification channel the app creates for order updates |
 | `SUPABASE_SECRET_KEY` | (empty → local disk) | Supabase secret key |
 | `SUPABASE_STORAGE_BUCKET` | `product-images` | `product-images` (public bucket) |
 

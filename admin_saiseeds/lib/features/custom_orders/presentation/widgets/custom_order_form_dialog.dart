@@ -228,6 +228,7 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
         apiClient: context.read<ApiClient>(),
       ),
       existingPublicIds: {for (final CustomOrderLine line in _lines) line.key},
+      isPerPacket: true,
     );
     if (picked == null || picked.isEmpty || !mounted) return;
 
@@ -258,11 +259,21 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
             packetWeight: source.packetWeight,
             packetsPerBag: source.packets,
             packets: entry.quantity,
-            priceText: source.sellingPrice,
+            priceText: _packetPriceOf(source),
           ),
         ];
       }
     });
+  }
+
+  /// A bag's price divided by what it holds: a custom order line is priced
+  /// per packet, but the API only publishes the bag price.
+  static String _packetPriceOf(ProductPackagingModel packaging) {
+    final num? bagPrice = packaging.sellingPriceValue;
+    if (bagPrice == null || packaging.packets <= 0) {
+      return packaging.sellingPrice;
+    }
+    return (bagPrice / packaging.packets).toStringAsFixed(2);
   }
 
   void _removeLine(int index) {

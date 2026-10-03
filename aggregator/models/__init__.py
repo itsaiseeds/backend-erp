@@ -20,6 +20,7 @@ from .FieldTrip import FieldTrip
 from .InwardEntryMixin import InwardEntryMixin
 from .InwardOtherMaterial import InwardOtherMaterial
 from .InwardRawMaterial import InwardRawMaterial, InwardRawMaterialStatus
+from .Notification import Notification
 from .Order import Order
 from .OrderItem import OrderItem
 from .OtherMaterialRecipe import OtherMaterialRecipe
@@ -31,6 +32,7 @@ from .PrivateDispatchDetails import PrivateDispatchDetails
 from .Product import Product
 from .ProductDescriptionItem import ProductDescriptionItem
 from .ProductPackaging import ProductPackaging
+from .PushDevice import PushDevice
 from .RawMaterialWaste import RawMaterialWaste
 from .ReturnOrder import ReturnOrder
 from .ReturnOrderItem import ReturnOrderItem
@@ -68,6 +70,8 @@ __all__ = [
     "ProductDescriptionItem",
     "ProductPackaging",
     "InventorySnapshot",
+    "Notification",
+    "PushDevice",
     "LooseStockSnapshot",
     "DispatchDetails",
     "PrivateDispatchDetails",

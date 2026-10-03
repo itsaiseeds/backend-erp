@@ -32,7 +32,8 @@ from .models import (
     TransportAgency,
 )
 from .models.ReturnOrder import LIVE_RETURN_STATUS_IDS
-from .ProductOperations import packaging_payload
+from .NotificationOperations import NotificationEvent, notify_order_event
+from .ProductOperations import assert_products_usable, packaging_payload
 from .ReturnOrderOperations import order_return_payload
 from .StockLedgerOperations import dispatch_detail, order_product_ids, recording
 
@@ -62,7 +63,16 @@ def create_order(
     ``transport_agency`` must be one of the client's own agencies (``Order.clean``
     enforces it). Leave it ``None`` for a private, own-vehicle dispatch -- the
     default assumption.
+
+    Refused (400) when any line's product is not usable.
     """
+    items = list(items)
+    assert_products_usable(
+        [item["product_packaging"].product_id for item in items],
+        field="items",
+        action="be ordered",
+        subject="this order",
+    )
     order = Order(
         client=client,
         delivery_address=delivery_address,
@@ -415,7 +425,9 @@ def hold_order(order: Order) -> Order:
         order_product_ids(order),
         source=order,
     ):
-        return update_order_status(order, StatusIds.ON_HOLD)
+        update_order_status(order, StatusIds.ON_HOLD)
+    notify_order_event(order, NotificationEvent.ORDER_ON_HOLD)
+    return order
 
 
 def reject_order(order: Order) -> Order:
@@ -427,7 +439,9 @@ def reject_order(order: Order) -> Order:
         order_product_ids(order),
         source=order,
     ):
-        return update_order_status(order, StatusIds.REJECTED)
+        update_order_status(order, StatusIds.REJECTED)
+    notify_order_event(order, NotificationEvent.ORDER_REJECTED)
+    return order
 
 
 @transaction.atomic
@@ -524,6 +538,12 @@ def dispatch_order(
         source=order,
         actor=actor,
     ) as rec:
+        assert_products_usable(
+            order_product_ids(order),
+            field="status",
+            action="be dispatched",
+            subject="this order",
+        )
         attach(
             order,
             dispatched_by=actor,
@@ -548,6 +568,7 @@ def dispatch_order(
         )
         update_order_status(order, StatusIds.DISPATCHED)
         rec.detail = dispatch_detail(order)
+    notify_order_event(order, NotificationEvent.ORDER_DISPATCHED)
     return order
 
 
@@ -580,6 +601,12 @@ def verify_order(order: Order, admin: User) -> Order:
         source=order,
         actor=admin,
     ):
+        assert_products_usable(
+            order_product_ids(order),
+            field="status",
+            action="be verified",
+            subject="this order",
+        )
         assert_stock_covers(InventoryOperations.order_bag_requirements(order), "verify")
 
         order.status = Status.by_id(StatusIds.CONFIRMED)
@@ -587,6 +614,7 @@ def verify_order(order: Order, admin: User) -> Order:
         order.verified_at = indian_now()
         order.full_clean()
         order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+    notify_order_event(order, NotificationEvent.ORDER_CONFIRMED)
     return order
 
 
@@ -612,6 +640,7 @@ def unverify_order(order: Order, *, status: StatusIds = StatusIds.UNDER_REVIEW) 
         order.verified_at = None
         order.full_clean()
         order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+    notify_order_event(order, NotificationEvent.ORDER_UNDER_REVIEW)
     return order
 
 
@@ -656,16 +685,22 @@ def revert_dispatch(order: Order) -> Order:
         order.actual_delivery_date = None
         order.full_clean()
         order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
+    notify_order_event(order, NotificationEvent.ORDER_DISPATCH_REVERTED)
     return order
 
 
+@transaction.atomic
 def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
-    """Mark a dispatched order delivered."""
+    """Mark a dispatched order delivered (refused while a product on it is not usable)."""
     assert_order_status(order, DELIVERABLE_STATUS_CODES, "deliver")
+    assert_products_usable(
+        order_product_ids(order), field="status", action="be delivered", subject="this order"
+    )
     order.status = Status.by_id(StatusIds.DELIVERED)
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
     order.full_clean()
     order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
+    notify_order_event(order, NotificationEvent.ORDER_DELIVERED)
     return order
 
 
@@ -926,6 +961,21 @@ def _sync_order_items(order: Order, items: list[dict], actor: User) -> list[Orde
             "product_packaging"
         )
     }
+
+    # A frozen product's line may be removed or lowered (that releases stock) but
+    # not added back or raised. A soft-deleted line being restored counts as added.
+    assert_products_usable(
+        {
+            item["product_packaging"].product_id
+            for item in items
+            if existing.get(item["product_packaging"].pk) is None
+            or existing[item["product_packaging"].pk].is_deleted
+            or item["quantity"] > existing[item["product_packaging"].pk].quantity
+        },
+        field="items",
+        action="have order lines added or raised",
+        subject="this order",
+    )
 
     if order.is_verified:
         held = {

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime
 from decimal import Decimal
+from unittest import mock
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from rest_framework import status
@@ -28,7 +29,10 @@ from aggregator import InwardOperations, StockLedgerOperations
 from aggregator.models import (
     InwardOtherMaterial,
     InwardRawMaterial,
+    Notification,
     OtherMaterialRecipe,
+    Product,
+    PushDevice,
     ReturnOrder,
     ReturnOrderItem,
     StatusIds,
@@ -627,6 +631,39 @@ class ReturnOrderOperationsTest(ReturnWorldTestCase):
         self.assertEqual(len(payload["inward_other_materials"]), 1)
         self.assertEqual(documented_keys_mismatches(ReturnOrderPayloadSerializer(), payload), [])
 
+    def test_accepting_and_rejecting_notify_the_sales_person_who_raised_the_return(self):
+        """tests/test_return_orders.py::ReturnOrderOperationsTest::test_accepting_and_rejecting_notify_the_sales_person_who_raised_the_return"""
+        order = self.dispatched_order()
+        accepted = self.new_return(order, 10)
+        with (
+            mock.patch(
+                "aggregator.NotificationOperations.fire_and_forget",
+                side_effect=lambda func: func(),
+            ),
+            mock.patch("aggregator.NotificationOperations.send_push", return_value=[]) as send,
+        ):
+            PushDevice.objects.create(user=self.sp_user, fcm_token="phone-1")
+            self.accept(accepted)
+            accept_push = send.call_args.args
+            reject_return_order(self.new_return(self.dispatched_order(), 5), admin=self.admin_user)
+            reject_push = send.call_args.args
+
+        first, second = Notification.objects.filter(
+            recipient=self.sp_user, event_type__startswith="RETURN_"
+        ).order_by("id")
+        self.assertEqual((first.event_type, first.title), ("RETURN_ACCEPTED", "Return accepted"))
+        self.assertEqual((second.event_type, second.title), ("RETURN_REJECTED", "Return rejected"))
+        self.assertEqual(
+            first.data,
+            {"return_order_public_id": accepted.public_id, "order_public_id": order.public_id},
+        )
+        self.assertEqual(first.order, order)
+        self.assertIn(accepted.public_id, first.body)
+        self.assertIn(order.public_id, first.body)
+        self.assertTrue(first.body.endswith("was accepted."))
+        self.assertEqual(accept_push[3]["screen"], "return_order_detail")
+        self.assertEqual(reject_push[3]["type"], "RETURN_REJECTED")
+
 
 class ReturnOrderLedgerReportTest(ReturnWorldTestCase):
     """The accept and its revert show up in the product's ledger report."""
@@ -1054,3 +1091,68 @@ class ReturnOrderApiTest(ReturnWorldTestCase):
             self.web.get(f"{self.ADMIN}return-order-recipes/RET-NOSUCHRETURN").status_code,
             status.HTTP_404_NOT_FOUND,
         )
+
+
+class ReturnOrderFreezeTest(ReturnWorldTestCase):
+    """A frozen product (``is_usable = False``) takes no new return stock movement.
+
+    tests/test_return_orders.py::ReturnOrderFreezeTest
+    """
+
+    def freeze(self, product):
+        Product.objects.filter(pk=product.pk).update(is_usable=False)
+        product.refresh_from_db()
+
+    def test_a_return_cannot_be_raised_for_a_frozen_product(self):
+        """tests/test_return_orders.py::ReturnOrderFreezeTest::test_a_return_cannot_be_raised_for_a_frozen_product"""
+        order = self.dispatched_order()
+        self.freeze(self.product)
+        with self.assertRaises(ValidationError) as ctx:
+            self.new_return(order)
+        self.assertIn("not usable", str(ctx.exception))
+        self.assertFalse(ReturnOrder.all_objects.exists())
+
+    def test_a_pending_return_can_shrink_but_not_grow_or_be_accepted_while_frozen(self):
+        """Releases stay open: lowering and rejecting work; raising and accepting do not.
+
+        tests/test_return_orders.py::ReturnOrderFreezeTest::test_a_pending_return_can_shrink_but_not_grow_or_be_accepted_while_frozen
+        """
+        order = self.dispatched_order()
+        ret = self.new_return(order, 10)
+        self.freeze(self.product)
+
+        with self.assertRaises(ValidationError):
+            update_return_order(
+                ret, return_date=None, items=[self.item(self.product, 20)], actor=self.sp_user
+            )
+        update_return_order(
+            ret, return_date=None, items=[self.item(self.product, 5)], actor=self.sp_user
+        )
+        self.assertEqual(ret.items.get().packets, 5)
+
+        raw_before = InwardRawMaterial.objects.count()
+        with self.assertRaises(ValidationError) as ctx:
+            self.accept(ret)
+        self.assertIn("not usable", str(ctx.exception))
+        self.assertEqual(InwardRawMaterial.objects.count(), raw_before)
+
+        reject_return_order(ret, admin=self.admin_user)
+        ret.refresh_from_db()
+        self.assertEqual(ret.status_id, StatusIds.RETURN_REJECTED)
+
+    def test_an_accepted_return_cannot_be_reverted_while_its_product_is_frozen(self):
+        """Its inward lots are existing rows, so they are read-only until unfrozen.
+
+        tests/test_return_orders.py::ReturnOrderFreezeTest::test_an_accepted_return_cannot_be_reverted_while_its_product_is_frozen
+        """
+        ret = self.new_return(self.dispatched_order(), 10)
+        self.accept(ret)
+        self.freeze(self.product)
+
+        with self.assertRaises(ValidationError):
+            revert_accept_return_order(ret, admin=self.admin_user)
+        self.assertTrue(InwardRawMaterial.objects.filter(return_order=ret).exists())
+
+        Product.objects.filter(pk=self.product.pk).update(is_usable=True)
+        revert_accept_return_order(ret, admin=self.admin_user)
+        self.assertFalse(InwardRawMaterial.objects.filter(return_order=ret).exists())

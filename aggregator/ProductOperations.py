@@ -6,10 +6,12 @@ Products and packagings are exposed to the frontend by their ``public_id``
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import QuerySet
 
 from common.models import indian_now
 
@@ -23,6 +25,76 @@ from .models import (
 
 if TYPE_CHECKING:
     from authentication.models import User
+
+
+# -- Usability freeze ---------------------------------------------------------
+#
+# ``Product.is_usable = False`` freezes a product: nothing about it may be
+# created or changed (inward lots, waste, packagings, recipes, counts,
+# bookings), while its history stays visible. There is exactly one rule, below;
+# every writer calls it first, inside its transaction. Release actions (hold,
+# reject, unverify, revert a dispatch, delete an order) deliberately do not.
+
+
+def assert_products_usable(
+    products: Iterable[Product | int | None],
+    *,
+    field: str = "product",
+    action: str = "be changed",
+    subject: str = "it",
+) -> None:
+    """Raise a 400 unless every product in ``products`` is usable.
+
+    ``products`` holds ``Product`` instances or primary keys (``None`` is
+    ignored, so a nullable foreign key can be passed straight in). The rows are
+    locked in pk order *before* they are read, so the switch in
+    ``UpdateProductView`` -- which locks the same rows -- either lands before
+    the check (and the write is refused) or after the write commits; a write
+    can never slip past a freeze that is already in force. Therefore it must run
+    inside ``transaction.atomic``; the stock-ledger ``recording`` blocks already
+    are.
+
+    Deleted products are checked too (``all_objects``): a frozen, then deleted,
+    product stays frozen. One message names every offender so a caller fixes the
+    request once.
+
+    ``subject`` is who cannot act in the message ("so *it* cannot ..."); an order
+    says "this order".
+
+    ``ValidationError`` is what ``api.exceptions.custom_exception_handler``
+    turns into a 400, keyed by ``field``.
+    """
+    ids = sorted(
+        {
+            item.pk if isinstance(item, Product) else int(item)
+            for item in products
+            if item is not None
+        }
+    )
+    if not ids:
+        return
+    frozen = [
+        product.name
+        for product in Product.all_objects.select_for_update().filter(pk__in=ids).order_by("pk")
+        if not product.is_usable
+    ]
+    if frozen:
+        names = ", ".join(f"'{name}'" for name in frozen)
+        noun = "Product" if len(frozen) == 1 else "Products"
+        verb = "is" if len(frozen) == 1 else "are"
+        raise ValidationError(
+            {field: f"{noun} {names} {verb} not usable, so {subject} cannot {action}."}
+        )
+
+
+def usable_products() -> QuerySet[Product]:
+    """Live products that are switched on -- the queryset every picker starts from."""
+    return Product.objects.filter(is_usable=True)
+
+
+def usable_packagings() -> QuerySet[ProductPackaging]:
+    """Live packagings of usable, live products."""
+    return ProductPackaging.objects.filter(product__is_usable=True, product__is_deleted=False)
 
 
 def _resolve_crop(crop: Crop | str, actor: User) -> Crop:
@@ -58,6 +130,7 @@ def create_product(
     return product
 
 
+@transaction.atomic
 def add_packaging(
     product: Product,
     *,
@@ -73,7 +146,10 @@ def add_packaging(
     product rate turned into a packet price, then multiplied by the packets in
     the bag (captured at creation time --
     later changes to the product's price do not propagate here).
+
+    Refused (400) while the product is not usable.
     """
+    assert_products_usable([product], action="get a packaging")
     if selling_price is None:
         selling_price = packets * product.price_for_weight(packet_weight)
     packaging = ProductPackaging(
@@ -201,6 +277,7 @@ def product_payload(product: Product) -> dict:
         "stage": {"code": product.stage.code, "name": product.stage.name},
         "selling_price": str(product.selling_price),
         "image_url": product.image_url,
+        "is_usable": product.is_usable,
         "description_items": description_items_payload(product),
         "packagings": [
             packaging_payload(p) for p in product.packagings.all()

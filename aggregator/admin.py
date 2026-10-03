@@ -107,6 +107,65 @@ class StockLedgerAdminMixin:
             self.ledger_refine(rec, obj, change)
 
 
+class UnusableProductAdminMixin:
+    """Freeze the rows of an unusable product in the admin (``Product.is_usable``).
+
+    A row whose product is frozen is read-only -- no change, no delete -- and a
+    form cannot add or move a row onto a frozen product. Deleting several rows
+    at once is stopped by each model's own ``guard_soft_delete``, like every other
+    refusal.
+
+    ``product_path`` is the dotted path from the saved row to its product, and
+    ``form_product_path`` the same path from the form's cleaned data (they differ
+    where the product is reached through another field).
+    """
+
+    product_path = "product"
+    form_product_path = "product"
+
+    @staticmethod
+    def _walk(start, path: str):
+        current = start
+        for part in path.split("."):
+            current = getattr(current, part, None)
+            if current is None:
+                return None
+        return current
+
+    def _is_frozen(self, obj) -> bool:
+        product = self._walk(obj, self.product_path)
+        return product is not None and not product.is_usable
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and self._is_frozen(obj):
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and self._is_frozen(obj):
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        base = super().get_form(request, obj, change=change, **kwargs)
+        first, _, rest = self.form_product_path.partition(".")
+        walk = self._walk
+
+        class UsableProductForm(base):
+            def clean(self):
+                cleaned = super().clean()
+                value = (cleaned or {}).get(first)
+                product = walk(value, rest) if rest and value is not None else value
+                if product is not None and not product.is_usable:
+                    raise forms.ValidationError(
+                        f"Product '{product.name}' is not usable, so nothing can be "
+                        "created or changed for it."
+                    )
+                return cleaned
+
+        return UsableProductForm
+
+
 class ReturnLotAdminMixin:
     """Make a lot an accepted return booked read-only, and unassignable.
 
@@ -382,9 +441,17 @@ class ProductDescriptionItemInline(CreatedByStampInlineMixin, admin.TabularInlin
 @admin.register(Product)
 class ProductAdmin(SoftDeleteParentAdmin):
     form = ProductAdminForm
-    list_display = ("public_id", "name", "crop", "stage", "selling_price", "created_at")
+    list_display = (
+        "public_id",
+        "name",
+        "crop",
+        "stage",
+        "selling_price",
+        "is_usable",
+        "created_at",
+    )
     search_fields = ("public_id", "name", "crop__name")
-    list_filter = ("crop", "stage")
+    list_filter = ("crop", "stage", "is_usable")
     autocomplete_fields = ("crop", "stage")
     list_select_related = ("crop", "stage")
     readonly_fields = ("image_url",)
@@ -440,7 +507,7 @@ class ProductPackagingAdminForm(forms.ModelForm):
 
 
 @admin.register(ProductPackaging)
-class ProductPackagingAdmin(SoftDeleteModelAdmin):
+class ProductPackagingAdmin(UnusableProductAdminMixin, SoftDeleteModelAdmin):
     form = ProductPackagingAdminForm
     list_display = (
         "public_id",
@@ -638,7 +705,11 @@ class OrderItemAdmin(ViewOnlyAdminMixin, SoftDeleteModelAdmin):
 
 
 @admin.register(InventorySnapshot)
-class InventorySnapshotAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+class InventorySnapshotAdmin(
+    UnusableProductAdminMixin, StockLedgerAdminMixin, SoftDeleteModelAdmin
+):
+    product_path = "product_packaging.product"
+    form_product_path = "product_packaging.product"
     ledger_detail = StockEventDetail.BAG_COUNT
 
     list_display = (
@@ -666,7 +737,9 @@ class InventorySnapshotAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
 
 
 @admin.register(LooseStockSnapshot)
-class LooseStockSnapshotAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+class LooseStockSnapshotAdmin(
+    UnusableProductAdminMixin, StockLedgerAdminMixin, SoftDeleteModelAdmin
+):
     ledger_detail = StockEventDetail.LOOSE_COUNT
 
     list_display = (
@@ -832,7 +905,10 @@ class PartyAdmin(SoftDeleteModelAdmin):
 
 @admin.register(InwardRawMaterial)
 class InwardRawMaterialAdmin(
-    ReturnLotAdminMixin, StockLedgerAdminMixin, SoftDeleteModelAdmin
+    UnusableProductAdminMixin,
+    ReturnLotAdminMixin,
+    StockLedgerAdminMixin,
+    SoftDeleteModelAdmin,
 ):
     ledger_event_type = StockEventType.INWARD_OPERATIONS
     ledger_detail = StockEventDetail.RAW_LOT_IN_USE
@@ -867,7 +943,9 @@ class InwardRawMaterialAdmin(
 
 
 @admin.register(RawMaterialWaste)
-class RawMaterialWasteAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+class RawMaterialWasteAdmin(
+    UnusableProductAdminMixin, StockLedgerAdminMixin, SoftDeleteModelAdmin
+):
     ledger_event_type = StockEventType.RAW_WASTED
     ledger_detail = StockEventDetail.WASTE_RECORDED
 
@@ -898,7 +976,7 @@ class OtherMaterialTypeAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(OtherMaterialRecipe)
-class OtherMaterialRecipeAdmin(SoftDeleteModelAdmin):
+class OtherMaterialRecipeAdmin(UnusableProductAdminMixin, SoftDeleteModelAdmin):
     list_display = (
         "public_id",
         "product",
@@ -916,8 +994,13 @@ class OtherMaterialRecipeAdmin(SoftDeleteModelAdmin):
 
 @admin.register(InwardOtherMaterial)
 class InwardOtherMaterialAdmin(
-    ReturnLotAdminMixin, StockLedgerAdminMixin, SoftDeleteModelAdmin
+    UnusableProductAdminMixin,
+    ReturnLotAdminMixin,
+    StockLedgerAdminMixin,
+    SoftDeleteModelAdmin,
 ):
+    product_path = "recipe.product"
+    form_product_path = "recipe.product"
     ledger_event_type = StockEventType.INWARD_OPERATIONS
     ledger_detail = StockEventDetail.OTHER_MATERIAL_RECEIVED
 

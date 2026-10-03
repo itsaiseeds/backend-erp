@@ -55,6 +55,8 @@ from .models import (
     StockEventType,
 )
 from .models.ReturnOrder import LIVE_RETURN_STATUS_IDS
+from .NotificationOperations import NotificationEvent, notify_return_order_event
+from .ProductOperations import assert_products_usable
 from .StockLedgerOperations import recording
 
 if TYPE_CHECKING:
@@ -302,6 +304,20 @@ def _sync_items(ret: ReturnOrder, items: list[dict], actor: User) -> list[Return
         (line.product_id, _weight(line.packet_weight)): line
         for line in ReturnOrderItem.all_objects.filter(return_order=ret)
     }
+    # A frozen product's line may be removed or lowered but not added back or raised;
+    # a soft-deleted line being restored counts as added.
+    assert_products_usable(
+        {
+            item["product"].pk
+            for item in items
+            if (key := (item["product"].pk, _weight(item["packet_weight"]))) not in existing
+            or existing[key].is_deleted
+            or item["packets"] > existing[key].packets
+        },
+        field="items",
+        action="have return lines added or raised",
+        subject="this return",
+    )
     kept: list[ReturnOrderItem] = []
     for item in items:
         key = (item["product"].pk, _weight(item["packet_weight"]))
@@ -504,6 +520,11 @@ def accept_return_order(
         source=ret,
         actor=admin,
     ):
+        # Accepting books inward lots for these products, so it is refused while any
+        # of them is frozen (``Product.is_usable``).
+        assert_products_usable(
+            product_ids, field="status", action="be accepted", subject="this return"
+        )
         # A material that only a deleted recipe uses is not among the types the
         # recording locked, so lock the ones about to be booked as well.
         InventoryOperations._lock_materials(
@@ -556,6 +577,7 @@ def accept_return_order(
                 "updated_at",
             ]
         )
+    notify_return_order_event(ret, NotificationEvent.RETURN_ACCEPTED)
     return ret
 
 
@@ -593,6 +615,15 @@ def revert_accept_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
         source=ret,
         actor=admin,
     ):
+        # The lots are removed by a queryset update, which skips their own delete
+        # guard, so the freeze is checked here: a frozen product's existing rows
+        # are read-only.
+        assert_products_usable(
+            product_ids,
+            field="status",
+            action="have its accept reverted",
+            subject="this return",
+        )
 
         def perform() -> None:
             now = indian_now()
@@ -644,6 +675,7 @@ def reject_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
     ret.rejected_at = indian_now()
     ret.full_clean()
     ret.save(update_fields=["status", "rejected_by", "rejected_at", "updated_at"])
+    notify_return_order_event(ret, NotificationEvent.RETURN_REJECTED)
     return ret
 
 

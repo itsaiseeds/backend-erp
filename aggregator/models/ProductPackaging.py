@@ -64,6 +64,17 @@ class ProductPackaging(
             ),
         ]
 
+    def guard_soft_delete(self, perform):
+        """Refuse deleting a packaging of an unusable product (the Django admin path).
+
+        The API delete view applies the same rule itself --
+        ``ProductOperations.assert_products_usable``.
+        """
+        from aggregator.ProductOperations import assert_products_usable
+
+        assert_products_usable([self.product_id], action="have its packaging deleted")
+        perform()
+
     def __str__(self):
         if self.product_id:
             return f"{self.product.name}: {self.packets} × {self.packet_weight}kg"

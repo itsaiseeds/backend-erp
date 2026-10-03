@@ -30,6 +30,7 @@ ADMIN_UTILITIES = "Admin · Utilities"
 ANDROID_AUTH = "Android · Auth"
 ANDROID_CLIENTS = "Android · Clients"
 ANDROID_ORDERS = "Android · Orders"
+ANDROID_NOTIFICATIONS = "Android · Notifications"
 ANDROID_CATALOGUE = "Android · Catalogue"
 ANDROID_FIELD_TRIPS = "Android · Field trips"
 ANDROID_GODOWN = "Android · Godown"
@@ -79,6 +80,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {
         "name": ANDROID_ORDERS,
         "description": "Placing and listing the sales person's orders, and their returns.",
+    },
+    {
+        "name": ANDROID_NOTIFICATIONS,
+        "description": "Push-notification device registration and the in-app inbox.",
     },
     {"name": ANDROID_CATALOGUE, "description": "Products the sales person can sell."},
     {
@@ -243,6 +248,10 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "get-challan",
         ),
         (ANDROID_ORDERS,),
+    ),
+    (
+        _route(_ANDROID, "devices", "notifications", "notification"),
+        (ANDROID_NOTIFICATIONS,),
     ),
     (_route(_ANDROID, "sales-person-catalogue"), (ANDROID_CATALOGUE,)),
     (_route(_ANDROID, "godown"), (ANDROID_GODOWN,)),
