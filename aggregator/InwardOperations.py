@@ -54,6 +54,7 @@ from .models import (
     StockEventDetail,
     StockEventType,
 )
+from .ProductOperations import assert_products_usable
 from .StockLedgerOperations import recording
 
 if TYPE_CHECKING:
@@ -364,6 +365,7 @@ def raw_incoming_stock(
                 "product_id": product_id,
                 "public_id": row["public_id"],
                 "name": row["name"],
+                "is_usable": product.is_usable,
                 "incoming_kg": incoming_kg,
                 "packed_kg": packed_kg,
                 "wasted_kg": wasted_kg,
@@ -475,6 +477,7 @@ def create_raw_lot(
         [product.id],
         actor=actor,
     ) as rec:
+        assert_products_usable([product], action="receive an inward lot")
         entry = InwardRawMaterial.objects.create(
             product=product,
             party=party,
@@ -506,6 +509,9 @@ def update_raw_lot(
         source=entry,
         actor=actor,
     ) as rec:
+        assert_products_usable(
+            [entry.product_id], field="status", action="have its inward lot changed"
+        )
         for field in ("lab_sampling_date", "effective_date", "status"):
             if field in values:
                 setattr(entry, field, values[field])
@@ -524,6 +530,7 @@ def create_other_lot(
         [recipe.product_id],
         actor=actor,
     ) as rec:
+        assert_products_usable([recipe.product_id], field="recipe", action="receive an inward lot")
         entry = InwardOtherMaterial.objects.create(
             party=party,
             recipe=recipe,

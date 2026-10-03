@@ -92,7 +92,7 @@ class ProductPackagingApiTest(WebApiTestCase):
         self.assertTrue(packaging["public_id"].startswith("PP-"))
         self.assertEqual(
             packaging["product"],
-            {"public_id": self.product.public_id, "name": "Premium"},
+            {"public_id": self.product.public_id, "name": "Premium", "is_usable": True},
         )
         self.assertEqual(float(packaging["packet_weight"]), 50.0)
         self.assertEqual(packaging["packets"], 2)

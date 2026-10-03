@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from django.db import transaction
 from django.db.models import Prefetch
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
@@ -115,6 +115,9 @@ class ProductPayloadSerializer(serializers.Serializer):
         ),
     )
     image_url = serializers.CharField(allow_blank=True)
+    is_usable = serializers.BooleanField(
+        help_text="False when the product is frozen: nothing about it may be created or changed."
+    )
     description_items = serializers.ListField(child=serializers.CharField())
 
 
@@ -170,6 +173,7 @@ def product_payload(product):
         },
         "selling_price": product.selling_price,
         "image_url": product.image_url,
+        "is_usable": product.is_usable,
         "description_items": description_items_payload(product),
     }
 
@@ -182,10 +186,26 @@ class ProductsView(AdminApiView):
 
     @extend_schema(
         summary="List products",
+        parameters=[
+            OpenApiParameter(
+                "is_usable",
+                bool,
+                description="Only usable (true) or only frozen (false) products.",
+            )
+        ],
         responses={200: ProductPayloadSerializer(many=True)},
     )
     def get(self, request):
         products = products_queryset().order_by("name")
+        raw = request.query_params.get("is_usable")
+        if raw is not None:
+            try:
+                wanted = serializers.BooleanField().to_internal_value(raw)
+            except serializers.ValidationError:
+                raise serializers.ValidationError(
+                    {"is_usable": "Must be true or false."}
+                ) from None
+            products = products.filter(is_usable=wanted)
         return Response([product_payload(product) for product in products])
 
     @extend_schema(

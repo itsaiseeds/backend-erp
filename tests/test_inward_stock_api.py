@@ -191,6 +191,7 @@ class InwardStockApiTest(WebApiTestCase):
         self.assertEqual(response.data["lines"][0], {
             "product": self.product1.public_id,
             "name": "SAI-33",
+            "is_usable": True,
             "incoming_kg": "100.000",
             "packed_kg": "0.000",
             "wasted_kg": "0.000",
@@ -262,6 +263,7 @@ class InwardStockApiTest(WebApiTestCase):
         self.assertEqual(response.data["lines"], [{
             "product": self.product1.public_id,
             "name": "SAI-33",
+            "is_usable": True,
             "incoming_kg": "25.000",
             "packed_kg": "0.000",
             "wasted_kg": "0.000",
@@ -296,6 +298,7 @@ class InwardStockApiTest(WebApiTestCase):
         self.assertEqual(counting.data["lines"], [{
             "product": self.product1.public_id,
             "name": "SAI-33",
+            "is_usable": True,
             "incoming_kg": "25.000",
             "packed_kg": "0.000",
             "wasted_kg": "0.000",
@@ -353,6 +356,7 @@ class InwardStockApiTest(WebApiTestCase):
         self.assertEqual(response.data["lines"], [{
             "product": self.product1.public_id,
             "name": "SAI-33",
+            "is_usable": True,
             "incoming_kg": "1000.000",
             "packed_kg": "0.000",
             "wasted_kg": "0.000",
@@ -392,6 +396,7 @@ class InwardStockApiTest(WebApiTestCase):
         self.assertEqual(response.data["lines"], [{
             "product": self.product2.public_id,
             "name": "SAI-3353",
+            "is_usable": True,
             "incoming_kg": "0.000",
             "packed_kg": "0.000",
             "wasted_kg": "0.000",
