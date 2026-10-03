@@ -8,8 +8,6 @@ class RecipesService {
 
   static final RecipesService instance = RecipesService._();
 
-  static const int _PAGE_SIZE = 30;
-  static const int _MAX_PAGES = 40;
 
   OtherRawMaterialsRepository? _repository;
   final List<OtherMaterialRecipeModel> _recipes = [];
@@ -35,19 +33,13 @@ class RecipesService {
     if (_isLoaded && !forceRefresh) return true;
 
     try {
-      final List<OtherMaterialRecipeModel> collected = [];
-
-      for (int page = 1; page <= _MAX_PAGES; page++) {
-        final PaginatedOtherMaterialRecipesModel result =
-            await _resolvedRepository.fetchRecipes(
-              queryParams: {'page': page, 'page_size': _PAGE_SIZE},
-            );
-
-        collected.addAll(result.results);
-
-        final int? next = result.nextPageNumber;
-        if (next == null || next <= page || result.results.isEmpty) break;
-      }
+      // One call with all=true instead of walking pages: the endpoint
+      // returns every row, so nothing is missed and nothing is capped.
+      final PaginatedOtherMaterialRecipesModel result =
+          await _resolvedRepository.fetchRecipes(
+            queryParams: const {'all': true},
+          );
+      final List<OtherMaterialRecipeModel> collected = result.results;
 
       _recipes
         ..clear()

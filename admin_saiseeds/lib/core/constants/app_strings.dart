@@ -742,6 +742,60 @@ class AppStrings {
   static const String CHALLAN_PREVIEW_TITLE = 'Delivery challan';
   static const String CHALLAN_FILE_PREFIX = 'challan-';
   static const String PRINT = 'Print';
+  static const String CUSTOM_ORDERS = 'Custom Orders';
+  static const String COLUMN_CUSTOM_ORDER_CITY = 'City';
+  static const String COLUMN_CUSTOM_ORDER_ITEMS = 'Items';
+  static const String COLUMN_CUSTOM_ORDER_PACKETS = 'Packets';
+  static const String COLUMN_CUSTOM_ORDER_EXPECTED = 'Expected Delivery';
+  static const String CUSTOM_ORDERS_SEARCH_HINT = 'Search custom orders...';
+  static const String CUSTOM_ORDERS_EMPTY_TITLE = 'No custom orders found';
+  static const String CUSTOM_ORDERS_EMPTY_BODY =
+      'Loose-packet orders booked for verified clients will appear here.';
+  static const String CUSTOM_ORDER_PER_PACKET = 'per packet';
+  static const String CUSTOM_ORDER_ADD = 'Book custom order';
+  static const String CUSTOM_ORDER_STEP_CLIENT = 'Client';
+  static const String CUSTOM_ORDER_STEP_CLIENT_CAPTION = 'Who it is for';
+  static const String CUSTOM_ORDER_STEP_ITEMS_CAPTION = 'Packets on this order';
+  static const String CUSTOM_ORDER_STEP_DELIVERY_CAPTION = 'When and where';
+  static const String CUSTOM_ORDER_ADD_SUBTITLE =
+      'Book a loose-packet order for a verified client.';
+  static const String CUSTOM_ORDER_DETAIL_TITLE = 'Custom order';
+  static const String CUSTOM_ORDER_DETAIL_SUBTITLE =
+      'Review the order and its lines.';
+  static const String CUSTOM_ORDER_CREATED = 'Custom order booked';
+  static const String CUSTOM_ORDER_UPDATED = 'Custom order updated';
+  static const String CUSTOM_ORDER_DELETED = 'Custom order deleted';
+  static const String CUSTOM_ORDER_DELETE_TITLE = 'Delete this custom order?';
+  static const String CUSTOM_ORDER_DELETE_BODY =
+      'The order and all of its lines are removed. This cannot be undone.';
+  static const String CUSTOM_ORDER_DELETE_BLOCKED =
+      'A dispatched order cannot be deleted.';
+  static const String CUSTOM_ORDER_LOAD_FAILED = 'Could not load custom orders';
+  static const String CUSTOM_ORDER_ITEMS_TITLE = 'Order lines';
+  static const String CUSTOM_ORDER_ADD_LINE = 'Add line';
+  static const String CUSTOM_ORDER_NO_LINES = 'Add at least one order line.';
+  static const String CUSTOM_ORDER_LINE_INVALID =
+      'Every line needs a product, a packet weight, packets and a price.';
+  static const String FIELD_NEGOTIATED_PRICE = 'Negotiated price';
+  static const String FIELD_NEGOTIATED_PRICE_HINT = 'Price per packet';
+  static const String FIELD_SPECIAL_COMMENTS = 'Special comments';
+  static const String FIELD_SPECIAL_COMMENTS_HINT = 'Optional notes';
+  static const String FIELD_EXPECTED_DELIVERY = 'Expected delivery date';
+  static const String FIELD_ACTUAL_DELIVERY = 'Actual delivery date';
+  static const String FIELD_DELIVERY_ADDRESS_PICK = 'Delivery address';
+  static const String FIELD_CLIENT_HINT = 'Select a client';
+  static const String VALIDATION_PACKET_WEIGHT_REQUIRED =
+      'Select a packet weight.';
+  static const String VALIDATION_CLIENT_REQUIRED = 'Select a client.';
+  static const String VALIDATION_ADDRESS_REQUIRED =
+      'Select a delivery address.';
+  static const String FIELD_PACKET_WEIGHT_SELECT = 'Packet Weight (kg)';
+  static const String FIELD_PACKET_WEIGHT_SELECT_HINT =
+      'Select a packet weight';
+  static const String FIELD_PACKET_WEIGHT_PICK_PRODUCT =
+      'Choose a product first';
+  static const String FIELD_PACKET_WEIGHT_NONE =
+      'This product has no packagings configured.';
   static const String CHALLAN_PRINT_FAILED =
       'Could not open the print dialog.';
   static const String CHALLAN_DOWNLOAD_FAILED =
@@ -779,6 +833,9 @@ class AppStrings {
 
   static const String ORDER_DISPATCH = 'Dispatch';
   static const String ORDER_DISPATCH_TITLE = 'Dispatch order';
+  static const String ORDER_DISPATCH_SUBTITLE =
+      'Record the vehicle, driver and lot numbers.';
+  static const String ORDER_DISPATCH_DONE = 'Order dispatched';
   static const String ORDER_DISPATCH_BLOCKED =
       'Only a verified order can be dispatched.';
   static const String ORDER_REVERT_DISPATCH = 'Revert dispatch';
@@ -860,7 +917,7 @@ class AppStrings {
   static const String STOCK_AS_OF_PREFIX = 'As of';
 
   static const String INWARD_RAW_MATERIALS = 'Raw Material Inward';
-  static const String OTHER_RAW_MATERIALS = 'Material Recipes';
+  static const String OTHER_RAW_MATERIALS = 'Other Material Recipes';
   static const String OTHER_MATERIAL_INWARD = 'Other Mat. Inward';
 
   static const String COLUMN_RECIPE = 'Recipe';
