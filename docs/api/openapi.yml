@@ -641,6 +641,64 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderListPage'
           description: ''
+  /android/api/v1/get-return-orders:
+    get:
+      operationId: android_api_v1_get_return_orders_list
+      description: 'List the caller''s own returns: filter by order / status, sort.'
+      summary: List my returns (filter by order / status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: order
+        schema:
+          type: string
+        description: Public id(s) of the order the return is against. Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (RET-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at); prefix a key with '-'
+          for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Return lifecycle status. Comma-separated (any match); AND-ed
+          with the other filters.
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderListPage'
+          description: ''
   /android/api/v1/godown/inward-other-material/{public_id}:
     patch:
       operationId: android_api_v1_godown_inward_other_material_partial_update
@@ -1009,6 +1067,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
+  /android/api/v1/return-order/{order_public_id}:
+    get:
+      operationId: android_api_v1_return_order_prefill
+      description: Prefill (GET) or raise (POST) a return against one of the caller's
+        orders.
+      summary: 'Prefill a return: the order''s challan lines and what is still returnable'
+      parameters:
+      - in: path
+        name: order_public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPrefill'
+          description: ''
+    post:
+      operationId: android_api_v1_return_order_create
+      description: Prefill (GET) or raise (POST) a return against one of the caller's
+        orders.
+      summary: Raise a return against a dispatched order
+      parameters:
+      - in: path
+        name: order_public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReturnOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReturnOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReturnOrderWriteRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPayload'
           description: ''
   /android/api/v1/sales-person-catalogue:
     get:
@@ -1386,6 +1503,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExecuteCodeResponse'
+          description: ''
+  /api/sales-admin/accept-return-order/{public_id}:
+    post:
+      operationId: api_sales_admin_accept_return_order_create
+      description: Accept a return, booking its raw (and optionally packing) material
+        back in.
+      summary: Accept a return (PENDING -> ACCEPTED), booking inward stock
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The return's public id, e.g. RET-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptReturnOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AcceptReturnOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AcceptReturnOrderRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPayload'
           description: ''
   /api/sales-admin/admins:
     get:
@@ -2116,6 +2269,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
+  /api/sales-admin/edit-return-order/{public_id}:
+    patch:
+      operationId: api_sales_admin_edit_return_order_partial_update
+      description: Replace a pending return's lines (app admin only).
+      summary: Edit a pending return (including its items)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The return's public id, e.g. RET-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedReturnOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedReturnOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedReturnOrderWriteRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPayload'
           description: ''
   /api/sales-admin/export/custom-orders:
     get:
@@ -3823,6 +4010,154 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
           description: ''
+  /api/sales-admin/reject-return-order/{public_id}:
+    post:
+      operationId: api_sales_admin_reject_return_order_create
+      description: Reject a pending return.
+      summary: Reject a return (PENDING -> REJECTED)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The return's public id, e.g. RET-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPayload'
+          description: ''
+  /api/sales-admin/return-order-recipes/{public_id}:
+    get:
+      operationId: api_sales_admin_return_order_recipes_retrieve
+      description: List the candidate recipes per line of a return (app admin only).
+      summary: Recipes to book a return's packing material against, per line
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The return's public id, e.g. RET-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderRecipes'
+          description: ''
+  /api/sales-admin/return-orders/:
+    get:
+      operationId: sales_admin_get_return_orders_list
+      description: 'List every return: filter by status / sales person / client /
+        product / order.'
+      summary: List returns (filter by status / sales person / client / product /
+        order, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client id(s) whose order the return is against (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: created_by
+        schema:
+          type: string
+        description: User id(s) of the sales person who raised the return (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: order
+        schema:
+          type: string
+        description: Public id(s) of the order the return is against. Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product id(s) the return contains (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (RET-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, value); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Return lifecycle status. Comma-separated (any match); AND-ed
+          with the other filters.
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminReturnOrderListPage'
+          description: ''
+  /api/sales-admin/revert-accept-return-order/{public_id}:
+    post:
+      operationId: api_sales_admin_revert_accept_return_order_create
+      description: Undo an accept, removing the stock it booked.
+      summary: Revert an accepted return (ACCEPTED -> PENDING), removing its inward
+        stock
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The return's public id, e.g. RET-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPayload'
+          description: ''
   /api/sales-admin/revert-custom-order-dispatch/{public_id}:
     post:
       operationId: api_sales_admin_revert_custom_order_dispatch_create
@@ -4006,6 +4341,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FieldTripPayload'
+          description: ''
+  /api/sales-admin/unreject-return-order/{public_id}:
+    post:
+      operationId: api_sales_admin_unreject_return_order_create
+      description: Undo a rejection, returning the return to PENDING.
+      summary: Unreject a return (REJECTED -> PENDING)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The return's public id, e.g. RET-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPayload'
           description: ''
   /api/sales-admin/unverify-order/{public_id}:
     post:
@@ -4413,6 +4771,28 @@ paths:
           description: ''
 components:
   schemas:
+    AcceptReturnOrderRequest:
+      type: object
+      description: |-
+        Request body to accept a return.
+
+        ``include_in_other_raw_materials`` is required: it is the admin's explicit
+        choice to book the packing materials back too. ``recipe_public_ids`` is the
+        flat list of the recipes to book them against (live or soft-deleted); it
+        must be empty or omitted when the flag is false.
+      properties:
+        include_in_other_raw_materials:
+          type: boolean
+        recipe_public_ids:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 20
+          description: OMR-… recipes to book packing material against, one per material
+            type per line. Required (covering every line) when the flag is true.
+      required:
+      - include_in_other_raw_materials
     AdminOrderListCity:
       type: object
       description: Output shape for the ``city`` reference on an order card.
@@ -4573,6 +4953,40 @@ components:
       - phone_number
       - role
       - share_contact
+    AdminReturnOrderListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnOrderListItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
     AdminUpdateClientRequest:
       type: object
       description: Request validation for an admin's client update -- every field
@@ -6818,6 +7232,12 @@ components:
           $ref: '#/components/schemas/InwardOtherMaterialRecipeRef'
         party:
           $ref: '#/components/schemas/InwardOtherMaterialPartyRef'
+        return_order:
+          allOf:
+          - $ref: '#/components/schemas/InwardReturnOrderRef'
+          nullable: true
+          description: The accepted return that booked this lot; null for an ordinary
+            lot.
         quantity:
           type: string
           description: Amount received, in the recipe's unit.
@@ -6835,6 +7255,7 @@ components:
       - public_id
       - quantity
       - recipe
+      - return_order
     ExportInwardRawMaterial:
       type: object
       description: Output shape for one raw-material lot.
@@ -6845,6 +7266,12 @@ components:
           $ref: '#/components/schemas/InwardRawMaterialProductRef'
         party:
           $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        return_order:
+          allOf:
+          - $ref: '#/components/schemas/InwardReturnOrderRef'
+          nullable: true
+          description: The accepted return that booked this lot; null for an ordinary
+            lot.
         lot_no:
           type: string
           description: The supplier's own batch number.
@@ -6873,6 +7300,7 @@ components:
       - product
       - public_id
       - quantity_kg
+      - return_order
       - status
     ExportLooseSnapshot:
       type: object
@@ -7329,10 +7757,15 @@ components:
       - total_pages
     InwardOtherMaterialPartyRef:
       type: object
-      description: Output shape for the ``party`` reference on a lot.
+      description: |-
+        Output shape for the ``party`` reference on a lot.
+
+        A lot an accepted return booked has no party: ``id`` is null and ``name``
+        reads ``Return Order (<ORD-…>)``.
       properties:
         id:
           type: integer
+          nullable: true
         name:
           type: string
       required:
@@ -7348,6 +7781,12 @@ components:
           $ref: '#/components/schemas/InwardOtherMaterialRecipeRef'
         party:
           $ref: '#/components/schemas/InwardOtherMaterialPartyRef'
+        return_order:
+          allOf:
+          - $ref: '#/components/schemas/InwardReturnOrderRef'
+          nullable: true
+          description: The accepted return that booked this lot; null for an ordinary
+            lot.
         quantity:
           type: string
           description: Amount received, in the recipe's unit.
@@ -7367,6 +7806,7 @@ components:
       - public_id
       - quantity
       - recipe
+      - return_order
     InwardOtherMaterialProductRef:
       type: object
       description: Output shape for the ``product`` reference inside a recipe ref.
@@ -7444,10 +7884,15 @@ components:
       - total_pages
     InwardRawMaterialPartyRef:
       type: object
-      description: Output shape for the ``party`` reference on a lot.
+      description: |-
+        Output shape for the ``party`` reference on a lot.
+
+        A lot an accepted return booked has no party: ``id`` is null and ``name``
+        reads ``Return Order (<ORD-…>)``.
       properties:
         id:
           type: integer
+          nullable: true
         name:
           type: string
       required:
@@ -7463,6 +7908,12 @@ components:
           $ref: '#/components/schemas/InwardRawMaterialProductRef'
         party:
           $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        return_order:
+          allOf:
+          - $ref: '#/components/schemas/InwardReturnOrderRef'
+          nullable: true
+          description: The accepted return that booked this lot; null for an ordinary
+            lot.
         lot_no:
           type: string
           description: The supplier's own batch number.
@@ -7493,6 +7944,7 @@ components:
       - product
       - public_id
       - quantity_kg
+      - return_order
       - status
     InwardRawMaterialProductRef:
       type: object
@@ -7504,6 +7956,17 @@ components:
           type: string
       required:
       - name
+      - public_id
+    InwardReturnOrderRef:
+      type: object
+      description: Output shape for the ``return_order`` reference on a lot.
+      properties:
+        public_id:
+          type: string
+        order_public_id:
+          type: string
+      required:
+      - order_public_id
       - public_id
     LedgerActor:
       type: object
@@ -8015,6 +8478,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemPayload'
+        return_order:
+          allOf:
+          - $ref: '#/components/schemas/ReturnOrderPayload'
+          nullable: true
+          description: The order's live return (PENDING or ACCEPTED); null when it
+            has none. A REJECTED return is not shown.
       required:
       - actual_delivery_date
       - client
@@ -8023,6 +8492,7 @@ components:
       - expected_delivery_date
       - items
       - public_id
+      - return_order
       - special_comments
       - status
       - total_amount
@@ -8470,6 +8940,22 @@ components:
         expected_end_at:
           type: string
           format: date-time
+    PatchedReturnOrderWriteRequest:
+      type: object
+      description: |-
+        Request body to raise (Android POST) or edit (admin PATCH) a return.
+
+        ``items`` is a full declarative replacement on edit: a line left out is
+        removed. ``return_date`` defaults to today on create and is informational
+        only. No field declares a ``default``, so an absent key stays absent.
+      properties:
+        return_date:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnOrderItemWriteRequest'
     PatchedUpdateAdminRequest:
       type: object
       description: |-
@@ -9100,6 +9586,417 @@ components:
       required:
       - name
       - public_id
+    ReturnClientRef:
+      type: object
+      description: Output shape for the client on a return.
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+      required:
+      - company_name
+      - public_id
+    ReturnOrderItemPayload:
+      type: object
+      description: Output shape for one returned line.
+      properties:
+        product:
+          $ref: '#/components/schemas/ReturnProductRef'
+        packet_weight:
+          type: string
+        packets:
+          type: integer
+        kg:
+          type: string
+          description: packets x packet_weight.
+        price_per_packet:
+          type: string
+        line_total:
+          type: string
+          description: packets x price_per_packet.
+      required:
+      - kg
+      - line_total
+      - packet_weight
+      - packets
+      - price_per_packet
+      - product
+    ReturnOrderItemWriteRequest:
+      type: object
+      description: 'One returned line: a product''s packets of one weight, and their
+        price.'
+      properties:
+        product_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+          description: Weight of one returned packet, in kg (as on the challan).
+        packets:
+          type: integer
+          minimum: 1
+        price_per_packet:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - packet_weight
+      - packets
+      - price_per_packet
+      - product_public_id
+    ReturnOrderListItem:
+      type: object
+      description: Output shape for one return in a list (``return_order_list_payload``).
+      properties:
+        public_id:
+          type: string
+        status:
+          type: string
+          description: RETURN_PENDING, RETURN_ACCEPTED or RETURN_REJECTED.
+        return_date:
+          type: string
+          format: date
+        created_at:
+          type: string
+          format: date-time
+        order:
+          $ref: '#/components/schemas/ReturnOrderRef'
+        client:
+          $ref: '#/components/schemas/ReturnClientRef'
+        created_by:
+          allOf:
+          - $ref: '#/components/schemas/ReturnUserRef'
+          nullable: true
+          description: Sales person who raised it.
+        verified_by:
+          allOf:
+          - $ref: '#/components/schemas/ReturnUserRef'
+          nullable: true
+          description: Sales admin who accepted it; null unless ACCEPTED.
+        rejected_by:
+          allOf:
+          - $ref: '#/components/schemas/ReturnUserRef'
+          nullable: true
+          description: Sales admin who rejected it; null unless REJECTED.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnOrderItemPayload'
+        total_kg:
+          type: string
+        total_amount:
+          type: string
+      required:
+      - client
+      - created_at
+      - created_by
+      - items
+      - order
+      - public_id
+      - rejected_by
+      - return_date
+      - status
+      - total_amount
+      - total_kg
+      - verified_by
+    ReturnOrderListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnOrderListItem'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    ReturnOrderPayload:
+      type: object
+      description: Output shape for one return in full (``return_order_payload``).
+      properties:
+        public_id:
+          type: string
+        status:
+          type: string
+          description: RETURN_PENDING, RETURN_ACCEPTED or RETURN_REJECTED.
+        return_date:
+          type: string
+          format: date
+        created_at:
+          type: string
+          format: date-time
+        order:
+          $ref: '#/components/schemas/ReturnOrderRef'
+        client:
+          $ref: '#/components/schemas/ReturnClientRef'
+        created_by:
+          allOf:
+          - $ref: '#/components/schemas/ReturnUserRef'
+          nullable: true
+          description: Sales person who raised it.
+        verified_by:
+          allOf:
+          - $ref: '#/components/schemas/ReturnUserRef'
+          nullable: true
+          description: Sales admin who accepted it; null unless ACCEPTED.
+        rejected_by:
+          allOf:
+          - $ref: '#/components/schemas/ReturnUserRef'
+          nullable: true
+          description: Sales admin who rejected it; null unless REJECTED.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnOrderItemPayload'
+        total_kg:
+          type: string
+        total_amount:
+          type: string
+        include_in_other_raw_materials:
+          type: boolean
+          nullable: true
+          description: 'Set on accept: whether packing material was booked too.'
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        rejected_at:
+          type: string
+          format: date-time
+          nullable: true
+        inward_raw_materials:
+          type: array
+          items:
+            type: string
+          description: IR-… lots the accept booked; empty unless ACCEPTED.
+        inward_other_materials:
+          type: array
+          items:
+            type: string
+          description: IO-… lots the accept booked; empty unless ACCEPTED.
+      required:
+      - client
+      - created_at
+      - created_by
+      - include_in_other_raw_materials
+      - inward_other_materials
+      - inward_raw_materials
+      - items
+      - order
+      - public_id
+      - rejected_at
+      - rejected_by
+      - return_date
+      - status
+      - total_amount
+      - total_kg
+      - verified_at
+      - verified_by
+    ReturnOrderPrefill:
+      type: object
+      description: Output shape for ``GET return-order/<order_public_id>``.
+      properties:
+        order:
+          $ref: '#/components/schemas/ReturnPrefillOrder'
+        return_order:
+          allOf:
+          - $ref: '#/components/schemas/ReturnOrderPayload'
+          nullable: true
+          description: The order's live return, if there is one.
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnPrefillLine'
+      required:
+      - lines
+      - order
+      - return_order
+    ReturnOrderRecipes:
+      type: object
+      description: Output shape for ``GET return-order-recipes/<public_id>``.
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnRecipeLine'
+      required:
+      - lines
+    ReturnOrderRef:
+      type: object
+      description: Output shape for the order a return is against.
+      properties:
+        public_id:
+          type: string
+        status:
+          type: string
+      required:
+      - public_id
+      - status
+    ReturnOrderWriteRequest:
+      type: object
+      description: |-
+        Request body to raise (Android POST) or edit (admin PATCH) a return.
+
+        ``items`` is a full declarative replacement on edit: a line left out is
+        removed. ``return_date`` defaults to today on create and is informational
+        only. No field declares a ``default``, so an absent key stays absent.
+      properties:
+        return_date:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnOrderItemWriteRequest'
+      required:
+      - items
+    ReturnPrefillLine:
+      type: object
+      description: Output shape for one challan line on the prefill.
+      properties:
+        product:
+          $ref: '#/components/schemas/ReturnProductRef'
+        packet_weight:
+          type: string
+        dispatched_packets:
+          type: integer
+          description: Packets on the challan.
+        returnable_packets:
+          type: integer
+          description: Dispatched, less what a live return already claims.
+        suggested_price_per_packet:
+          type: string
+          description: The order line's bag price divided by the packets in the bag.
+      required:
+      - dispatched_packets
+      - packet_weight
+      - product
+      - returnable_packets
+      - suggested_price_per_packet
+    ReturnPrefillOrder:
+      type: object
+      description: Output shape for the order summary on the prefill.
+      properties:
+        public_id:
+          type: string
+        status:
+          type: string
+        client:
+          $ref: '#/components/schemas/ReturnClientRef'
+      required:
+      - client
+      - public_id
+      - status
+    ReturnProductRef:
+      type: object
+      description: Output shape for a ``{public_id, name}`` product reference.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
+    ReturnRecipeLine:
+      type: object
+      description: Output shape for one return line with its candidate recipes.
+      properties:
+        product:
+          $ref: '#/components/schemas/ReturnProductRef'
+        packet_weight:
+          type: string
+        packets:
+          type: integer
+        recipes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnRecipeOption'
+      required:
+      - packet_weight
+      - packets
+      - product
+      - recipes
+    ReturnRecipeOption:
+      type: object
+      description: Output shape for one recipe the admin may book a line's packing
+        against.
+      properties:
+        public_id:
+          type: string
+        material_type:
+          $ref: '#/components/schemas/ReturnRecipeOptionMaterialType'
+        quantity:
+          type: string
+          description: Material per packet, in the type's unit.
+        is_deleted:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - created_at
+      - deleted_at
+      - is_deleted
+      - material_type
+      - public_id
+      - quantity
+    ReturnRecipeOptionMaterialType:
+      type: object
+      description: Output shape for a recipe's material type.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        unit_type:
+          type: string
+      required:
+      - id
+      - name
+      - unit_type
+    ReturnUserRef:
+      type: object
+      description: Output shape for the user who raised, accepted or rejected a return.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     SalesAdminContact:
       type: object
       description: Output shape for one shared admin contact (schema only).
@@ -9558,7 +10455,7 @@ tags:
 - name: Admin · Clients
   description: Client records and verification.
 - name: Admin · Orders
-  description: 'Order review: verify, hold, reject, edit.'
+  description: 'Order review: verify, hold, reject, edit; and client returns.'
 - name: Admin · Dispatch
   description: Dispatching orders, challans and LR numbers.
 - name: Admin · Field trips
@@ -9581,7 +10478,7 @@ tags:
 - name: Android · Clients
   description: The sales person's clients, addresses, transport.
 - name: Android · Orders
-  description: Placing and listing the sales person's orders.
+  description: Placing and listing the sales person's orders, and their returns.
 - name: Android · Catalogue
   description: Products the sales person can sell.
 - name: Android · Field trips

@@ -107,6 +107,29 @@ class StockLedgerAdminMixin:
             self.ledger_refine(rec, obj, change)
 
 
+class ReturnLotAdminMixin:
+    """Make a lot an accepted return booked read-only, and unassignable.
+
+    Such a lot (``return_order`` set) is owned by its return: only reverting the
+    accept removes it (``ReturnOrderOperations``), so the admin may neither
+    change nor delete it. ``return_order`` is never editable here, so a lot
+    cannot be pointed at a return by hand either.
+    """
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and obj.return_order_id is not None:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.return_order_id is not None:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def get_readonly_fields(self, request, obj=None):
+        return (*super().get_readonly_fields(request, obj), "return_order")
+
+
 class CreatedByStampInlineMixin:
     """Base for inlines on ``CreatedByModel`` children.
 
@@ -808,7 +831,9 @@ class PartyAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(InwardRawMaterial)
-class InwardRawMaterialAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+class InwardRawMaterialAdmin(
+    ReturnLotAdminMixin, StockLedgerAdminMixin, SoftDeleteModelAdmin
+):
     ledger_event_type = StockEventType.INWARD_OPERATIONS
     ledger_detail = StockEventDetail.RAW_LOT_IN_USE
 
@@ -890,7 +915,9 @@ class OtherMaterialRecipeAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(InwardOtherMaterial)
-class InwardOtherMaterialAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+class InwardOtherMaterialAdmin(
+    ReturnLotAdminMixin, StockLedgerAdminMixin, SoftDeleteModelAdmin
+):
     ledger_event_type = StockEventType.INWARD_OPERATIONS
     ledger_detail = StockEventDetail.OTHER_MATERIAL_RECEIVED
 

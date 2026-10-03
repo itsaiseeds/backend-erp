@@ -53,6 +53,7 @@ from .models import (
     Product,
     ProductPackaging,
     RawMaterialWaste,
+    ReturnOrder,
     StatusIds,
     StockEvent,
     StockEventDetail,
@@ -96,6 +97,7 @@ _SOURCE_FIELDS: dict[type[models.Model], str] = {
     RawMaterialWaste: "raw_material_waste",
     InventorySnapshot: "inventory_snapshot",
     LooseStockSnapshot: "loose_stock_snapshot",
+    ReturnOrder: "return_order",
 }
 
 

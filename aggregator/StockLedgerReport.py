@@ -230,6 +230,13 @@ def _source_payload(event: StockEvent, product: Product) -> dict[str, object] | 
             "public_id": order.public_id,
             "label": order.client.company_name,
         }
+    if event.return_order_id:
+        ret = event.return_order
+        return {
+            "kind": "return_order",
+            "public_id": ret.public_id,
+            "label": ret.order.client.company_name,
+        }
     if event.inward_raw_material_id:
         lot = event.inward_raw_material
         return {"kind": "inward_raw_material", "public_id": lot.public_id, "label": lot.lot_no}

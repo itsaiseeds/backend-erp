@@ -118,6 +118,7 @@ class InwardRawMaterial(
 
         from aggregator import InventoryOperations, InwardOperations, StockLedgerOperations
 
+        self.refuse_return_lot_change()
         with StockLedgerOperations.recording(
             StockEventType.INWARD_OPERATIONS,
             StockEventDetail.RAW_LOT_DELETED,
