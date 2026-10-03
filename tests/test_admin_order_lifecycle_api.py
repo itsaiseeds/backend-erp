@@ -13,8 +13,10 @@ Authentication and role gating are proven once in ``tests/test_view_contracts.py
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -24,14 +26,16 @@ from aggregator.ClientOperations import create_client_with_details
 from aggregator.models import (
     City,
     Country,
+    Notification,
     Product,
     ProductPackaging,
+    PushDevice,
     Stage,
     StageIds,
     State,
 )
 from aggregator.models.Status import StatusIds
-from aggregator.OrderOperations import create_order
+from aggregator.OrderOperations import create_order, mark_delivered
 from authentication.models import Admin, SalesPerson
 from common.models import indian_now
 from tests.common import WebApiTestCase, book_raw_material_for_every_product
@@ -132,6 +136,16 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
     def setUp(self):
         super().setUp()
         self.login_as(self.admin_user)
+        # TestCase never commits, so run the post-commit push inline and record it.
+        for target, kwargs in (
+            ("fire_and_forget", {"side_effect": lambda func: func()}),
+            ("send_push", {"return_value": []}),
+        ):
+            patcher = mock.patch(f"aggregator.NotificationOperations.{target}", **kwargs)
+            started = patcher.start()
+            self.addCleanup(patcher.stop)
+            if target == "send_push":
+                self.send_push = started
 
     # -- helpers --------------------------------------------------------------
 
@@ -681,3 +695,119 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
                     self._post(url, order),
                     f"Cannot {action} an order that is DISPATCHED",
                 )
+
+    # -- notifications --------------------------------------------------------
+
+    def _latest(self):
+        return Notification.objects.filter(recipient=self.sales_person).latest("id")
+
+    def test_each_transition_notifies_the_booking_sales_person(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_each_transition_notifies_the_booking_sales_person"""
+        order = self._order()
+        self._count_stock()
+        steps = [
+            ("verify", VERIFY_URL, "ORDER_CONFIRMED"),
+            ("unverify", UNVERIFY_URL, "ORDER_UNDER_REVIEW"),
+            ("hold", HOLD_URL, "ORDER_ON_HOLD"),
+            ("verify again", VERIFY_URL, "ORDER_CONFIRMED"),
+        ]
+        for label, url, event_type in steps:
+            with self.subTest(step=label):
+                self.assertEqual(self._post(url, order).status_code, status.HTTP_200_OK)
+                notification = self._latest()
+                self.assertEqual(notification.event_type, event_type)
+                self.assertEqual(notification.order, order)
+                self.assertIn(order.public_id, notification.body)
+                self.assertIn("Acme Seeds", notification.body)
+                self.assertIsNone(notification.read_at)
+
+        self.assertEqual(Notification.objects.count(), len(steps))
+
+    def test_dispatch_revert_and_delivery_notify(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_dispatch_revert_and_delivery_notify"""
+        order = self._dispatched_order()
+        self.assertEqual(self._latest().event_type, "ORDER_DISPATCHED")
+
+        self.assertEqual(self._post(REVERT_URL, order).status_code, status.HTTP_200_OK)
+        self.assertEqual(self._latest().event_type, "ORDER_DISPATCH_REVERTED")
+
+        self._post(DISPATCH_URL, order, self._dispatch_body())
+        order.refresh_from_db()
+        mark_delivered(order)
+        self.assertEqual(self._latest().event_type, "ORDER_DELIVERED")
+
+    def test_rejecting_notifies(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_rejecting_notifies"""
+        order = self._order()
+
+        self.assertEqual(self._post(REJECT_URL, order).status_code, status.HTTP_200_OK)
+
+        self.assertEqual(self._latest().event_type, "ORDER_REJECTED")
+
+    def test_a_refused_transition_notifies_nobody(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_refused_transition_notifies_nobody"""
+        order = self._order()  # BOOKED: it cannot be unverified or reverted.
+
+        self.assertEqual(
+            self._post(UNVERIFY_URL, order).status_code, status.HTTP_400_BAD_REQUEST
+        )
+
+        self.assertFalse(Notification.objects.exists())
+        self.send_push.assert_not_called()
+
+    def test_the_push_carries_the_order_and_goes_to_the_bookers_devices(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_the_push_carries_the_order_and_goes_to_the_bookers_devices"""
+        PushDevice.objects.create(user=self.sales_person, fcm_token="phone-1")
+        PushDevice.objects.create(user=self.admin_user, fcm_token="admins-phone")
+        order = self._order()
+
+        self._post(REJECT_URL, order)
+
+        tokens, title, body, data = self.send_push.call_args.args
+        self.assertEqual(tokens, ["phone-1"])
+        self.assertEqual(title, "Order rejected")
+        self.assertIn(order.public_id, body)
+        self.assertEqual(json.loads(data["data"]), {"order_public_id": order.public_id})
+        self.assertEqual(data["type"], "ORDER_REJECTED")
+        self.assertEqual(data["screen"], "order_detail")
+        self.assertEqual(data["notification_id"], str(self._latest().pk))
+
+    def test_a_token_fcm_reports_dead_is_forgotten(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_token_fcm_reports_dead_is_forgotten"""
+        PushDevice.objects.create(user=self.sales_person, fcm_token="stale")
+        PushDevice.objects.create(user=self.sales_person, fcm_token="fresh")
+        self.send_push.return_value = ["stale"]
+
+        self._post(REJECT_URL, self._order())
+
+        self.assertEqual(
+            list(PushDevice.objects.values_list("fcm_token", flat=True)), ["fresh"]
+        )
+
+    def test_a_notification_that_blows_up_does_not_break_the_transition(self):
+        """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_a_notification_that_blows_up_does_not_break_the_transition"""
+        from common.background import fire_and_forget as real_fire_and_forget
+
+        class SyncThread:
+            def __init__(self, target, **kwargs):
+                self.target = target
+
+            def start(self):
+                self.target()
+
+        order = self._order()
+        with (
+            mock.patch("aggregator.NotificationOperations.fire_and_forget", real_fire_and_forget),
+            mock.patch("common.background.threading.Thread", SyncThread),
+            mock.patch("common.background.connections"),
+            mock.patch(
+                "aggregator.NotificationOperations.deliver_event",
+                side_effect=RuntimeError("FCM exploded"),
+            ),
+            self.captureOnCommitCallbacks(execute=True) as callbacks,
+        ):
+            response = self._post(REJECT_URL, order)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["status"], "REJECTED")
+        self.assertEqual(len(callbacks), 1)  # the notification did run, and failed quietly

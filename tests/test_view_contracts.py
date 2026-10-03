@@ -120,6 +120,16 @@ EXPECTED_CONTRACTS = {
     "android/api/v1/get-orders": ("GetOrdersView", TOKEN_SALESPERSON),
     "android/api/v1/return-order/<order_public_id>": ("ReturnOrderView", TOKEN_SALESPERSON),
     "android/api/v1/get-return-orders": ("GetReturnOrdersView", TOKEN_SALESPERSON),
+    "android/api/v1/devices/register": ("RegisterDeviceView", TOKEN_SALESPERSON),
+    "android/api/v1/notifications": ("GetNotificationsView", TOKEN_SALESPERSON),
+    "android/api/v1/notifications/read-all": (
+        "MarkAllNotificationsReadView",
+        TOKEN_SALESPERSON,
+    ),
+    "android/api/v1/notification/<int:id>/read": (
+        "MarkNotificationReadView",
+        TOKEN_SALESPERSON,
+    ),
     "android/api/v1/sales-person-catalogue": (
         "SalesPersonCatalogueView",
         TOKEN_SALESPERSON,

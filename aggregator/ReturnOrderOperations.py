@@ -55,6 +55,7 @@ from .models import (
     StockEventType,
 )
 from .models.ReturnOrder import LIVE_RETURN_STATUS_IDS
+from .NotificationOperations import NotificationEvent, notify_return_order_event
 from .StockLedgerOperations import recording
 
 if TYPE_CHECKING:
@@ -556,6 +557,7 @@ def accept_return_order(
                 "updated_at",
             ]
         )
+    notify_return_order_event(ret, NotificationEvent.RETURN_ACCEPTED)
     return ret
 
 
@@ -644,6 +646,7 @@ def reject_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
     ret.rejected_at = indian_now()
     ret.full_clean()
     ret.save(update_fields=["status", "rejected_by", "rejected_at", "updated_at"])
+    notify_return_order_event(ret, NotificationEvent.RETURN_REJECTED)
     return ret
 
 
