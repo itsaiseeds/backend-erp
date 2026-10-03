@@ -8,6 +8,7 @@ from common.models import indian_now
 from common.storage import delete_image, upload_image
 
 from .CustomOrderOperations import assert_loose_stock_covers
+from .InwardOperations import raw_status_detail
 from .models import (
     Address,
     City,
@@ -35,6 +36,7 @@ from .models import (
     OrderItem,
     OtherMaterialRecipe,
     OtherMaterialType,
+    PackedRecipeLayer,
     Party,
     Pincode,
     PrivateDispatchDetails,
@@ -46,8 +48,13 @@ from .models import (
     State,
     Status,
     StatusIds,
+    StockEvent,
+    StockEventDetail,
+    StockEventLine,
+    StockEventType,
     TransportAgency,
 )
+from .StockLedgerOperations import products_with_pools, recording
 
 # An order's lifecycle and verification: moved only by the lifecycle verbs
 # (verify / dispatch / revert / hold / reject ...), which carry the status
@@ -59,6 +66,45 @@ ORDER_LIFECYCLE_FIELDS = (
     "dispatch_details",
     "private_dispatch_details",
 )
+
+
+class StockLedgerAdminMixin:
+    """Record the stock an admin add/change form moves in the stock ledger.
+
+    The admin form is parsed after the view starts, so which products it will
+    touch is unknown up front: every product with a pool is tracked, which is
+    affordable because these forms are rare, superuser-only maintenance. The
+    whole add/change POST runs inside one recording, so the parent row and its
+    inlines are covered together and a form that fails records nothing.
+
+    ``ledger_event_type`` ``None`` means a count write (classified by packed
+    packets). ``ledger_refine`` may set the detail once the saved row is known.
+    """
+
+    ledger_event_type: StockEventType | None = None
+    ledger_detail: StockEventDetail = StockEventDetail.NONE
+
+    def ledger_refine(self, rec, obj, change: bool) -> None:
+        """Hook: adjust ``rec.detail`` for the row just saved."""
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        if request.method != "POST":
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        with recording(
+            self.ledger_event_type,
+            self.ledger_detail,
+            products_with_pools(),
+            actor=request.user,
+        ) as rec:
+            request._stock_ledger_recording = rec
+            return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        rec = getattr(request, "_stock_ledger_recording", None)
+        if rec is not None:
+            rec.source = obj
+            self.ledger_refine(rec, obj, change)
 
 
 class CreatedByStampInlineMixin:
@@ -569,7 +615,9 @@ class OrderItemAdmin(ViewOnlyAdminMixin, SoftDeleteModelAdmin):
 
 
 @admin.register(InventorySnapshot)
-class InventorySnapshotAdmin(SoftDeleteModelAdmin):
+class InventorySnapshotAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_detail = StockEventDetail.BAG_COUNT
+
     list_display = (
         "public_id",
         "snapshot_date",
@@ -595,7 +643,9 @@ class InventorySnapshotAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(LooseStockSnapshot)
-class LooseStockSnapshotAdmin(SoftDeleteModelAdmin):
+class LooseStockSnapshotAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_detail = StockEventDetail.LOOSE_COUNT
+
     list_display = (
         "public_id",
         "snapshot_date",
@@ -669,7 +719,10 @@ class CustomOrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):
 
 
 @admin.register(CustomOrder)
-class CustomOrderAdmin(SoftDeleteParentAdmin):
+class CustomOrderAdmin(StockLedgerAdminMixin, SoftDeleteParentAdmin):
+    ledger_event_type = StockEventType.ORDER_CONFIRMED
+    ledger_detail = StockEventDetail.CUSTOM_ORDER_CREATED
+
     list_display = (
         "public_id",
         "client",
@@ -755,7 +808,13 @@ class PartyAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(InwardRawMaterial)
-class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
+class InwardRawMaterialAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_event_type = StockEventType.INWARD_OPERATIONS
+    ledger_detail = StockEventDetail.RAW_LOT_IN_USE
+
+    def ledger_refine(self, rec, obj, change):
+        rec.detail = raw_status_detail(obj)
+
     list_display = (
         "public_id",
         "product",
@@ -783,7 +842,14 @@ class InwardRawMaterialAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(RawMaterialWaste)
-class RawMaterialWasteAdmin(SoftDeleteModelAdmin):
+class RawMaterialWasteAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_event_type = StockEventType.RAW_WASTED
+    ledger_detail = StockEventDetail.WASTE_RECORDED
+
+    def ledger_refine(self, rec, obj, change):
+        if change:
+            rec.detail = StockEventDetail.WASTE_EDITED
+
     list_display = (
         "public_id",
         "product",
@@ -824,7 +890,14 @@ class OtherMaterialRecipeAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(InwardOtherMaterial)
-class InwardOtherMaterialAdmin(SoftDeleteModelAdmin):
+class InwardOtherMaterialAdmin(StockLedgerAdminMixin, SoftDeleteModelAdmin):
+    ledger_event_type = StockEventType.INWARD_OPERATIONS
+    ledger_detail = StockEventDetail.OTHER_MATERIAL_RECEIVED
+
+    def ledger_refine(self, rec, obj, change):
+        if change:
+            rec.detail = StockEventDetail.OTHER_MATERIAL_EDITED
+
     list_display = (
         "public_id",
         "recipe",
@@ -908,3 +981,148 @@ class FarmerVisitProductAdmin(SoftDeleteModelAdmin):
     list_display = ("farmer_visit", "product", "created_at")
     autocomplete_fields = ("farmer_visit", "product")
     list_select_related = ("farmer_visit", "product")
+
+
+# -- Stock ledger ---------------------------------------------------------------
+#
+# The product stock ledger is append-only and written only by
+# ``StockLedgerOperations.recording``. Nobody edits or deletes it by hand -- not
+# even a superuser -- because a hand-edited delta makes it disagree with the live
+# figures (``manage.py check_stock_ledger`` would then report the drift). These
+# admins are therefore strictly read-only, for inspection and support.
+
+
+class ReadOnlyLedgerAdminMixin:
+    """No add, change or delete for anyone."""
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class StockEventLineInline(ReadOnlyLedgerAdminMixin, admin.TabularInline):
+    """What one event moved in each pool, as signed deltas."""
+
+    model = StockEventLine
+    extra = 0
+    can_delete = False
+    fields = (
+        "pool_kind",
+        "product_packaging",
+        "packet_weight",
+        "material_type",
+        "d_on_hand",
+        "d_reserved",
+        "d_consumed",
+        "d_incoming",
+        "d_packed",
+        "d_rejected",
+        "d_wasted",
+    )
+    readonly_fields = fields
+
+
+@admin.register(StockEvent)
+class StockEventAdmin(ReadOnlyLedgerAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "id",
+        "occurred_at",
+        "product",
+        "event",
+        "detail_name",
+        "source",
+        "actor",
+        "line_count",
+    )
+    list_filter = ("event_type", "detail", "occurred_at")
+    search_fields = (
+        "product__name",
+        "product__public_id",
+        "order__public_id",
+        "custom_order__public_id",
+        "inward_raw_material__public_id",
+        "inward_raw_material__lot_no",
+        "inward_other_material__public_id",
+        "raw_material_waste__public_id",
+        "inventory_snapshot__public_id",
+        "loose_stock_snapshot__public_id",
+        "actor__name",
+    )
+    date_hierarchy = "occurred_at"
+    ordering = ("-occurred_at", "-id")
+    inlines = (StockEventLineInline,)
+    list_select_related = (
+        "product",
+        "actor",
+        "order",
+        "custom_order",
+        "inward_raw_material",
+        "inward_other_material",
+        "raw_material_waste",
+        "inventory_snapshot",
+        "loose_stock_snapshot",
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("lines")
+
+    @admin.display(description="event", ordering="event_type")
+    def event(self, obj):
+        return StockEventType(obj.event_type).name
+
+    @admin.display(description="detail", ordering="detail")
+    def detail_name(self, obj):
+        return StockEventDetail(obj.detail).name
+
+    @admin.display(description="source")
+    def source(self, obj):
+        for name in (
+            "order",
+            "custom_order",
+            "inward_raw_material",
+            "inward_other_material",
+            "raw_material_waste",
+            "inventory_snapshot",
+            "loose_stock_snapshot",
+        ):
+            row = getattr(obj, name)
+            if row is not None:
+                return row.public_id
+        return "-"
+
+    @admin.display(description="lines")
+    def line_count(self, obj):
+        return len(obj.lines.all())
+
+
+@admin.register(PackedRecipeLayer)
+class PackedRecipeLayerAdmin(ReadOnlyLedgerAdminMixin, admin.ModelAdmin):
+    """Packets of a count row packed under one recipe (frozen packing-material usage)."""
+
+    list_display = (
+        "id",
+        "inventory_snapshot",
+        "loose_stock_snapshot",
+        "material_type",
+        "recipe",
+        "packets",
+        "opened_at",
+    )
+    list_filter = ("material_type",)
+    search_fields = (
+        "inventory_snapshot__public_id",
+        "loose_stock_snapshot__public_id",
+        "recipe__public_id",
+    )
+    ordering = ("-opened_at", "-id")
+    list_select_related = (
+        "inventory_snapshot__product_packaging__product",
+        "loose_stock_snapshot__product",
+        "material_type",
+        "recipe",
+    )

@@ -141,10 +141,10 @@ class OtherMaterialRecipeApiTest(WebApiTestCase):
         self.assertEqual(different_type.status_code, status.HTTP_201_CREATED)
         self.assertEqual(different_type.data["material_type"]["name"], "bag_outer_cover")
 
-    def test_duplicate_check_includes_a_soft_deleted_recipe(self):
-        """A deleted recipe still claims its keys; re-creating it is a 400.
+    def test_a_soft_deleted_recipe_does_not_block_its_replacement(self):
+        """A recipe change is delete-old + create-new, so the deleted row frees its keys.
 
-        tests/test_other_material_recipe_api.py::OtherMaterialRecipeApiTest::test_duplicate_check_includes_a_soft_deleted_recipe
+        tests/test_other_material_recipe_api.py::OtherMaterialRecipeApiTest::test_a_soft_deleted_recipe_does_not_block_its_replacement
         """
         self.login_as(self.seed_admin)
         created = self._create_recipe()
@@ -154,10 +154,11 @@ class OtherMaterialRecipeApiTest(WebApiTestCase):
             self.client.delete(self._delete_url(created.data)).status_code,
             status.HTTP_204_NO_CONTENT,
         )
+        self.assertEqual(self._create_recipe().status_code, status.HTTP_201_CREATED)
         self.assertEqual(
             self._create_recipe().status_code,
             status.HTTP_400_BAD_REQUEST,
-            "a soft-deleted recipe must still block the same variant",
+            "a live recipe still blocks the same variant",
         )
 
     def test_zero_or_negative_bounds_are_rejected(self):

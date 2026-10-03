@@ -14,7 +14,7 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.InwardOperations import inward_raw_material_payload, today
+from aggregator.InwardOperations import create_raw_lot, inward_raw_material_payload, today
 from aggregator.models import InwardRawMaterial
 from android.api.paginated_views import AndroidGodownPaginatedDateRangeListView
 from api.inward_serializers import (
@@ -38,10 +38,7 @@ class GodownInwardRawMaterialsView(AndroidGodownPaginatedDateRangeListView):
 
     @extend_schema(
         operation_id="android_api_v1_godown_inward_raw_materials_list",
-        summary=(
-            "List inward raw-material lots (filter by product / party / status / "
-            "effective date range, sortable)"
-        ),
+        summary="List inward raw-material lots (filter by product / party / status, sortable)",
         parameters=list_query_parameters(
             queryset_filters=RAW_LOT_QUERYSET_FILTERS,
             sort_options=RAW_LOT_SORT_OPTIONS,
@@ -68,12 +65,12 @@ class GodownInwardRawMaterialsView(AndroidGodownPaginatedDateRangeListView):
         serializer = CreateInwardRawMaterialSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        entry = InwardRawMaterial.objects.create(
+        entry = create_raw_lot(
             product=data["product"],
             party=data["party"],
             lot_no=data["lot_no"],
             quantity_kg=data["quantity_kg"],
             lab_sampling_date=data.get("lab_sampling_date") or today(),
-            created_by=request.user,
+            actor=request.user,
         )
         return Response(inward_raw_material_payload(entry), status=status.HTTP_201_CREATED)

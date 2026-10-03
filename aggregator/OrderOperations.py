@@ -26,9 +26,12 @@ from .models import (
     ProductPackaging,
     Status,
     StatusIds,
+    StockEventDetail,
+    StockEventType,
     TransportAgency,
 )
 from .ProductOperations import packaging_payload
+from .StockLedgerOperations import dispatch_detail, order_product_ids, recording
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -403,13 +406,25 @@ def hold_order(order: Order) -> Order:
     holding a CONFIRMED order releases its bags with no bookkeeping.
     """
     assert_order_status(order, HOLDABLE_STATUS_CODES, "hold")
-    return update_order_status(order, StatusIds.ON_HOLD)
+    with recording(
+        StockEventType.ORDER_RELEASED,
+        StockEventDetail.HELD,
+        order_product_ids(order),
+        source=order,
+    ):
+        return update_order_status(order, StatusIds.ON_HOLD)
 
 
 def reject_order(order: Order) -> Order:
     """Reject ``order``. Terminal: no verb moves an order out of REJECTED."""
     assert_order_status(order, REJECTABLE_STATUS_CODES, "reject")
-    return update_order_status(order, StatusIds.REJECTED)
+    with recording(
+        StockEventType.ORDER_RELEASED,
+        StockEventDetail.REJECTED,
+        order_product_ids(order),
+        source=order,
+    ):
+        return update_order_status(order, StatusIds.REJECTED)
 
 
 @transaction.atomic
@@ -499,29 +514,38 @@ def dispatch_order(
         if order.transport_agency_id
         else attach_private_dispatch_details
     )
-    attach(
-        order,
-        dispatched_by=actor,
-        dispatch_date=dispatched_at.date(),
-        from_city=from_city,
-        to_city=to_city,
-        driver_name=driver_name,
-        driver_number=driver_number,
-        vehicle_number=vehicle_number,
-    )
-    sync_dispatch_entry(
-        order,
+    with recording(
+        StockEventType.ORDER_DISPATCHED,
+        StockEventDetail.FULL,
+        order_product_ids(order),
+        source=order,
         actor=actor,
-        dispatched_at=dispatched_at,
-        from_city=from_city,
-        to_city=to_city,
-        driver_name=driver_name,
-        driver_number=driver_number,
-        vehicle_number=vehicle_number,
-        lot_numbers=lot_numbers,
-        quantities=quantities,
-    )
-    return update_order_status(order, StatusIds.DISPATCHED)
+    ) as rec:
+        attach(
+            order,
+            dispatched_by=actor,
+            dispatch_date=dispatched_at.date(),
+            from_city=from_city,
+            to_city=to_city,
+            driver_name=driver_name,
+            driver_number=driver_number,
+            vehicle_number=vehicle_number,
+        )
+        sync_dispatch_entry(
+            order,
+            actor=actor,
+            dispatched_at=dispatched_at,
+            from_city=from_city,
+            to_city=to_city,
+            driver_name=driver_name,
+            driver_number=driver_number,
+            vehicle_number=vehicle_number,
+            lot_numbers=lot_numbers,
+            quantities=quantities,
+        )
+        update_order_status(order, StatusIds.DISPATCHED)
+        rec.detail = dispatch_detail(order)
+    return order
 
 
 @transaction.atomic
@@ -546,13 +570,20 @@ def verify_order(order: Order, admin: User) -> Order:
     if not (admin is not None and (admin.is_admin_user or admin.is_superuser)):
         raise PermissionDenied("Orders can only be verified by a sales admin.")
 
-    assert_stock_covers(InventoryOperations.order_bag_requirements(order), "verify")
+    with recording(
+        StockEventType.ORDER_CONFIRMED,
+        StockEventDetail.ORDER_VERIFIED,
+        order_product_ids(order),
+        source=order,
+        actor=admin,
+    ):
+        assert_stock_covers(InventoryOperations.order_bag_requirements(order), "verify")
 
-    order.status = Status.by_id(StatusIds.CONFIRMED)
-    order.verified_by = admin
-    order.verified_at = indian_now()
-    order.full_clean()
-    order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+        order.status = Status.by_id(StatusIds.CONFIRMED)
+        order.verified_by = admin
+        order.verified_at = indian_now()
+        order.full_clean()
+        order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
     return order
 
 
@@ -567,11 +598,17 @@ def unverify_order(order: Order, *, status: StatusIds = StatusIds.UNDER_REVIEW) 
     order can go back and forth between approved and under review.
     """
     assert_order_status(order, UNVERIFIABLE_STATUS_CODES, "unverify")
-    order.status = Status.by_id(status)
-    order.verified_by = None
-    order.verified_at = None
-    order.full_clean()
-    order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+    with recording(
+        StockEventType.ORDER_RELEASED,
+        StockEventDetail.UNVERIFIED,
+        order_product_ids(order),
+        source=order,
+    ):
+        order.status = Status.by_id(status)
+        order.verified_by = None
+        order.verified_at = None
+        order.full_clean()
+        order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
     return order
 
 
@@ -590,10 +627,16 @@ def revert_dispatch(order: Order) -> Order:
     """
     assert_order_status(order, REVERTIBLE_DISPATCH_STATUS_CODES, "revert the dispatch of")
     assert_dispatched_today(order)
-    order.status = Status.by_id(StatusIds.CONFIRMED)
-    order.actual_delivery_date = None
-    order.full_clean()
-    order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
+    with recording(
+        StockEventType.DISPATCH_REVERTED,
+        StockEventDetail.NONE,
+        order_product_ids(order),
+        source=order,
+    ):
+        order.status = Status.by_id(StatusIds.CONFIRMED)
+        order.actual_delivery_date = None
+        order.full_clean()
+        order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
     return order
 
 
@@ -802,6 +845,27 @@ def update_order_core(order: Order, **fields) -> Order:
 
 @transaction.atomic
 def sync_order_items(order: Order, items: list[dict], actor: User) -> list[OrderItem]:
+    """Replace ``order``'s lines with ``items``, recording the stock it moves.
+
+    See :func:`_sync_order_items` for the rules. Editing a CONFIRMED order
+    moves reserved bags, which the stock ledger records as ``ORDER_EDITED``.
+    """
+    products = {
+        item["product_packaging"].product_id
+        for item in items
+        if "product_packaging" in item
+    }
+    with recording(
+        StockEventType.ORDER_EDITED,
+        StockEventDetail.ORDER_LINES_CHANGED,
+        order_product_ids(order, products),
+        source=order,
+        actor=actor,
+    ):
+        return _sync_order_items(order, items, actor)
+
+
+def _sync_order_items(order: Order, items: list[dict], actor: User) -> list[OrderItem]:
     """Replace ``order``'s lines with ``items`` (full declarative replacement).
 
     Each entry is ``{"product_packaging", "quantity"}`` plus an optional

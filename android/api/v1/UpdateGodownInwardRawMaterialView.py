@@ -21,7 +21,11 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.InwardOperations import inward_raw_material_payload, locked_raw_lot
+from aggregator.InwardOperations import (
+    inward_raw_material_payload,
+    locked_raw_lot,
+    update_raw_lot,
+)
 from aggregator.models import InwardRawMaterial
 from android.api.base import AndroidGodownBaseView
 from api.inward_serializers import (
@@ -53,10 +57,7 @@ class UpdateGodownInwardRawMaterialView(AndroidGodownBaseView):
                 instance=entry, data=request.data, partial=True
             )
             serializer.is_valid(raise_exception=True)
-            for field in ("lab_sampling_date", "effective_date", "status"):
-                if field in serializer.validated_data:
-                    setattr(entry, field, serializer.validated_data[field])
-            entry.save()
+            update_raw_lot(entry, serializer.validated_data, request.user)
         return Response(inward_raw_material_payload(entry))
 
     @extend_schema(

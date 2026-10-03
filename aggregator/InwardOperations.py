@@ -25,11 +25,14 @@ leave the ``In Use`` pool (reverting to ``Lab Testing``, soft-deleting) so
 neither can strand bags or packets that no longer have raw material behind
 them.
 
-Everything here is derived or shape-only: nothing in this module writes rows.
+Reads here are derived or shape-only. The lot **writes** at the bottom
+(``create_raw_lot``, ``update_raw_lot``, ``create_other_lot``) live here so the
+stock ledger wraps each exactly once, whichever API calls them.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -48,9 +51,14 @@ from .models import (
     RawMaterialWaste,
     Status,
     StatusIds,
+    StockEventDetail,
+    StockEventType,
 )
+from .StockLedgerOperations import recording
 
 if TYPE_CHECKING:
+    from authentication.models import User
+
     from .models import OtherMaterialRecipe, Party
 
 
@@ -411,3 +419,89 @@ def locked_raw_lot(queryset: QuerySet, public_id: str) -> InwardRawMaterial:
     if pk is None:
         raise Http404("No InwardRawMaterial matches the given query.")
     return queryset.get(pk=pk)
+
+
+# -- Lot writes (recorded in the stock ledger) --------------------------------
+
+_RAW_STATUS_DETAILS = {
+    InwardRawMaterialStatus.IN_USE: StockEventDetail.RAW_LOT_IN_USE,
+    InwardRawMaterialStatus.RAW_MATERIAL_REJECTED: StockEventDetail.RAW_LOT_REJECTED,
+    InwardRawMaterialStatus.LAB_TESTING: StockEventDetail.RAW_LOT_BACK_TO_LAB,
+}
+
+
+def raw_status_detail(entry: InwardRawMaterial) -> StockEventDetail:
+    """The ledger detail for a lot that ended up in its current status."""
+    return _RAW_STATUS_DETAILS[raw_status_of(entry)]
+
+
+def create_raw_lot(
+    *,
+    product: Product,
+    party: Party,
+    lot_no: str,
+    quantity_kg: Decimal,
+    lab_sampling_date: date,
+    actor: User,
+) -> InwardRawMaterial:
+    """Book a raw-material lot. It starts in Lab Testing, so it moves no stock yet."""
+    with recording(
+        StockEventType.INWARD_OPERATIONS,
+        StockEventDetail.RAW_LOT_IN_USE,
+        [product.id],
+        actor=actor,
+    ) as rec:
+        entry = InwardRawMaterial.objects.create(
+            product=product,
+            party=party,
+            lot_no=lot_no,
+            quantity_kg=quantity_kg,
+            lab_sampling_date=lab_sampling_date,
+            created_by=actor,
+        )
+        rec.source = entry
+    return entry
+
+
+def update_raw_lot(
+    entry: InwardRawMaterial, values: Mapping[str, object], actor: User
+) -> InwardRawMaterial:
+    """Apply a lot's lifecycle update (dates and status), recording what it moves.
+
+    Call inside ``transaction.atomic`` with the lot loaded through
+    :func:`locked_raw_lot`. The event's detail is the status the lot ends in.
+    """
+    with recording(
+        StockEventType.INWARD_OPERATIONS,
+        StockEventDetail.RAW_LOT_IN_USE,
+        [entry.product_id],
+        source=entry,
+        actor=actor,
+    ) as rec:
+        for field in ("lab_sampling_date", "effective_date", "status"):
+            if field in values:
+                setattr(entry, field, values[field])
+        entry.save()
+        rec.detail = raw_status_detail(entry)
+    return entry
+
+
+def create_other_lot(
+    *, party: Party, recipe: OtherMaterialRecipe, quantity: Decimal, actor: User
+) -> InwardOtherMaterial:
+    """Book an other-material lot; it is in stock the day it arrives."""
+    with recording(
+        StockEventType.INWARD_OPERATIONS,
+        StockEventDetail.OTHER_MATERIAL_RECEIVED,
+        [recipe.product_id],
+        actor=actor,
+    ) as rec:
+        entry = InwardOtherMaterial.objects.create(
+            party=party,
+            recipe=recipe,
+            quantity=quantity,
+            effective_date=today(),
+            created_by=actor,
+        )
+        rec.source = entry
+    return entry

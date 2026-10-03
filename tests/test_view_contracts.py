@@ -266,6 +266,10 @@ EXPECTED_CONTRACTS = {
         "UpdateProductPackagingView",
         SESSION_ADMIN,
     ),
+    "api/sales-admin/product-stock-ledger/<str:public_id>": (
+        "ProductStockLedgerView",
+        SESSION_ADMIN,
+    ),
     "api/sales-admin/products": ("ProductsView", SESSION_ADMIN),
     "api/sales-admin/products/<str:public_id>": ("UpdateProductView", SESSION_ADMIN),
     "api/sales-admin/raw-material-stock": ("RawMaterialStockView", SESSION_ADMIN),

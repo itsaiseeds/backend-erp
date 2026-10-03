@@ -8,6 +8,7 @@ from common.models import (
 )
 
 from .InwardEntryMixin import InwardEntryMixin
+from .StockEvent import StockEventDetail, StockEventType
 
 
 class InwardOtherMaterial(
@@ -68,7 +69,14 @@ class InwardOtherMaterial(
         from aggregator import InventoryOperations
 
         InventoryOperations.guard_stock_deletion(
-            perform, material_type_ids=[self.recipe.material_type_id]
+            perform,
+            product_ids=[self.recipe.product_id],
+            material_type_ids=[self.recipe.material_type_id],
+            ledger=(
+                StockEventType.INWARD_OPERATIONS,
+                StockEventDetail.OTHER_MATERIAL_DELETED,
+                self,
+            ),
         )
 
     def __str__(self):

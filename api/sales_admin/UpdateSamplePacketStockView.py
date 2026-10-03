@@ -218,7 +218,7 @@ class UpdateLooseStockView(AdminApiView):
         counts = self._resolve_counts(serializer)
         try:
             snapshots = InventoryOperations.record_loose_stocks(
-                counts=counts, actor=request.user
+                counts=counts, actor=request.user, carry_forward=True
             )
         except ValueError as exc:
             raise serializers.ValidationError({"counts": str(exc)}) from None

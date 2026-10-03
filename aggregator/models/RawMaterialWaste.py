@@ -7,6 +7,8 @@ from common.models import (
     TimeStampedModel,
 )
 
+from .StockEvent import StockEventDetail, StockEventType
+
 
 class RawMaterialWaste(
     PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel
@@ -55,6 +57,19 @@ class RawMaterialWaste(
                 name="ck_rawmaterialwaste_quantity_kg_positive",
             ),
         ]
+
+    def guard_soft_delete(self, perform):
+        """Delete the waste row, recording the kilograms it gives back to raw."""
+        from aggregator import StockLedgerOperations
+
+        with StockLedgerOperations.recording(
+            StockEventType.RAW_WASTED,
+            StockEventDetail.WASTE_DELETED,
+            [self.product_id],
+            source=self,
+        ) as rec:
+            perform()
+            rec.actor = self.deleted_by
 
     def __str__(self):
         return f"{self.public_id}: {self.product} {self.quantity_kg} kg wasted"

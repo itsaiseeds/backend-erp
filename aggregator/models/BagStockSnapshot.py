@@ -9,6 +9,8 @@ from common.models import (
     indian_now,
 )
 
+from .StockEvent import StockEventDetail, StockEventType
+
 
 def default_snapshot_date():
     """Default snapshot date: today in the project's timezone (Asia/Kolkata)."""
@@ -96,6 +98,11 @@ class InventorySnapshot(
             perform,
             product_ids=[self.product_packaging.product_id],
             packagings=[self.product_packaging],
+            ledger=(
+                StockEventType.STOCK_ADJUSTED,
+                StockEventDetail.COUNT_DELETED,
+                self,
+            ),
         )
 
     def __str__(self):
