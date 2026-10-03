@@ -16,8 +16,9 @@ class StatusIds(IntEnum):
     lifecycle, ids 12-15 the field-trip lifecycle, id 16 the inward
     raw-material lot's ``Rejected`` status (not contiguous with 10-11: it was
     added after the field-trip range was already seeded, and its ``code`` must
-    differ from the unrelated order-lifecycle ``REJECTED`` at id 7). No
-    migrations — keep in sync with the seed rows.
+    differ from the unrelated order-lifecycle ``REJECTED`` at id 7), and ids
+    17-19 the return-order lifecycle. No migrations — keep in sync with the
+    seed rows.
     """
 
     BOOKED = 1
@@ -36,6 +37,9 @@ class StatusIds(IntEnum):
     IN_PROGRESS = 14
     COMPLETED = 15
     RAW_MATERIAL_REJECTED = 16
+    RETURN_PENDING = 17
+    RETURN_ACCEPTED = 18
+    RETURN_REJECTED = 19
 
     @classmethod
     def order_statuses(cls) -> list[StatusIds]:
@@ -53,6 +57,11 @@ class StatusIds(IntEnum):
         return [cls.LAB_TESTING, cls.IN_USE, cls.RAW_MATERIAL_REJECTED]
 
     @classmethod
+    def return_statuses(cls) -> list[StatusIds]:
+        """The return-order lifecycle ids (17–19)."""
+        return [cls.RETURN_PENDING, cls.RETURN_ACCEPTED, cls.RETURN_REJECTED]
+
+    @classmethod
     def field_trip_statuses(cls) -> list[StatusIds]:
         """The field-trip lifecycle ids (12–15)."""
         return [cls(value) for value in range(cls.PLANNED, cls.COMPLETED + 1)]
@@ -62,7 +71,7 @@ class Status(TimeStampedModel, SoftDeletedModel, CreatedByModel):
     """A generic, enum-like status value shared across domains.
 
     Rows are seeded (see ``sql/dml.sql``) and referenced by ``Order``,
-    ``Client``, ``InwardRawMaterial`` and ``FieldTrip``. The table carries no
+    ``Client``, ``InwardRawMaterial``, ``ReturnOrder`` and ``FieldTrip``. The table carries no
     transition rules; each consumer restricts which ``code`` values it
     accepts in its own ``clean()``.
     """

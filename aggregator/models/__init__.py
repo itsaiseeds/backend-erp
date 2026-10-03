@@ -32,6 +32,8 @@ from .Product import Product
 from .ProductDescriptionItem import ProductDescriptionItem
 from .ProductPackaging import ProductPackaging
 from .RawMaterialWaste import RawMaterialWaste
+from .ReturnOrder import ReturnOrder
+from .ReturnOrderItem import ReturnOrderItem
 from .SamplePacketStockSnapshot import LooseStockSnapshot
 from .Stage import Stage, StageIds
 from .State import State
@@ -80,6 +82,8 @@ __all__ = [
     "InwardRawMaterial",
     "InwardRawMaterialStatus",
     "RawMaterialWaste",
+    "ReturnOrder",
+    "ReturnOrderItem",
     "OtherMaterialType",
     "OtherMaterialUnitType",
     "OtherMaterialRecipe",

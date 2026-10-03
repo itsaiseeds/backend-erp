@@ -24,6 +24,7 @@ from .GetClientView import GetClientView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
+from .GetReturnOrdersView import GetReturnOrdersView
 from .GodownInwardOtherMaterialsView import GodownInwardOtherMaterialsView
 from .GodownInwardRawMaterialsView import GodownInwardRawMaterialsView
 from .GodownOtherMaterialRecipesView import GodownOtherMaterialRecipesView
@@ -35,6 +36,7 @@ from .OtherMaterialTypesView import OtherMaterialTypesView
 from .PartiesView import PartiesView
 from .ProductsView import ProductsView
 from .ReauthenticateView import ReauthenticateView
+from .ReturnOrderView import ReturnOrderView
 from .SalesAdminsView import SalesAdminsView
 from .SalesPersonCatalogueView import SalesPersonCatalogueView
 from .StartFieldTripView import StartFieldTripView
@@ -61,6 +63,8 @@ ROUTES: dict[str, type] = {
     "analytics": AnalyticsView,
     "get-clients": GetClientsView,
     "get-orders": GetOrdersView,
+    "return-order/<order_public_id>": ReturnOrderView,
+    "get-return-orders": GetReturnOrdersView,
     "client/<public_id>": GetClientView,
     "create-client": CreateClientView,
     "update-client": UpdateClientView,

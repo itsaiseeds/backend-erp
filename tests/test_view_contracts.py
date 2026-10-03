@@ -118,6 +118,8 @@ EXPECTED_CONTRACTS = {
     ),
     "android/api/v1/get-clients": ("GetClientsView", TOKEN_SALESPERSON),
     "android/api/v1/get-orders": ("GetOrdersView", TOKEN_SALESPERSON),
+    "android/api/v1/return-order/<order_public_id>": ("ReturnOrderView", TOKEN_SALESPERSON),
+    "android/api/v1/get-return-orders": ("GetReturnOrdersView", TOKEN_SALESPERSON),
     "android/api/v1/sales-person-catalogue": (
         "SalesPersonCatalogueView",
         TOKEN_SALESPERSON,
@@ -218,6 +220,31 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/order/<str:public_id>": ("GetOrderView", SESSION_ADMIN),
     "api/sales-admin/orders/": ("GetOrdersView", SESSION_ADMIN),
     "api/sales-admin/reject-order/<str:public_id>": ("RejectOrderView", SESSION_ADMIN),
+    "api/sales-admin/return-orders/": ("GetReturnOrdersView", SESSION_ADMIN),
+    "api/sales-admin/edit-return-order/<str:public_id>": (
+        "UpdateReturnOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/return-order-recipes/<str:public_id>": (
+        "ReturnOrderRecipesView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/accept-return-order/<str:public_id>": (
+        "AcceptReturnOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/reject-return-order/<str:public_id>": (
+        "RejectReturnOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/unreject-return-order/<str:public_id>": (
+        "UnrejectReturnOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/revert-accept-return-order/<str:public_id>": (
+        "RevertAcceptReturnOrderView",
+        SESSION_ADMIN,
+    ),
     "api/sales-admin/revert-dispatch/<str:public_id>": ("RevertDispatchView", SESSION_ADMIN),
     "api/sales-admin/unverify-order/<str:public_id>": ("UnverifyOrderView", SESSION_ADMIN),
     "api/sales-admin/upload-lr-number/<str:public_id>": ("UploadLRNumberView", SESSION_ADMIN),

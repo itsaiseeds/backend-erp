@@ -11,6 +11,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from api.client_serializers import ClientPayloadSerializer
+from api.return_order_serializers import ReturnOrderPayloadSerializer
 
 
 class TransportAgencyRefSerializer(serializers.Serializer):
@@ -109,3 +110,10 @@ class OrderDetailPayloadSerializer(serializers.Serializer):
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()
     items = OrderItemPayloadSerializer(many=True)
+    return_order = ReturnOrderPayloadSerializer(
+        allow_null=True,
+        help_text=(
+            "The order's live return (PENDING or ACCEPTED); null when it has none. "
+            "A REJECTED return is not shown."
+        ),
+    )

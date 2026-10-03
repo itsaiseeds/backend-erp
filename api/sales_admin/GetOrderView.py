@@ -21,7 +21,15 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.models import ClientAddress, ClientTransportAgency, Order, OrderItem
+from aggregator.models import (
+    ClientAddress,
+    ClientTransportAgency,
+    Order,
+    OrderItem,
+    ReturnOrder,
+    ReturnOrderItem,
+)
+from aggregator.models.ReturnOrder import LIVE_RETURN_STATUS_IDS
 from aggregator.OrderOperations import order_detail_payload
 from api.admin import AdminApiView
 from api.order_serializers import OrderDetailPayloadSerializer
@@ -39,7 +47,8 @@ def order_detail_queryset() -> QuerySet:
 
     ``client_payload`` walks the client's three link tables and each address's
     geography, so those are prefetched here rather than left to fire one query
-    per row at render time.
+    per row at render time. The order's live return rides along as
+    ``live_return_orders`` (a REJECTED return is hidden).
     """
     return Order.objects.select_related(
         "status",
@@ -54,6 +63,26 @@ def order_detail_queryset() -> QuerySet:
         Prefetch(
             "items",
             queryset=OrderItem.objects.select_related("product_packaging__product"),
+        ),
+        Prefetch(
+            "return_orders",
+            queryset=ReturnOrder.objects.filter(
+                status_id__in=[int(s) for s in LIVE_RETURN_STATUS_IDS]
+            )
+            .select_related(
+                "status",
+                "order__status",
+                "order__client",
+                "created_by",
+                "verified_by",
+                "rejected_by",
+            )
+            .prefetch_related(
+                Prefetch(
+                    "items", queryset=ReturnOrderItem.objects.select_related("product")
+                )
+            ),
+            to_attr="live_return_orders",
         ),
         Prefetch(
             "client__client_addresses",

@@ -2,7 +2,8 @@
 
 A seeded-random sequence of 200 operations runs through the real operation
 functions -- inward lots, counts, orders, dispatches, reverts, waste, custom
-orders, recipe changes, deletions, and the passing of days. After **every** step
+orders, return orders (raise, accept, revert, reject, unreject), recipe changes,
+deletions, and the passing of days. After **every** step
 the ledger totals are compared with the live figures of every pool of every
 product (``StockLedgerOperations.check_ledger``). At the end the report itself is
 checked: each row plus the next row's change is the next row, a range's closing
@@ -33,7 +34,9 @@ from aggregator.models import (
     OtherMaterialRecipe,
     ProductPackaging,
     Status,
+    StatusIds,
     StockEvent,
+    StockEventType,
 )
 from aggregator.OrderOperations import (
     hold_order,
@@ -42,6 +45,13 @@ from aggregator.OrderOperations import (
     revert_dispatch,
     sync_order_items,
     unverify_order,
+)
+from aggregator.ReturnOrderOperations import (
+    accept_return_order,
+    create_return_order,
+    reject_return_order,
+    revert_accept_return_order,
+    unreject_return_order,
 )
 from aggregator.StockLedgerReport import product_ledger_rows
 from tests.stock_ledger_support import TODAY, W1, LedgerWorldTestCase
@@ -98,6 +108,7 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
         self.orders = []
         self.custom_orders = []
         self.wastes = []
+        self.returns = []
         self.counts_needed_in_full = True
         applied = 0
 
@@ -108,6 +119,9 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
             self.op_edit, self.op_deliver, self.op_custom, self.op_custom_dispatch,
             self.op_custom_release, self.op_waste, self.op_waste_delete, self.op_recipe,
             self.op_delete_count, self.op_delete_lot,
+            self.op_return_create, self.op_return_create, self.op_return_accept,
+            self.op_return_accept, self.op_return_revert_accept, self.op_return_reject,
+            self.op_return_unreject,
         ]
         # Stock first, so most later operations have something to act on.
         self.op_raw_in(rng)
@@ -131,6 +145,10 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
 
         self.assertGreater(applied, OPERATIONS // 3, "too few operations took effect")
         self.assertGreater(StockEvent.objects.count(), 40)
+        self.assertTrue(
+            StockEvent.objects.filter(event_type=StockEventType.RETURN_OPERATIONS).exists(),
+            "the sequence never accepted a return",
+        )
         self._assert_reports_reconcile()
 
     # -- stamping ----------------------------------------------------------------
@@ -324,6 +342,66 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
         if lot.is_deleted:
             return False
         lot.mark_deleted(self.su)
+
+    def op_return_create(self, rng):
+        picked = self._pick(rng, {"DISPATCHED", "DELIVERED"})
+        if picked is None:
+            return False
+        order, packaging = picked
+        self.returns.append(
+            create_return_order(
+                order,
+                return_date=None,
+                items=[
+                    {
+                        "product": packaging.product,
+                        "packet_weight": packaging.packet_weight,
+                        "packets": rng.randint(1, 30),
+                        "price_per_packet": Decimal("5.00"),
+                    }
+                ],
+                actor=self.sp_user,
+            )
+        )
+
+    def _pick_return(self, rng, status_id):
+        candidates = []
+        for ret in self.returns:
+            ret.refresh_from_db()
+            if ret.status_id == status_id:
+                candidates.append(ret)
+        return rng.choice(candidates) if candidates else None
+
+    def op_return_accept(self, rng):
+        ret = self._pick_return(rng, StatusIds.RETURN_PENDING)
+        if ret is None:
+            return False
+        include = rng.random() < 0.6
+        recipe = self.recipe_p if ret.items.get().product_id == self.product.pk else self.recipe_q
+        accept_return_order(
+            ret,
+            include_other=include,
+            recipe_public_ids=[recipe.public_id] if include else None,
+            admin=self.su,
+        )
+
+    def op_return_revert_accept(self, rng):
+        ret = self._pick_return(rng, StatusIds.RETURN_ACCEPTED)
+        if ret is None:
+            return False
+        revert_accept_return_order(ret, admin=self.su)
+
+    def op_return_reject(self, rng):
+        ret = self._pick_return(rng, StatusIds.RETURN_PENDING)
+        if ret is None:
+            return False
+        reject_return_order(ret, admin=self.su)
+
+    def op_return_unreject(self, rng):
+        ret = self._pick_return(rng, StatusIds.RETURN_REJECTED)
+        if ret is None:
+            return False
+        unreject_return_order(ret, admin=self.su)
 
     # -- the report ------------------------------------------------------------------
 

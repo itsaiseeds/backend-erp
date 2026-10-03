@@ -23,6 +23,7 @@ class StockEventType(models.IntegerChoices):
     ORDER_RELEASED = 9
     ORDER_DISPATCHED = 10
     DISPATCH_REVERTED = 11
+    RETURN_OPERATIONS = 12
 
 
 class StockEventDetail(models.IntegerChoices):
@@ -65,6 +66,9 @@ class StockEventDetail(models.IntegerChoices):
 
     FULL = 70
     PARTIAL = 71
+
+    RETURN_ACCEPTED = 80
+    RETURN_ACCEPT_REVERTED = 81
 
 
 VALID_DETAILS: dict[int, frozenset[int]] = {
@@ -125,6 +129,9 @@ VALID_DETAILS: dict[int, frozenset[int]] = {
         {StockEventDetail.FULL, StockEventDetail.PARTIAL}
     ),
     StockEventType.DISPATCH_REVERTED: frozenset({StockEventDetail.NONE}),
+    StockEventType.RETURN_OPERATIONS: frozenset(
+        {StockEventDetail.RETURN_ACCEPTED, StockEventDetail.RETURN_ACCEPT_REVERTED}
+    ),
 }
 
 
@@ -170,6 +177,7 @@ class StockEvent(models.Model):
     raw_material_waste = _source_fk("aggregator.RawMaterialWaste")
     inventory_snapshot = _source_fk("aggregator.InventorySnapshot")
     loose_stock_snapshot = _source_fk("aggregator.LooseStockSnapshot")
+    return_order = _source_fk("aggregator.ReturnOrder")
 
     class Meta:
         verbose_name = "stock event"
