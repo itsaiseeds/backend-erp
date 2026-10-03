@@ -27,6 +27,7 @@ from aggregator.models import (
     Stage,
     StageIds,
     State,
+    Status,
 )
 from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import create_order
@@ -117,7 +118,7 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         )
 
     @classmethod
-    def _bag(cls, product_name, price, *, packets, image_url=""):
+    def _bag(cls, product_name, price, *, packets, image_url="", packet_weight="1.000"):
         product = Product.objects.create(
             name=product_name,
             crop_id=1,
@@ -128,7 +129,7 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         )
         return ProductPackaging.objects.create(
             product=product,
-            packet_weight=Decimal("1.000"),
+            packet_weight=Decimal(packet_weight),
             packets=packets,
             selling_price=price,
             created_by=cls.superuser,
@@ -167,10 +168,35 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         )
         self.login_as(self.sales_person)
 
-    def test_analytics_counts_orders_clients_and_orders_per_client_in_the_window(self):
+    def _confirm(self, order, approver):
+        """Move a booked order to CONFIRMED, the way the sales-admin API does.
+
+        CONFIRMED is the *verified* state (``Order.is_verified``), and it may
+        only be entered with the approver and the stamp on the row -- so this
+        goes through ``full_clean`` rather than assigning the status blindly.
+        """
+        order.status = Status.by_id(StatusIds.CONFIRMED)
+        order.verified_by = approver
+        order.verified_at = indian_now()
+        order.full_clean()
+        order.save()
+        return order
+
+    def _sales_admin(self, phone, name):
+        user = User.objects.create_user(
+            phone_number=phone,
+            name=name,
+            is_verified=True,
+            created_by=self.superuser,
+            verified_by=self.superuser,
+        )
+        Admin.objects.create(user=user, created_by=self.superuser)
+        return user
+
+    def test_analytics_counts_orders_and_clients_and_kgs_per_product_in_the_window(self):
         """Counts are the caller's own, inside the window, zero-filled by status.
 
-        tests/android/test_orders.py::AndroidOrderListApiTest::test_analytics_counts_orders_clients_and_orders_per_client_in_the_window
+        tests/android/test_orders.py::AndroidOrderListApiTest::test_analytics_counts_orders_and_clients_and_kgs_per_product_in_the_window
         """
         self._seed_orders()
         url = "/android/api/v1/analytics"
@@ -194,17 +220,33 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
             },
         )
         self.assertEqual(data["clients"]["total"], 2)  # the rival's client is not ours
+        self.assertEqual(data["clients"]["by_status"], {"VERIFICATION_PENDING": 2, "VERIFIED": 0})
+
+        # Kilograms grouped by product, heaviest first. Alpha is a 10kg bag and
+        # beta a 5kg one. Alpha: 1 bag on ``first`` + 2 on ``third`` = 30kg,
+        # all BOOKED. Beta: 3 bags on the ON_HOLD ``second`` + 1 on ``third``
+        # = 20kg split across both statuses. The rival's 5 alpha bags are the
+        # other sales person's.
         self.assertEqual(
-            data["clients"]["by_status"], {"VERIFICATION_PENDING": 2, "VERIFIED": 0}
+            [(row["product"]["name"], row["total_kg"]) for row in data["products"]],
+            [("Alpha Seed", "30.000"), ("Beta Seed", "20.000")],
         )
+        alpha, beta = data["products"]
+        self.assertEqual(alpha["product"]["public_id"], self.alpha_product.public_id)
         self.assertEqual(
-            [(row["client"]["company_name"], row["total"]) for row in data["client_orders"]],
-            [("Acme Seeds", 2), ("Beta Seeds", 1)],
+            alpha["kg_by_status"],
+            {
+                "BOOKED": "30.000",
+                "UNDER_REVIEW": "0.000",
+                "CONFIRMED": "0.000",
+                "DISPATCHED": "0.000",
+                "DELIVERED": "0.000",
+                "ON_HOLD": "0.000",
+                "REJECTED": "0.000",
+            },
         )
-        beta = data["client_orders"][1]
-        self.assertEqual(beta["client"]["public_id"], self.beta.public_id)
-        self.assertEqual(beta["by_status"]["ON_HOLD"], 1)
-        self.assertEqual(beta["by_status"]["BOOKED"], 0)
+        self.assertEqual(beta["kg_by_status"]["ON_HOLD"], "15.000")
+        self.assertEqual(beta["kg_by_status"]["BOOKED"], "5.000")
 
         # A window that closed before anything was created is all zeros.
         empty = self.client.get(
@@ -213,12 +255,60 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         ).data
         self.assertEqual(empty["orders"]["total"], 0)
         self.assertEqual(empty["clients"]["total"], 0)
-        self.assertEqual(empty["client_orders"], [])
+        self.assertEqual(empty["products"], [])
 
         # Both bounds are required, in order.
         self.assertEqual(self.client.get(url).status_code, status.HTTP_400_BAD_REQUEST)
         inverted = {**everything, "start_date_time": "2999-01-02T00:00:00Z"}
         self.assertEqual(self.client.get(url, inverted).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_analytics_splits_the_kilograms_between_booked_and_confirmed(self):
+        """Confirming an order moves its kg from one bucket to the next.
+
+        The status drives the split, not the approver: the very same order
+        weighs the same before and after, only landing under ``CONFIRMED``
+        (the verified state) instead of ``BOOKED``. ``total_kg`` -- every status
+        added up -- does not move.
+
+        A three-line order spanning three products, one of them a 0.5kg packet:
+        2 alpha (10kg) + 1 beta (5kg) + 1 half-kg trio (1.5kg), so a dropped or
+        rounded fractional weight shows up rather than hides.
+
+        tests/android/test_orders.py::AndroidOrderListApiTest::test_analytics_splits_the_kilograms_between_booked_and_confirmed
+        """
+        approver = self._sales_admin("9000000388", "Sales Admin")
+        half_kg_bag = self._bag("Gamma Seed", Decimal("900.00"), packets=3, packet_weight="0.500")
+        order = self._order(
+            self.acme,
+            [(self.alpha_bag, 2), (self.beta_bag, 1), (half_kg_bag, 1)],
+        )
+        self.login_as(self.sales_person)
+        url = "/android/api/v1/analytics"
+        everything = {
+            "start_date_time": "2000-01-01T00:00:00Z",
+            "end_date_time": "2999-01-01T00:00:00Z",
+        }
+
+        before = {
+            row["product"]["name"]: row for row in self.client.get(url, everything).data["products"]
+        }
+        self.assertEqual(
+            [(name, row["total_kg"]) for name, row in before.items()],
+            [("Alpha Seed", "20.000"), ("Beta Seed", "5.000"), ("Gamma Seed", "1.500")],
+        )
+        self.assertEqual(before["Alpha Seed"]["kg_by_status"]["BOOKED"], "20.000")
+        self.assertEqual(before["Alpha Seed"]["kg_by_status"]["CONFIRMED"], "0.000")
+
+        self._confirm(order, approver)
+
+        after = {
+            row["product"]["name"]: row for row in self.client.get(url, everything).data["products"]
+        }
+        self.assertEqual(after["Alpha Seed"]["kg_by_status"]["BOOKED"], "0.000")
+        self.assertEqual(after["Alpha Seed"]["kg_by_status"]["CONFIRMED"], "20.000")
+        self.assertEqual(after["Beta Seed"]["kg_by_status"]["CONFIRMED"], "5.000")
+        self.assertEqual(after["Gamma Seed"]["kg_by_status"]["CONFIRMED"], "1.500")
+        self.assertEqual(after["Alpha Seed"]["total_kg"], before["Alpha Seed"]["total_kg"])
 
     def _ids(self, response):
         return [row["public_id"] for row in response.data["results"]]

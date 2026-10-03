@@ -8,8 +8,9 @@ paths:
   /android/api/v1/analytics:
     get:
       operationId: android_api_v1_analytics_retrieve
-      description: Order, client and per-client order counts for the caller in a window.
-      summary: Order / client counts by status within a date window
+      description: Order / client counts and per-product kilograms for the caller
+        in a window.
+      summary: Order / client counts by status, and kg booked per product, in a window
       parameters:
       - in: query
         name: end_date_time
@@ -5304,15 +5305,15 @@ components:
           maxLength: 15
       required:
       - public_id
-    AnalyticsClientRef:
+    AnalyticsProductRef:
       type: object
       properties:
         public_id:
           type: string
-        company_name:
+        name:
           type: string
       required:
-      - company_name
+      - name
       - public_id
     AnalyticsResponse:
       type: object
@@ -5327,15 +5328,15 @@ components:
           $ref: '#/components/schemas/OrderCounts'
         clients:
           $ref: '#/components/schemas/ClientCounts'
-        client_orders:
+        products:
           type: array
           items:
-            $ref: '#/components/schemas/ClientOrderCounts'
+            $ref: '#/components/schemas/ProductKg'
       required:
-      - client_orders
       - clients
       - end_date_time
       - orders
+      - products
       - start_date_time
     AndroidCity:
       type: object
@@ -6038,19 +6039,6 @@ components:
       - results
       - total_count
       - total_pages
-    ClientOrderCounts:
-      type: object
-      properties:
-        client:
-          $ref: '#/components/schemas/AnalyticsClientRef'
-        total:
-          type: integer
-        by_status:
-          $ref: '#/components/schemas/OrderStatusCounts'
-      required:
-      - by_status
-      - client
-      - total
     ClientPayload:
       type: object
       description: Output shape for a full client (schema only; responses are built
@@ -9140,6 +9128,38 @@ components:
       - ON_HOLD
       - REJECTED
       - UNDER_REVIEW
+    OrderStatusKg:
+      type: object
+      properties:
+        BOOKED:
+          type: string
+          description: Kilograms of this product in this status.
+        UNDER_REVIEW:
+          type: string
+          description: Kilograms of this product in this status.
+        CONFIRMED:
+          type: string
+          description: Kilograms of this product in this status.
+        DISPATCHED:
+          type: string
+          description: Kilograms of this product in this status.
+        DELIVERED:
+          type: string
+          description: Kilograms of this product in this status.
+        ON_HOLD:
+          type: string
+          description: Kilograms of this product in this status.
+        REJECTED:
+          type: string
+          description: Kilograms of this product in this status.
+      required:
+      - BOOKED
+      - CONFIRMED
+      - DELIVERED
+      - DISPATCHED
+      - ON_HOLD
+      - REJECTED
+      - UNDER_REVIEW
     OrderTypeEnum:
       enum:
       - CUSTOM_ORDER
@@ -9621,6 +9641,20 @@ components:
             minimum: 0
           description: Map of product-packaging public_id to its sealed-bag count;
             loose packets are recorded at ``update-sample-packet-stock``, not here.
+    ProductKg:
+      type: object
+      properties:
+        product:
+          $ref: '#/components/schemas/AnalyticsProductRef'
+        total_kg:
+          type: string
+          description: Kilograms booked across every status.
+        kg_by_status:
+          $ref: '#/components/schemas/OrderStatusKg'
+      required:
+      - kg_by_status
+      - product
+      - total_kg
     ProductLooseStockPayload:
       type: object
       description: Output shape for a product's loose position, one line per packet
