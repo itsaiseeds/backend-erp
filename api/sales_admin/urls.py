@@ -28,6 +28,7 @@ from .GetClientView import GetClientView
 from .GetCustomOrdersView import GetCustomOrdersView
 from .GetDispatchChallansView import GetDispatchChallansView
 from .GetDispatchLotNumbersView import GetDispatchLotNumbersView
+from .GetFarmersView import GetFarmersView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
@@ -258,6 +259,9 @@ urlpatterns = [
         GetFieldTripFarmerVisitsView.as_view(),
         name="field-trip-farmer-visits",
     ),
+    # Farmers are not a trip's rows: one farmer across every trip, deduped by
+    # contact number, so the list is a collection of its own.
+    path("farmers/", GetFarmersView.as_view(), name="farmers"),
     path(
         "edit-field-trip/<str:public_id>",
         UpdateFieldTripView.as_view(),

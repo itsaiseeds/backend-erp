@@ -41,7 +41,7 @@ class FieldTripFixtures:
         cls.other_sales_person = cls._sales_person("9000000802", "Sales Two")
         cls.admin_user = User.objects.create_user(
             phone_number="9000000803",
-            name="Trip Admin",
+            name="Meera Desai",
             is_verified=True,
             created_by=cls.superuser,
             verified_by=cls.superuser,

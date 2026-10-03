@@ -268,6 +268,7 @@ EXPECTED_CONTRACTS = {
         "GetFieldTripFarmerVisitsView",
         SESSION_ADMIN,
     ),
+    "api/sales-admin/farmers/": ("GetFarmersView", SESSION_ADMIN),
     "api/sales-admin/edit-field-trip/<str:public_id>": ("UpdateFieldTripView", SESSION_ADMIN),
     "api/sales-admin/approve-field-trip/<str:public_id>": (
         "ApproveFieldTripView",

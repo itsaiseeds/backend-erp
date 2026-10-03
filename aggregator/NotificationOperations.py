@@ -1,12 +1,12 @@
 """Notifications for the sales person whose work an admin just acted on.
 
-Order status changes, a client being verified and a return being accepted or
-rejected each call a ``notify_*_event`` function, which hands the whole job --
-saving the in-app :class:`~aggregator.models.Notification` row and pushing it to
-the recipient's phones -- to ``fire_and_forget``. It therefore runs only once the
-change has committed (a rolled-back change notifies nobody), off the request
-thread, and a failure anywhere in it is logged and swallowed rather than failing
-the change.
+Order status changes, a field trip being approved or un-approved, a client being
+verified and a return being accepted or rejected each call a ``notify_*_event``
+function, which hands the whole job -- saving the in-app
+:class:`~aggregator.models.Notification` row and pushing it to the recipient's
+phones -- to ``fire_and_forget``. It therefore runs only once the change has
+committed (a rolled-back change notifies nobody), off the request thread, and a
+failure anywhere in it is logged and swallowed rather than failing the change.
 
 Every notification is one ``event`` (what happened), which fixes its title, its
 wording and the app ``screen`` to open; the ids that screen needs travel in
@@ -29,7 +29,7 @@ from django.utils import timezone
 from common.background import fire_and_forget
 from common.push import send_push
 
-from .models import Client, Notification, Order, PushDevice, ReturnOrder
+from .models import Client, FieldTrip, Notification, Order, PushDevice, ReturnOrder
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -45,6 +45,8 @@ class NotificationEvent(StrEnum):
     ORDER_DISPATCHED = "ORDER_DISPATCHED"
     ORDER_DISPATCH_REVERTED = "ORDER_DISPATCH_REVERTED"
     ORDER_DELIVERED = "ORDER_DELIVERED"
+    FIELD_TRIP_APPROVED = "FIELD_TRIP_APPROVED"
+    FIELD_TRIP_UNAPPROVED = "FIELD_TRIP_UNAPPROVED"
     CLIENT_VERIFIED = "CLIENT_VERIFIED"
     RETURN_ACCEPTED = "RETURN_ACCEPTED"
     RETURN_REJECTED = "RETURN_REJECTED"
@@ -54,6 +56,7 @@ class Screen(StrEnum):
     """The app screen a notification opens; the value is the route name the app maps."""
 
     ORDER_DETAIL = "order_detail"
+    FIELD_TRIP_DETAIL = "field_trip_detail"
     CLIENT_DETAIL = "client_detail"
     RETURN_ORDER_DETAIL = "return_order_detail"
 
@@ -85,6 +88,14 @@ _SPECS: dict[NotificationEvent, EventSpec] = {
         "Dispatch reverted", "had its dispatch reverted", Screen.ORDER_DETAIL
     ),
     _E.ORDER_DELIVERED: EventSpec("Order delivered", "has been delivered", Screen.ORDER_DETAIL),
+    _E.FIELD_TRIP_APPROVED: EventSpec(
+        "Field trip approved", "was approved", Screen.FIELD_TRIP_DETAIL
+    ),
+    _E.FIELD_TRIP_UNAPPROVED: EventSpec(
+        "Field trip approval withdrawn",
+        "had its approval withdrawn",
+        Screen.FIELD_TRIP_DETAIL,
+    ),
     _E.CLIENT_VERIFIED: EventSpec("Client verified", "was verified", Screen.CLIENT_DETAIL),
     _E.RETURN_ACCEPTED: EventSpec("Return accepted", "was accepted", Screen.RETURN_ORDER_DETAIL),
     _E.RETURN_REJECTED: EventSpec("Return rejected", "was rejected", Screen.RETURN_ORDER_DETAIL),
@@ -105,6 +116,12 @@ def notify_order_event(order: Order, event: NotificationEvent, *, actor: User) -
     """Tell the order's booking sales person that ``order`` just changed by ``actor``."""
     order_id = order.pk
     _notify(event, actor, lambda: _order_message(order_id))
+
+
+def notify_field_trip_event(trip: FieldTrip, event: NotificationEvent, *, actor: User) -> None:
+    """Tell the sales person who planned ``trip`` what ``actor`` decided about it."""
+    trip_id = trip.pk
+    _notify(event, actor, lambda: _field_trip_message(trip_id))
 
 
 def notify_client_event(client: Client, event: NotificationEvent, *, actor: User) -> None:
@@ -136,6 +153,15 @@ def _order_message(order_id: int) -> Message:
         subject=f"{order.public_id} for {order.client.company_name}",
         data={"order_public_id": order.public_id},
         order_id=order.pk,
+    )
+
+
+def _field_trip_message(trip_id: int) -> Message:
+    trip = FieldTrip.objects.get(pk=trip_id)
+    return Message(
+        recipient_id=trip.created_by_id,
+        subject=f"{trip.public_id} to {trip.village}",
+        data={"field_trip_public_id": trip.public_id},
     )
 
 
