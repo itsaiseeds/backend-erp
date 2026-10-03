@@ -32,6 +32,7 @@ from .models import (
     InwardOtherMaterial,
     InwardRawMaterial,
     LooseStockSnapshot,
+    Notification,
     Order,
     OrderItem,
     OtherMaterialRecipe,
@@ -43,6 +44,7 @@ from .models import (
     Product,
     ProductDescriptionItem,
     ProductPackaging,
+    PushDevice,
     RawMaterialWaste,
     Stage,
     State,
@@ -1091,6 +1093,58 @@ class FarmerVisitProductAdmin(SoftDeleteModelAdmin):
     list_display = ("farmer_visit", "product", "created_at")
     autocomplete_fields = ("farmer_visit", "product")
     list_select_related = ("farmer_visit", "product")
+
+
+# -- Push notifications ---------------------------------------------------------
+#
+# Both tables are written by ``NotificationOperations`` (and, for the device
+# token, by the app at login). They are registered here with full CRUD so a
+# mis-sent notification can be pulled and a phone that should no longer receive
+# pushes can be un-registered by hand.
+
+
+@admin.register(PushDevice)
+class PushDeviceAdmin(admin.ModelAdmin):
+    """The phones a user is signed in on, so support can spot stale registrations.
+
+    ``updated_at`` is the app's last login or token refresh, so this doubles as
+    a "last seen" list. Deleting a row un-registers that one phone; the token
+    comes back only when that app next logs in.
+    """
+
+    list_display = ("id", "user", "app_version", "token", "updated_at")
+    list_filter = ("app_version",)
+    search_fields = ("fcm_token", "user__name", "user__phone_number")
+    date_hierarchy = "updated_at"
+    ordering = ("-updated_at", "-id")
+    list_select_related = ("user",)
+
+    @admin.display(description="token", ordering="fcm_token")
+    def token(self, obj):
+        return f"{obj.fcm_token[:12]}..."
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    """The in-app inbox: what was sent, to whom, and who has read it."""
+
+    list_display = ("id", "recipient", "title", "event_type", "order", "read", "created_at")
+    list_filter = ("event_type", "created_at")
+    search_fields = (
+        "title",
+        "body",
+        "recipient__name",
+        "recipient__phone_number",
+        "order__public_id",
+    )
+    date_hierarchy = "created_at"
+    ordering = ("-created_at", "-id")
+    autocomplete_fields = ("order",)
+    list_select_related = ("recipient", "order")
+
+    @admin.display(description="read", boolean=True, ordering="read_at")
+    def read(self, obj):
+        return obj.read_at is not None
 
 
 # -- Stock ledger ---------------------------------------------------------------

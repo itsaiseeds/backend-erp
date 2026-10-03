@@ -64,6 +64,10 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(48, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(49, 'aggregator', 'farmervisitcrop');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(50, 'aggregator', 'farmervisitproduct');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(52, 'authentication', 'godownmanager');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(53, 'aggregator', 'rawmaterialwaste');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(54, 'aggregator', 'stockevent');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(55, 'aggregator', 'pushdevice');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(56, 'aggregator', 'notification');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -257,6 +261,23 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(183, 'Can change godown manager', 52, 'change_godownmanager');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(184, 'Can delete godown manager', 52, 'delete_godownmanager');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(185, 'Can view godown manager', 52, 'view_godownmanager');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(186, 'Can add raw material waste', 53, 'add_rawmaterialwaste');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(187, 'Can change raw material waste', 53, 'change_rawmaterialwaste');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(188, 'Can delete raw material waste', 53, 'delete_rawmaterialwaste');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(189, 'Can view raw material waste', 53, 'view_rawmaterialwaste');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(190, 'Can add stock event', 54, 'add_stockevent');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(191, 'Can change stock event', 54, 'change_stockevent');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(192, 'Can delete stock event', 54, 'delete_stockevent');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(193, 'Can view stock event', 54, 'view_stockevent');
+
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(194, 'Can add push device', 55, 'add_pushdevice');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(195, 'Can change push device', 55, 'change_pushdevice');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(196, 'Can delete push device', 55, 'delete_pushdevice');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(197, 'Can view push device', 55, 'view_pushdevice');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(198, 'Can add notification', 56, 'add_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(199, 'Can change notification', 56, 'change_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(200, 'Can delete notification', 56, 'delete_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(201, 'Can view notification', 56, 'view_notification');
 -- Custom permission (authentication.User.Meta.permissions): gates POST /api/execute-code/.
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(165, 'Can execute Python code on the server', 1, 'execute_python_code');
 
