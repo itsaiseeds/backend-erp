@@ -485,14 +485,17 @@ class ChallanGenerator {
               ),
               _td(item.lotNumber, pw.TextAlign.left),
               _td('${item.packetWeight} kg', pw.TextAlign.center),
-              _tdBold('${item.packets * item.quantity}', pw.TextAlign.right),
+              _tdBold('${item.shippedPackets}', pw.TextAlign.right),
               _td(
                 item.shippedWeight.isEmpty
                     ? _blank
                     : '${item.shippedWeight} kg',
                 pw.TextAlign.right,
               ),
-              _td('${item.quantity}', pw.TextAlign.right),
+              _td(
+                item.hasBags ? '${item.quantity}' : _blank,
+                pw.TextAlign.right,
+              ),
             ],
           );
         }),

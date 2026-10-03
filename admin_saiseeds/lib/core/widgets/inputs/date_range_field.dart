@@ -48,11 +48,11 @@ class DateRangeValue {
   }
 }
 
-class _Preset {
+class DateRangePreset {
   final String label;
   final int days;
 
-  const _Preset(this.label, this.days);
+  const DateRangePreset(this.label, this.days);
 }
 
 class DateRangeField extends StatefulWidget {
@@ -60,27 +60,33 @@ class DateRangeField extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final bool enabled;
 
+  /// Shortcuts offered beside the calendars. Overridden where the longer
+  /// windows would not be accepted -- an export caps at 31 days, so
+  /// offering "Last 90 days" would only produce an error.
+  final List<DateRangePreset>? presets;
+
   const DateRangeField({
     super.key,
     required this.value,
     required this.onChanged,
     this.enabled = true,
+    this.presets,
   });
+
+  static const List<DateRangePreset> defaultPresets = [
+    DateRangePreset(AppStrings.DATE_RANGE_TODAY, 0),
+    DateRangePreset(AppStrings.DATE_RANGE_LAST_7, 7),
+    DateRangePreset(AppStrings.DATE_RANGE_LAST_30, 30),
+    DateRangePreset(AppStrings.DATE_RANGE_LAST_90, 90),
+    DateRangePreset(AppStrings.DATE_RANGE_LAST_6M, 182),
+    DateRangePreset(AppStrings.DATE_RANGE_LAST_YEAR, 365),
+  ];
 
   @override
   State<DateRangeField> createState() => _DateRangeFieldState();
 }
 
 class _DateRangeFieldState extends State<DateRangeField> {
-  static const List<_Preset> _presets = [
-    _Preset(AppStrings.DATE_RANGE_TODAY, 0),
-    _Preset(AppStrings.DATE_RANGE_LAST_7, 7),
-    _Preset(AppStrings.DATE_RANGE_LAST_30, 30),
-    _Preset(AppStrings.DATE_RANGE_LAST_90, 90),
-    _Preset(AppStrings.DATE_RANGE_LAST_6M, 182),
-    _Preset(AppStrings.DATE_RANGE_LAST_YEAR, 365),
-  ];
-
   final LayerLink _layerLink = LayerLink();
 
   OverlayEntry? _overlayEntry;
@@ -114,9 +120,20 @@ class _DateRangeFieldState extends State<DateRangeField> {
 
   void _close() => _removeOverlay();
 
+  /// Flips above the field when the panel would run off the bottom -- in a
+  /// dialog low on the screen there is often no room beneath it.
+  bool get _opensUpward {
+    final RenderObject? box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return false;
+
+    final double bottom = box.localToGlobal(Offset.zero).dy + box.size.height;
+    final double room = MediaQuery.sizeOf(context).height - bottom;
+    return room < AppSizes.dateRangePopoverHeight;
+  }
+
   void _rebuildOverlay() => _overlayEntry?.markNeedsBuild();
 
-  void _applyPreset(_Preset preset) {
+  void _applyPreset(DateRangePreset preset) {
     final DateTime now = DateTime.now();
     final DateTime end = DateTime(now.year, now.month, now.day);
 
@@ -173,7 +190,13 @@ class _DateRangeFieldState extends State<DateRangeField> {
           child: CompositedTransformFollower(
             link: _layerLink,
             showWhenUnlinked: false,
-            offset: const Offset(0, AppSizes.tableControlHeight),
+            targetAnchor: _opensUpward
+                ? Alignment.topLeft
+                : Alignment.bottomLeft,
+            followerAnchor: _opensUpward
+                ? Alignment.bottomLeft
+                : Alignment.topLeft,
+            offset: Offset(0, _opensUpward ? -AppSpacing.xs : AppSpacing.xs),
             child: Material(
               color: AppColors.TRANSPARENT,
               child: Container(
@@ -282,7 +305,7 @@ class _DateRangeFieldState extends State<DateRangeField> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final preset in _presets)
+          for (final preset in (widget.presets ?? DateRangeField.defaultPresets))
             InkWell(
               onTap: () => _applyPreset(preset),
               child: Padding(

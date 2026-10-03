@@ -45,6 +45,11 @@ class SidebarItems {
       icon: Icons.tune_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.EXPORTS,
+      label: AppStrings.EXPORTS,
+      icon: Icons.download_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.PRODUCTS,
       label: AppStrings.PRODUCTS,
       icon: Icons.inventory_2_outlined,
@@ -136,6 +141,7 @@ class SidebarItems {
         label: AppStrings.GROUP_INWARD,
         itemIds: [TabIds.INWARD_RAW_MATERIALS, TabIds.OTHER_MATERIAL_INWARD],
       ),
+      SidebarGroupModel(id: 'ops-exports', itemIds: [TabIds.EXPORTS]),
     ],
   );
 
