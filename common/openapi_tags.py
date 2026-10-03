@@ -239,6 +239,8 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "analytics",
             "return-order",
             "get-return-orders",
+            "get-challans",
+            "get-challan",
         ),
         (ANDROID_ORDERS,),
     ),

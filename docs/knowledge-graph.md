@@ -457,6 +457,8 @@ erDiagram
         ├── get-orders         GET   GetOrdersView         (IsSalesPerson -> own orders; paginated; ?client / ?product / ?city_id / ?status filters + ?sort=created_at|price; catalogues in available_filters/available_sorts)
         ├── return-order/<order_public_id> GET/POST ReturnOrderView (IsSalesPerson → own dispatched/delivered order only: GET prefill of challan lines + returnable packets + suggested price; POST raises a PENDING return)
         ├── get-return-orders  GET   GetReturnOrdersView   (IsSalesPerson -> own returns; paginated; ?status / ?order filters + ?sort=created_at)
+        ├── get-challans       GET   GetChallansView       (IsSalesPerson -> challans of OWN orders still DISPATCHED/DELIVERED; paginated; date window REQUIRED; ?client / ?city_id / ?status / ?challan_number; reuses the website's challan queryset + payload)
+        ├── get-challan/<order_public_id> GET GetChallanView (IsSalesPerson -> one own order's challan; 404 for anyone else's, undispatched, reverted or custom orders)
         ├── client/<public_id> GET   GetClientView         (IsSalesPerson → own client, full detail: core + all addresses/contacts/agencies)
         ├── create-client      POST  CreateClientView      (IsSalesPerson → born VERIFICATION_PENDING)
         ├── update-client      POST  UpdateClientView      (IsSalesPerson → own client's three lists only)
