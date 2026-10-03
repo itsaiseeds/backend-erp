@@ -3,12 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/material_types_service.dart';
+import '../../../../core/services/packagings_service.dart';
 import '../../../../core/services/products_service.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/widgets/buttons/add_action_button.dart';
 import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/widgets/feedback/confirmation_dialog.dart';
+import '../../../product_packagings/data/product_packagings_repository.dart';
 import '../../../products/data/products_repository.dart';
 import '../../data/models/other_material_recipe_model.dart';
 import '../../data/other_raw_materials_repository.dart';
@@ -31,6 +33,9 @@ class OtherRawMaterialsView extends StatelessWidget {
       apiClient: apiClient,
     );
     MaterialTypesService.instance.repository = repository;
+    PackagingsService.instance.repository = ProductPackagingsRepository(
+      apiClient: apiClient,
+    );
 
     return BlocProvider<OtherRawMaterialsCubit>(
       create: (context) =>
@@ -69,6 +74,7 @@ class _OtherRawMaterialsContentState extends State<_OtherRawMaterialsContent> {
     await Future.wait([
       ProductsService.instance.loadProducts(forceRefresh: true),
       MaterialTypesService.instance.loadMaterialTypes(forceRefresh: true),
+      PackagingsService.instance.loadPackagings(forceRefresh: true),
     ]);
     if (mounted) setState(() {});
   }

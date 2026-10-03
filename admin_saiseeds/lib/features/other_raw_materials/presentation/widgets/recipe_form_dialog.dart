@@ -9,6 +9,7 @@ import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/utils/validators/form_validators.dart';
 import '../../../../core/widgets/dialogs/app_form_dialog.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
+import '../../../../core/widgets/inputs/packet_weight_picker_field.dart';
 import '../../../../core/widgets/inputs/material_type_picker_field.dart';
 import '../../../../core/widgets/inputs/product_picker_field.dart';
 import '../../../products/data/models/product_model.dart';
@@ -38,8 +39,8 @@ class RecipeFormDialog extends StatefulWidget {
 
 class _RecipeFormDialogState extends State<RecipeFormDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _packetWeightController =
-      TextEditingController();
+  String? _packetWeight;
+  String? _packetWeightError;
   final TextEditingController _quantityController = TextEditingController();
 
   ProductModel? _product;
@@ -51,7 +52,6 @@ class _RecipeFormDialogState extends State<RecipeFormDialog> {
 
   @override
   void dispose() {
-    _packetWeightController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
@@ -59,6 +59,7 @@ class _RecipeFormDialogState extends State<RecipeFormDialog> {
   Future<void> _submit() async {
     final bool isFormValid = _formKey.currentState?.validate() ?? false;
     final bool isProductValid = _product != null;
+    final bool isWeightValid = (_packetWeight ?? '').isNotEmpty;
     final bool isTypeValid = _materialType != null;
 
     setState(() {
@@ -68,9 +69,14 @@ class _RecipeFormDialogState extends State<RecipeFormDialog> {
       _materialTypeError = isTypeValid
           ? null
           : AppStrings.VALIDATION_MATERIAL_TYPE_REQUIRED;
+      _packetWeightError = isWeightValid
+          ? null
+          : AppStrings.VALIDATION_PACKET_WEIGHT_REQUIRED;
     });
 
-    if (!isFormValid || !isProductValid || !isTypeValid) return;
+    if (!isFormValid || !isProductValid || !isTypeValid || !isWeightValid) {
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -79,7 +85,7 @@ class _RecipeFormDialogState extends State<RecipeFormDialog> {
     final bool succeeded = await cubit.createRecipe(
       productPublicId: _product!.publicId,
       materialTypeId: _materialType!.id,
-      packetWeight: _packetWeightController.text.trim(),
+      packetWeight: _packetWeight ?? '',
       quantity: _quantityController.text.trim(),
     );
 
@@ -121,6 +127,10 @@ class _RecipeFormDialogState extends State<RecipeFormDialog> {
               onSelected: (product) => setState(() {
                 _product = product;
                 _productError = null;
+                // The weights belong to the product, so a stale pick must
+                // not survive the change.
+                _packetWeight = null;
+                _packetWeightError = null;
               }),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -135,18 +145,15 @@ class _RecipeFormDialogState extends State<RecipeFormDialog> {
               }),
             ),
             const SizedBox(height: AppSpacing.md),
-            AppTextField(
-              controller: _packetWeightController,
-              label: AppStrings.COLUMN_PACKET_WEIGHT,
-              hint: AppStrings.FIELD_PACKET_WEIGHT_HINT,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
+            PacketWeightPickerField(
+              productPublicId: _product?.publicId,
+              value: _packetWeight,
               enabled: !_isSubmitting,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
-              ],
-              validator: FormValidators.positiveAmount,
+              errorText: _packetWeightError,
+              onSelected: (weight) => setState(() {
+                _packetWeight = weight;
+                _packetWeightError = null;
+              }),
             ),
             const SizedBox(height: AppSpacing.md),
             AppTextField(

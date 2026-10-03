@@ -27,6 +27,27 @@ class PackagingsService {
     return null;
   }
 
+  /// The distinct packet weights configured for one product, ascending.
+  ///
+  /// A product usually has several packagings at the same weight (different
+  /// packets-per-bag), so the list is de-duplicated on the numeric value:
+  /// "1" and "1.000" are the same weight to a user choosing one.
+  List<String> packetWeightsFor(String productPublicId) {
+    if (productPublicId.isEmpty) return const [];
+
+    final Map<num, String> byValue = {};
+
+    for (final ProductPackagingModel packaging in _packagings) {
+      if (packaging.productPublicId != productPublicId) continue;
+      final num? value = packaging.packetWeightValue;
+      if (value == null) continue;
+      byValue.putIfAbsent(value, () => packaging.packetWeight);
+    }
+
+    final List<num> sorted = byValue.keys.toList()..sort();
+    return [for (final num value in sorted) byValue[value]!];
+  }
+
   Future<bool> loadPackagings({bool forceRefresh = false}) async {
     if (_isLoaded && !forceRefresh) return true;
 

@@ -40,6 +40,11 @@ class SidebarItems {
       icon: Icons.local_shipping_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.CUSTOM_ORDERS,
+      label: AppStrings.CUSTOM_ORDERS,
+      icon: Icons.tune_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.PRODUCTS,
       label: AppStrings.PRODUCTS,
       icon: Icons.inventory_2_outlined,
@@ -106,7 +111,11 @@ class SidebarItems {
       SidebarGroupModel(
         id: 'ops-orders',
         label: AppStrings.GROUP_ORDERS,
-        itemIds: [TabIds.ORDERS, TabIds.DISPATCH_CHALLANS],
+        itemIds: [
+          TabIds.ORDERS,
+          TabIds.CUSTOM_ORDERS,
+          TabIds.DISPATCH_CHALLANS,
+        ],
       ),
       SidebarGroupModel(
         id: 'ops-daily-stock',

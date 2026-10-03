@@ -1,4 +1,7 @@
 class ClientAddressModel {
+  /// Server id for the address. A custom order references it directly as
+  /// `client_address_id`, so it has to survive the round trip.
+  final int id;
   final String label;
   final String line1;
   final String line2;
@@ -12,6 +15,7 @@ class ClientAddressModel {
   final bool isPrimary;
 
   ClientAddressModel copyWith({
+    int? id,
     String? label,
     String? line1,
     String? line2,
@@ -25,6 +29,7 @@ class ClientAddressModel {
     bool? isPrimary,
   }) {
     return ClientAddressModel(
+      id: id ?? this.id,
       label: label ?? this.label,
       line1: line1 ?? this.line1,
       line2: line2 ?? this.line2,
@@ -40,6 +45,7 @@ class ClientAddressModel {
   }
 
   const ClientAddressModel({
+    this.id = 0,
     this.label = '',
     this.line1 = '',
     this.line2 = '',
@@ -55,6 +61,7 @@ class ClientAddressModel {
 
   factory ClientAddressModel.fromJson(Map<String, dynamic> json) {
     return ClientAddressModel(
+      id: _idOf(json['id']),
       label: json['label'] as String? ?? '',
       line1: json['line_1'] as String? ?? '',
       line2: json['line_2'] as String? ?? '',
@@ -105,4 +112,12 @@ class ClientAddressModel {
     stateName,
     pincode,
   ].where((part) => part.trim().isNotEmpty).join(', ');
+
+  /// The address prefixed by its label, so a client with several addresses
+  /// can be told apart at a glance when picking one.
+  String get labelled {
+    final String tag = label.trim();
+    if (tag.isEmpty) return formatted;
+    return '$tag - $formatted';
+  }
 }
