@@ -5,9 +5,12 @@ farmer visit (``product_public_ids``). Each row carries its ``crop_id`` so the
 app can narrow the picker to the crops the farmer grows. Products, not bags: a
 farmer uses a seed, whatever it was packed in.
 
-Soft-deleted products are excluded unless ``?show_deleted=true``; each row's
-``is_deleted`` tells them apart. A deleted product is listed for display only:
-``create-farmer-visit`` still refuses it.
+Soft-deleted products and products that are not usable (``is_usable`` false -- see
+``Product``) are excluded, so the picker never offers one. ``?show_deleted=true``
+is the display mode: it lists every product, and each row's ``is_deleted`` and
+``is_usable`` tell them apart, so an old farmer visit can still show its product.
+A deleted product is listed for display only: ``create-farmer-visit`` still
+refuses it.
 """
 
 from __future__ import annotations
@@ -35,8 +38,8 @@ class UtilityProductSerializer(serializers.Serializer):
     is_deleted = serializers.BooleanField()
     is_usable = serializers.BooleanField(
         help_text=(
-            "False when the product is frozen. It is still listed (a farmer can "
-            "use it); no stock or booking action is available for it."
+            "False when the product is frozen. Only present in the display mode "
+            "(``?show_deleted=true``): the picker never lists a frozen product."
         )
     )
 
@@ -50,8 +53,14 @@ class ProductsView(AndroidSharedView):
         responses={200: UtilityProductSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
-        manager = Product.all_objects if query_flag(request, "show_deleted") else Product.objects
+        show_all = query_flag(request, "show_deleted")
+        manager = Product.all_objects if show_all else Product.objects
         products = manager.select_related("crop").order_by("name", "id")
+        if not show_all:
+            # A picker never offers a frozen product (``is_usable`` false). The
+            # display mode (``show_deleted``) lists every product, flagged, so an
+            # old farmer visit still renders its product's name.
+            products = products.filter(is_usable=True)
         return Response(
             [
                 {

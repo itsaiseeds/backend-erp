@@ -92,6 +92,32 @@ def usable_products() -> QuerySet[Product]:
     return Product.objects.filter(is_usable=True)
 
 
+def usability_filter(queryset: QuerySet, raw: str | None, *, field: str = "is_usable") -> QuerySet:
+    """Apply a list endpoint's ``?is_usable=`` parameter to ``queryset``.
+
+    The lists that feed a product **dropdown** (``products``,
+    ``product-packagings``) must not offer a frozen product, so the default --
+    parameter absent -- is *usable only*. The product management page, which has
+    to show a frozen product so it can be switched back on, asks for it:
+
+    * absent or ``true``: usable products only (the dropdown-safe default);
+    * ``false``: only the frozen ones;
+    * ``all``: both.
+
+    ``field`` is the lookup to filter on (``product__is_usable`` for a packaging).
+    A history record of a frozen product is unaffected -- this only narrows a
+    picker, it never hides existing rows from the pages that report them.
+    """
+    value = (raw or "true").strip().lower()
+    if value == "all":
+        return queryset
+    if value in ("true", "1"):
+        return queryset.filter(**{field: True})
+    if value in ("false", "0"):
+        return queryset.filter(**{field: False})
+    raise ValidationError({"is_usable": "Must be true, false or all."})
+
+
 def usable_packagings() -> QuerySet[ProductPackaging]:
     """Live packagings of usable, live products."""
     return ProductPackaging.objects.filter(product__is_usable=True, product__is_deleted=False)
