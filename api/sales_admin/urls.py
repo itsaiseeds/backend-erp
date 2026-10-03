@@ -6,6 +6,7 @@ plain ``APIView``.
 
 from django.urls import path
 
+from .AcceptReturnOrderView import AcceptReturnOrderView
 from .AdminsView import AdminsView
 from .ApproveFieldTripView import ApproveFieldTripView
 from .BagStockView import BagStockView
@@ -26,10 +27,12 @@ from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetCustomOrdersView import GetCustomOrdersView
 from .GetDispatchChallansView import GetDispatchChallansView
+from .GetDispatchLotNumbersView import GetDispatchLotNumbersView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
+from .GetReturnOrdersView import GetReturnOrdersView
 from .GodownManagersView import GodownManagersView
 from .HoldOrderView import HoldOrderView
 from .InwardOtherMaterialsView import InwardOtherMaterialsView
@@ -45,12 +48,16 @@ from .ProductsView import ProductsView
 from .RawMaterialStockView import RawMaterialStockView
 from .RawMaterialWastesView import RawMaterialWastesView
 from .RejectOrderView import RejectOrderView
+from .RejectReturnOrderView import RejectReturnOrderView
+from .ReturnOrderRecipesView import ReturnOrderRecipesView
+from .RevertAcceptReturnOrderView import RevertAcceptReturnOrderView
 from .RevertCustomOrderDispatchView import RevertCustomOrderDispatchView
 from .RevertDispatchView import RevertDispatchView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
 from .StockView import StockView
 from .UnapproveFieldTripView import UnapproveFieldTripView
+from .UnrejectReturnOrderView import UnrejectReturnOrderView
 from .UnverifyOrderView import UnverifyOrderView
 from .UpdateAdminView import UpdateAdminView
 from .UpdateBagStockView import UpdateTodaysInventoryView
@@ -67,6 +74,7 @@ from .UpdatePartyView import UpdatePartyView
 from .UpdateProductPackagingView import UpdateProductPackagingView
 from .UpdateProductView import UpdateProductView
 from .UpdateRawMaterialWasteView import UpdateRawMaterialWasteView
+from .UpdateReturnOrderView import UpdateReturnOrderView
 from .UpdateSalesPersonView import UpdateSalesPersonView
 from .UpdateSamplePacketStockView import UpdateLooseStockView
 from .UploadLRNumberView import UploadLRNumberView
@@ -167,8 +175,47 @@ urlpatterns = [
         GetDispatchChallansView.as_view(),
         name="dispatch-challans",
     ),
+    path(
+        "dispatch-lot-numbers/",
+        GetDispatchLotNumbersView.as_view(),
+        name="dispatch-lot-numbers",
+    ),
     path("hold-order/<str:public_id>", HoldOrderView.as_view(), name="hold-order"),
     path("reject-order/<str:public_id>", RejectOrderView.as_view(), name="reject-order"),
+    # Returns follow the order convention: ``return-orders/`` is a collection and
+    # the verbs carry the id in the path. A return is raised from the Android app
+    # (``return-order/<order_public_id>``), so there is no admin create route.
+    path("return-orders/", GetReturnOrdersView.as_view(), name="return-orders"),
+    path(
+        "edit-return-order/<str:public_id>",
+        UpdateReturnOrderView.as_view(),
+        name="edit-return-order",
+    ),
+    path(
+        "return-order-recipes/<str:public_id>",
+        ReturnOrderRecipesView.as_view(),
+        name="return-order-recipes",
+    ),
+    path(
+        "accept-return-order/<str:public_id>",
+        AcceptReturnOrderView.as_view(),
+        name="accept-return-order",
+    ),
+    path(
+        "reject-return-order/<str:public_id>",
+        RejectReturnOrderView.as_view(),
+        name="reject-return-order",
+    ),
+    path(
+        "unreject-return-order/<str:public_id>",
+        UnrejectReturnOrderView.as_view(),
+        name="unreject-return-order",
+    ),
+    path(
+        "revert-accept-return-order/<str:public_id>",
+        RevertAcceptReturnOrderView.as_view(),
+        name="revert-accept-return-order",
+    ),
     # Custom (loose-packet) orders mirror the order routes: ``custom-orders/`` is
     # a collection, ``custom-order/<public_id>`` a collection item (GET /
     # DELETE), and the verbs carry the id in the path. Booking is admin-only,

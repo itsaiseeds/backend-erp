@@ -119,6 +119,7 @@ class InwardRawMaterial(
         from aggregator import InventoryOperations, InwardOperations, StockLedgerOperations
         from aggregator.ProductOperations import assert_products_usable
 
+        self.refuse_return_lot_change()
         with StockLedgerOperations.recording(
             StockEventType.INWARD_OPERATIONS,
             StockEventDetail.RAW_LOT_DELETED,

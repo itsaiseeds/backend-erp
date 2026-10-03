@@ -24,13 +24,16 @@ from .models import (
     OrderItem,
     PrivateDispatchDetails,
     ProductPackaging,
+    ReturnOrder,
     Status,
     StatusIds,
     StockEventDetail,
     StockEventType,
     TransportAgency,
 )
+from .models.ReturnOrder import LIVE_RETURN_STATUS_IDS
 from .ProductOperations import assert_products_usable, packaging_payload
+from .ReturnOrderOperations import order_return_payload
 from .StockLedgerOperations import dispatch_detail, order_product_ids, recording
 
 if TYPE_CHECKING:
@@ -645,8 +648,24 @@ def revert_dispatch(order: Order) -> Order:
     Only today's dispatch can be reverted (``assert_dispatched_today``). Note
     the knock-on: because a re-dispatch needs a revert first, re-dispatching is
     same-day only too.
+
+    An order with a live return (PENDING or ACCEPTED) cannot be reverted: those
+    goods are on the road back, and a REJECTED return does not count.
     """
     assert_order_status(order, REVERTIBLE_DISPATCH_STATUS_CODES, "revert the dispatch of")
+    live_return = ReturnOrder.objects.filter(
+        order=order, status_id__in=[int(s) for s in LIVE_RETURN_STATUS_IDS]
+    ).first()
+    if live_return is not None:
+        raise ValidationError(
+            {
+                "status": (
+                    f"Cannot revert the dispatch of an order with a live return "
+                    f"({live_return.public_id}, {live_return.status.code}). "
+                    "Reject or revert that return first."
+                )
+            }
+        )
     assert_dispatched_today(order)
     with recording(
         StockEventType.DISPATCH_REVERTED,
@@ -796,8 +815,15 @@ def order_detail_payload(order: Order) -> dict:
     pickers on the edit screen can name one; that is exactly
     :func:`ClientOperations.client_payload`, which is a superset, so the key is
     replaced wholesale rather than merged.
+
+    ``return_order`` is the order's live return (PENDING or ACCEPTED) in full,
+    or null; a REJECTED return is hidden.
     """
-    return {**order_payload(order), "client": client_payload(order.client)}
+    return {
+        **order_payload(order),
+        "client": client_payload(order.client),
+        "return_order": order_return_payload(order),
+    }
 
 
 ORDER_CORE_FIELDS = (

@@ -263,7 +263,8 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 -- -------------------------------------------------------------------------
 -- aggregator_status (generic, enum-like status values)
 --   Order lifecycle (1-7) + client verification (8-9) + inward raw-material
---   lot lifecycle (10-11, 16) + field-trip lifecycle (12-15). created_by left
+--   lot lifecycle (10-11, 16) + field-trip lifecycle (12-15) + return-order
+--   lifecycle (17-19). created_by left
 --   NULL (seed data). Id 16 (code RAW_MATERIAL_REJECTED) is not contiguous
 --   with 10-11: added later, after the field-trip range, and its code must
 --   differ from the unrelated order-lifecycle REJECTED row at id 7.
@@ -284,6 +285,9 @@ INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, de
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(14, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'IN_PROGRESS', 'In progress', 3);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(15, '2026-08-28 05:22:53.878', '2026-08-28 05:22:53.878', false, NULL, NULL, NULL, 'COMPLETED', 'Completed', 4);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(16, '2026-10-01 00:00:00.000', '2026-10-01 00:00:00.000', false, NULL, NULL, NULL, 'RAW_MATERIAL_REJECTED', 'Rejected', 3);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(17, '2026-10-03 00:00:00.000', '2026-10-03 00:00:00.000', false, NULL, NULL, NULL, 'RETURN_PENDING', 'Return pending', 1);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(18, '2026-10-03 00:00:00.000', '2026-10-03 00:00:00.000', false, NULL, NULL, NULL, 'RETURN_ACCEPTED', 'Return accepted', 2);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(19, '2026-10-03 00:00:00.000', '2026-10-03 00:00:00.000', false, NULL, NULL, NULL, 'RETURN_REJECTED', 'Return rejected', 3);
 
 -- -------------------------------------------------------------------------
 -- aggregator_stage (seed classification of a product; enum-like, 4 fixed rows)
@@ -371,7 +375,7 @@ SELECT setval(pg_get_serial_sequence('public.aggregator_othermaterialtype', 'id'
 --   DELIVERED (own vehicle), ON_HOLD; custom orders: BOOKED, CONFIRMED, DISPATCHED.
 --   Relies on the seed ids above: users 1-5 (3 = sales person, 4 = admin),
 --   cities 1-5, crops 1-2, products 1-2, packagings 1-2, material types 1-3,
---   statuses 1-16 (16 = Rejected raw lot), user 6 = godown manager.
+--   statuses 1-19 (16 = Rejected raw lot, 17-19 = return order), user 6 = godown manager.
 -- =========================================================================
 
 -- "Today" in the project's timezone, matching InventoryOperations.today().

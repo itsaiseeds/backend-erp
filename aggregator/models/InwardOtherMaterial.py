@@ -68,6 +68,7 @@ class InwardOtherMaterial(
         see ``InventoryOperations.guard_stock_deletion``."""
         from aggregator import InventoryOperations
 
+        self.refuse_return_lot_change()
         InventoryOperations.guard_stock_deletion(
             perform,
             product_ids=[self.recipe.product_id],

@@ -50,9 +50,6 @@ class PacketStockState extends Equatable {
 
   bool get hasDraft => draftCounts.isNotEmpty;
 
-  bool get isDraftComplete =>
-      allLines.isNotEmpty && draftCounts.length >= allLines.length;
-
   PacketStockState copyWith({
     PacketStockStatus? status,
     String? snapshotDate,
@@ -193,10 +190,13 @@ class PacketStockCubit extends SafeCubit<PacketStockState> {
     emit(state.copyWith(isSubmitting: true, clearError: true));
 
     try {
-      if (state.isDraftComplete) {
-        await _repository.replacePacketStock(entries);
-      } else {
+      final bool alreadyRecorded = await _repository
+          .fetchTodaysStockComplete();
+
+      if (alreadyRecorded) {
         await _repository.patchPacketStock(entries);
+      } else {
+        await _repository.replacePacketStock(entries);
       }
       emit(state.copyWith(isSubmitting: false, draftCounts: const {}));
       await loadPacketStock();

@@ -47,10 +47,21 @@ class InwardRawMaterialProductRefSerializer(serializers.Serializer):
 
 
 class InwardRawMaterialPartyRefSerializer(serializers.Serializer):
-    """Output shape for the ``party`` reference on a lot."""
+    """Output shape for the ``party`` reference on a lot.
 
-    id = serializers.IntegerField()
+    A lot an accepted return booked has no party: ``id`` is null and ``name``
+    reads ``Return Order (<ORD-…>)``.
+    """
+
+    id = serializers.IntegerField(allow_null=True)
     name = serializers.CharField()
+
+
+class InwardReturnOrderRefSerializer(serializers.Serializer):
+    """Output shape for the ``return_order`` reference on a lot."""
+
+    public_id = serializers.CharField()
+    order_public_id = serializers.CharField()
 
 
 class InwardCreatedByRefSerializer(serializers.Serializer):
@@ -66,6 +77,10 @@ class InwardRawMaterialPayloadSerializer(serializers.Serializer):
     public_id = serializers.CharField()
     product = InwardRawMaterialProductRefSerializer()
     party = InwardRawMaterialPartyRefSerializer()
+    return_order = InwardReturnOrderRefSerializer(
+        allow_null=True,
+        help_text="The accepted return that booked this lot; null for an ordinary lot.",
+    )
     lot_no = serializers.CharField(help_text="The supplier's own batch number.")
     quantity_kg = serializers.CharField(help_text="Kilograms received.")
     status = serializers.CharField()
@@ -304,9 +319,13 @@ class InwardOtherMaterialRecipeRefSerializer(serializers.Serializer):
 
 
 class InwardOtherMaterialPartyRefSerializer(serializers.Serializer):
-    """Output shape for the ``party`` reference on a lot."""
+    """Output shape for the ``party`` reference on a lot.
 
-    id = serializers.IntegerField()
+    A lot an accepted return booked has no party: ``id`` is null and ``name``
+    reads ``Return Order (<ORD-…>)``.
+    """
+
+    id = serializers.IntegerField(allow_null=True)
     name = serializers.CharField()
 
 
@@ -316,6 +335,10 @@ class InwardOtherMaterialPayloadSerializer(serializers.Serializer):
     public_id = serializers.CharField()
     recipe = InwardOtherMaterialRecipeRefSerializer()
     party = InwardOtherMaterialPartyRefSerializer()
+    return_order = InwardReturnOrderRefSerializer(
+        allow_null=True,
+        help_text="The accepted return that booked this lot; null for an ordinary lot.",
+    )
     quantity = serializers.CharField(help_text="Amount received, in the recipe's unit.")
     effective_date = serializers.DateField(allow_null=True)
     created_by = InwardCreatedByRefSerializer(allow_null=True, help_text="Who booked the lot.")

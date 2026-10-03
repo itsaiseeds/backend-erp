@@ -1200,7 +1200,9 @@ CREATE INDEX IF NOT EXISTS aggregator_party_deleted_by_id_idx ON public.aggregat
 -- reverts back to. status_id references the same aggregator_status lookup
 -- table as aggregator_order / aggregator_client (see
 -- StatusIds.raw_material_statuses, ids 10-11 and 16). lot_no is the supplier's
--- own batch number for the consignment, required at booking.
+-- own batch number for the consignment, required at booking. party_id is NULL
+-- only for a lot an accepted return order booked in (return_order_id set, lot_no
+-- = the return's public_id); such a lot is removed only by reverting the accept.
 CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1213,19 +1215,22 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	effective_date date NULL,
 	lab_sampling_date date NULL,
 	product_id int8 NOT NULL,
-	party_id int8 NOT NULL,
+	party_id int8 NULL,
+	return_order_id int8 NULL,
 	lot_no varchar(64) NOT NULL,
 	quantity_kg numeric(10, 3) NOT NULL,
 	status_id int8 NOT NULL,
 	CONSTRAINT aggregator_inwardrawmaterial_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_inwardrawmaterial_public_id_key UNIQUE (public_id),
-	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0)
+	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0),
+	CONSTRAINT ck_inwardrawmaterial_party_or_return CHECK (party_id IS NOT NULL OR return_order_id IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_public_id_like ON public.aggregator_inwardrawmaterial USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_effective_date_idx ON public.aggregator_inwardrawmaterial USING btree (effective_date);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_status_id_idx ON public.aggregator_inwardrawmaterial USING btree (status_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_product_id_idx ON public.aggregator_inwardrawmaterial USING btree (product_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_party_id_idx ON public.aggregator_inwardrawmaterial USING btree (party_id);
+CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_return_order_id_idx ON public.aggregator_inwardrawmaterial USING btree (return_order_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_is_deleted_idx ON public.aggregator_inwardrawmaterial USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_created_by_id_idx ON public.aggregator_inwardrawmaterial USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_deleted_by_id_idx ON public.aggregator_inwardrawmaterial USING btree (deleted_by_id);
@@ -1317,7 +1322,8 @@ CREATE INDEX IF NOT EXISTS aggregator_othermaterialrecipe_deleted_by_id_idx ON p
 -- Inward movement of other (packing) materials. quantity is the amount
 -- received from the party, measured in the recipe's material unit. No status:
 -- other material is usable directly, and booking stamps effective_date with
--- today so the entry counts toward on-hand stock from its arrival day.
+-- today so the entry counts toward on-hand stock from its arrival day. party_id
+-- is NULL only for a row an accepted return order booked in (return_order_id set).
 CREATE TABLE IF NOT EXISTS public.aggregator_inwardothermaterial (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1328,20 +1334,88 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inwardothermaterial (
 	created_by_id int8 NULL,
 	public_id varchar(20) NOT NULL,
 	effective_date date NULL,
-	party_id int8 NOT NULL,
+	party_id int8 NULL,
+	return_order_id int8 NULL,
 	recipe_id int8 NOT NULL,
 	quantity numeric(10, 3) NOT NULL,
 	CONSTRAINT aggregator_inwardothermaterial_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_inwardothermaterial_public_id_key UNIQUE (public_id),
-	CONSTRAINT ck_inwardothermater_quantity_positive CHECK (quantity > 0)
+	CONSTRAINT ck_inwardothermater_quantity_positive CHECK (quantity > 0),
+	CONSTRAINT ck_inwardothermater_party_or_return CHECK (party_id IS NOT NULL OR return_order_id IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_public_id_like ON public.aggregator_inwardothermaterial USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_effective_date_idx ON public.aggregator_inwardothermaterial USING btree (effective_date);
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_party_id_idx ON public.aggregator_inwardothermaterial USING btree (party_id);
+CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_return_order_id_idx ON public.aggregator_inwardothermaterial USING btree (return_order_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_recipe_id_idx ON public.aggregator_inwardothermaterial USING btree (recipe_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_is_deleted_idx ON public.aggregator_inwardothermaterial USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_created_by_id_idx ON public.aggregator_inwardothermaterial USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_inwardothermaterial_deleted_by_id_idx ON public.aggregator_inwardothermaterial USING btree (deleted_by_id);
+
+-- aggregator_returnorder ------------------------------------------------------
+-- Goods a client sent back against an order that was already shipped
+-- (docs/prd/return-orders.md). status_id is one of the return statuses (ids
+-- 17-19). A return is live while PENDING or ACCEPTED; the partial unique index
+-- lets an order carry only one live return. include_in_other_raw_materials is
+-- NULL until the return is accepted. Accepting books inward rows that point back
+-- here (aggregator_inwardrawmaterial / aggregator_inwardothermaterial
+-- .return_order_id).
+CREATE TABLE IF NOT EXISTS public.aggregator_returnorder (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	order_id int8 NOT NULL,
+	status_id int8 NOT NULL,
+	return_date date NOT NULL,
+	include_in_other_raw_materials bool NULL,
+	verified_by_id int8 NULL,
+	verified_at timestamptz NULL,
+	rejected_by_id int8 NULL,
+	rejected_at timestamptz NULL,
+	CONSTRAINT aggregator_returnorder_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_returnorder_public_id_key UNIQUE (public_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_returnorder_one_live_per_order ON public.aggregator_returnorder USING btree (order_id) WHERE is_deleted = false AND status_id IN (17, 18);
+CREATE INDEX IF NOT EXISTS aggregator_returnorder_public_id_like ON public.aggregator_returnorder USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_returnorder_order_id_idx ON public.aggregator_returnorder USING btree (order_id);
+CREATE INDEX IF NOT EXISTS aggregator_returnorder_status_id_idx ON public.aggregator_returnorder USING btree (status_id);
+CREATE INDEX IF NOT EXISTS aggregator_returnorder_verified_by_id_idx ON public.aggregator_returnorder USING btree (verified_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_returnorder_rejected_by_id_idx ON public.aggregator_returnorder USING btree (rejected_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_returnorder_is_deleted_idx ON public.aggregator_returnorder USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_returnorder_created_by_id_idx ON public.aggregator_returnorder USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_returnorder_deleted_by_id_idx ON public.aggregator_returnorder USING btree (deleted_by_id);
+
+-- aggregator_returnorderitem --------------------------------------------------
+-- One returned line: packets of a (product, packet_weight) at a price per packet.
+-- The unique key is not soft-delete aware (a removed line is restored, never
+-- re-inserted), the same way aggregator_orderitem works.
+CREATE TABLE IF NOT EXISTS public.aggregator_returnorderitem (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	return_order_id int8 NOT NULL,
+	product_id int8 NOT NULL,
+	packet_weight numeric(8, 3) NOT NULL,
+	packets int8 NOT NULL,
+	price_per_packet numeric(12, 2) NOT NULL,
+	CONSTRAINT aggregator_returnorderitem_pkey PRIMARY KEY (id),
+	CONSTRAINT uniq_returnorderitem_return_product_weight UNIQUE (return_order_id, product_id, packet_weight),
+	CONSTRAINT ck_returnorderitem_positive CHECK (packets > 0 AND price_per_packet >= 0)
+);
+CREATE INDEX IF NOT EXISTS aggregator_returnorderitem_return_order_id_idx ON public.aggregator_returnorderitem USING btree (return_order_id);
+CREATE INDEX IF NOT EXISTS aggregator_returnorderitem_product_id_idx ON public.aggregator_returnorderitem USING btree (product_id);
+CREATE INDEX IF NOT EXISTS aggregator_returnorderitem_is_deleted_idx ON public.aggregator_returnorderitem USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_returnorderitem_created_by_id_idx ON public.aggregator_returnorderitem USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_returnorderitem_deleted_by_id_idx ON public.aggregator_returnorderitem USING btree (deleted_by_id);
 
 -- aggregator_fieldtrip --------------------------------------------------------
 -- A sales person's trip to one village, planned by them (created_by) and
@@ -1580,6 +1654,21 @@ ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwa
 ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
+ALTER TABLE public.aggregator_returnorder ADD CONSTRAINT aggregator_returnorder_order_id_fk FOREIGN KEY (order_id) REFERENCES public.aggregator_order(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_returnorder ADD CONSTRAINT aggregator_returnorder_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_returnorder ADD CONSTRAINT aggregator_returnorder_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_returnorder ADD CONSTRAINT aggregator_returnorder_verified_by_id_fk FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_returnorder ADD CONSTRAINT aggregator_returnorder_rejected_by_id_fk FOREIGN KEY (rejected_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_returnorder ADD CONSTRAINT aggregator_returnorder_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_returnorderitem ADD CONSTRAINT aggregator_returnorderitem_return_order_id_fk FOREIGN KEY (return_order_id) REFERENCES public.aggregator_returnorder(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_returnorderitem ADD CONSTRAINT aggregator_returnorderitem_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_returnorderitem ADD CONSTRAINT aggregator_returnorderitem_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_returnorderitem ADD CONSTRAINT aggregator_returnorderitem_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+
+ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_return_order_id_fk FOREIGN KEY (return_order_id) REFERENCES public.aggregator_returnorder(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_inwardothermaterial ADD CONSTRAINT aggregator_inwardothermaterial_return_order_id_fk FOREIGN KEY (return_order_id) REFERENCES public.aggregator_returnorder(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+
 ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_city_id_fk FOREIGN KEY (city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_status_id_fk FOREIGN KEY (status_id) REFERENCES public.aggregator_status(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_approved_by_id_fk FOREIGN KEY (approved_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
@@ -1665,6 +1754,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_stockevent (
 	raw_material_waste_id int8 NULL,
 	inventory_snapshot_id int8 NULL,
 	loose_stock_snapshot_id int8 NULL,
+	return_order_id int8 NULL,
 	CONSTRAINT aggregator_stockevent_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_stockevent_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) DEFERRABLE INITIALLY DEFERRED,
 	CONSTRAINT aggregator_stockevent_actor_id_fk FOREIGN KEY (actor_id) REFERENCES public.authentication_user(id) DEFERRABLE INITIALLY DEFERRED,
@@ -1674,7 +1764,8 @@ CREATE TABLE IF NOT EXISTS public.aggregator_stockevent (
 	CONSTRAINT aggregator_stockevent_inward_other_material_id_fk FOREIGN KEY (inward_other_material_id) REFERENCES public.aggregator_inwardothermaterial(id) DEFERRABLE INITIALLY DEFERRED,
 	CONSTRAINT aggregator_stockevent_raw_material_waste_id_fk FOREIGN KEY (raw_material_waste_id) REFERENCES public.aggregator_rawmaterialwaste(id) DEFERRABLE INITIALLY DEFERRED,
 	CONSTRAINT aggregator_stockevent_inventory_snapshot_id_fk FOREIGN KEY (inventory_snapshot_id) REFERENCES public.aggregator_inventorysnapshot(id) DEFERRABLE INITIALLY DEFERRED,
-	CONSTRAINT aggregator_stockevent_loose_stock_snapshot_id_fk FOREIGN KEY (loose_stock_snapshot_id) REFERENCES public.aggregator_loosestocksnapshot(id) DEFERRABLE INITIALLY DEFERRED
+	CONSTRAINT aggregator_stockevent_loose_stock_snapshot_id_fk FOREIGN KEY (loose_stock_snapshot_id) REFERENCES public.aggregator_loosestocksnapshot(id) DEFERRABLE INITIALLY DEFERRED,
+	CONSTRAINT aggregator_stockevent_return_order_id_fk FOREIGN KEY (return_order_id) REFERENCES public.aggregator_returnorder(id) DEFERRABLE INITIALLY DEFERRED
 );
 CREATE INDEX IF NOT EXISTS ix_stock_event_product_time ON public.aggregator_stockevent USING btree (product_id, occurred_at, id);
 

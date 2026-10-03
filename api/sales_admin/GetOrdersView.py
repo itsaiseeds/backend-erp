@@ -121,6 +121,7 @@ class AdminOrderListItemSerializer(serializers.Serializer):
         help_text="Sales admin who approved the order; null until verified.",
     )
     delivery_address = serializers.CharField()
+    special_comments = serializers.CharField(allow_blank=True)
     city = AdminOrderListCitySerializer(allow_null=True)
     transport_agency = TransportAgencyRefSerializer(allow_null=True)
     dispatch_mode = serializers.ChoiceField(choices=["AGENCY", "PRIVATE"])
@@ -332,6 +333,7 @@ class GetOrdersView(AdminPaginatedDateRangeListView):
         return [
             {
                 **order_list_payload(order),
+                "special_comments": order.special_comments,
                 "created_by": order.created_by.name if order.created_by else None,
                 "verified_by": order.verified_by.name if order.verified_by else None,
                 "client_created_by": (
