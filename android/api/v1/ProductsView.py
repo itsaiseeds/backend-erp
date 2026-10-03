@@ -33,6 +33,12 @@ class UtilityProductSerializer(serializers.Serializer):
     crop = serializers.CharField()
     image_url = serializers.CharField(allow_blank=True)
     is_deleted = serializers.BooleanField()
+    is_usable = serializers.BooleanField(
+        help_text=(
+            "False when the product is frozen. It is still listed (a farmer can "
+            "use it); no stock or booking action is available for it."
+        )
+    )
 
 
 class ProductsView(AndroidSharedView):
@@ -55,6 +61,7 @@ class ProductsView(AndroidSharedView):
                     "crop": product.crop.name,
                     "image_url": product.image_url,
                     "is_deleted": product.is_deleted,
+                    "is_usable": product.is_usable,
                 }
                 for product in products
             ]

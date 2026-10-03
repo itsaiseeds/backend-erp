@@ -740,6 +740,10 @@ CREATE TABLE IF NOT EXISTS public.aggregator_product (
 	stage_id int8 NOT NULL,
 	selling_price numeric(12, 2) NOT NULL,
 	image_url varchar(500) NOT NULL DEFAULT '',
+	-- False freezes the product: no inward, waste, packaging, recipe, count or
+	-- booking may touch it (ProductOperations.assert_products_usable). Production
+	-- (Neon) needs: ALTER TABLE public.aggregator_product ADD COLUMN is_usable bool NOT NULL DEFAULT true;
+	is_usable bool NOT NULL DEFAULT true,
 	CONSTRAINT aggregator_product_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_product_public_id_key UNIQUE (public_id),
 	CONSTRAINT uniq_product_name_crop UNIQUE (name, crop_id),
@@ -749,6 +753,7 @@ CREATE INDEX IF NOT EXISTS aggregator_product_public_id_like ON public.aggregato
 CREATE INDEX IF NOT EXISTS aggregator_product_crop_id_idx ON public.aggregator_product USING btree (crop_id);
 CREATE INDEX IF NOT EXISTS aggregator_product_stage_id_idx ON public.aggregator_product USING btree (stage_id);
 CREATE INDEX IF NOT EXISTS aggregator_product_is_deleted_idx ON public.aggregator_product USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_product_is_usable_idx ON public.aggregator_product USING btree (is_usable);
 CREATE INDEX IF NOT EXISTS aggregator_product_created_by_id_idx ON public.aggregator_product USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_product_deleted_by_id_idx ON public.aggregator_product USING btree (deleted_by_id);
 

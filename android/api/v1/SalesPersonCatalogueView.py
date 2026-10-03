@@ -34,7 +34,7 @@ from rest_framework.request import Request
 
 from aggregator.models import Crop, ProductDescriptionItem, ProductPackaging
 from aggregator.models.Stage import StageIds
-from aggregator.ProductOperations import catalogue_packaging_payload
+from aggregator.ProductOperations import catalogue_packaging_payload, usable_packagings
 from android.api.paginated_views import AndroidPaginatedDateRangeListView
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
@@ -102,12 +102,14 @@ def _crops_with_packagings(request: Request) -> list[dict]:
 
     This is the eligible value set for the ``crop`` filter: the picker never
     needs to offer a crop that would return an empty page. ``is_deleted=False``
-    is explicit on both spans because a lookup across a relation does not pick
-    up the soft-delete default manager.
+    (and ``is_usable=True``: a frozen product is not sold) is explicit on the
+    spans because a lookup across a relation does not pick up the soft-delete
+    default manager.
     """
     rows = (
         Crop.objects.filter(
             products__is_deleted=False,
+            products__is_usable=True,
             products__packagings__is_deleted=False,
         )
         .values_list("id", "name")
@@ -125,7 +127,7 @@ def _products_with_packagings(request: Request) -> list[dict]:
     manager.
     """
     rows = (
-        ProductPackaging.objects.filter(product__is_deleted=False)
+        usable_packagings()
         .values_list("product__public_id", "product__name")
         .distinct()
         .order_by("product__name")
@@ -233,7 +235,7 @@ class SalesPersonCatalogueView(AndroidPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        return ProductPackaging.objects.select_related(
+        return usable_packagings().select_related(
             "product", "product__crop", "product__stage"
         ).prefetch_related(
             Prefetch(

@@ -81,6 +81,7 @@ from .models import (
     StockEventType,
     StockPoolKind,
 )
+from .ProductOperations import assert_products_usable
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -143,6 +144,9 @@ def record_stock_count(
         actor=actor,
         new_bag_date=snapshot_date,
     ) as rec:
+        assert_products_usable(
+            [product_packaging.product_id], field="counts", action="have its stock counted"
+        )
         lock_raw_pools([product_packaging.product_id])
         materials_before = _material_guard([product_packaging.product_id])
         bags_before = _bag_availability([product_packaging])
@@ -208,6 +212,7 @@ def record_stock_counts(
     actor: User,
     snapshot_date: date | None = None,
     carry_forward: bool = False,
+    carry_frozen: bool = False,
 ) -> list[InventorySnapshot]:
     """Upload a whole day's bag count in one transaction.
 
@@ -228,6 +233,11 @@ def record_stock_counts(
     their raw and packing material. A full upload (POST) names every packaging,
     so it carries nothing. The carried rows are not returned.
 
+    ``carry_frozen=True`` is the full-upload (POST) counterpart: a full upload
+    names every *usable* packaging, but a packaging of an unusable product cannot
+    be counted, so it is carried forward exactly as above -- and only it -- so
+    freezing a product never moves its stock, raw material or packing material.
+
     The raw-material check runs once, after every line is written, so one
     upload may raise one packaging of a product and lower another: only the
     net kilograms per product must fit its raw pool. The packing-material
@@ -246,13 +256,16 @@ def record_stock_counts(
         actor=actor,
         new_bag_date=snapshot_date,
     ) as rec:
+        assert_products_usable(product_ids, field="counts", action="have its stock counted")
         lock_raw_pools(product_ids)
         # All up front and in pk order; _write_stock_count re-takes each as a no-op.
         lock_bag_pools(counts)
         materials_before = _material_guard(product_ids)
         bags_before = _bag_availability(counts)
-        if carry_forward:
-            carried = _carry_forward_bag_counts(counts, snapshot_date, actor)
+        if carry_forward or carry_frozen:
+            carried = _carry_forward_bag_counts(
+                counts, snapshot_date, actor, frozen_only=not carry_forward
+            )
             rec.carried |= {
                 (row.product_packaging.product_id, (StockPoolKind.BAG, row.product_packaging_id))
                 for row in carried
@@ -278,7 +291,11 @@ def record_stock_counts(
 
 
 def _carry_forward_bag_counts(
-    named: Iterable[ProductPackaging], snapshot_date: date, actor: User
+    named: Iterable[ProductPackaging],
+    snapshot_date: date,
+    actor: User,
+    *,
+    frozen_only: bool = False,
 ) -> list[InventorySnapshot]:
     """Count every unnamed packaging onto a newly opened date, at its physical figure.
 
@@ -286,6 +303,10 @@ def _carry_forward_bag_counts(
     Packed and available are unchanged by it: the count drops by what was
     dispatched since the last count, and those dispatches now precede the new
     count instead.
+
+    ``frozen_only`` restricts it to packagings of unusable products (the full-upload
+    case). Carrying is a system write, not a user change, so it deliberately
+    bypasses the usability guard.
     """
     latest = latest_snapshot_date()
     if latest is None or snapshot_date <= latest:
@@ -295,9 +316,9 @@ def _carry_forward_bag_counts(
     rows = InventorySnapshot.objects.filter(snapshot_date=latest).exclude(
         product_packaging_id__in=named_ids
     )
-    for row in rows.select_related("product_packaging"):
+    for row in rows.select_related("product_packaging__product"):
         packaging = row.product_packaging
-        if packaging.is_deleted:
+        if packaging.is_deleted or (frozen_only and packaging.product.is_usable):
             continue
         physical = max(row.bags - consumed_bags(packaging, latest), 0)
         carried.append(
@@ -312,7 +333,11 @@ def _carry_forward_bag_counts(
 
 
 def _carry_forward_loose_counts(
-    named: Iterable[tuple[Product, Decimal]], snapshot_date: date, actor: User
+    named: Iterable[tuple[Product, Decimal]],
+    snapshot_date: date,
+    actor: User,
+    *,
+    frozen_only: bool = False,
 ) -> list[LooseStockSnapshot]:
     """The loose-pool counterpart of :func:`_carry_forward_bag_counts`."""
     latest = latest_loose_snapshot_date()
@@ -324,6 +349,8 @@ def _carry_forward_loose_counts(
         "product"
     ):
         if (row.product_id, row.packet_weight) in named_pairs or row.product.is_deleted:
+            continue
+        if frozen_only and row.product.is_usable:
             continue
         physical = max(
             row.packets
@@ -623,9 +650,15 @@ def snapshot_line(
 
 
 def missing_packagings(snapshot_date: date | None = None):
-    """Active packagings with no counted line for ``snapshot_date``."""
+    """Active packagings with no counted line for ``snapshot_date``.
+
+    Packagings of an unusable product are left out: nobody can count them while
+    the product is frozen (their last figure is carried forward onto each new
+    date instead -- see ``_carry_forward_bag_counts``), so they must not block
+    the day's count from being complete.
+    """
     counted = snapshot_for(snapshot_date).values_list("product_packaging_id", flat=True)
-    return ProductPackaging.objects.exclude(id__in=counted)
+    return ProductPackaging.objects.exclude(id__in=counted).filter(product__is_usable=True)
 
 
 def is_stock_count_complete(snapshot_date: date | None = None) -> bool:
@@ -878,6 +911,7 @@ def record_loose_stock(
         actor=actor,
         new_loose_date=snapshot_date,
     ) as rec:
+        assert_products_usable([product.id], field="counts", action="have its stock counted")
         lock_raw_pools([product.id])
         materials_before = _material_guard([product.id])
         loose_before = _loose_availability([(product, packet_weight)])
@@ -948,6 +982,7 @@ def record_loose_stocks(
     actor: User,
     snapshot_date: date | None = None,
     carry_forward: bool = False,
+    carry_frozen: bool = False,
 ) -> list[LooseStockSnapshot]:
     """Upload a whole loose count in one transaction.
 
@@ -962,6 +997,8 @@ def record_loose_stocks(
 
     ``carry_forward=True`` carries every loose pool the upload does not name
     onto a newly opened date, exactly as :func:`record_stock_counts` does.
+    ``carry_frozen=True`` carries only the pools of unusable products (the full-upload
+    case), as there.
     """
     from . import StockLedgerOperations
 
@@ -975,13 +1012,16 @@ def record_loose_stocks(
         actor=actor,
         new_loose_date=snapshot_date,
     ) as rec:
+        assert_products_usable(product_ids, field="counts", action="have its stock counted")
         lock_raw_pools(product_ids)
         # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
         lock_loose_pools(product_ids)
         materials_before = _material_guard(product_ids)
         loose_before = _loose_availability(counts)
-        if carry_forward:
-            carried = _carry_forward_loose_counts(counts, snapshot_date, actor)
+        if carry_forward or carry_frozen:
+            carried = _carry_forward_loose_counts(
+                counts, snapshot_date, actor, frozen_only=not carry_forward
+            )
             rec.carried |= {
                 (
                     row.product_id,
@@ -1343,6 +1383,7 @@ def record_raw_waste(
         [product.id],
         actor=actor,
     ) as rec:
+        assert_products_usable([product.id], action="have waste recorded")
         lock_raw_pools([product.id])
         waste = RawMaterialWaste.objects.create(
             product=product,
@@ -1532,6 +1573,9 @@ def guard_stock_deletion(
     with StockLedgerOperations.recording(
         event_type, detail, tracked, source=source
     ) as rec:
+        # After recording() has taken the locks in the writers' order, so a frozen
+        # product's stock records can neither be deleted nor race the switch.
+        assert_products_usable(tracked, action="have its stock records deleted")
         _guard_stock_deletion(
             perform,
             product_ids=product_ids,

@@ -379,6 +379,17 @@ CREATE FUNCTION pg_temp.today_ist() RETURNS date LANGUAGE sql AS
 $$ SELECT (now() AT TIME ZONE 'Asia/Kolkata')::date $$;
 
 -- -------------------------------------------------------------------------
+-- A frozen product (is_usable = false): shows how the freeze reads. It is still
+-- listed by the management endpoints, flagged; the catalogue and the recipe
+-- picker omit it, and every inward / waste / packaging / count / booking write
+-- for it is refused until it is switched back on.
+-- -------------------------------------------------------------------------
+INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, stage_id, selling_price, image_url, is_usable) VALUES(3, now(), now(), false, NULL, NULL, 1, 'P-DUMMY0000003', 'SAI-99', 1, 1, 110.00, '', false);
+INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(3, now(), now(), false, NULL, NULL, 1, 'PP-DUMMY000003', 3, 1.000, 20, 2200.00);
+SELECT setval(pg_get_serial_sequence('public.aggregator_product', 'id'),          (SELECT MAX(id) FROM public.aggregator_product));
+SELECT setval(pg_get_serial_sequence('public.aggregator_productpackaging', 'id'), (SELECT MAX(id) FROM public.aggregator_productpackaging));
+
+-- -------------------------------------------------------------------------
 -- Geography: pincodes + addresses
 -- -------------------------------------------------------------------------
 INSERT INTO public.aggregator_pincode (id, created_at, updated_at, is_deleted, created_by_id, code, city_id) VALUES

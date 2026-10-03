@@ -76,16 +76,22 @@ class LooseStockPayloadSerializer(serializers.Serializer):
     available = serializers.IntegerField()
 
 
-def packable_pairs() -> dict[tuple[str, Decimal], tuple[Product, Decimal]]:
+def packable_pairs(
+    *, usable_only: bool = True
+) -> dict[tuple[str, Decimal], tuple[Product, Decimal]]:
     """Every ``(product, packet_weight)`` pair the business actually packs.
 
     Taken from the active packagings: a loose packet only exists in a weight
     something is packed in, so this is the universe of valid loose lines and
-    the zero-fill set for a ``POST``.
+    the zero-fill set for a ``POST``. Pairs of an unusable product are left out
+    (they cannot be counted -- their last figure is carried forward instead);
+    pass ``usable_only=False`` to see them too.
     """
     pairs: dict[tuple[str, Decimal], tuple[Product, Decimal]] = {}
     for packaging in ProductPackaging.objects.select_related("product"):
         product = packaging.product
+        if usable_only and not product.is_usable:
+            continue
         pairs[(product.public_id, packaging.packet_weight)] = (
             product,
             packaging.packet_weight,
@@ -107,11 +113,16 @@ class UpdateLooseStockView(AdminApiView):
         """
         lines = serializer.validated_data["counts"]
         valid = packable_pairs()
+        everything = packable_pairs(usable_only=False)
 
         counts = {}
         unknown, duplicates = [], []
+        frozen: list[str] = []
         for line in lines:
             key = (line["product"], line["packet_weight"])
+            if key not in valid and key in everything:
+                frozen.append(key[0])
+                continue
             if key not in valid:
                 unknown.append(f"{key[0]} @ {key[1]}kg")
                 continue
@@ -122,6 +133,12 @@ class UpdateLooseStockView(AdminApiView):
             counts[resolved] = line["packets"]
 
         errors = []
+        if frozen:
+            errors.append(
+                "Stock cannot be counted for unusable product(s): "
+                + ", ".join(sorted(set(frozen)))
+                + "."
+            )
         if unknown:
             errors.append(
                 "No packaging exists for: " + ", ".join(sorted(unknown)) + "."
@@ -181,8 +198,10 @@ class UpdateLooseStockView(AdminApiView):
             pair: provided.get(pair, 0) for pair in packable_pairs().values()
         }
         try:
+            # Pairs of an unusable product cannot be counted; their last figure is
+            # carried forward so freezing a product never moves its stock.
             snapshots = InventoryOperations.record_loose_stocks(
-                counts=full_counts, actor=request.user
+                counts=full_counts, actor=request.user, carry_frozen=True
             )
         except ValueError as exc:
             raise serializers.ValidationError({"counts": str(exc)}) from None

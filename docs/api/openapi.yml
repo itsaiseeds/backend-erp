@@ -3603,6 +3603,12 @@ paths:
       operationId: api_sales_admin_products_list
       description: List (GET) or create (POST) products (app admin only).
       summary: List products
+      parameters:
+      - in: query
+        name: is_usable
+        schema:
+          type: boolean
+        description: Only usable (true) or only frozen (false) products.
       tags:
       - Admin · Master data
       security:
@@ -4033,9 +4039,11 @@ paths:
   /api/sales-admin/update-bag-stock:
     post:
       operationId: api_sales_admin_update_bag_stock_create
-      description: 'Sealed-bag counts only: every active packaging receives a snapshot
-        row for today, and packagings absent from ``counts`` are recorded as zero
-        bags. Loose packets are not accepted here -- record them at ``/api/sales-admin/update-sample-packet-stock``.'
+      description: 'Sealed-bag counts only: every active packaging of a usable product
+        receives a snapshot row for today, and packagings absent from ``counts`` are
+        recorded as zero bags. Packagings of an unusable product cannot be counted
+        (naming one is a 400); their last figure is carried forward. Loose packets
+        are not accepted here -- record them at ``/api/sales-admin/update-sample-packet-stock``.'
       summary: Replace today's entire stock count
       tags:
       - Admin · Stock count
@@ -8673,6 +8681,11 @@ components:
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
           description: Rate per kilogram; packet and bag prices derive from it and
             the weight sold.
+        is_usable:
+          type: boolean
+          description: 'False freezes the product: nothing about it can be created
+            or changed until it is switched back on (its history stays visible). The
+            other fields stay editable while it is frozen.'
         image:
           type: string
           format: binary
@@ -8775,7 +8788,7 @@ components:
         public_id:
           type: string
         product:
-          $ref: '#/components/schemas/ProductRef'
+          $ref: '#/components/schemas/PackagingProductRef'
         packet_weight:
           type: string
           format: decimal
@@ -8818,6 +8831,10 @@ components:
             the weight sold.
         image_url:
           type: string
+        is_usable:
+          type: boolean
+          description: 'False when the product is frozen: nothing about it may be
+            created or changed.'
         description_items:
           type: array
           items:
@@ -8826,6 +8843,7 @@ components:
       - crop
       - description_items
       - image_url
+      - is_usable
       - name
       - public_id
       - selling_price
@@ -8895,6 +8913,10 @@ components:
         name:
           type: string
           description: Product name.
+        is_usable:
+          type: boolean
+          description: False when the product is frozen; its figures are read-only
+            history.
         incoming_kg:
           type: string
           description: Sum of in-use KG with a reached effective date.
@@ -8914,6 +8936,7 @@ components:
       required:
       - available_kg
       - incoming_kg
+      - is_usable
       - name
       - packed_kg
       - product
@@ -9470,11 +9493,16 @@ components:
           type: string
         is_deleted:
           type: boolean
+        is_usable:
+          type: boolean
+          description: False when the product is frozen. It is still listed (a farmer
+            can use it); no stock or booking action is available for it.
       required:
       - crop
       - crop_id
       - image_url
       - is_deleted
+      - is_usable
       - name
       - public_id
     VerifyClientRequest:

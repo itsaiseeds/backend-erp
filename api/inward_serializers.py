@@ -673,6 +673,9 @@ class RawMaterialStockLineSerializer(serializers.Serializer):
 
     product = serializers.CharField(help_text="Product public id.")
     name = serializers.CharField(help_text="Product name.")
+    is_usable = serializers.BooleanField(
+        help_text="False when the product is frozen; its figures are read-only history."
+    )
     incoming_kg = serializers.CharField(help_text="Sum of in-use KG with a reached effective date.")
     packed_kg = serializers.CharField(
         help_text="KG already packed into bags or sample packets."
