@@ -1,0 +1,213 @@
+import 'package:equatable/equatable.dart';
+import '../../../../core/bloc/safe_cubit.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/network/api_exception.dart';
+import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
+import '../../../../core/widgets/inputs/date_range_field.dart';
+import '../../../clients/data/models/client_filter_model.dart';
+import '../../data/field_trips_repository.dart';
+import '../../data/models/farmer_model.dart';
+import '../../data/models/paginated_farmers_model.dart';
+
+enum FarmersStatus { initial, loading, loaded, failure }
+
+class FarmersState extends Equatable {
+  final FarmersStatus status;
+  final List<FarmerModel> farmers;
+  final List<ClientFilterModel> availableFilters;
+  final List<ClientSortModel> availableSorts;
+  final int currentPage;
+  final int totalPages;
+  final int totalItems;
+  final String? search;
+  final String? sortBy;
+  final String? sortOrder;
+  final Map<String, String> filters;
+  final String? errorMessage;
+
+  const FarmersState({
+    this.status = FarmersStatus.initial,
+    this.farmers = const [],
+    this.availableFilters = const [],
+    this.availableSorts = const [],
+    this.currentPage = 1,
+    this.totalPages = 0,
+    this.totalItems = 0,
+    this.search,
+    this.sortBy,
+    this.sortOrder,
+    this.filters = const {},
+    this.errorMessage,
+  });
+
+  bool get isEmptySource => (search?.trim().isEmpty ?? true) && filters.isEmpty;
+
+  bool get hasMore => currentPage < totalPages;
+
+  FarmersState copyWith({
+    FarmersStatus? status,
+    List<FarmerModel>? farmers,
+    List<ClientFilterModel>? availableFilters,
+    List<ClientSortModel>? availableSorts,
+    int? currentPage,
+    int? totalPages,
+    int? totalItems,
+    String? search,
+    String? sortBy,
+    String? sortOrder,
+    Map<String, String>? filters,
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    return FarmersState(
+      status: status ?? this.status,
+      farmers: farmers ?? this.farmers,
+      availableFilters: availableFilters ?? this.availableFilters,
+      availableSorts: availableSorts ?? this.availableSorts,
+      currentPage: currentPage ?? this.currentPage,
+      totalPages: totalPages ?? this.totalPages,
+      totalItems: totalItems ?? this.totalItems,
+      search: search ?? this.search,
+      sortBy: sortBy ?? this.sortBy,
+      sortOrder: sortOrder ?? this.sortOrder,
+      filters: filters ?? this.filters,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    status,
+    farmers,
+    availableFilters,
+    availableSorts,
+    currentPage,
+    totalPages,
+    totalItems,
+    search,
+    sortBy,
+    sortOrder,
+    filters,
+    errorMessage,
+  ];
+}
+
+class FarmersCubit extends SafeCubit<FarmersState> {
+  final FieldTripsRepository _repository;
+
+  FarmersCubit({required FieldTripsRepository repository})
+    : _repository = repository,
+      super(const FarmersState());
+
+  static const int PAGE_SIZE = 10;
+
+  Future<void> loadFarmers() => _fetch(page: state.currentPage);
+
+  Future<void> refresh() => _fetch(page: 1);
+
+  Future<void> applyQuery({
+    required int page,
+    required int limit,
+    String? search,
+    String? sortBy,
+    String? sortOrder,
+    Map<String, String>? filters,
+  }) async {
+    emit(
+      state.copyWith(
+        currentPage: page,
+        search: search ?? '',
+        sortBy: sortBy ?? '',
+        sortOrder: sortOrder ?? '',
+        filters: filters ?? const {},
+      ),
+    );
+    await _fetch(page: page);
+  }
+
+  ClientFilterModel? _filterFor(String key) {
+    for (final ClientFilterModel filter in state.availableFilters) {
+      if (filter.key == key) return filter;
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _buildQueryParams(int page) {
+    final Map<String, dynamic> params = {'page': page, 'page_size': PAGE_SIZE};
+
+    final String search = state.search?.trim() ?? '';
+    if (search.isNotEmpty) params['farmer_name'] = search;
+
+    state.filters.forEach((key, value) {
+      final String trimmed = value.trim();
+      if (trimmed.isEmpty) return;
+
+      // A range arrives as one "from|to" value but the API wants it as two
+      // bound params, named by the filter itself.
+      final ClientFilterModel? filter = _filterFor(key);
+      if (filter != null && filter.kind == ClientFilterKind.datetimeRange) {
+        final List<String> bounds = trimmed.split(DateRangeValue.SEPARATOR);
+        final String lower = bounds.isNotEmpty ? bounds.first.trim() : '';
+        final String upper = bounds.length > 1 ? bounds[1].trim() : '';
+        if (lower.isNotEmpty) params[filter.lowerBoundParam] = lower;
+        if (upper.isNotEmpty) params[filter.upperBoundParam] = upper;
+        return;
+      }
+
+      params[key] = trimmed;
+    });
+
+    final String sort = state.sortBy?.trim() ?? '';
+    if (sort.isNotEmpty) {
+      final bool isDescending =
+          (state.sortOrder ?? '') == AppFilterSearchBar.SORT_DESCENDING;
+      params['sort'] = isDescending ? '-$sort' : sort;
+    }
+
+    return params;
+  }
+
+  /// Pulls the next page and appends it, for scroll-to-load.
+  Future<void> loadMore() async {
+    if (!state.hasMore) return;
+    if (state.status == FarmersStatus.loading) return;
+    await _fetch(page: state.currentPage + 1, append: true);
+  }
+
+  Future<void> _fetch({required int page, bool append = false}) async {
+    emit(state.copyWith(status: FarmersStatus.loading, clearError: true));
+
+    try {
+      final PaginatedFarmersModel result = await _repository.fetchFarmers(
+        queryParams: _buildQueryParams(page),
+      );
+
+      emit(
+        state.copyWith(
+          status: FarmersStatus.loaded,
+          farmers: append
+              ? [...state.farmers, ...result.results]
+              : result.results,
+          availableFilters: result.availableFilters.isEmpty
+              ? state.availableFilters
+              : result.availableFilters,
+          availableSorts: result.availableSorts.isEmpty
+              ? state.availableSorts
+              : result.availableSorts,
+          currentPage: page,
+          totalPages: result.totalPages,
+          totalItems: result.totalCount,
+        ),
+      );
+    } on ApiException catch (e) {
+      emit(state.copyWith(status: FarmersStatus.failure, errorMessage: e.message));
+    } catch (_) {
+      emit(
+        state.copyWith(
+          status: FarmersStatus.failure,
+          errorMessage: AppStrings.SOMETHING_WENT_WRONG,
+        ),
+      );
+    }
+  }
+}

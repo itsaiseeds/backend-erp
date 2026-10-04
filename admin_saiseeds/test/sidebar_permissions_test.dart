@@ -28,6 +28,8 @@ void main() {
       TabIds.PRODUCT_STOCK,
       TabIds.RAW_MATERIAL_STOCK,
       TabIds.OTHER_MATERIAL_STOCK,
+      TabIds.FIELD_TRIPS,
+      TabIds.FARMERS,
     ]);
   });
 
@@ -54,6 +56,8 @@ void main() {
       TabIds.PRODUCT_STOCK,
       TabIds.RAW_MATERIAL_STOCK,
       TabIds.OTHER_MATERIAL_STOCK,
+      TabIds.FIELD_TRIPS,
+      TabIds.FARMERS,
     ]);
   });
 

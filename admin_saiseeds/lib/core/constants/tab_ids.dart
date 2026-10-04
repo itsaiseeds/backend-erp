@@ -20,5 +20,7 @@ class TabIds {
   static const String PRODUCT_STOCK = 'product-stock';
   static const String RAW_MATERIAL_STOCK = 'raw-material-stock';
   static const String OTHER_MATERIAL_STOCK = 'other-material-stock';
+  static const String FIELD_TRIPS = 'field-trips';
+  static const String FARMERS = 'farmers';
   static const String PROFILE = 'profile';
 }
