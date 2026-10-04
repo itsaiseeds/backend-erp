@@ -229,12 +229,13 @@ class AndroidFieldTripApiTest(FieldTripFixtures, AndroidApiTestCase):
         url = EDIT_VISIT_URL.format(public_id=visit.public_id)
 
         response = self.client.patch(
-            url, {"farmer_name": " Suresh Patel ", "contact_number": "9000000000"}, format="json"
+            url, {"farmer_name": " Suresh Patel ", "field_trip_public_id": "FT-OTHER"}, format="json"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["farmer_name"], "Suresh Patel")
         visit.refresh_from_db()
         self.assertEqual(visit.contact_number, "9876500001")
+        self.assertEqual(visit.field_trip_id, trip.pk)
 
         blank = self.client.patch(url, {"farmer_name": "  "}, format="json")
         self.assertEqual(blank.status_code, status.HTTP_400_BAD_REQUEST)
