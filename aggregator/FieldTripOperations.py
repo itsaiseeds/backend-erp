@@ -300,7 +300,7 @@ def create_farmer_visit(
 
 @transaction.atomic
 def rename_farmer_visit(visit: FarmerVisit, farmer_name: str) -> FarmerVisit:
-    """Correct the farmer's name -- the only editable field, and only while the trip is in progress."""
+    """Correct the farmer's name -- the only editable field, and only while the trip runs."""
     assert_field_trip_status(visit.field_trip, FARMER_VISIT_STATUS_CODES, "edit a farmer on")
     visit.farmer_name = farmer_name
     visit.full_clean()

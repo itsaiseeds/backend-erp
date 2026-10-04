@@ -433,9 +433,7 @@ class ViewContractRegistryTest(SimpleTestCase):
         tests/test_view_contracts.py::ViewContractRegistryTest::test_the_routed_view_set_matches_the_expected_table
         """
         routed = {
-            path
-            for path, view in _routed_api_views().items()
-            if issubclass(view, BaseApiView)
+            path for path, view in _routed_api_views().items() if issubclass(view, BaseApiView)
         }
         self.assertEqual(routed, set(EXPECTED_CONTRACTS))
 
@@ -451,9 +449,7 @@ class ViewContractRegistryTest(SimpleTestCase):
                     issubclass(view, _SCHEME_BASES[scheme]),
                     f"{view.__name__} must inherit {_SCHEME_BASES[scheme].__name__}",
                 )
-                self.assertEqual(
-                    view.authentication_classes, [_SCHEME_AUTHENTICATORS[scheme]]
-                )
+                self.assertEqual(view.authentication_classes, [_SCHEME_AUTHENTICATORS[scheme]])
                 self.assertTrue(view.auth_required)
                 for flag, expected in _ROLE_FLAGS[role].items():
                     self.assertEqual(getattr(view, flag), expected, flag)
@@ -531,9 +527,7 @@ class SessionAuthContractTest(WebApiTestCase):
             created_by=cls.superuser,
             verified_by=cls.superuser,
         )
-        Admin.objects.create(
-            user=cls.admin, can_update_stock_count=True, created_by=cls.superuser
-        )
+        Admin.objects.create(user=cls.admin, can_update_stock_count=True, created_by=cls.superuser)
         cls.plain = User.objects.create_user(
             phone_number="6666666666",
             name="plain user",
@@ -621,9 +615,13 @@ class SessionAuthContractTest(WebApiTestCase):
     def test_execute_code_does_not_exist_unless_enabled(self):
         """tests/test_view_contracts.py::SessionAuthContractTest::test_execute_code_does_not_exist_unless_enabled"""
         body = {"code": "result = 1"}
-        self.assertEqual(self.client.post(self.PERMISSION_URL, body, format="json").status_code, 404)
+        self.assertEqual(
+            self.client.post(self.PERMISSION_URL, body, format="json").status_code, 404
+        )
         self.login_as(self.superuser)
-        self.assertEqual(self.client.post(self.PERMISSION_URL, body, format="json").status_code, 404)
+        self.assertEqual(
+            self.client.post(self.PERMISSION_URL, body, format="json").status_code, 404
+        )
         self.assertEqual(self.client.get("/execute-code/").status_code, 404)
 
     def test_a_bearer_token_never_authenticates_the_web_side(self):

@@ -175,9 +175,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
         (ADMIN_INWARD,),
     ),
     (
-        _route(
-            _ADMIN, "update-bag-stock", "update-sample-packet-stock", "check-todays-inventory"
-        ),
+        _route(_ADMIN, "update-bag-stock", "update-sample-packet-stock", "check-todays-inventory"),
         (ADMIN_STOCK_COUNT,),
     ),
     (

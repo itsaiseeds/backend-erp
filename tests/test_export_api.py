@@ -51,7 +51,7 @@ SUPERUSER_PHONE = "9999999999"
 ORDERS_URL = "/api/sales-admin/export/orders"
 CUSTOM_ORDERS_URL = "/api/sales-admin/export/custom-orders"
 FARMER_VISITS_URL = "/api/sales-admin/export/farmer-visits"
-DISPATCH_RECEIPTS_URL ="/api/sales-admin/export/dispatch-receipts"
+DISPATCH_RECEIPTS_URL = "/api/sales-admin/export/dispatch-receipts"
 INWARD_URL = "/api/sales-admin/export/inward-entries"
 SNAPSHOTS_URL = "/api/sales-admin/export/inventory-snapshots"
 VERIFY_URL = "/api/sales-admin/verify-order/{public_id}"
@@ -84,7 +84,11 @@ def _documented_keys_mismatches(serializer, data, path="") -> list[str]:
     if not isinstance(serializer, serializers.Serializer) or data is None:
         return []
     fields = serializer.fields
-    problems = [f"{path}: undocumented {sorted(set(data) - set(fields))}"] if set(data) - set(fields) else []
+    problems = (
+        [f"{path}: undocumented {sorted(set(data) - set(fields))}"]
+        if set(data) - set(fields)
+        else []
+    )
     if set(fields) - set(data):
         problems.append(f"{path}: missing {sorted(set(fields) - set(data))}")
     for name, field in fields.items():
@@ -104,7 +108,6 @@ class ExportApiTest(WebApiTestCase):
     # directly), so the stock ledger is not expected to follow -- see
     # DMLTestCase.stock_ledger_guard.
     stock_ledger_guard = False
-
 
     @classmethod
     def setUpTestData(cls):
@@ -188,9 +191,7 @@ class ExportApiTest(WebApiTestCase):
 
     def _export(self, url, start, end=None):
         end = end or start
-        return self.client.get(
-            url, {"start_date": start.isoformat(), "end_date": end.isoformat()}
-        )
+        return self.client.get(url, {"start_date": start.isoformat(), "end_date": end.isoformat()})
 
     def _order(self, **kwargs):
         return create_order(
@@ -295,7 +296,9 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["items"][0]["quantity"], 2)
         self.assertEqual(row["total_amount"], "2000.00")
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportOrdersResponseSerializer(), resp.data), [])
+        self.assertEqual(
+            _documented_keys_mismatches(ExportOrdersResponseSerializer(), resp.data), []
+        )
 
     # -- custom orders --------------------------------------------------------
 
@@ -325,7 +328,9 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["items"][0]["product"]["public_id"], self.product.public_id)
         self.assertEqual(row["items"][0]["packets"], 5)
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportCustomOrdersResponseSerializer(), resp.data), [])
+        self.assertEqual(
+            _documented_keys_mismatches(ExportCustomOrdersResponseSerializer(), resp.data), []
+        )
 
     # -- farmer visits --------------------------------------------------------
 
@@ -447,13 +452,19 @@ class ExportApiTest(WebApiTestCase):
 
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         days = resp.data["results"]
-        self.assertEqual([day["date"] for day in days], [yesterday.isoformat(), self.today.isoformat()])
+        self.assertEqual(
+            [day["date"] for day in days], [yesterday.isoformat(), self.today.isoformat()]
+        )
         self.assertEqual([r["public_id"] for r in days[0]["raw_materials"]], [raw_old.public_id])
         self.assertEqual(days[0]["other_materials"], [])
         self.assertEqual([r["public_id"] for r in days[1]["raw_materials"]], [raw_new.public_id])
-        self.assertEqual([r["public_id"] for r in days[1]["other_materials"]], [other_new.public_id])
+        self.assertEqual(
+            [r["public_id"] for r in days[1]["other_materials"]], [other_new.public_id]
+        )
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportInwardEntriesResponseSerializer(), resp.data), [])
+        self.assertEqual(
+            _documented_keys_mismatches(ExportInwardEntriesResponseSerializer(), resp.data), []
+        )
 
     # -- inventory snapshots --------------------------------------------------
 
@@ -497,9 +508,7 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual([r["bags"] for r in rows if r["kind"] == "bag"], [100, 90])
         self.assertEqual([r["packets"] for r in rows if r["kind"] == "loose"], [30, 25])
         # Counted figures only: the live position describes today, not the count day.
-        self.assertFalse(
-            _keys(rows) & {"packets_available", "reserved", "consumed", "available"}
-        )
+        self.assertFalse(_keys(rows) & {"packets_available", "reserved", "consumed", "available"})
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
         self.assertEqual(
             _documented_keys_mismatches(ExportInventorySnapshotsPageSerializer(), resp.data), []
