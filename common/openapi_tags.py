@@ -175,9 +175,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
         (ADMIN_INWARD,),
     ),
     (
-        _route(
-            _ADMIN, "update-bag-stock", "update-sample-packet-stock", "check-todays-inventory"
-        ),
+        _route(_ADMIN, "update-bag-stock", "update-sample-packet-stock", "check-todays-inventory"),
         (ADMIN_STOCK_COUNT,),
     ),
     (
@@ -219,6 +217,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
         (ADMIN_FIELD_TRIPS,),
     ),
     (_route(_ADMIN, "export/orders", "export/custom-orders"), (ADMIN_ORDERS, ADMIN_EXPORTS)),
+    (_route(_ADMIN, "export/farmer-visits"), (ADMIN_FIELD_TRIPS, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/dispatch-receipts"), (ADMIN_DISPATCH, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/inward-entries"), (ADMIN_INWARD, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/inventory-snapshots"), (ADMIN_STOCK_COUNT, ADMIN_EXPORTS)),
@@ -267,6 +266,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "delete-field-trip",
             "field-trip-farmer-visits",
             "create-farmer-visit",
+            "edit-farmer-visit",
         ),
         (ANDROID_FIELD_TRIPS,),
     ),

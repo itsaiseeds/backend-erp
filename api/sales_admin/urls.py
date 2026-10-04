@@ -19,6 +19,7 @@ from .DispatchCustomOrderView import DispatchCustomOrderView
 from .DispatchOrderView import DispatchOrderView
 from .ExportCustomOrdersView import ExportCustomOrdersView
 from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
+from .ExportFarmerVisitsView import ExportFarmerVisitsView
 from .ExportInventorySnapshotsView import ExportInventorySnapshotsView
 from .ExportInwardEntriesView import ExportInwardEntriesView
 from .ExportOrdersView import ExportOrdersView
@@ -354,6 +355,11 @@ urlpatterns = [
         "export/dispatch-receipts",
         ExportDispatchReceiptsView.as_view(),
         name="export-dispatch-receipts",
+    ),
+    path(
+        "export/farmer-visits",
+        ExportFarmerVisitsView.as_view(),
+        name="export-farmer-visits",
     ),
     path(
         "export/inward-entries",

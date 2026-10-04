@@ -313,6 +313,40 @@ paths:
               schema:
                 description: Device registered.
           description: ''
+  /android/api/v1/edit-farmer-visit/{public_id}:
+    patch:
+      operationId: android_api_v1_edit_farmer_visit_partial_update
+      description: Rename a farmer recorded on the caller's in-progress field trip.
+      summary: Rename a farmer on my in-progress field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer visit's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
   /android/api/v1/edit-field-trip/{public_id}:
     patch:
       operationId: android_api_v1_edit_field_trip_partial_update
@@ -2622,6 +2656,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExportDispatchReceiptsResponse'
+          description: ''
+  /api/sales-admin/export/farmer-visits:
+    get:
+      operationId: sales_admin_export_farmer_visits
+      description: Export the farmers recorded in a date window, across all field
+        trips.
+      summary: Export farmers recorded on field trips in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 62 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - Admin · Field trips
+      - Admin · Exports
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportFarmerVisitsResponse'
           description: ''
   /api/sales-admin/export/inventory-snapshots:
     get:
@@ -7579,6 +7647,86 @@ components:
       oneOf:
       - $ref: '#/components/schemas/ExportDispatchReceipt'
       - $ref: '#/components/schemas/ExportCustomDispatchReceipt'
+    ExportFarmerVisit:
+      type: object
+      description: '``FieldTripOperations.farmer_visit_export_payload``: a visit with
+        its trip and sales person.'
+      properties:
+        public_id:
+          type: string
+        farmer_name:
+          type: string
+        contact_number:
+          type: string
+        village:
+          type: string
+        land_area_bigha:
+          type: string
+        crops:
+          type: array
+          items:
+            $ref: '#/components/schemas/IdName'
+        uses_our_products:
+          type: boolean
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductRef'
+        created_at:
+          type: string
+          format: date-time
+        field_trip:
+          $ref: '#/components/schemas/ExportFarmerVisitFieldTrip'
+        sales_person:
+          $ref: '#/components/schemas/UserContactRef'
+      required:
+      - contact_number
+      - created_at
+      - crops
+      - farmer_name
+      - field_trip
+      - land_area_bigha
+      - products
+      - public_id
+      - sales_person
+      - uses_our_products
+      - village
+    ExportFarmerVisitFieldTrip:
+      type: object
+      description: The trip a farmer was met on (``FieldTripOperations.farmer_visit_export_payload``).
+      properties:
+        public_id:
+          type: string
+        village:
+          type: string
+        city:
+          $ref: '#/components/schemas/IdName'
+      required:
+      - city
+      - public_id
+      - village
+    ExportFarmerVisitsResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportFarmerVisit'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
     ExportInventorySnapshotRow:
       oneOf:
       - $ref: '#/components/schemas/ExportBagSnapshot'
@@ -9548,6 +9696,16 @@ components:
       - contact_number
       - id
       - name
+    PatchedEditFarmerVisitRequest:
+      type: object
+      description: |-
+        A correction to a recorded farmer. The name is the only editable field;
+        anything else sent is ignored.
+      properties:
+        farmer_name:
+          type: string
+          minLength: 1
+          maxLength: 255
     PatchedFieldTripWriteRequest:
       type: object
       description: |-

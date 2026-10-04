@@ -14,12 +14,14 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers, status
 
+from aggregator import FieldTripOperations as ft_ops
 from aggregator import InventoryOperations as inv
 from aggregator.ClientOperations import create_client_with_details
 from aggregator.CustomOrderOperations import create_custom_order
 from aggregator.models import (
     City,
     Country,
+    Crop,
     InwardOtherMaterial,
     InwardRawMaterial,
     OtherMaterialRecipe,
@@ -34,6 +36,7 @@ from aggregator.models import (
 from aggregator.OrderOperations import create_order
 from api.export_views import MAX_EXPORT_RANGE_DAYS
 from api.sales_admin.ExportCustomOrdersView import ExportCustomOrdersResponseSerializer
+from api.sales_admin.ExportFarmerVisitsView import ExportFarmerVisitsResponseSerializer
 from api.sales_admin.ExportInventorySnapshotsView import (
     ExportInventorySnapshotsPageSerializer,
 )
@@ -47,6 +50,7 @@ User = get_user_model()
 SUPERUSER_PHONE = "9999999999"
 ORDERS_URL = "/api/sales-admin/export/orders"
 CUSTOM_ORDERS_URL = "/api/sales-admin/export/custom-orders"
+FARMER_VISITS_URL = "/api/sales-admin/export/farmer-visits"
 DISPATCH_RECEIPTS_URL = "/api/sales-admin/export/dispatch-receipts"
 INWARD_URL = "/api/sales-admin/export/inward-entries"
 SNAPSHOTS_URL = "/api/sales-admin/export/inventory-snapshots"
@@ -80,7 +84,11 @@ def _documented_keys_mismatches(serializer, data, path="") -> list[str]:
     if not isinstance(serializer, serializers.Serializer) or data is None:
         return []
     fields = serializer.fields
-    problems = [f"{path}: undocumented {sorted(set(data) - set(fields))}"] if set(data) - set(fields) else []
+    problems = (
+        [f"{path}: undocumented {sorted(set(data) - set(fields))}"]
+        if set(data) - set(fields)
+        else []
+    )
     if set(fields) - set(data):
         problems.append(f"{path}: missing {sorted(set(fields) - set(data))}")
     for name, field in fields.items():
@@ -100,7 +108,6 @@ class ExportApiTest(WebApiTestCase):
     # directly), so the stock ledger is not expected to follow -- see
     # DMLTestCase.stock_ledger_guard.
     stock_ledger_guard = False
-
 
     @classmethod
     def setUpTestData(cls):
@@ -184,9 +191,7 @@ class ExportApiTest(WebApiTestCase):
 
     def _export(self, url, start, end=None):
         end = end or start
-        return self.client.get(
-            url, {"start_date": start.isoformat(), "end_date": end.isoformat()}
-        )
+        return self.client.get(url, {"start_date": start.isoformat(), "end_date": end.isoformat()})
 
     def _order(self, **kwargs):
         return create_order(
@@ -291,7 +296,9 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["items"][0]["quantity"], 2)
         self.assertEqual(row["total_amount"], "2000.00")
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportOrdersResponseSerializer(), resp.data), [])
+        self.assertEqual(
+            _documented_keys_mismatches(ExportOrdersResponseSerializer(), resp.data), []
+        )
 
     # -- custom orders --------------------------------------------------------
 
@@ -321,7 +328,59 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["items"][0]["product"]["public_id"], self.product.public_id)
         self.assertEqual(row["items"][0]["packets"], 5)
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportCustomOrdersResponseSerializer(), resp.data), [])
+        self.assertEqual(
+            _documented_keys_mismatches(ExportCustomOrdersResponseSerializer(), resp.data), []
+        )
+
+    # -- farmer visits --------------------------------------------------------
+
+    def test_farmer_visits_export_names_the_trip_and_sales_person_and_skips_deleted(self):
+        """tests/test_export_api.py::ExportApiTest::test_farmer_visits_export_names_the_trip_and_sales_person_and_skips_deleted"""
+        start = timezone.now() + timedelta(days=1)
+        trip = ft_ops.create_field_trip(
+            sales_person=self.sales_person,
+            city=self.city,
+            village="Kamrej",
+            expected_start_at=start,
+            expected_end_at=start + timedelta(hours=8),
+        )
+        ft_ops.approve_field_trip(trip, self.admin_user)
+        ft_ops.start_field_trip(trip)
+        crop = Crop.objects.get(name="Castor")
+
+        def visit(contact):
+            return ft_ops.create_farmer_visit(
+                trip,
+                actor=self.sales_person,
+                farmer_name="Ramesh Patel",
+                contact_number=contact,
+                land_area_bigha=Decimal("2.5"),
+                crops=[crop],
+                products=[self.product] if contact == "9876500001" else [],
+            )
+
+        live = visit("9876500001")
+        old = visit("9876500002")
+        deleted = visit("9876500003")
+        self._backdate(old, _ist(self.today - timedelta(days=2)))
+        deleted.mark_deleted(self.admin_user)
+
+        resp = self._export(FARMER_VISITS_URL, self.today)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual([row["public_id"] for row in resp.data["results"]], [live.public_id])
+        row = resp.data["results"][0]
+        self.assertEqual(row["farmer_name"], "Ramesh Patel")
+        self.assertEqual(row["crops"], [{"id": crop.id, "name": "Castor"}])
+        self.assertTrue(row["uses_our_products"])
+        self.assertEqual(row["products"][0]["public_id"], self.product.public_id)
+        self.assertEqual(row["field_trip"]["public_id"], trip.public_id)
+        self.assertEqual(row["field_trip"]["city"], {"id": self.city.id, "name": "Surat"})
+        self.assertEqual(row["sales_person"]["id"], self.sales_person.id)
+        self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
+        self.assertEqual(
+            _documented_keys_mismatches(ExportFarmerVisitsResponseSerializer(), resp.data), []
+        )
 
     # -- dispatch receipts ----------------------------------------------------
 
@@ -393,13 +452,19 @@ class ExportApiTest(WebApiTestCase):
 
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         days = resp.data["results"]
-        self.assertEqual([day["date"] for day in days], [yesterday.isoformat(), self.today.isoformat()])
+        self.assertEqual(
+            [day["date"] for day in days], [yesterday.isoformat(), self.today.isoformat()]
+        )
         self.assertEqual([r["public_id"] for r in days[0]["raw_materials"]], [raw_old.public_id])
         self.assertEqual(days[0]["other_materials"], [])
         self.assertEqual([r["public_id"] for r in days[1]["raw_materials"]], [raw_new.public_id])
-        self.assertEqual([r["public_id"] for r in days[1]["other_materials"]], [other_new.public_id])
+        self.assertEqual(
+            [r["public_id"] for r in days[1]["other_materials"]], [other_new.public_id]
+        )
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
-        self.assertEqual(_documented_keys_mismatches(ExportInwardEntriesResponseSerializer(), resp.data), [])
+        self.assertEqual(
+            _documented_keys_mismatches(ExportInwardEntriesResponseSerializer(), resp.data), []
+        )
 
     # -- inventory snapshots --------------------------------------------------
 
@@ -443,9 +508,7 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual([r["bags"] for r in rows if r["kind"] == "bag"], [100, 90])
         self.assertEqual([r["packets"] for r in rows if r["kind"] == "loose"], [30, 25])
         # Counted figures only: the live position describes today, not the count day.
-        self.assertFalse(
-            _keys(rows) & {"packets_available", "reserved", "consumed", "available"}
-        )
+        self.assertFalse(_keys(rows) & {"packets_available", "reserved", "consumed", "available"})
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
         self.assertEqual(
             _documented_keys_mismatches(ExportInventorySnapshotsPageSerializer(), resp.data), []

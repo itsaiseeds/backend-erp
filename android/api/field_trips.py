@@ -12,8 +12,12 @@ from django.shortcuts import get_object_or_404
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.FieldTripOperations import field_trip_payload, field_trip_queryset
-from aggregator.models import FieldTrip
+from aggregator.FieldTripOperations import (
+    farmer_visit_queryset,
+    field_trip_payload,
+    field_trip_queryset,
+)
+from aggregator.models import FarmerVisit, FieldTrip
 
 from .base import AndroidBaseView
 
@@ -26,6 +30,16 @@ def own_field_trips(request: Request) -> QuerySet[FieldTrip]:
 def own_field_trip_or_404(request: Request, public_id: str) -> FieldTrip:
     """One of the caller's trips, or 404 -- including for somebody else's."""
     return get_object_or_404(own_field_trips(request), public_id=public_id)
+
+
+def own_farmer_visit_or_404(request: Request, public_id: str) -> FarmerVisit:
+    """A farmer recorded on one of the caller's trips, or 404 -- including for somebody else's."""
+    return get_object_or_404(
+        farmer_visit_queryset()
+        .select_related("field_trip__status")
+        .filter(field_trip__created_by=request.user),
+        public_id=public_id,
+    )
 
 
 class OwnFieldTripTransitionView(AndroidBaseView):

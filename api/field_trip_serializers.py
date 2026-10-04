@@ -84,6 +84,16 @@ class CreateFarmerVisitSerializer(serializers.Serializer):
         return value.strip()
 
 
+class EditFarmerVisitSerializer(serializers.Serializer):
+    """A correction to a recorded farmer. The name is the only editable field;
+    anything else sent is ignored."""
+
+    farmer_name = serializers.CharField(max_length=255)
+
+    def validate_farmer_name(self, value: str) -> str:
+        return value.strip()
+
+
 # -- Responses (schema only) ---------------------------------------------------
 
 

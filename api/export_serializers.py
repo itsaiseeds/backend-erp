@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from api.field_trip_serializers import (
+    FarmerVisitPayloadSerializer,
+    IdNameSerializer,
+    UserContactRefSerializer,
+)
 from api.inward_serializers import (
     InwardOtherMaterialPayloadSerializer,
     InwardRawMaterialPayloadSerializer,
@@ -52,9 +57,7 @@ class ExportOrderSerializer(serializers.Serializer):
     public_id = serializers.CharField()
     created_at = serializers.DateTimeField()
     client = ExportClientSerializer()
-    city = ExportCitySerializer(
-        allow_null=True, help_text="order -> delivery address -> city."
-    )
+    city = ExportCitySerializer(allow_null=True, help_text="order -> delivery address -> city.")
     delivery_address = serializers.CharField()
     status = serializers.CharField(allow_null=True)
     expected_delivery_date = serializers.DateField()
@@ -84,9 +87,7 @@ class ExportCustomOrderSerializer(serializers.Serializer):
     public_id = serializers.CharField()
     created_at = serializers.DateTimeField()
     client = ExportClientSerializer()
-    city = ExportCitySerializer(
-        allow_null=True, help_text="order -> delivery address -> city."
-    )
+    city = ExportCitySerializer(allow_null=True, help_text="order -> delivery address -> city.")
     delivery_address = serializers.CharField()
     status = serializers.CharField(allow_null=True)
     expected_delivery_date = serializers.DateField()
@@ -105,9 +106,7 @@ class ExportDispatchReceiptSerializer(DispatchChallanItemSerializer):
     """One row of ``export/dispatch-receipts``: a full challan plus the order's own facts."""
 
     order_created_at = serializers.DateTimeField()
-    city = ExportCitySerializer(
-        allow_null=True, help_text="order -> delivery address -> city."
-    )
+    city = ExportCitySerializer(allow_null=True, help_text="order -> delivery address -> city.")
 
 
 class ExportCustomDispatchReceiptSerializer(CustomDispatchChallanItemSerializer):
@@ -172,3 +171,21 @@ class ExportLooseSnapshotSerializer(serializers.Serializer):
     packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
     packets = serializers.IntegerField()
     total_weight = serializers.CharField(help_text="Kilograms.")
+
+
+# -- farmer visits -------------------------------------------------------------
+
+
+class ExportFarmerVisitFieldTripSerializer(serializers.Serializer):
+    """The trip a farmer was met on (``FieldTripOperations.farmer_visit_export_payload``)."""
+
+    public_id = serializers.CharField()
+    village = serializers.CharField()
+    city = IdNameSerializer()
+
+
+class ExportFarmerVisitSerializer(FarmerVisitPayloadSerializer):
+    """``FieldTripOperations.farmer_visit_export_payload``: a visit, its trip and sales person."""
+
+    field_trip = ExportFarmerVisitFieldTripSerializer()
+    sales_person = UserContactRefSerializer()
