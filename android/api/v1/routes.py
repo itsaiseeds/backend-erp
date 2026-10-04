@@ -34,6 +34,7 @@ from .GodownInwardOtherMaterialsView import GodownInwardOtherMaterialsView
 from .GodownInwardRawMaterialsView import GodownInwardRawMaterialsView
 from .GodownOtherMaterialRecipesView import GodownOtherMaterialRecipesView
 from .GodownOtherMaterialStockView import GodownOtherMaterialStockView
+from .GodownProductPackagingsView import GodownProductPackagingsView
 from .GodownRawMaterialStockView import GodownRawMaterialStockView
 from .GodownUpdateBagStockView import GodownUpdateBagStockView
 from .GodownUpdateSamplePacketStockView import GodownUpdateSamplePacketStockView
@@ -109,4 +110,5 @@ ROUTES: dict[str, type] = {
     "godown/export/inventory-snapshots": GodownExportInventorySnapshotsView,
     "godown/update-bag-stock": GodownUpdateBagStockView,
     "godown/update-sample-packet-stock": GodownUpdateSamplePacketStockView,
+    "godown/product-packagings": GodownProductPackagingsView,
 }

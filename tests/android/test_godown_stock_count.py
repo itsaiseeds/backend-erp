@@ -1,11 +1,11 @@
 """ORM-backed tests for the godown-manager stock-count endpoints.
 
-Covers what the four ``godown/...`` count endpoints *do* from the app: the
-readiness report, the sealed-bag count (POST/PATCH), the loose-packet count
-(POST/PATCH) and the interleaved export. Who may call them is owned by
-``tests/test_view_contracts.py``; the counting rules themselves are proven by
-the web inventory tests -- here we show the Android endpoints reach the same
-``InventoryOperations`` writes.
+Covers what the ``godown/...`` count endpoints *do* from the app: the
+packaging list the count is keyed by, the readiness report, the sealed-bag
+count (POST/PATCH), the loose-packet count (POST/PATCH) and the interleaved
+export. Who may call them is owned by ``tests/test_view_contracts.py``; the
+counting rules themselves are proven by the web inventory tests -- here we show
+the Android endpoints reach the same ``InventoryOperations`` writes.
 
 ``stock_ledger_guard`` is left **on**: every count in this module is written
 through the API, so the stock ledger must reconcile with the live figures once
@@ -37,6 +37,7 @@ CHECK_URL = BASE + "check-todays-inventory"
 BAGS_URL = BASE + "update-bag-stock"
 LOOSE_URL = BASE + "update-sample-packet-stock"
 EXPORT_URL = BASE + "export/inventory-snapshots"
+PACKAGINGS_URL = BASE + "product-packagings"
 
 
 def _keys(value) -> set[str]:
@@ -119,6 +120,40 @@ class GodownStockCountApiTest(AndroidApiTestCase):
             {"product": self.product.public_id, "packet_weight": weight, "packets": packets}
             for weight, packets in weights.items()
         ]
+
+    # -- the counter's picker ---------------------------------------------------
+
+    def test_the_packaging_list_is_exactly_what_the_count_accepts(self):
+        """The rows are the packagings ``update-bag-stock`` takes, and a frozen
+        product's drop out of the list just as they are refused by the count.
+
+        tests/android/test_godown_stock_count.py::GodownStockCountApiTest::test_the_packaging_list_is_exactly_what_the_count_accepts
+        """
+        resp = self.client.get(PACKAGINGS_URL)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        listed = {row["public_id"]: row for row in resp.data}
+        self.assertLessEqual({self.half_kg.public_id, self.one_kg.public_id}, set(listed))
+        row = listed[self.half_kg.public_id]
+        self.assertEqual(row["product"]["public_id"], self.product.public_id)
+        self.assertTrue(row["product"]["is_usable"])
+        self.assertEqual(row["packets"], 50)
+        self.assertEqual(float(row["total_weight"]), 25.0)
+        self.assertNotIn("id", row)
+
+        # The public_ids handed out are the keys the count takes.
+        counted = self._patch_bags({self.half_kg.public_id: 3})
+        self.assertEqual(counted.status_code, status.HTTP_200_OK, counted.data)
+
+        self.product.is_usable = False
+        self.product.save(update_fields=["is_usable"])
+        default_ids = {r["public_id"] for r in self.client.get(PACKAGINGS_URL).data}
+        self.assertNotIn(self.half_kg.public_id, default_ids)
+        frozen_ids = {
+            r["public_id"]
+            for r in self.client.get(PACKAGINGS_URL, {"is_usable": "false"}).data
+        }
+        self.assertIn(self.half_kg.public_id, frozen_ids)
 
     # -- counting ---------------------------------------------------------------
 
