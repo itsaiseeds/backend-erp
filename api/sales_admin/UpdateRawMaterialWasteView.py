@@ -1,4 +1,4 @@
-"""Raw material waste edit/delete endpoint: ``PATCH`` / ``DELETE`` on ``raw-material-waste/<public_id>``.
+"""Raw material waste edit/delete endpoint: ``PATCH`` / ``DELETE`` on one waste row.
 
 Path: ``/api/sales-admin/raw-material-waste/<public_id>``.
 

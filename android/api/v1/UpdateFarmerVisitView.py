@@ -1,8 +1,8 @@
 """Farmer-visit edit endpoint: ``PATCH /android/api/v1/edit-farmer-visit/<public_id>``.
 
-The sales person corrects a farmer they recorded -- the name, contact
-number, village, land, crops and products, any subset (a field that is sent may not be blank) -- and only
-while the trip the farmer was recorded on is IN_PROGRESS. A
+The sales person corrects a farmer they recorded -- the name, contact number,
+village, land, crops and products, any subset (a field that is sent may not be
+blank) -- and only while the trip the farmer was recorded on is IN_PROGRESS. A
 farmer on someone else's trip is a 404; on a trip in any other status, a 400.
 """
 
@@ -34,7 +34,7 @@ class UpdateFarmerVisitView(AndroidBaseView):
     """Edit a farmer recorded on the caller's in-progress field trip."""
 
     @extend_schema(
-        summary="Edit a farmer (name, contact, village, land, crops, products) on my in-progress field trip",
+        summary="Edit a farmer on my in-progress field trip",
         request=EditFarmerVisitSerializer,
         parameters=[FARMER_VISIT_PUBLIC_ID_PARAMETER],
         responses={200: FarmerVisitPayloadSerializer},

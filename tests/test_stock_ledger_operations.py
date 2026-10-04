@@ -262,6 +262,29 @@ class StockLedgerOperationsTest(LedgerWorldTestCase):
             Decimal("-15"),
         )
 
+    def test_waste_edited_records_the_difference(self):
+        """tests/test_stock_ledger_operations.py::StockLedgerOperationsTest::test_waste_edited_records_the_difference"""
+        waste = inv.record_raw_waste(
+            product=self.product, quantity_kg=Decimal("15"), reason="spill", actor=self.su
+        )
+
+        before = self.marker()
+        inv.update_raw_waste(waste, actor=self.su, quantity_kg=Decimal("20"))
+        self.assertEqual(self.kinds_since(before), [("RAW_WASTED", "WASTE_EDITED")])
+        event = self.events_since(before)[0]
+        self.assertEqual(event.raw_material_waste_id, waste.pk)
+        self.assertEqual(line_for(event, StockPoolKind.RAW).d_wasted, Decimal("5"))
+
+        before = self.marker()
+        inv.update_raw_waste(waste, actor=self.su, quantity_kg=Decimal("8"))
+        self.assertEqual(
+            line_for(self.events_since(before)[0], StockPoolKind.RAW).d_wasted, Decimal("-12")
+        )
+
+        before = self.marker()
+        inv.update_raw_waste(waste, actor=self.su, reason="rain")
+        self.assertEqual(self.kinds_since(before), [])
+
     # -- counts ----------------------------------------------------------------------
 
     def test_count_classification_and_deletion(self):

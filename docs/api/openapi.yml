@@ -4222,22 +4222,9 @@ paths:
   /api/sales-admin/products:
     get:
       operationId: api_sales_admin_products_list
-      description: 'Usable products only by default, so this list is safe to use as
-        a dropdown: a frozen product (``is_usable`` false) is never offered. The product
-        management page asks for the frozen ones with ``?is_usable=all`` (everything)
-        or ``?is_usable=false`` (only frozen), so an admin can switch one back on.'
+      description: Every product, usable or frozen -- the product management page.
+        The rows carry no freeze flag; it is switched with PATCH.
       summary: List products
-      parameters:
-      - in: query
-        name: is_usable
-        schema:
-          type: string
-          enum:
-          - all
-          - 'false'
-          - 'true'
-        description: '``true`` (default): usable only. ``false``: frozen only. ``all``:
-          both.'
       tags:
       - Admin · Master data
       security:
@@ -4249,7 +4236,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ProductPayload'
+                  $ref: '#/components/schemas/ProductListItem'
           description: ''
     post:
       operationId: api_sales_admin_products_create
@@ -10172,6 +10159,39 @@ components:
       - public_id
       - selling_price
       - total_weight
+    ProductListItem:
+      type: object
+      description: 'One row of the product list: the product payload without the freeze
+        flag.'
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        crop:
+          $ref: '#/components/schemas/CropRef'
+        stage:
+          $ref: '#/components/schemas/StageRef'
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Rate per kilogram; packet and bag prices derive from it and
+            the weight sold.
+        image_url:
+          type: string
+        description_items:
+          type: array
+          items:
+            type: string
+      required:
+      - crop
+      - description_items
+      - image_url
+      - name
+      - public_id
+      - selling_price
+      - stage
     ProductPayload:
       type: object
       description: Output shape for one product row.
