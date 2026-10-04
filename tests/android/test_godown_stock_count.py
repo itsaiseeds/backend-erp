@@ -124,11 +124,15 @@ class GodownStockCountApiTest(AndroidApiTestCase):
     # -- the counter's picker ---------------------------------------------------
 
     def test_the_packaging_list_is_exactly_what_the_count_accepts(self):
-        """The rows are the packagings ``update-bag-stock`` takes, and a frozen
-        product's drop out of the list just as they are refused by the count.
+        """The rows are the packagings ``update-bag-stock`` takes, each labelled
+        with its product image, and a frozen product's drop out of the list just
+        as they are refused by the count.
 
         tests/android/test_godown_stock_count.py::GodownStockCountApiTest::test_the_packaging_list_is_exactly_what_the_count_accepts
         """
+        self.product.image_url = "/media/products/godown-pbw-725.jpg"
+        self.product.save(update_fields=["image_url"])
+
         resp = self.client.get(PACKAGINGS_URL)
 
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
@@ -137,6 +141,8 @@ class GodownStockCountApiTest(AndroidApiTestCase):
         row = listed[self.half_kg.public_id]
         self.assertEqual(row["product"]["public_id"], self.product.public_id)
         self.assertTrue(row["product"]["is_usable"])
+        # The picture comes with the row: no second lookup to label a bag.
+        self.assertEqual(row["product"]["image_url"], "/media/products/godown-pbw-725.jpg")
         self.assertEqual(row["packets"], 50)
         self.assertEqual(float(row["total_weight"]), 25.0)
         self.assertNotIn("id", row)

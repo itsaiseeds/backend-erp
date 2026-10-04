@@ -1300,7 +1300,8 @@ paths:
       description: Packagings of usable products only by default, so this list is
         the set of packagings ``update-bag-stock`` will accept. ``?is_usable=all``
         (or ``false``) also returns the packagings of frozen products, which cannot
-        be counted.
+        be counted. Each row carries its product's ``image_url`` so the app needs
+        no second lookup.
       summary: List product packagings (filter by product usability)
       parameters:
       - in: query
@@ -1324,7 +1325,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ProductPackagingPayload'
+                  $ref: '#/components/schemas/GodownProductPackagingPayload'
           description: ''
   /android/api/v1/godown/raw-material-stock:
     get:
@@ -8670,6 +8671,54 @@ components:
       - name
       - phone_number
       - role
+    GodownPackagingProductRef:
+      type: object
+      description: The product a packaging belongs to, plus the picture the app shows.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        is_usable:
+          type: boolean
+        image_url:
+          type: string
+          description: Product picture; empty when the product has no image set.
+      required:
+      - image_url
+      - is_usable
+      - name
+      - public_id
+    GodownProductPackagingPayload:
+      type: object
+      description: The web row plus ``product.image_url`` (schema only).
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/GodownPackagingProductRef'
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        packets:
+          type: integer
+          minimum: 1
+        total_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,3})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - selling_price
+      - total_weight
     IdName:
       type: object
       description: An ``{id, name}`` reference (a city, a crop).
