@@ -1,4 +1,4 @@
-"""ORM-backed tests for the raw-material waste endpoints (list/create + delete).
+"""ORM-backed tests for the raw-material waste endpoints (list/create + patch + delete).
 
 Uses the ``WebApiTestCase`` baseline (DML-seeded, superuser phone ``9999999999``)
 and adds its own app admin in ``setUpTestData``. The product (SAI-33, whose bag
@@ -260,6 +260,67 @@ class RawMaterialWasteApiTest(WebApiTestCase):
         self.assertEqual(self.client.delete(url).status_code, status.HTTP_404_NOT_FOUND)
         listed = self.client.get(WASTES_URL).data["results"]
         self.assertNotIn(created.data["public_id"], {row["public_id"] for row in listed})
+
+    def test_patching_waste_changes_quantity_and_reason_within_available_raw(self):
+        """PATCH edits kg / reason; the pool follows, and an overdraw is refused unchanged.
+
+        tests/test_raw_material_waste_api.py::RawMaterialWasteApiTest::test_patching_waste_changes_quantity_and_reason_within_available_raw
+        """
+        self.login_as(self.seed_admin)
+        self._stock_in("100")
+        created = self._waste(quantity_kg="10")
+        url = f"{WASTE_URL}/{created.data['public_id']}"
+
+        lowered = self.client.patch(url, {"quantity_kg": "4"}, format="json")
+        self.assertEqual(lowered.status_code, status.HTTP_200_OK, lowered.content)
+        self.assertEqual(lowered.data["quantity_kg"], "4.000")
+        self.assertEqual(lowered.data["reason"], "rain damage")
+        self.assertEqual(self._stock_line()["available_kg"], "96.000")
+
+        reason_only = self.client.patch(url, {"reason": " spilled "}, format="json")
+        self.assertEqual(reason_only.data["reason"], "spilled")
+        self.assertEqual(reason_only.data["quantity_kg"], "4.000")
+        cleared = self.client.patch(url, {"reason": ""}, format="json")
+        self.assertEqual(cleared.status_code, status.HTTP_200_OK)
+        self.assertEqual(cleared.data["reason"], "")
+
+        raised = self.client.patch(url, {"quantity_kg": "100"}, format="json")
+        self.assertEqual(raised.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._stock_line()["available_kg"], "0.000")
+
+        overdraw = self.client.patch(url, {"quantity_kg": "100.001"}, format="json")
+        self.assertEqual(overdraw.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            RawMaterialWaste.objects.get(public_id=created.data["public_id"]).quantity_kg,
+            Decimal("100.000"),
+        )
+        self.assertEqual(self._stock_line()["available_kg"], "0.000")
+
+    def test_patching_waste_rejects_bad_bodies_and_missing_rows(self):
+        """Empty / zero / negative / blank kg are 400s; a deleted or unknown row is 404.
+
+        tests/test_raw_material_waste_api.py::RawMaterialWasteApiTest::test_patching_waste_rejects_bad_bodies_and_missing_rows
+        """
+        self.login_as(self.seed_admin)
+        self._stock_in("100")
+        created = self._waste(quantity_kg="10")
+        url = f"{WASTE_URL}/{created.data['public_id']}"
+
+        for bad in ({}, {"quantity_kg": "0"}, {"quantity_kg": "-1"}, {"quantity_kg": ""}):
+            with self.subTest(bad=bad):
+                response = self.client.patch(url, bad, format="json")
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self._stock_line()["available_kg"], "90.000")
+
+        ignored = self.client.patch(url, {"product": "P-OTHER", "quantity_kg": "5"}, format="json")
+        self.assertEqual(ignored.status_code, status.HTTP_200_OK)
+        self.assertEqual(ignored.data["product"]["public_id"], self.product.public_id)
+
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT)
+        gone = self.client.patch(url, {"quantity_kg": "1"}, format="json")
+        self.assertEqual(gone.status_code, status.HTTP_404_NOT_FOUND)
+        unknown = self.client.patch(f"{WASTE_URL}/WS-NOPE", {"quantity_kg": "1"}, format="json")
+        self.assertEqual(unknown.status_code, status.HTTP_404_NOT_FOUND)
 
     # -- listing --------------------------------------------------------------
 

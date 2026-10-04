@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime
 from decimal import Decimal
+from functools import partial
 
 from aggregator import InventoryOperations as inv
 from aggregator import InwardOperations
@@ -82,9 +83,9 @@ class StockLedgerOperationsTest(LedgerWorldTestCase):
         )
 
         for label, release, detail in (
-            ("unverify", unverify_order, "UNVERIFIED"),
-            ("hold", hold_order, "HELD"),
-            ("reject", reject_order, "REJECTED"),
+            ("unverify", partial(unverify_order, actor=self.su), "UNVERIFIED"),
+            ("hold", partial(hold_order, actor=self.su), "HELD"),
+            ("reject", partial(reject_order, actor=self.su), "REJECTED"),
         ):
             with self.subTest(release=label):
                 if order.status.code != "CONFIRMED":
@@ -114,7 +115,7 @@ class StockLedgerOperationsTest(LedgerWorldTestCase):
         self.assertEqual((line.d_reserved, line.d_consumed), (-3, 3))
 
         before = self.marker()
-        revert_dispatch(order)
+        revert_dispatch(order, actor=self.su)
         self.assertEqual(self.kinds_since(before), [("DISPATCH_REVERTED", "NONE")])
         line = line_for(self.events_since(before)[0], StockPoolKind.BAG)
         self.assertEqual((line.d_reserved, line.d_consumed), (3, -3))
@@ -128,7 +129,7 @@ class StockLedgerOperationsTest(LedgerWorldTestCase):
         order = self.order(self.pp1, 2)
         self.dispatch(order, self.pp1)
         before = self.marker()
-        mark_delivered(order)
+        mark_delivered(order, actor=self.su)
         self.assertEqual(self.kinds_since(before), [])
 
     def test_editing_a_confirmed_order_is_recorded_and_an_unverified_one_is_not(self):
@@ -261,6 +262,29 @@ class StockLedgerOperationsTest(LedgerWorldTestCase):
             Decimal("-15"),
         )
 
+    def test_waste_edited_records_the_difference(self):
+        """tests/test_stock_ledger_operations.py::StockLedgerOperationsTest::test_waste_edited_records_the_difference"""
+        waste = inv.record_raw_waste(
+            product=self.product, quantity_kg=Decimal("15"), reason="spill", actor=self.su
+        )
+
+        before = self.marker()
+        inv.update_raw_waste(waste, actor=self.su, quantity_kg=Decimal("20"))
+        self.assertEqual(self.kinds_since(before), [("RAW_WASTED", "WASTE_EDITED")])
+        event = self.events_since(before)[0]
+        self.assertEqual(event.raw_material_waste_id, waste.pk)
+        self.assertEqual(line_for(event, StockPoolKind.RAW).d_wasted, Decimal("5"))
+
+        before = self.marker()
+        inv.update_raw_waste(waste, actor=self.su, quantity_kg=Decimal("8"))
+        self.assertEqual(
+            line_for(self.events_since(before)[0], StockPoolKind.RAW).d_wasted, Decimal("-12")
+        )
+
+        before = self.marker()
+        inv.update_raw_waste(waste, actor=self.su, reason="rain")
+        self.assertEqual(self.kinds_since(before), [])
+
     # -- counts ----------------------------------------------------------------------
 
     def test_count_classification_and_deletion(self):
@@ -352,7 +376,7 @@ class StockLedgerOperationsTest(LedgerWorldTestCase):
         """tests/test_stock_ledger_operations.py::StockLedgerOperationsTest::test_every_stored_detail_is_legal_for_its_event_type"""
         order = self.order(self.pp1, 3)
         self.dispatch(order, self.pp1, shipped=2)
-        revert_dispatch(order)
+        revert_dispatch(order, actor=self.su)
         self.count_bags({self.pp1: 40})
         self.pouches("10")
         inv.record_raw_waste(product=self.product, quantity_kg=Decimal("1"), reason="", actor=self.su)

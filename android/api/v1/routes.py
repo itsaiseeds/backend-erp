@@ -54,6 +54,7 @@ from .SalesPersonCatalogueView import SalesPersonCatalogueView
 from .StartFieldTripView import StartFieldTripView
 from .StatesView import StatesView
 from .UpdateClientView import UpdateClientView
+from .UpdateFarmerVisitView import UpdateFarmerVisitView
 from .UpdateFieldTripView import UpdateFieldTripView
 from .UpdateGodownInwardOtherMaterialView import UpdateGodownInwardOtherMaterialView
 from .UpdateGodownInwardRawMaterialView import UpdateGodownInwardRawMaterialView
@@ -96,6 +97,7 @@ ROUTES: dict[str, type] = {
     "delete-field-trip/<public_id>": DeleteFieldTripView,
     "field-trip-farmer-visits/<public_id>": GetFieldTripFarmerVisitsView,
     "create-farmer-visit": CreateFarmerVisitView,
+    "edit-farmer-visit/<public_id>": UpdateFarmerVisitView,
     "godown/raw-material-stock": GodownRawMaterialStockView,
     "godown/other-material-stock": GodownOtherMaterialStockView,
     "godown/inward-raw-materials": GodownInwardRawMaterialsView,

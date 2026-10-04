@@ -217,6 +217,24 @@ class ClientModelTest(DMLTestCase):
                 self.sp_user,
             )
 
+    def test_sync_client_addresses_rejects_a_pincode_filed_under_another_city(self):
+        """A code is unique, so re-using one under a second city is a 400 rather
+        than a duplicate row.
+
+        tests/test_client_model.py::ClientModelTest::test_sync_client_addresses_rejects_a_pincode_filed_under_another_city
+        """
+        client = create_client(
+            company_name="Acme", gst_number="27AAPFU0939F1ZV", actor=self.sp_user
+        )
+        other_city = City.objects.create(name="Nagpur", state=self.state, created_by=self.su)
+
+        with self.assertRaises(ValidationError):
+            sync_client_addresses(
+                client, [self._sync_item(city=other_city)], self.sp_user
+            )
+
+        assert Pincode.objects.filter(code="411001").count() == 1
+
     def test_sync_client_addresses_rejects_a_mismatch_even_on_an_unchanged_row(self):
         """The declarative sync matches an unchanged address by (line, pincode,
         city); the submitted state/country is still validated so a mismatch is a

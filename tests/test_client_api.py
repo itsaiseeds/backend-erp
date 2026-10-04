@@ -64,7 +64,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
 
         cls.admin_user = User.objects.create_user(
             phone_number="9000000002",
-            name="Sales Admin",
+            name="Asha Rao",
             is_verified=True,
             created_by=cls.superuser,
             verified_by=cls.superuser,
@@ -155,7 +155,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
         notification = Notification.objects.get(recipient=self.sales_person)
         self.assertEqual(notification.event_type, "CLIENT_VERIFIED")
         self.assertEqual(notification.title, "Client verified")
-        self.assertEqual(notification.body, "Acme Seeds was verified.")
+        self.assertEqual(notification.body, "Acme Seeds was verified by Asha Rao.")
         self.assertEqual(notification.data, {"client_public_id": self.pending.public_id})
         tokens, title, body, data = send.call_args.args
         self.assertEqual(tokens, ["phone-1"])
@@ -178,7 +178,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "VERIFIED")
         self.assertTrue(response.data["is_verified"])
-        self.assertEqual(response.data["verified_by"], "Sales Admin")
+        self.assertEqual(response.data["verified_by"], "Asha Rao")
         self.assertIsNotNone(response.data["verified_at"])
 
         repeat = self.client.post(VERIFY_CLIENT_URL, body, format="json")
@@ -409,7 +409,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
         )
 
         card = self.client.get(GET_CLIENTS_URL).data["results"][0]
-        self.assertEqual(card["verified_by"], "Sales Admin")
+        self.assertEqual(card["verified_by"], "Asha Rao")
 
     def test_verified_by_options_skip_clients_nobody_has_verified(self):
         """tests/test_client_api.py::SalesAdminClientApiTest::test_verified_by_options_skip_clients_nobody_has_verified"""
@@ -430,7 +430,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
 
         self.assertEqual(
             verified_by_options(),
-            [{"value": self.admin_user.id, "label": "Sales Admin"}],
+            [{"value": self.admin_user.id, "label": "Asha Rao"}],
         )
 
     def test_every_declared_filter_narrows_the_list(self):

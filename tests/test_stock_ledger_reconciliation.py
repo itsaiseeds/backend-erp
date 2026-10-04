@@ -240,13 +240,14 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
         picked = self._pick(rng, {"DISPATCHED"})
         if picked is None:
             return False
-        revert_dispatch(picked[0])
+        revert_dispatch(picked[0], actor=self.su)
 
     def op_release(self, rng):
         picked = self._pick(rng, {"CONFIRMED"})
         if picked is None:
             return False
-        rng.choice([hold_order, unverify_order, reject_order])(picked[0])
+        release = rng.choice([hold_order, unverify_order, reject_order])
+        release(picked[0], actor=self.su)
 
     def op_edit(self, rng):
         picked = self._pick(rng, {"CONFIRMED", "BOOKED"})
@@ -261,7 +262,7 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
         picked = self._pick(rng, {"DISPATCHED"})
         if picked is None:
             return False
-        mark_delivered(picked[0])
+        mark_delivered(picked[0], actor=self.su)
 
     def op_custom(self, rng):
         product = self._product(rng)

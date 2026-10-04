@@ -29,6 +29,7 @@ END_URL = BASE + "end-field-trip/{public_id}"
 DELETE_URL = BASE + "delete-field-trip/{public_id}"
 VISITS_URL = BASE + "field-trip-farmer-visits/{public_id}"
 CREATE_VISIT_URL = BASE + "create-farmer-visit"
+EDIT_VISIT_URL = BASE + "edit-farmer-visit/{public_id}"
 CROPS_URL = BASE + "utilities/crops"
 PRODUCTS_URL = BASE + "utilities/products"
 
@@ -220,6 +221,102 @@ class AndroidFieldTripApiTest(FieldTripFixtures, AndroidApiTestCase):
         late = self._visit_body(trip, contact_number="9876500004")
         response = self.client.post(CREATE_VISIT_URL, late, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_edit_farmer_visit_renames_only_while_the_trip_is_in_progress(self):
+        """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_edit_farmer_visit_renames_only_while_the_trip_is_in_progress"""
+        trip = self.make_trip(status=StatusIds.IN_PROGRESS)
+        visit = self.make_visit(trip)
+        url = EDIT_VISIT_URL.format(public_id=visit.public_id)
+
+        response = self.client.patch(
+            url, {"farmer_name": " Suresh Patel ", "field_trip_public_id": "FT-OTHER"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["farmer_name"], "Suresh Patel")
+        visit.refresh_from_db()
+        self.assertEqual(visit.contact_number, "9876500001")
+        self.assertEqual(visit.field_trip_id, trip.pk)
+
+        blank = self.client.patch(url, {"farmer_name": "  "}, format="json")
+        self.assertEqual(blank.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.client.post(END_URL.format(public_id=trip.public_id))
+        late = self.client.patch(url, {"farmer_name": "Late"}, format="json")
+        self.assertEqual(late.status_code, status.HTTP_400_BAD_REQUEST)
+        visit.refresh_from_db()
+        self.assertEqual(visit.farmer_name, "Suresh Patel")
+
+    def test_edit_farmer_visit_is_partial_and_required_fields_stay_filled(self):
+        """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_edit_farmer_visit_is_partial_and_required_fields_stay_filled"""
+        trip = self.make_trip(status=StatusIds.IN_PROGRESS)
+        visit = self.make_visit(trip)
+        url = EDIT_VISIT_URL.format(public_id=visit.public_id)
+
+        crops_only = self.client.patch(url, {"crop_ids": [self.bajari.id]}, format="json")
+        self.assertEqual(crops_only.status_code, status.HTTP_200_OK)
+        body = crops_only.json()
+        self.assertEqual(body["farmer_name"], "Ramesh Patel")
+        self.assertEqual([c["id"] for c in body["crops"]], [self.bajari.id])
+
+        no_products = self.client.patch(url, {"product_public_ids": []}, format="json")
+        self.assertEqual(no_products.status_code, status.HTTP_200_OK)
+        self.assertEqual(no_products.json()["products"], [])
+        self.assertEqual([c["id"] for c in no_products.json()["crops"]], [self.bajari.id])
+
+        restored = self.client.patch(
+            url, {"crop_ids": [self.castor.id, self.bajari.id]}, format="json"
+        )
+        self.assertEqual(len(restored.json()["crops"]), 2)
+
+        for bad in ({}, {"farmer_name": ""}, {"farmer_name": None}, {"crop_ids": []}):
+            with self.subTest(bad=bad):
+                response = self.client.patch(url, bad, format="json")
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        visit.refresh_from_db()
+        self.assertEqual(visit.farmer_name, "Ramesh Patel")
+
+    def test_edit_farmer_visit_changes_contact_village_and_land(self):
+        """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_edit_farmer_visit_changes_contact_village_and_land"""
+        trip = self.make_trip(status=StatusIds.IN_PROGRESS)
+        visit = self.make_visit(trip)
+        other = self.make_visit(trip, contact_number="9876500002")
+        url = EDIT_VISIT_URL.format(public_id=visit.public_id)
+
+        ok = self.client.patch(
+            url,
+            {"contact_number": "9876500003", "village": " New Village ", "land_area_bigha": "4.5"},
+            format="json",
+        )
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+        body = ok.json()
+        self.assertEqual(body["contact_number"], "9876500003")
+        self.assertEqual(body["village"], "New Village")
+        self.assertEqual(body["land_area_bigha"], "4.5000")
+        self.assertEqual(body["farmer_name"], "Ramesh Patel")
+
+        same = self.client.patch(url, {"contact_number": "9876500003"}, format="json")
+        self.assertEqual(same.status_code, status.HTTP_200_OK)
+
+        for bad in (
+            {"contact_number": other.contact_number},
+            {"contact_number": "123"},
+            {"village": " "},
+            {"land_area_bigha": "-1"},
+        ):
+            with self.subTest(bad=bad):
+                response = self.client.patch(url, bad, format="json")
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_another_sales_persons_farmer_visit_is_not_found(self):
+        """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_another_sales_persons_farmer_visit_is_not_found"""
+        theirs = self.make_trip(owner=self.other_sales_person, status=StatusIds.IN_PROGRESS)
+        visit = self.make_visit(theirs)
+        response = self.client.patch(
+            EDIT_VISIT_URL.format(public_id=visit.public_id), {"farmer_name": "X"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        visit.refresh_from_db()
+        self.assertEqual(visit.farmer_name, "Ramesh Patel")
 
     def test_utilities_return_every_crop_and_product_unpaginated(self):
         """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_utilities_return_every_crop_and_product_unpaginated"""

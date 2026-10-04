@@ -52,7 +52,10 @@ class FieldTripLifecycleTest(FieldTripFixtures, DMLTestCase):
         """tests/test_field_trip_operations.py::FieldTripLifecycleTest::test_each_verb_refuses_every_other_status"""
         verbs = {
             "approve": (lambda trip: ops.approve_field_trip(trip, self.admin_user), {"PLANNED"}),
-            "unapprove": (ops.unapprove_field_trip, {"APPROVED"}),
+            "unapprove": (
+                lambda trip: ops.unapprove_field_trip(trip, self.admin_user),
+                {"APPROVED"},
+            ),
             "start": (ops.start_field_trip, {"APPROVED"}),
             "end": (ops.end_field_trip, {"IN_PROGRESS"}),
             "admin edit": (
@@ -85,7 +88,7 @@ class FieldTripLifecycleTest(FieldTripFixtures, DMLTestCase):
     def test_unapprove_clears_the_approval(self):
         """tests/test_field_trip_operations.py::FieldTripLifecycleTest::test_unapprove_clears_the_approval"""
         trip = self.make_trip(status=StatusIds.APPROVED)
-        ops.unapprove_field_trip(trip)
+        ops.unapprove_field_trip(trip, self.admin_user)
         trip.refresh_from_db()
         self.assertEqual(trip.status_code, "PLANNED")
         self.assertIsNone(trip.approved_by)

@@ -302,7 +302,7 @@ class InventoryOperationsTest(DMLTestCase):
         verify_order(order, self.stock_admin)
         assert inv.available_bags(self.pack) == 397
 
-        unverify_order(order)
+        unverify_order(order, actor=self.stock_admin)
         assert order.verified_by_id is None
         assert order.verified_at is None
         assert order.status.code == "UNDER_REVIEW"
@@ -320,7 +320,7 @@ class InventoryOperationsTest(DMLTestCase):
         assert inv.consumed_bags(self.pack) == 5
         assert inv.available_bags(self.pack) == 395
 
-        revert_dispatch(order)
+        revert_dispatch(order, actor=self.stock_admin)
         assert inv.reserved_bags(self.pack) == 5
         assert inv.consumed_bags(self.pack) == 0
         assert inv.available_bags(self.pack) == 395

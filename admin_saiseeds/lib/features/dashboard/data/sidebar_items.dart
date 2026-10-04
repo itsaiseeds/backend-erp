@@ -104,6 +104,16 @@ class SidebarItems {
       label: AppStrings.OTHER_MATERIAL_STOCK,
       icon: Icons.layers_outlined,
     ),
+    SidebarItemModel(
+      id: TabIds.FIELD_TRIPS,
+      label: AppStrings.FIELD_TRIPS,
+      icon: Icons.map_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.FARMERS,
+      label: AppStrings.FARMERS,
+      icon: Icons.agriculture_outlined,
+    ),
   ];
 
   static const SidebarWorkspaceModel OPERATIONS = SidebarWorkspaceModel(
@@ -164,6 +174,11 @@ class SidebarItems {
         id: 'setup-onboarding',
         label: AppStrings.GROUP_ONBOARDING,
         itemIds: [TabIds.CLIENTS, TabIds.PARTIES],
+      ),
+      SidebarGroupModel(
+        id: 'setup-farmer-trips',
+        label: AppStrings.GROUP_FARMER_TRIPS,
+        itemIds: [TabIds.FIELD_TRIPS, TabIds.FARMERS],
       ),
       SidebarGroupModel(
         id: 'setup-users',

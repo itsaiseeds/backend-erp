@@ -595,7 +595,7 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
         self._confirm(bags=5)
         edited = self._patch({"special_comments": "address was unlinked"})
         self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
-        hold_order(on_hold)
+        hold_order(on_hold, actor=self.admin_user)
         self._dispatch(self.order)
 
         self.order.refresh_from_db()
@@ -623,7 +623,7 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
         verify_order(order, self.admin_user)
         edited = self._patch({"special_comments": "agency was unlinked"}, order=order)
         self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
-        hold_order(order)
+        hold_order(order, actor=self.admin_user)
 
         order.refresh_from_db()
         self.assertEqual(order.status.code, "ON_HOLD")

@@ -19,6 +19,7 @@ from .DispatchCustomOrderView import DispatchCustomOrderView
 from .DispatchOrderView import DispatchOrderView
 from .ExportCustomOrdersView import ExportCustomOrdersView
 from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
+from .ExportFarmerVisitsView import ExportFarmerVisitsView
 from .ExportInventorySnapshotsView import ExportInventorySnapshotsView
 from .ExportInwardEntriesView import ExportInwardEntriesView
 from .ExportOrdersView import ExportOrdersView
@@ -28,6 +29,7 @@ from .GetClientView import GetClientView
 from .GetCustomOrdersView import GetCustomOrdersView
 from .GetDispatchChallansView import GetDispatchChallansView
 from .GetDispatchLotNumbersView import GetDispatchLotNumbersView
+from .GetFarmersView import GetFarmersView
 from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
@@ -258,6 +260,9 @@ urlpatterns = [
         GetFieldTripFarmerVisitsView.as_view(),
         name="field-trip-farmer-visits",
     ),
+    # Farmers are not a trip's rows: one farmer across every trip, deduped by
+    # contact number, so the list is a collection of its own.
+    path("farmers/", GetFarmersView.as_view(), name="farmers"),
     path(
         "edit-field-trip/<str:public_id>",
         UpdateFieldTripView.as_view(),
@@ -350,6 +355,11 @@ urlpatterns = [
         "export/dispatch-receipts",
         ExportDispatchReceiptsView.as_view(),
         name="export-dispatch-receipts",
+    ),
+    path(
+        "export/farmer-visits",
+        ExportFarmerVisitsView.as_view(),
+        name="export-farmer-visits",
     ),
     path(
         "export/inward-entries",

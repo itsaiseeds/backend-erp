@@ -412,7 +412,7 @@ def assert_stock_covers(
         )
 
 
-def hold_order(order: Order) -> Order:
+def hold_order(order: Order, *, actor: User) -> Order:
     """Put ``order`` on hold.
 
     A held order reserves nothing: reservations are derived from the status, so
@@ -426,11 +426,11 @@ def hold_order(order: Order) -> Order:
         source=order,
     ):
         update_order_status(order, StatusIds.ON_HOLD)
-    notify_order_event(order, NotificationEvent.ORDER_ON_HOLD)
+    notify_order_event(order, NotificationEvent.ORDER_ON_HOLD, actor=actor)
     return order
 
 
-def reject_order(order: Order) -> Order:
+def reject_order(order: Order, *, actor: User) -> Order:
     """Reject ``order``. Terminal: no verb moves an order out of REJECTED."""
     assert_order_status(order, REJECTABLE_STATUS_CODES, "reject")
     with recording(
@@ -440,7 +440,7 @@ def reject_order(order: Order) -> Order:
         source=order,
     ):
         update_order_status(order, StatusIds.REJECTED)
-    notify_order_event(order, NotificationEvent.ORDER_REJECTED)
+    notify_order_event(order, NotificationEvent.ORDER_REJECTED, actor=actor)
     return order
 
 
@@ -568,7 +568,7 @@ def dispatch_order(
         )
         update_order_status(order, StatusIds.DISPATCHED)
         rec.detail = dispatch_detail(order)
-    notify_order_event(order, NotificationEvent.ORDER_DISPATCHED)
+    notify_order_event(order, NotificationEvent.ORDER_DISPATCHED, actor=actor)
     return order
 
 
@@ -614,12 +614,14 @@ def verify_order(order: Order, admin: User) -> Order:
         order.verified_at = indian_now()
         order.full_clean()
         order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
-    notify_order_event(order, NotificationEvent.ORDER_CONFIRMED)
+    notify_order_event(order, NotificationEvent.ORDER_CONFIRMED, actor=admin)
     return order
 
 
 @transaction.atomic
-def unverify_order(order: Order, *, status: StatusIds = StatusIds.UNDER_REVIEW) -> Order:
+def unverify_order(
+    order: Order, *, actor: User, status: StatusIds = StatusIds.UNDER_REVIEW
+) -> Order:
     """Reverse a verification, clearing who verified it and when.
 
     The bags this order was holding are released automatically: reservations
@@ -640,11 +642,11 @@ def unverify_order(order: Order, *, status: StatusIds = StatusIds.UNDER_REVIEW) 
         order.verified_at = None
         order.full_clean()
         order.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
-    notify_order_event(order, NotificationEvent.ORDER_UNDER_REVIEW)
+    notify_order_event(order, NotificationEvent.ORDER_UNDER_REVIEW, actor=actor)
     return order
 
 
-def revert_dispatch(order: Order) -> Order:
+def revert_dispatch(order: Order, *, actor: User) -> Order:
     """Reverse a dispatch, returning the order to ``CONFIRMED``.
 
     Its bags move back from consumed to reserved on their own, for the same
@@ -685,12 +687,12 @@ def revert_dispatch(order: Order) -> Order:
         order.actual_delivery_date = None
         order.full_clean()
         order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
-    notify_order_event(order, NotificationEvent.ORDER_DISPATCH_REVERTED)
+    notify_order_event(order, NotificationEvent.ORDER_DISPATCH_REVERTED, actor=actor)
     return order
 
 
 @transaction.atomic
-def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
+def mark_delivered(order: Order, actual_delivery_date=None, *, actor: User) -> Order:
     """Mark a dispatched order delivered (refused while a product on it is not usable)."""
     assert_order_status(order, DELIVERABLE_STATUS_CODES, "deliver")
     assert_products_usable(
@@ -700,7 +702,7 @@ def mark_delivered(order: Order, actual_delivery_date=None) -> Order:
     order.actual_delivery_date = actual_delivery_date or indian_now().date()
     order.full_clean()
     order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
-    notify_order_event(order, NotificationEvent.ORDER_DELIVERED)
+    notify_order_event(order, NotificationEvent.ORDER_DELIVERED, actor=actor)
     return order
 
 

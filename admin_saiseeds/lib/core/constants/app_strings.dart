@@ -122,6 +122,8 @@ class AppStrings {
   static const String ERROR_FORBIDDEN =
       'You do not have permission to perform this action.';
   static const String ERROR_NOT_FOUND = 'The requested item was not found.';
+  static const String FARMERS_ENDPOINT_MISSING =
+      'The farmers list is not available on this server yet.';
   static const String ERROR_SERVER =
       'The server encountered an error. Please try again.';
 
@@ -208,6 +210,7 @@ class AppStrings {
   static const String DATE_RANGE_TODAY = 'Today';
   static const String DATE_RANGE_LAST_7 = 'Last 7 days';
   static const String DATE_RANGE_LAST_30 = 'Last 30 days';
+  static const String DATE_RANGE_LAST_60 = 'Last 60 days';
   static const String DATE_RANGE_LAST_90 = 'Last 90 days';
   static const String DATE_RANGE_LAST_6M = 'Last 6 months';
   static const String DATE_RANGE_LAST_YEAR = 'Last 1 year';
@@ -753,7 +756,7 @@ class AppStrings {
   static const String EXPORT_BUILDING = 'Building...';
   static const String EXPORT_HINT_TITLE = 'Good to know';
   static const String EXPORT_HINT_WINDOW =
-      'A window can cover up to 31 days.';
+      'A window can cover up to 62 days.';
   static const String EXPORT_HINT_ROWS =
       'Every report lands as one row per line, ready to filter or pivot.';
   static const String EXPORT_HINT_HISTORY =
@@ -895,6 +898,7 @@ class AppStrings {
   static const String GROUP_CATALOGUE = 'Product Configuration';
   static const String GROUP_ONBOARDING = 'Client & Party';
   static const String GROUP_USER_MANAGEMENT = 'User Management';
+  static const String GROUP_FARMER_TRIPS = 'Farmer & Trips';
 
   static const String ORDER_DISPATCH = 'Dispatch';
   static const String ORDER_DISPATCH_TITLE = 'Dispatch order';
@@ -1140,4 +1144,116 @@ class AppStrings {
   static const String PACKET_STOCK_LOAD_FAILED_TITLE =
       'Could not load packet stock';
   static const String PACKET_STOCK_UPDATED_TITLE = 'Packet stock updated';
+
+  static const String FIELD_TRIPS = 'Field Trips';
+  static const String FARMERS = 'Farmers';
+
+  static const String COLUMN_TRIP_ID = 'Trip ID';
+  static const String COLUMN_VILLAGE = 'Village';
+  static const String COLUMN_SALES_PERSON = 'Sales Person';
+  static const String COLUMN_EXPECTED_START = 'Expected Start';
+  static const String COLUMN_EXPECTED_END = 'Expected End';
+  static const String COLUMN_STARTED_AT = 'Started At';
+  static const String COLUMN_ENDED_AT = 'Ended At';
+  static const String COLUMN_APPROVED_BY = 'Approved By';
+  static const String COLUMN_APPROVED_AT = 'Approved At';
+  static const String COLUMN_FARMER_VISITS = 'Farmers';
+  static const String COLUMN_FARMER_NAME = 'Farmer';
+  static const String COLUMN_CONTACT_NUMBER = 'Contact';
+  static const String COLUMN_LAND_AREA = 'Land (Bigha)';
+  static const String COLUMN_CROPS = 'Crops';
+  static const String COLUMN_USES_OUR_PRODUCTS = 'Our Products';
+  static const String COLUMN_PRODUCTS_USED = 'Products';
+
+  static const String FIELD_TRIP_STATUS_PLANNED = 'Planned';
+  static const String FIELD_TRIP_STATUS_APPROVED = 'Approved';
+  static const String FIELD_TRIP_STATUS_IN_PROGRESS = 'In Progress';
+  static const String FIELD_TRIP_STATUS_COMPLETED = 'Completed';
+
+  static const String FIELD_TRIPS_TABLE_SEARCH_HINT = 'Search by village...';
+  static const String FIELD_TRIPS_EMPTY_STATE_TITLE = 'No field trips yet';
+  static const String FIELD_TRIPS_EMPTY_STATE_BODY =
+      'A field trip appears here once a salesperson plans one.';
+  static const String FIELD_TRIPS_LOAD_FAILED_TITLE =
+      'Could not load field trips';
+
+  static const String FIELD_TRIP_DETAIL_TITLE = 'Field trip';
+  static const String FIELD_TRIP_SECTION_PLAN = 'Trip plan';
+  static const String FIELD_TRIP_SECTION_PEOPLE = 'People';
+  static const String FIELD_TRIP_SECTION_PROGRESS = 'Progress';
+  static const String FIELD_TRIP_SECTION_APPROVAL = 'Approval';
+  static const String FIELD_TRIP_SECTION_FARMERS = 'Farmers visited';
+  static const String FIELD_TRIP_STEP_PLAN_CAPTION = 'Where and when';
+  static const String FIELD_TRIP_STEP_PROGRESS_CAPTION =
+      'How far the trip has got';
+  static const String FIELD_TRIP_STEP_FARMERS_CAPTION =
+      'Farmers recorded on this trip';
+  static const String FIELD_TRIP_TIMELINE_PLANNED = 'Planned';
+  static const String FIELD_TRIP_TIMELINE_APPROVED = 'Approved';
+  static const String FIELD_TRIP_TIMELINE_STARTED = 'Started';
+  static const String FIELD_TRIP_TIMELINE_ENDED = 'Ended';
+  static const String FIELD_TRIP_TIMELINE_PENDING = 'Not yet';
+  static const String FIELD_TRIP_FARMERS_EMPTY =
+      'No farmers recorded on this trip yet.';
+  static const String FIELD_TRIP_FARMERS_FAILED =
+      'Could not load the farmers on this trip.';
+
+  static const String EDIT_FIELD_TRIP = 'Edit trip';
+  static const String EDIT_FIELD_TRIP_SUBTITLE =
+      'Change the plan while the trip is still unapproved.';
+  static const String FIELD_TRIP_UPDATED_TITLE = 'Trip updated';
+  static const String FIELD_VILLAGE = 'Village';
+  static const String FIELD_VILLAGE_HINT = 'Village the trip covers';
+  static const String FIELD_EXPECTED_START = 'Expected start';
+  static const String FIELD_EXPECTED_END = 'Expected end';
+  static const String VALIDATION_VILLAGE_REQUIRED = 'Village is required.';
+  static const String VALIDATION_EXPECTED_START_REQUIRED =
+      'Expected start is required.';
+  static const String VALIDATION_EXPECTED_END_REQUIRED =
+      'Expected end is required.';
+  static const String VALIDATION_EXPECTED_END_BEFORE_START =
+      'Expected end must fall on or after the start.';
+
+  static const String FIELD_TRIP_APPROVE = 'Approve';
+  static const String FIELD_TRIP_APPROVE_TITLE = 'Approve this trip?';
+  static const String FIELD_TRIP_APPROVE_BODY =
+      'The salesperson can start the trip once it is approved.';
+  static const String FIELD_TRIP_APPROVED_DONE = 'Trip approved';
+  static const String FIELD_TRIP_UNAPPROVE = 'Unapprove';
+  static const String FIELD_TRIP_UNAPPROVE_TITLE = 'Withdraw approval?';
+  static const String FIELD_TRIP_UNAPPROVE_BODY =
+      'The trip returns to Planned and cannot be started until it is '
+      'approved again.';
+  static const String FIELD_TRIP_UNAPPROVED_DONE = 'Approval withdrawn';
+  static const String DELETE_FIELD_TRIP_TITLE = 'Delete trip';
+  static const String DELETE_FIELD_TRIP_BODY =
+      'This permanently removes the field trip. This cannot be undone.';
+  static const String FIELD_TRIP_DELETED_TITLE = 'Trip deleted';
+
+  static const String FARMERS_EMPTY_STATE_TITLE = 'No farmers yet';
+  static const String FARMERS_EMPTY_STATE_BODY =
+      'Every farmer recorded on a field trip will be listed here.';
+  static const String FARMERS_LOAD_FAILED_TITLE = 'Could not load farmers';
+  static const String FARMERS_TABLE_SEARCH_HINT = 'Search by farmer name...';
+
+  static const String COLUMN_VISIT_COUNT = 'Visits';
+  static const String COLUMN_LAST_VISITED = 'Last Visited';
+  static const String COLUMN_SALES_PEOPLE = 'Met By';
+
+  static const String FARMER_DETAIL_TITLE = 'Farmer';
+  static const String FARMER_DETAIL_SUBTITLE =
+      'Everything recorded about this farmer across their visits.';
+  static const String FARMER_SECTION_PROFILE = 'Profile';
+  static const String FARMER_SECTION_CROPS = 'Crops grown';
+  static const String FARMER_SECTION_PRODUCTS = 'Our products used';
+  static const String FARMER_SECTION_SALES_PEOPLE = 'Met by';
+  static const String FARMER_SECTION_VISITS = 'Visit history';
+  static const String FARMER_CROPS_EMPTY = 'No crops recorded.';
+  static const String FARMER_PRODUCTS_EMPTY =
+      'This farmer does not use any of our products.';
+  static const String FARMER_SALES_PEOPLE_EMPTY =
+      'No salesperson recorded against this farmer.';
+  static const String FARMER_VISITS_EMPTY = 'No visits recorded yet.';
+  static const String FARMER_USES_PRODUCTS_YES = 'Yes';
+  static const String FARMER_USES_PRODUCTS_NO = 'No';
 }

@@ -20,7 +20,8 @@ class RawMaterialWaste(
     available to pack. There is deliberately **no date**: waste is a standing
     deduction, not a dated movement, and is always counted.
 
-    A wrong entry is fixed by soft-deleting it, which gives the kilograms back.
+    A wrong entry is fixed by editing it (``update_raw_waste``) or soft-deleting
+    it, which gives the kilograms back.
 
     Exposed to the frontend by its ``public_id`` (``WS-…``).
     """

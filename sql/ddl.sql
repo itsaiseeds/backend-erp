@@ -353,10 +353,9 @@ CREATE TABLE public.aggregator_pincode (
 	CONSTRAINT aggregator_pincode_is_deleted_not_null NOT NULL is_deleted,
 	CONSTRAINT aggregator_pincode_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_pincode_updated_at_not_null NOT NULL updated_at,
-	CONSTRAINT uniq_pincode_city_code UNIQUE (city_id, code)
+	CONSTRAINT uniq_pincode_code UNIQUE (code)
 );
 CREATE INDEX aggregator_pincode_city_id_22cea78d ON public.aggregator_pincode USING btree (city_id);
-CREATE INDEX aggregator_pincode_code_811fb568 ON public.aggregator_pincode USING btree (code);
 CREATE INDEX aggregator_pincode_code_811fb568_like ON public.aggregator_pincode USING btree (code varchar_pattern_ops);
 CREATE INDEX aggregator_pincode_created_by_id_27d8c46d ON public.aggregator_pincode USING btree (created_by_id);
 CREATE INDEX aggregator_pincode_deleted_by_id_ce50a668 ON public.aggregator_pincode USING btree (deleted_by_id);

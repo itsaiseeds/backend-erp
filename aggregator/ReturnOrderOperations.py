@@ -577,7 +577,7 @@ def accept_return_order(
                 "updated_at",
             ]
         )
-    notify_return_order_event(ret, NotificationEvent.RETURN_ACCEPTED)
+    notify_return_order_event(ret, NotificationEvent.RETURN_ACCEPTED, actor=admin)
     return ret
 
 
@@ -675,7 +675,7 @@ def reject_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
     ret.rejected_at = indian_now()
     ret.full_clean()
     ret.save(update_fields=["status", "rejected_by", "rejected_at", "updated_at"])
-    notify_return_order_event(ret, NotificationEvent.RETURN_REJECTED)
+    notify_return_order_event(ret, NotificationEvent.RETURN_REJECTED, actor=admin)
     return ret
 
 
