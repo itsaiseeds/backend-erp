@@ -37,6 +37,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet, Sum
 from django.http import Http404
 
@@ -459,6 +460,26 @@ _RAW_STATUS_DETAILS = {
 def raw_status_detail(entry: InwardRawMaterial) -> StockEventDetail:
     """The ledger detail for a lot that ended up in its current status."""
     return _RAW_STATUS_DETAILS[raw_status_of(entry)]
+
+
+def assert_can_change_inward(actor: User | None) -> None:
+    """Raise unless ``actor`` may book, change or delete inward raw / other material.
+
+    The same gate as writing a stock count: a superuser, or an admin holding
+    ``Admin.can_update_stock_count``. Called by the sales-admin inward write views;
+    viewing the lists only needs an admin, and the godown manager's own Android
+    endpoints are not gated by it.
+    """
+    if actor is None:
+        raise PermissionDenied("A user must be provided to change inward material.")
+    if getattr(actor, "is_superuser", False):
+        return
+    admin = getattr(actor, "live_admin_profile", None)
+    if admin is None or not admin.can_update_stock_count:
+        raise PermissionDenied(
+            f"User '{actor}' is not allowed to change inward material "
+            "(requires permission to update the stock count)."
+        )
 
 
 def create_raw_lot(

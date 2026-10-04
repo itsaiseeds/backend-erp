@@ -35,6 +35,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from aggregator.InwardOperations import (
+    assert_can_change_inward,
     inward_raw_material_payload,
     locked_raw_lot,
     update_raw_lot,
@@ -59,6 +60,7 @@ class UpdateInwardRawMaterialView(AdminApiView):
         responses={200: InwardRawMaterialPayloadSerializer},
     )
     def patch(self, request, public_id: str):
+        assert_can_change_inward(request.user)
         with transaction.atomic():
             entry = locked_raw_lot(
                 InwardRawMaterial.objects.select_related(
@@ -79,6 +81,7 @@ class UpdateInwardRawMaterialView(AdminApiView):
         responses={204: None},
     )
     def delete(self, request, public_id: str):
+        assert_can_change_inward(request.user)
         with transaction.atomic():
             entry = locked_raw_lot(
                 InwardRawMaterial.objects.select_related("status"), public_id

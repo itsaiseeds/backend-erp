@@ -22,7 +22,12 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.InwardOperations import create_raw_lot, inward_raw_material_payload, today
+from aggregator.InwardOperations import (
+    assert_can_change_inward,
+    create_raw_lot,
+    inward_raw_material_payload,
+    today,
+)
 from aggregator.models import InwardRawMaterial
 from api.inward_serializers import (
     RAW_LOT_QUERYSET_FILTERS,
@@ -73,6 +78,7 @@ class InwardRawMaterialsView(AdminPaginatedDateRangeListView):
         responses={201: InwardRawMaterialPayloadSerializer},
     )
     def post(self, request):
+        assert_can_change_inward(request.user)
         serializer = CreateInwardRawMaterialSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

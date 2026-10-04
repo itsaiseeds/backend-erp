@@ -20,7 +20,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 
-from aggregator.InwardOperations import inward_other_material_payload
+from aggregator.InwardOperations import assert_can_change_inward, inward_other_material_payload
 from aggregator.models import InwardOtherMaterial
 from api.admin import AdminApiView
 from api.inward_serializers import (
@@ -41,6 +41,7 @@ class UpdateInwardOtherMaterialView(AdminApiView):
         responses={200: InwardOtherMaterialPayloadSerializer},
     )
     def patch(self, request, public_id: str):
+        assert_can_change_inward(request.user)
         entry = get_object_or_404(
             InwardOtherMaterial.objects.select_related("return_order__order"),
             public_id=public_id,
@@ -59,6 +60,7 @@ class UpdateInwardOtherMaterialView(AdminApiView):
         responses={204: None},
     )
     def delete(self, request, public_id: str):
+        assert_can_change_inward(request.user)
         entry = get_object_or_404(InwardOtherMaterial.objects.all(), public_id=public_id)
         entry.mark_deleted(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
