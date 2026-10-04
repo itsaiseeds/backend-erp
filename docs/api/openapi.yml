@@ -4222,22 +4222,9 @@ paths:
   /api/sales-admin/products:
     get:
       operationId: api_sales_admin_products_list
-      description: 'Usable products only by default, so this list is safe to use as
-        a dropdown: a frozen product (``is_usable`` false) is never offered. The product
-        management page asks for the frozen ones with ``?is_usable=all`` (everything)
-        or ``?is_usable=false`` (only frozen), so an admin can switch one back on.'
+      description: Every product, usable or frozen -- the product management page.
+        The rows carry no freeze flag; it is switched with PATCH.
       summary: List products
-      parameters:
-      - in: query
-        name: is_usable
-        schema:
-          type: string
-          enum:
-          - all
-          - 'false'
-          - 'true'
-        description: '``true`` (default): usable only. ``false``: frozen only. ``all``:
-          both.'
       tags:
       - Admin · Master data
       security:
@@ -4249,7 +4236,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ProductPayload'
+                  $ref: '#/components/schemas/ProductListItem'
           description: ''
     post:
       operationId: api_sales_admin_products_create
@@ -4362,6 +4349,41 @@ paths:
       responses:
         '204':
           description: No response body
+    patch:
+      operationId: api_sales_admin_raw_material_waste_partial_update
+      description: |-
+        Edit (PATCH) or soft-delete (DELETE) a raw-material waste row (app admin
+        only). PATCH changes quantity_kg and/or reason; raising the quantity beyond
+        the product's unpacked raw kilograms is refused (400).
+      summary: Edit a raw-material waste row (quantity / reason)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin · Inward
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialWastePayload'
+          description: ''
   /api/sales-admin/raw-material-wastes:
     get:
       operationId: sales_admin_raw_material_wastes_list
@@ -9699,13 +9721,41 @@ components:
     PatchedEditFarmerVisitRequest:
       type: object
       description: |-
-        A correction to a recorded farmer. The name is the only editable field;
-        anything else sent is ignored.
+        A partial correction to a recorded farmer: send only what changed.
+
+        Every field is optional, but one that is sent may not be blank: the name,
+        contact number and village must have text and ``crop_ids`` at least one
+        crop. ``product_public_ids`` may be empty -- the farmer does not use our
+        products. Anything else sent is ignored.
       properties:
         farmer_name:
           type: string
           minLength: 1
           maxLength: 255
+        contact_number:
+          type: string
+          minLength: 1
+        village:
+          type: string
+          minLength: 1
+          maxLength: 255
+        land_area_bigha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          description: Land held, in bigha.
+        crop_ids:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+          description: Replaces the farmer's crops; at least one.
+        product_public_ids:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: Replaces the products the farmer uses; empty if none.
     PatchedFieldTripWriteRequest:
       type: object
       description: |-
@@ -9965,6 +10015,23 @@ components:
           description: Feature bullets, in display order. Sending the list replaces
             it wholesale; [] clears it.
           maxItems: 30
+    PatchedUpdateRawMaterialWasteRequest:
+      type: object
+      description: |-
+        Request validation for a partial edit of a raw-material waste row.
+
+        Send only what changed. The product is fixed -- delete and re-record to move
+        waste to another product -- and ``quantity_kg``, when sent, must be above
+        zero. ``reason`` is free text and may be cleared.
+      properties:
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms of raw material wasted.
+        reason:
+          type: string
+          maxLength: 255
     PatchedUpdateSalesPersonRequest:
       type: object
       description: |-
@@ -10092,6 +10159,39 @@ components:
       - public_id
       - selling_price
       - total_weight
+    ProductListItem:
+      type: object
+      description: 'One row of the product list: the product payload without the freeze
+        flag.'
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        crop:
+          $ref: '#/components/schemas/CropRef'
+        stage:
+          $ref: '#/components/schemas/StageRef'
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Rate per kilogram; packet and bag prices derive from it and
+            the weight sold.
+        image_url:
+          type: string
+        description_items:
+          type: array
+          items:
+            type: string
+      required:
+      - crop
+      - description_items
+      - image_url
+      - name
+      - public_id
+      - selling_price
+      - stage
     ProductPayload:
       type: object
       description: Output shape for one product row.

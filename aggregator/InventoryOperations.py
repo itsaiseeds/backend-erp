@@ -1396,6 +1396,50 @@ def record_raw_waste(
     return waste
 
 
+@transaction.atomic
+def update_raw_waste(
+    entry: RawMaterialWaste,
+    *,
+    actor: User,
+    quantity_kg: Decimal | None = None,
+    reason: str | None = None,
+) -> RawMaterialWaste:
+    """Correct a waste row's kilograms and/or reason; only what is passed changes.
+
+    The product is not editable: moving waste to another product is a delete
+    and a fresh record, so each product's raw pool is only ever touched by the
+    row that belongs to it. Takes the same locks as ``record_raw_waste`` and
+    re-checks the pool afterwards, so raising ``quantity_kg`` beyond the
+    product's unpacked raw kilograms is rejected (and rolled back) with
+    ``ValueError`` -- the view turns it into a 400. Lowering it only gives
+    kilograms back. The stock ledger records the change as ``WASTE_EDITED``.
+    """
+    from . import StockLedgerOperations
+
+    with StockLedgerOperations.recording(
+        StockEventType.RAW_WASTED,
+        StockEventDetail.WASTE_EDITED,
+        [entry.product_id],
+        actor=actor,
+        source=entry,
+    ):
+        assert_products_usable([entry.product_id], action="have its waste entry edited")
+        lock_raw_pools([entry.product_id])
+        entry = RawMaterialWaste.objects.select_for_update().get(pk=entry.pk)
+        changed = []
+        if quantity_kg is not None:
+            entry.quantity_kg = quantity_kg
+            changed.append("quantity_kg")
+        if reason is not None:
+            entry.reason = reason.strip()
+            changed.append("reason")
+        if changed:
+            entry.full_clean()
+            entry.save(update_fields=[*changed, "updated_at"])
+            _assert_raw_available([entry.product_id])
+    return entry
+
+
 # -- Packing (other) material backing -----------------------------------------
 #
 # Every packet also uses packing material -- leaflets, covers -- per the

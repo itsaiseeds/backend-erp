@@ -243,6 +243,33 @@ class CreateRawMaterialWasteSerializer(serializers.Serializer):
         return attrs
 
 
+class UpdateRawMaterialWasteSerializer(serializers.Serializer):
+    """Request validation for a partial edit of a raw-material waste row.
+
+    Send only what changed. The product is fixed -- delete and re-record to move
+    waste to another product -- and ``quantity_kg``, when sent, must be above
+    zero. ``reason`` is free text and may be cleared.
+    """
+
+    quantity_kg = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        min_value=0,
+        required=False,
+        help_text="Kilograms of raw material wasted.",
+    )
+    reason = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("Send at least one of quantity_kg, reason.")
+        if "quantity_kg" in attrs and attrs["quantity_kg"] <= 0:
+            raise serializers.ValidationError(
+                {"quantity_kg": "Quantity must be greater than zero."}
+            )
+        return attrs
+
+
 class RawMaterialWasteListPageSerializer(serializers.Serializer):
     """Output shape for the paginated envelope (schema only)."""
 

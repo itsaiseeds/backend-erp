@@ -85,13 +85,54 @@ class CreateFarmerVisitSerializer(serializers.Serializer):
 
 
 class EditFarmerVisitSerializer(serializers.Serializer):
-    """A correction to a recorded farmer. The name is the only editable field;
-    anything else sent is ignored."""
+    """A partial correction to a recorded farmer: send only what changed.
 
-    farmer_name = serializers.CharField(max_length=255)
+    Every field is optional, but one that is sent may not be blank: the name,
+    contact number and village must have text and ``crop_ids`` at least one
+    crop. ``product_public_ids`` may be empty -- the farmer does not use our
+    products. Anything else sent is ignored.
+    """
+
+    farmer_name = serializers.CharField(max_length=255, required=False)
+    contact_number = serializers.CharField(required=False, validators=[validate_phone_number])
+    village = serializers.CharField(max_length=255, required=False)
+    land_area_bigha = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        min_value=0,
+        required=False,
+        help_text="Land held, in bigha.",
+    )
+    crop_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Crop.objects.all(),
+        many=True,
+        allow_empty=False,
+        required=False,
+        source="crops",
+        help_text="Replaces the farmer's crops; at least one.",
+    )
+    product_public_ids = serializers.SlugRelatedField(
+        queryset=Product.objects.all(),
+        slug_field="public_id",
+        many=True,
+        required=False,
+        source="products",
+        help_text="Replaces the products the farmer uses; empty if none.",
+    )
 
     def validate_farmer_name(self, value: str) -> str:
         return value.strip()
+
+    def validate_village(self, value: str) -> str:
+        return value.strip()
+
+    def validate(self, attrs: dict) -> dict:
+        if not attrs:
+            raise serializers.ValidationError(
+                "Send at least one of farmer_name, contact_number, village, land_area_bigha, "
+                "crop_ids, product_public_ids."
+            )
+        return attrs
 
 
 # -- Responses (schema only) ---------------------------------------------------
