@@ -546,25 +546,28 @@ class ProductUsabilityApiTest(WebApiTestCase):
     # -- the switch ---------------------------------------------------------------
 
     def test_the_switch_round_trips_and_filters_the_list(self):
-        """PATCH flips it and returns it; the product list shows frozen products, flag-free.
+        """PATCH flips it; the payload and ?is_usable= filter reflect it.
 
         tests/test_product_usability.py::ProductUsabilityApiTest::test_the_switch_round_trips_and_filters_the_list
         """
-        self.assertNotIn("is_usable", self.client.get(self.PRODUCTS).data[0])
+        self.assertTrue(self.client.get(self.PRODUCTS).data[0]["is_usable"])
 
         off = self._patch(is_usable=False)
         self.assertEqual(off.status_code, status.HTTP_200_OK, off.content)
         self.assertFalse(off.data["is_usable"])
 
-        def names():
-            return {row["name"] for row in self.client.get(self.PRODUCTS).data}
+        def names(**params):
+            return {row["name"] for row in self.client.get(self.PRODUCTS, params).data}
 
-        # The product list is the management page: a frozen product is still listed,
-        # and its rows never carry the freeze flag.
-        self.assertIn("SAI-33", names())
-        self.assertNotIn(
-            "is_usable",
-            next(r for r in self.client.get(self.PRODUCTS).data if r["name"] == "SAI-33"),
+        self.assertNotIn("SAI-33", names(is_usable="true"))
+        self.assertEqual(names(is_usable="false"), {"SAI-33"})
+        # The default is dropdown-safe: a frozen product is not offered.
+        self.assertNotIn("SAI-33", names())
+        # The product management page asks for everything, to re-enable it.
+        self.assertIn("SAI-33", names(is_usable="all"))
+        self.assertEqual(
+            self.client.get(self.PRODUCTS, {"is_usable": "maybe"}).status_code,
+            status.HTTP_400_BAD_REQUEST,
         )
 
         on = self._patch(is_usable=True)
@@ -821,7 +824,7 @@ class ProductUsabilityApiTest(WebApiTestCase):
             with self.subTest(dropdown=url):
                 self.assertFalse(seen_on(url + "?page_size=1"))
         # The product page still lists it.
-        everything = self.client.get(self.PRODUCTS)
+        everything = self.client.get(self.PRODUCTS, {"is_usable": "all"})
         self.assertIn(self.product.public_id, {row["public_id"] for row in everything.data})
 
         self._patch(is_usable=True)

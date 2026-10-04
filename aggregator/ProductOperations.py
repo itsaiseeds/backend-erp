@@ -95,10 +95,10 @@ def usable_products() -> QuerySet[Product]:
 def usability_filter(queryset: QuerySet, raw: str | None, *, field: str = "is_usable") -> QuerySet:
     """Apply a list endpoint's ``?is_usable=`` parameter to ``queryset``.
 
-    The list that feeds a product **dropdown** (``product-packagings``) must not
-    offer a frozen product, so the default -- parameter absent -- is *usable
-    only*. (The product list itself takes no such parameter: it is the product
-    management page and always shows every product.) A caller asks for more:
+    The lists that feed a product **dropdown** (``products``,
+    ``product-packagings``) must not offer a frozen product, so the default --
+    parameter absent -- is *usable only*. The product management page, which has
+    to show a frozen product so it can be switched back on, asks for it:
 
     * absent or ``true``: usable products only (the dropdown-safe default);
     * ``false``: only the frozen ones;
