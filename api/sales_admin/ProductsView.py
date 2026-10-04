@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from django.db import transaction
 from django.db.models import Prefetch
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
@@ -18,6 +18,7 @@ from aggregator.models import Crop, Product, ProductDescriptionItem, Stage
 from aggregator.ProductOperations import (
     description_items_payload,
     sync_product_description_items,
+    usability_filter,
 )
 from api.admin import AdminApiView
 from common.storage import upload_image
@@ -121,12 +122,6 @@ class ProductPayloadSerializer(serializers.Serializer):
     description_items = serializers.ListField(child=serializers.CharField())
 
 
-class ProductListItemSerializer(ProductPayloadSerializer):
-    """One row of the product list: the product payload without the freeze flag."""
-
-    is_usable = None
-
-
 class CreateProductSerializer(serializers.Serializer):
     """Request validation for creating a new ``Product``."""
 
@@ -184,13 +179,6 @@ def product_payload(product):
     }
 
 
-def _list_row(product):
-    """A product row for the list: ``product_payload`` minus the freeze flag."""
-    row = product_payload(product)
-    del row["is_usable"]
-    return row
-
-
 class ProductsView(AdminApiView):
     """List (GET) or create (POST) products (app admin only)."""
 
@@ -200,14 +188,30 @@ class ProductsView(AdminApiView):
     @extend_schema(
         summary="List products",
         description=(
-            "Every product, usable or frozen -- the product management page. The "
-            "rows carry no freeze flag; it is switched with PATCH."
+            "Usable products only by default, so this list is safe to use as a "
+            "dropdown: a frozen product (``is_usable`` false) is never offered. The "
+            "product management page asks for the frozen ones with "
+            "``?is_usable=all`` (everything) or ``?is_usable=false`` (only frozen), "
+            "so an admin can switch one back on."
         ),
-        responses={200: ProductListItemSerializer(many=True)},
+        parameters=[
+            OpenApiParameter(
+                "is_usable",
+                str,
+                enum=["true", "false", "all"],
+                description=(
+                    "``true`` (default): usable only. ``false``: frozen only. "
+                    "``all``: both."
+                ),
+            )
+        ],
+        responses={200: ProductPayloadSerializer(many=True)},
     )
     def get(self, request):
-        products = products_queryset().order_by("name")
-        return Response([_list_row(product) for product in products])
+        products = usability_filter(
+            products_queryset().order_by("name"), request.query_params.get("is_usable")
+        )
+        return Response([product_payload(product) for product in products])
 
     @extend_schema(
         summary="Create a product",
