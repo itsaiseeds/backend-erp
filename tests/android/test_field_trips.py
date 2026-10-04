@@ -29,6 +29,7 @@ END_URL = BASE + "end-field-trip/{public_id}"
 DELETE_URL = BASE + "delete-field-trip/{public_id}"
 VISITS_URL = BASE + "field-trip-farmer-visits/{public_id}"
 CREATE_VISIT_URL = BASE + "create-farmer-visit"
+EDIT_VISIT_URL = BASE + "edit-farmer-visit/{public_id}"
 CROPS_URL = BASE + "utilities/crops"
 PRODUCTS_URL = BASE + "utilities/products"
 
@@ -221,6 +222,40 @@ class AndroidFieldTripApiTest(FieldTripFixtures, AndroidApiTestCase):
         response = self.client.post(CREATE_VISIT_URL, late, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_edit_farmer_visit_renames_only_while_the_trip_is_in_progress(self):
+        """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_edit_farmer_visit_renames_only_while_the_trip_is_in_progress"""
+        trip = self.make_trip(status=StatusIds.IN_PROGRESS)
+        visit = self.make_visit(trip)
+        url = EDIT_VISIT_URL.format(public_id=visit.public_id)
+
+        response = self.client.patch(
+            url, {"farmer_name": " Suresh Patel ", "contact_number": "9000000000"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["farmer_name"], "Suresh Patel")
+        visit.refresh_from_db()
+        self.assertEqual(visit.contact_number, "9876500001")
+
+        blank = self.client.patch(url, {"farmer_name": "  "}, format="json")
+        self.assertEqual(blank.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.client.post(END_URL.format(public_id=trip.public_id))
+        late = self.client.patch(url, {"farmer_name": "Late"}, format="json")
+        self.assertEqual(late.status_code, status.HTTP_400_BAD_REQUEST)
+        visit.refresh_from_db()
+        self.assertEqual(visit.farmer_name, "Suresh Patel")
+
+    def test_another_sales_persons_farmer_visit_is_not_found(self):
+        """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_another_sales_persons_farmer_visit_is_not_found"""
+        theirs = self.make_trip(owner=self.other_sales_person, status=StatusIds.IN_PROGRESS)
+        visit = self.make_visit(theirs)
+        response = self.client.patch(
+            EDIT_VISIT_URL.format(public_id=visit.public_id), {"farmer_name": "X"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        visit.refresh_from_db()
+        self.assertEqual(visit.farmer_name, "Ramesh Patel")
+
     def test_utilities_return_every_crop_and_product_unpaginated(self):
         """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_utilities_return_every_crop_and_product_unpaginated"""
         crops = self.client.get(CROPS_URL)
@@ -236,21 +271,15 @@ class AndroidFieldTripApiTest(FieldTripFixtures, AndroidApiTestCase):
         row = next(p for p in products.json() if p["public_id"] == self.castor_seed.public_id)
         self.assertEqual((row["crop_id"], row["crop"]), (self.castor.id, "Castor"))
 
-    def test_a_frozen_product_is_not_in_the_picker_but_is_in_display_mode(self):
-        """is_usable false hides it from the picker; ?show_deleted=true still lists it, flagged.
+    def test_a_frozen_product_stays_in_the_farmer_picker_flagged(self):
+        """Farmers and field trips are the one place a frozen product stays visible.
 
-        tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_a_frozen_product_is_not_in_the_picker_but_is_in_display_mode
+        tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_a_frozen_product_stays_in_the_farmer_picker_flagged
         """
         Product.objects.filter(pk=self.castor_seed.pk).update(is_usable=False)
 
-        picker = self.client.get(PRODUCTS_URL).json()
-        self.assertNotIn(self.castor_seed.public_id, [row["public_id"] for row in picker])
-        self.assertTrue(all(row["is_usable"] for row in picker))
-
-        display = {
-            row["public_id"]: row for row in self.client.get(PRODUCTS_URL + "?show_deleted=true").json()
-        }
-        self.assertFalse(display[self.castor_seed.public_id]["is_usable"])
+        rows = {row["public_id"]: row for row in self.client.get(PRODUCTS_URL).json()}
+        self.assertFalse(rows[self.castor_seed.public_id]["is_usable"])
 
     def test_utilities_show_soft_deleted_rows_only_on_request(self):
         """tests/android/test_field_trips.py::AndroidFieldTripApiTest::test_utilities_show_soft_deleted_rows_only_on_request"""

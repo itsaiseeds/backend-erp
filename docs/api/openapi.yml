@@ -313,6 +313,40 @@ paths:
               schema:
                 description: Device registered.
           description: ''
+  /android/api/v1/edit-farmer-visit/{public_id}:
+    patch:
+      operationId: android_api_v1_edit_farmer_visit_partial_update
+      description: Rename a farmer recorded on the caller's in-progress field trip.
+      summary: Rename a farmer on my in-progress field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer visit's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
   /android/api/v1/edit-field-trip/{public_id}:
     patch:
       operationId: android_api_v1_edit_field_trip_partial_update
@@ -2567,7 +2601,7 @@ paths:
         schema:
           type: string
           format: date
-        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+        description: Last day of the window (inclusive, IST). At most 62 days after-and-including
           start_date.
         required: true
       - in: query
@@ -2601,7 +2635,7 @@ paths:
         schema:
           type: string
           format: date
-        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+        description: Last day of the window (inclusive, IST). At most 62 days after-and-including
           start_date.
         required: true
       - in: query
@@ -2622,6 +2656,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExportDispatchReceiptsResponse'
+          description: ''
+  /api/sales-admin/export/farmer-visits:
+    get:
+      operationId: sales_admin_export_farmer_visits
+      description: Export the farmers recorded in a date window, across all field
+        trips.
+      summary: Export farmers recorded on field trips in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 62 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - Admin · Field trips
+      - Admin · Exports
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportFarmerVisitsResponse'
           description: ''
   /api/sales-admin/export/inventory-snapshots:
     get:
@@ -2683,7 +2751,7 @@ paths:
         schema:
           type: string
           format: date
-        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+        description: Last day of the window (inclusive, IST). At most 62 days after-and-including
           start_date.
         required: true
       - in: query
@@ -2716,7 +2784,7 @@ paths:
         schema:
           type: string
           format: date
-        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+        description: Last day of the window (inclusive, IST). At most 62 days after-and-including
           start_date.
         required: true
       - in: query
@@ -2737,6 +2805,107 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExportOrdersResponse'
+          description: ''
+  /api/sales-admin/farmers/:
+    get:
+      operationId: sales_admin_get_farmers_list
+      description: List every farmer recorded on any field trip.
+      summary: List every farmer recorded on a field trip (all trips, deduped by contact)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: Farmers met on a trip to any of these cities (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: contact_number
+        schema:
+          type: string
+        description: Case-insensitive substring of the farmer's contact number. Single
+          value; AND-ed with the other filters.
+      - in: query
+        name: created_by
+        schema:
+          type: string
+        description: User id(s) of the sales person who recorded a visit (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: crop
+        schema:
+          type: string
+        description: Farmers who grow any of these crops on any visit (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: farmer_name
+        schema:
+          type: string
+        description: Case-insensitive substring of the farmer's name. Single value;
+          AND-ed with the other filters.
+      - in: query
+        name: land_area_gte
+        schema:
+          type: number
+        description: Land held at the farmer's latest visit (inclusive bounds). Inclusive
+          lower bound.
+      - in: query
+        name: land_area_lte
+        schema:
+          type: number
+        description: Land held at the farmer's latest visit (inclusive bounds). Inclusive
+          upper bound.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Farmers who use any of our products on any visit (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (farmer_name, last_visited_at, visit_count,
+          land_area); prefix a key with '-' for descending. Defaults to the view's
+          natural order.
+      - in: query
+        name: uses_our_products
+        schema:
+          type: string
+        description: 'true: farmers using at least one of our products; false: none.
+          Single value; AND-ed with the other filters.'
+      - in: query
+        name: village
+        schema:
+          type: string
+        description: Farmers with a visit in a village whose name contains this. Single
+          value; AND-ed with the other filters.
+      tags:
+      - Admin · Field trips
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerPage'
           description: ''
   /api/sales-admin/field-trip-farmer-visits/{public_id}:
     get:
@@ -4014,7 +4183,7 @@ paths:
         schema:
           type: string
           format: date
-        description: Last day of the window (inclusive, IST). At most 31 days after-and-including
+        description: Last day of the window (inclusive, IST). At most 62 days after-and-including
           start_date.
         required: true
       - in: query
@@ -7478,6 +7647,86 @@ components:
       oneOf:
       - $ref: '#/components/schemas/ExportDispatchReceipt'
       - $ref: '#/components/schemas/ExportCustomDispatchReceipt'
+    ExportFarmerVisit:
+      type: object
+      description: '``FieldTripOperations.farmer_visit_export_payload``: a visit with
+        its trip and sales person.'
+      properties:
+        public_id:
+          type: string
+        farmer_name:
+          type: string
+        contact_number:
+          type: string
+        village:
+          type: string
+        land_area_bigha:
+          type: string
+        crops:
+          type: array
+          items:
+            $ref: '#/components/schemas/IdName'
+        uses_our_products:
+          type: boolean
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductRef'
+        created_at:
+          type: string
+          format: date-time
+        field_trip:
+          $ref: '#/components/schemas/ExportFarmerVisitFieldTrip'
+        sales_person:
+          $ref: '#/components/schemas/UserContactRef'
+      required:
+      - contact_number
+      - created_at
+      - crops
+      - farmer_name
+      - field_trip
+      - land_area_bigha
+      - products
+      - public_id
+      - sales_person
+      - uses_our_products
+      - village
+    ExportFarmerVisitFieldTrip:
+      type: object
+      description: The trip a farmer was met on (``FieldTripOperations.farmer_visit_export_payload``).
+      properties:
+        public_id:
+          type: string
+        village:
+          type: string
+        city:
+          $ref: '#/components/schemas/IdName'
+      required:
+      - city
+      - public_id
+      - village
+    ExportFarmerVisitsResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportFarmerVisit'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
     ExportInventorySnapshotRow:
       oneOf:
       - $ref: '#/components/schemas/ExportBagSnapshot'
@@ -7751,6 +8000,111 @@ components:
       - end_date
       - results
       - start_date
+    FarmerPage:
+      type: object
+      description: Output shape for a paginated page of farmers (all trips).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FarmerPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    FarmerPayload:
+      type: object
+      description: |-
+        Output shape for one farmer across every trip.
+
+        A farmer is one ``contact_number``, whatever the number of trips they were
+        recorded on: ``farmer_name`` / ``village`` / ``city`` / ``land_area_bigha``
+        come from their latest visit, while ``crops`` / ``products`` are merged over
+        all of them and ``visits`` lists the meetings behind the row.
+        ``FieldTripOperations.farmer_payload`` builds it.
+      properties:
+        contact_number:
+          type: string
+          description: The farmer's identity across trips.
+        farmer_name:
+          type: string
+          description: Name given at the latest visit.
+        village:
+          type: string
+          description: Village of the latest visit.
+        city:
+          allOf:
+          - $ref: '#/components/schemas/IdName'
+          description: City of the latest visit's field trip.
+        land_area_bigha:
+          type: string
+          description: Land held at the latest visit, in bigha.
+        crops:
+          type: array
+          items:
+            $ref: '#/components/schemas/IdName'
+          description: Every crop they grow, merged over visits.
+        uses_our_products:
+          type: boolean
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductRef'
+          description: Every product of ours they use, merged over visits.
+        visit_count:
+          type: integer
+          description: How many visits they have in all.
+        last_visited_at:
+          type: string
+          format: date-time
+          description: When they were last recorded.
+        sales_people:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserContactRef'
+          description: Sales people who have recorded a visit of theirs.
+        visits:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: 'Their visits, newest first: public_id, field_trip_public_id,
+            created_at.'
+      required:
+      - city
+      - contact_number
+      - crops
+      - farmer_name
+      - land_area_bigha
+      - last_visited_at
+      - products
+      - sales_people
+      - uses_our_products
+      - village
+      - visit_count
+      - visits
     FarmerVisitPage:
       type: object
       description: Output shape for a paginated page of farmer visits.
@@ -9342,6 +9696,16 @@ components:
       - contact_number
       - id
       - name
+    PatchedEditFarmerVisitRequest:
+      type: object
+      description: |-
+        A correction to a recorded farmer. The name is the only editable field;
+        anything else sent is ignored.
+      properties:
+        farmer_name:
+          type: string
+          minLength: 1
+          maxLength: 255
     PatchedFieldTripWriteRequest:
       type: object
       description: |-
@@ -10836,8 +11200,9 @@ components:
           type: boolean
         is_usable:
           type: boolean
-          description: 'False when the product is frozen. Only present in the display
-            mode (``?show_deleted=true``): the picker never lists a frozen product.'
+          description: 'False when the product is frozen (no stock or booking action
+            is available for it). It is still listed here: farmers and field trips
+            keep seeing it.'
       required:
       - crop
       - crop_id

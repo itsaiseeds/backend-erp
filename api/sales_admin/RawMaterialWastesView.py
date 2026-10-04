@@ -59,7 +59,9 @@ class RawMaterialWastesView(AdminPaginatedDateRangeListView):
         return super().get(request, *args, **kwargs)
 
     def get_queryset(self, request: Request) -> QuerySet:
-        return RawMaterialWaste.objects.select_related("product", "created_by")
+        return RawMaterialWaste.objects.filter(product__is_usable=True).select_related(
+            "product", "created_by"
+        )
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:
         return [raw_waste_payload(entry) for entry in page_items]

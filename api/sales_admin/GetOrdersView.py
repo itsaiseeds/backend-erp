@@ -178,7 +178,9 @@ def _products_on_orders(request: Request) -> list[dict]:
     does not pick up ``Order``'s default soft-delete manager.
     """
     rows = (
-        OrderItem.objects.filter(order__is_deleted=False)
+        OrderItem.objects.filter(
+            order__is_deleted=False, product_packaging__product__is_usable=True
+        )
         .values_list(
             "product_packaging__product_id", "product_packaging__product__name"
         )

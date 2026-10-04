@@ -74,7 +74,7 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
 
         cls.admin_user = User.objects.create_user(
             phone_number="9000000601",
-            name="Stock Admin",
+            name="Ravi Patel",
             is_verified=True,
             created_by=cls.superuser,
             verified_by=cls.superuser,
@@ -706,19 +706,21 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         order = self._order()
         self._count_stock()
         steps = [
-            ("verify", VERIFY_URL, "ORDER_CONFIRMED"),
-            ("unverify", UNVERIFY_URL, "ORDER_UNDER_REVIEW"),
-            ("hold", HOLD_URL, "ORDER_ON_HOLD"),
-            ("verify again", VERIFY_URL, "ORDER_CONFIRMED"),
+            ("verify", VERIFY_URL, "ORDER_CONFIRMED", "was confirmed"),
+            ("unverify", UNVERIFY_URL, "ORDER_UNDER_REVIEW", "was sent back under review"),
+            ("hold", HOLD_URL, "ORDER_ON_HOLD", "was put on hold"),
+            ("verify again", VERIFY_URL, "ORDER_CONFIRMED", "was confirmed"),
         ]
-        for label, url, event_type in steps:
+        for label, url, event_type, outcome in steps:
             with self.subTest(step=label):
                 self.assertEqual(self._post(url, order).status_code, status.HTTP_200_OK)
                 notification = self._latest()
                 self.assertEqual(notification.event_type, event_type)
                 self.assertEqual(notification.order, order)
-                self.assertIn(order.public_id, notification.body)
-                self.assertIn("Acme Seeds", notification.body)
+                self.assertEqual(
+                    notification.body,
+                    f"{order.public_id} for Acme Seeds {outcome} by Ravi Patel.",
+                )
                 self.assertIsNone(notification.read_at)
 
         self.assertEqual(Notification.objects.count(), len(steps))
@@ -727,14 +729,26 @@ class SalesAdminOrderLifecycleApiTest(WebApiTestCase):
         """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_dispatch_revert_and_delivery_notify"""
         order = self._dispatched_order()
         self.assertEqual(self._latest().event_type, "ORDER_DISPATCHED")
+        self.assertEqual(
+            self._latest().body,
+            f"{order.public_id} for Acme Seeds has been dispatched by Ravi Patel.",
+        )
 
         self.assertEqual(self._post(REVERT_URL, order).status_code, status.HTTP_200_OK)
         self.assertEqual(self._latest().event_type, "ORDER_DISPATCH_REVERTED")
+        self.assertEqual(
+            self._latest().body,
+            f"{order.public_id} for Acme Seeds had its dispatch reverted by Ravi Patel.",
+        )
 
         self._post(DISPATCH_URL, order, self._dispatch_body())
         order.refresh_from_db()
-        mark_delivered(order)
+        mark_delivered(order, actor=self.admin_user)
         self.assertEqual(self._latest().event_type, "ORDER_DELIVERED")
+        self.assertEqual(
+            self._latest().body,
+            f"{order.public_id} for Acme Seeds has been delivered by Ravi Patel.",
+        )
 
     def test_rejecting_notifies(self):
         """tests/test_admin_order_lifecycle_api.py::SalesAdminOrderLifecycleApiTest::test_rejecting_notifies"""

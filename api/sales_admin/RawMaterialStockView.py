@@ -63,5 +63,7 @@ class RawMaterialStockView(AdminApiView):
             for line in InwardOperations.raw_incoming_stock(
                 as_of, product_public_ids=product_public_ids
             )
+            # A frozen product is not shown on the stock side at all.
+            if line["is_usable"]
         ]
         return Response({"as_of": as_of.isoformat(), "lines": lines})

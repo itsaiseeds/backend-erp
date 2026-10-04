@@ -76,6 +76,8 @@ class LooseStockView(AdminApiView):
                 "lines": [
                     loose_line_payload(entry)
                     for entry in InventoryOperations.loose_stock_position()
+                    # A frozen product is not shown on the stock pages at all.
+                    if entry["product"].is_usable
                 ],
             }
         )

@@ -70,7 +70,7 @@ def verify_client(client: Client, admin: User) -> Client:
     client.verified_at = indian_now()
     client.full_clean()
     client.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
-    notify_client_event(client, NotificationEvent.CLIENT_VERIFIED)
+    notify_client_event(client, NotificationEvent.CLIENT_VERIFIED, actor=admin)
     return client
 
 
@@ -276,12 +276,20 @@ def _sync_links(
 
 
 def resolve_pincode(code: str, city: City, actor: User) -> Pincode:
-    """The ``Pincode`` row for ``code`` under ``city``, creating it if new.
+    """The ``Pincode`` row for ``code``, creating it under ``city`` if new.
 
     Cities, states and countries are master data and must already exist;
     pincodes are created on demand because a sales person types them in.
+
+    ``Pincode.code`` is unique on its own -- a pincode belongs to exactly one
+    city -- so a code already filed under a different city is a payload error
+    rather than a second row.
     """
-    pincode = Pincode.all_objects.filter(code=code, city=city).first()
+    pincode = Pincode.all_objects.filter(code=code).first()
+    if pincode is not None and pincode.city_id != city.id:
+        raise ValidationError(
+            {"pincode": f"Pincode {code} belongs to {pincode.city.name}, not {city.name}."}
+        )
     if pincode is None:
         pincode = Pincode(code=code, city=city, created_by=actor)
         pincode.full_clean()

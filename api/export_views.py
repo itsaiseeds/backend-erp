@@ -35,7 +35,7 @@ from rest_framework.response import Response
 
 from .admin import AdminApiView
 
-MAX_EXPORT_RANGE_DAYS = 31
+MAX_EXPORT_RANGE_DAYS = 62
 
 EXPORT_QUERY_PARAMETERS = [
     OpenApiParameter(

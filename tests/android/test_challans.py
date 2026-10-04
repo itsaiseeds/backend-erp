@@ -120,10 +120,10 @@ class AndroidChallanTest(ReturnWorldTestCase):
         """
         dispatched = self.dispatched_order()
         delivered = self.dispatched_order()
-        mark_delivered(delivered)
+        mark_delivered(delivered, actor=self.su)
         self.order(self.pp1, 1)  # mine, but only CONFIRMED
         reverted = self.dispatched_order()
-        revert_dispatch(reverted)
+        revert_dispatch(reverted, actor=self.su)
         theirs = self.dispatched_order(actor=self.other_sp)
         custom = self._custom_order_dispatched()
 
@@ -158,7 +158,7 @@ class AndroidChallanTest(ReturnWorldTestCase):
         """
         dispatched = self.dispatched_order()
         delivered = self.dispatched_order()
-        mark_delivered(delivered)
+        mark_delivered(delivered, actor=self.su)
 
         self.assertEqual(
             self.mine.get(LIST_URL).status_code, status.HTTP_400_BAD_REQUEST
@@ -207,7 +207,7 @@ class AndroidChallanTest(ReturnWorldTestCase):
         row = self.mine.get(LIST_URL, self._window()).data["results"][0]
         self.assertEqual(shipped.data, row)
 
-        mark_delivered(order)
+        mark_delivered(order, actor=self.su)
         self.assertEqual(self.mine.get(url).status_code, status.HTTP_200_OK)
 
     def test_anything_that_is_not_my_dispatched_order_is_a_404(self):
@@ -218,7 +218,7 @@ class AndroidChallanTest(ReturnWorldTestCase):
         theirs = self.dispatched_order(actor=self.other_sp)
         confirmed = self.order(self.pp1, 1)
         reverted = self.dispatched_order()
-        revert_dispatch(reverted)
+        revert_dispatch(reverted, actor=self.su)
         custom = self._custom_order_dispatched()
 
         cases = {

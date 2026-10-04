@@ -77,6 +77,8 @@ class BagStockView(AdminApiView):
                 "lines": [
                     bag_line_payload(entry)
                     for entry in InventoryOperations.stock_position(snapshot_date)
+                    # A frozen product is not shown on the stock pages at all.
+                    if entry["product"].is_usable
                 ],
             }
         )

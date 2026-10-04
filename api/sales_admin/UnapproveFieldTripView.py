@@ -3,6 +3,7 @@
 Reverses ``approve-field-trip``: an APPROVED trip goes back to PLANNED and its
 ``approved_by`` / ``approved_at`` are cleared. Refused once the trip has
 started -- an IN_PROGRESS or COMPLETED trip keeps the approval it ran under.
+The sales person who planned the trip is notified of the withdrawal.
 """
 
 from __future__ import annotations
@@ -32,4 +33,4 @@ class UnapproveFieldTripView(FieldTripTransitionView):
         return self.transition(request, public_id)
 
     def apply_transition(self, trip: FieldTrip, request: Request) -> None:
-        unapprove_field_trip(trip)
+        unapprove_field_trip(trip, request.user)

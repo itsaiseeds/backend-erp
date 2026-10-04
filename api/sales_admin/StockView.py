@@ -100,13 +100,16 @@ class StockView(AdminApiView):
         },
     )
     def get(self, request, public_id):
+        # A frozen product is not shown on the stock side: it answers as unknown.
         snapshot_date = (
             InventoryOperations.latest_snapshot_date()
             or InventoryOperations.today()
         )
 
         if public_id.startswith("PP-"):
-            packaging = ProductPackaging.objects.filter(public_id=public_id).first()
+            packaging = ProductPackaging.objects.filter(
+                public_id=public_id, product__is_usable=True
+            ).first()
             if packaging is None:
                 raise NotFound("Unknown product packaging.")
             reserved = InventoryOperations.reserved_bags(packaging)
@@ -129,7 +132,7 @@ class StockView(AdminApiView):
             )
 
         if public_id.startswith("P-"):
-            product = Product.objects.filter(public_id=public_id).first()
+            product = Product.objects.filter(public_id=public_id, is_usable=True).first()
             if product is None:
                 raise NotFound("Unknown product.")
             # Loose stock lives on its own date: the count is optional, so the

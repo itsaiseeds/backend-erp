@@ -3,22 +3,30 @@
 A sales person plans a trip (PLANNED), a sales admin approves it (APPROVED),
 the sales person starts it (IN_PROGRESS), records the farmers they meet, and
 ends it (COMPLETED). Which statuses each verb may be applied from lives here,
-beside the verb, so the rule holds however the function is reached.
+beside the verb, so the rule holds however the function is reached. An approval
+decision notifies the sales person who planned the trip.
 
 Trips and visits are exposed by their ``public_id`` (``FT-…`` / ``FV-…``);
 payloads never include their primary key.
+
+Farmers, though, are not a model: a ``FarmerVisit`` is a meeting, so the same
+farmer met twice is two rows. :func:`farmer_queryset` and
+:func:`farmer_payload` fold those meetings back into one farmer -- identified by
+``contact_number``, carrying their latest visit's details plus everything merged
+across every visit -- for lists that must show all farmers, not one trip's.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, F, IntegerField, OuterRef, Q, QuerySet, Subquery, Window
+from django.db.models.functions import RowNumber
 
 from common.models import indian_now
 
@@ -33,6 +41,8 @@ from .models import (
     Status,
     StatusIds,
 )
+from .NotificationOperations import NotificationEvent as _NE
+from .NotificationOperations import notify_field_trip_event
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -74,6 +84,37 @@ def field_trip_queryset() -> QuerySet[FieldTrip]:
 def farmer_visit_queryset() -> QuerySet[FarmerVisit]:
     """Every visit with the crops and products a visit payload reads."""
     return FarmerVisit.objects.prefetch_related("visit_crops__crop", "visit_products__product")
+
+
+def farmer_queryset() -> QuerySet[FarmerVisit]:
+    """One row per farmer across every trip: their **latest** visit, plus their visit count.
+
+    A farmer is identified by ``contact_number`` -- the one thing a farmer cannot
+    be recorded twice under on the same trip -- so repeat meetings are folded
+    together on it. The row kept is the latest visit, hence its ``created_at``
+    reads as *last visited*, which is what the all-farmers list sorts and
+    date-windows on; ``visit_count`` is how many meetings they have in all.
+    """
+    visits_per_farmer = Subquery(
+        FarmerVisit.objects.filter(contact_number=OuterRef("contact_number"))
+        .order_by()
+        .values("contact_number")
+        .annotate(total=Count("pk"))
+        .values("total"),
+        output_field=IntegerField(),
+    )
+    return (
+        FarmerVisit.objects.annotate(
+            visit_rank=Window(
+                expression=RowNumber(),
+                partition_by=[F("contact_number")],
+                order_by=[F("created_at").desc(), F("pk").desc()],
+            ),
+            visit_count=visits_per_farmer,
+        )
+        .filter(visit_rank=1)
+        .select_related("field_trip__city", "created_by")
+    )
 
 
 @transaction.atomic
@@ -146,18 +187,24 @@ def approve_field_trip(trip: FieldTrip, admin: User) -> FieldTrip:
     trip.approved_at = indian_now()
     trip.full_clean()
     trip.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
+    notify_field_trip_event(trip, _NE.FIELD_TRIP_APPROVED, actor=admin)
     return trip
 
 
 @transaction.atomic
-def unapprove_field_trip(trip: FieldTrip) -> FieldTrip:
-    """Withdraw an approval before the trip starts; it goes back to PLANNED."""
+def unapprove_field_trip(trip: FieldTrip, admin: User) -> FieldTrip:
+    """Withdraw an approval before the trip starts; it goes back to PLANNED.
+
+    ``admin`` is who withdrew it -- the sales person who planned the trip is
+    notified of the decision, so it is recorded with the trip's history.
+    """
     assert_field_trip_status(trip, UNAPPROVABLE_STATUS_CODES, "unapprove")
     trip.status = Status.by_id(StatusIds.PLANNED)
     trip.approved_by = None
     trip.approved_at = None
     trip.full_clean()
     trip.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
+    notify_field_trip_event(trip, _NE.FIELD_TRIP_UNAPPROVED, actor=admin)
     return trip
 
 
@@ -251,6 +298,16 @@ def create_farmer_visit(
     return visit
 
 
+@transaction.atomic
+def rename_farmer_visit(visit: FarmerVisit, farmer_name: str) -> FarmerVisit:
+    """Correct the farmer's name -- the only editable field, and only while the trip runs."""
+    assert_field_trip_status(visit.field_trip, FARMER_VISIT_STATUS_CODES, "edit a farmer on")
+    visit.farmer_name = farmer_name
+    visit.full_clean()
+    visit.save(update_fields=["farmer_name", "updated_at"])
+    return visit
+
+
 def _user_ref(user: User | None) -> dict | None:
     if user is None:
         return None
@@ -296,4 +353,85 @@ def farmer_visit_payload(visit: FarmerVisit) -> dict:
         "uses_our_products": bool(products),
         "products": [{"public_id": p.public_id, "name": p.name} for p in products],
         "created_at": _isoformat(visit.created_at),
+    }
+
+
+def farmer_visit_export_payload(visit: FarmerVisit) -> dict:
+    """A visit payload plus the trip it was recorded on and the sales person who met the farmer."""
+    trip = visit.field_trip
+    return {
+        **farmer_visit_payload(visit),
+        "field_trip": {
+            "public_id": trip.public_id,
+            "village": trip.village,
+            "city": {"id": trip.city_id, "name": trip.city.name},
+        },
+        "sales_person": _user_ref(trip.created_by),
+    }
+
+
+def farmer_visits_by_contact(contacts: Iterable[str]) -> dict[str, list[FarmerVisit]]:
+    """Every live visit of each farmer in ``contacts``, newest first, keyed by contact number.
+
+    The one query a page of farmers needs: their crops, products and meetings are
+    read off these rows rather than off the farmer row, which is one visit.
+    """
+    visits = (
+        FarmerVisit.objects.filter(contact_number__in=list(contacts))
+        .select_related("field_trip", "created_by")
+        .prefetch_related("visit_crops__crop", "visit_products__product")
+        .order_by("-created_at", "-pk")
+    )
+    grouped: dict[str, list[FarmerVisit]] = {}
+    for visit in visits:
+        grouped.setdefault(visit.contact_number, []).append(visit)
+    return grouped
+
+
+def _by_name(refs: dict) -> list[dict]:
+    """``{id: name}`` as a name-ordered list of ``{id, name}`` refs."""
+    return [
+        {"id": ref_id, "name": refs[ref_id]} for ref_id in sorted(refs, key=lambda i: (refs[i], i))
+    ]
+
+
+def farmer_payload(latest: FarmerVisit, visits: Sequence[FarmerVisit]) -> dict:
+    """One farmer: their latest visit's details, merged across every visit they have.
+
+    ``latest`` is the farmer's row from :func:`farmer_queryset` and ``visits``
+    every visit of theirs, newest first (see :func:`farmer_visits_by_contact`).
+    The latest visit speaks for the name, village, city and land area -- what we
+    were told most recently -- while the crops, products and meeting history are
+    the union over all of them, so nothing a farmer was ever recorded as is lost.
+    """
+    crops = {link.crop_id: link.crop.name for visit in visits for link in visit.visit_crops.all()}
+    products = {
+        link.product.public_id: link.product.name
+        for visit in visits
+        for link in visit.visit_products.all()
+    }
+    sales_people = {visit.created_by_id: visit.created_by.display_name for visit in visits}
+    return {
+        "contact_number": latest.contact_number,
+        "farmer_name": latest.farmer_name,
+        "village": latest.village,
+        "city": {"id": latest.field_trip.city_id, "name": latest.field_trip.city.name},
+        "land_area_bigha": str(latest.land_area_bigha),
+        "crops": _by_name(crops),
+        "uses_our_products": bool(products),
+        "products": [
+            {"public_id": public_id, "name": products[public_id]}
+            for public_id in sorted(products, key=lambda p: (products[p], p))
+        ],
+        "visit_count": len(visits),
+        "last_visited_at": _isoformat(visits[0].created_at),
+        "sales_people": _by_name(sales_people),
+        "visits": [
+            {
+                "public_id": visit.public_id,
+                "field_trip_public_id": visit.field_trip.public_id,
+                "created_at": _isoformat(visit.created_at),
+            }
+            for visit in visits
+        ],
     }
