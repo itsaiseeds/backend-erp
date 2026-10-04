@@ -874,6 +874,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReturnOrderListPage'
           description: ''
+  /android/api/v1/godown/check-todays-inventory:
+    get:
+      operationId: android_api_v1_godown_check_todays_inventory
+      description: '``is_complete`` covers sealed bags only -- the loose count is
+        optional and never blocks order verification. ``stock_admins`` lists the admins
+        who may upload the count; a godown manager counts from the app without an
+        admin profile and is therefore not listed.'
+      summary: Check whether today's stock count is complete
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckTodaysInventoryPayload'
+          description: ''
+  /android/api/v1/godown/export/inventory-snapshots:
+    get:
+      operationId: android_api_v1_godown_export_inventory_snapshots
+      description: Export bag and loose stock counts, interleaved and paginated.
+      summary: Export bag and loose stock counts, interleaved and paginated
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). Optional -- give together
+          with start_date, or omit both for the full history.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST). Optional -- give together
+          with end_date, or omit both for the full history.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportInventorySnapshotsPage'
+          description: ''
   /android/api/v1/godown/inward-other-material/{public_id}:
     patch:
       operationId: android_api_v1_godown_inward_other_material_partial_update
@@ -1242,6 +1309,163 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
+  /android/api/v1/godown/update-bag-stock:
+    post:
+      operationId: android_api_v1_godown_update_bag_stock
+      description: 'Sealed-bag counts only: every active packaging of a usable product
+        receives a snapshot row for today, and packagings absent from ``counts`` are
+        recorded as zero bags. Packagings of an unusable product cannot be counted
+        (naming one is a 400); their last figure is carried forward. Loose packets
+        are not accepted here -- record them at ``/android/api/v1/godown/update-sample-packet-stock``.'
+      summary: Replace today's entire sealed-bag stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+            examples:
+              Whole-dayBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                    PP-A1B2C3D4E0F2: 0
+                summary: Whole-day bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
+          description: ''
+    patch:
+      operationId: android_api_v1_godown_update_bag_stock_partial
+      description: 'Sealed-bag counts only: only the packagings named in ``counts``
+        are written; the rest of today''s rows are left as they are. Loose packets
+        are not accepted here -- record them at ``/android/api/v1/godown/update-sample-packet-stock``.'
+      summary: Partially update today's sealed-bag stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+            examples:
+              PartialBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                summary: Partial bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
+          description: ''
+  /android/api/v1/godown/update-sample-packet-stock:
+    post:
+      operationId: android_api_v1_godown_update_sample_packet_stock
+      description: Every (product, packet_weight) pair the business packs receives
+        a loose row for today. Pairs absent from ``counts`` are recorded as zero packets.
+        Does not touch the sealed-bag snapshot.
+      summary: Replace the whole loose-packet stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+            examples:
+              Whole-dayLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '0.500'
+                    packets: 0
+                summary: Whole-day loose count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LooseStockPayload'
+          description: ''
+    patch:
+      operationId: android_api_v1_godown_update_sample_packet_stock_partial
+      description: Only the pairs named in ``counts`` are written; every other loose
+        row is left as it is.
+      summary: Partially update the loose-packet stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+            examples:
+              PartialLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                summary: Partial loose count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LooseStockPayload'
           description: ''
   /android/api/v1/notification/{id}/read:
     post:
