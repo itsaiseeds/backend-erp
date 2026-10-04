@@ -189,6 +189,7 @@ EXPECTED_CONTRACTS = {
         TOKEN_SALESPERSON,
     ),
     "android/api/v1/create-farmer-visit": ("CreateFarmerVisitView", TOKEN_SALESPERSON),
+    "android/api/v1/edit-farmer-visit/<public_id>": ("UpdateFarmerVisitView", TOKEN_SALESPERSON),
     # -- Sales-admin website (session-only) ----------------------------------
     "api/sales-admin/admins": ("AdminsView", SESSION_SUPERUSER),
     "api/sales-admin/admins/<int:id>": ("UpdateAdminView", SESSION_SUPERUSER),
@@ -219,6 +220,7 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/dispatch-lot-numbers/": ("GetDispatchLotNumbersView", SESSION_ADMIN),
     "api/sales-admin/edit-order/<str:public_id>": ("UpdateOrderView", SESSION_ADMIN),
     "api/sales-admin/export/custom-orders": ("ExportCustomOrdersView", SESSION_ADMIN),
+    "api/sales-admin/export/farmer-visits": ("ExportFarmerVisitsView", SESSION_ADMIN),
     "api/sales-admin/export/dispatch-receipts": (
         "ExportDispatchReceiptsView",
         SESSION_ADMIN,

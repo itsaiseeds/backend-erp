@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from api.field_trip_serializers import (
+    FarmerVisitPayloadSerializer,
+    IdNameSerializer,
+    UserContactRefSerializer,
+)
 from api.inward_serializers import (
     InwardOtherMaterialPayloadSerializer,
     InwardRawMaterialPayloadSerializer,
@@ -172,3 +177,21 @@ class ExportLooseSnapshotSerializer(serializers.Serializer):
     packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
     packets = serializers.IntegerField()
     total_weight = serializers.CharField(help_text="Kilograms.")
+
+
+# -- farmer visits -------------------------------------------------------------
+
+
+class ExportFarmerVisitFieldTripSerializer(serializers.Serializer):
+    """The trip a farmer was met on (``FieldTripOperations.farmer_visit_export_payload``)."""
+
+    public_id = serializers.CharField()
+    village = serializers.CharField()
+    city = IdNameSerializer()
+
+
+class ExportFarmerVisitSerializer(FarmerVisitPayloadSerializer):
+    """``FieldTripOperations.farmer_visit_export_payload``: a visit with its trip and sales person."""
+
+    field_trip = ExportFarmerVisitFieldTripSerializer()
+    sales_person = UserContactRefSerializer()

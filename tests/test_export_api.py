@@ -14,12 +14,14 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers, status
 
+from aggregator import FieldTripOperations as ft_ops
 from aggregator import InventoryOperations as inv
 from aggregator.ClientOperations import create_client_with_details
 from aggregator.CustomOrderOperations import create_custom_order
 from aggregator.models import (
     City,
     Country,
+    Crop,
     InwardOtherMaterial,
     InwardRawMaterial,
     OtherMaterialRecipe,
@@ -34,6 +36,7 @@ from aggregator.models import (
 from aggregator.OrderOperations import create_order
 from api.export_views import MAX_EXPORT_RANGE_DAYS
 from api.sales_admin.ExportCustomOrdersView import ExportCustomOrdersResponseSerializer
+from api.sales_admin.ExportFarmerVisitsView import ExportFarmerVisitsResponseSerializer
 from api.sales_admin.ExportInventorySnapshotsView import (
     ExportInventorySnapshotsPageSerializer,
 )
@@ -47,7 +50,8 @@ User = get_user_model()
 SUPERUSER_PHONE = "9999999999"
 ORDERS_URL = "/api/sales-admin/export/orders"
 CUSTOM_ORDERS_URL = "/api/sales-admin/export/custom-orders"
-DISPATCH_RECEIPTS_URL = "/api/sales-admin/export/dispatch-receipts"
+FARMER_VISITS_URL = "/api/sales-admin/export/farmer-visits"
+DISPATCH_RECEIPTS_URL ="/api/sales-admin/export/dispatch-receipts"
 INWARD_URL = "/api/sales-admin/export/inward-entries"
 SNAPSHOTS_URL = "/api/sales-admin/export/inventory-snapshots"
 VERIFY_URL = "/api/sales-admin/verify-order/{public_id}"
@@ -322,6 +326,56 @@ class ExportApiTest(WebApiTestCase):
         self.assertEqual(row["items"][0]["packets"], 5)
         self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
         self.assertEqual(_documented_keys_mismatches(ExportCustomOrdersResponseSerializer(), resp.data), [])
+
+    # -- farmer visits --------------------------------------------------------
+
+    def test_farmer_visits_export_names_the_trip_and_sales_person_and_skips_deleted(self):
+        """tests/test_export_api.py::ExportApiTest::test_farmer_visits_export_names_the_trip_and_sales_person_and_skips_deleted"""
+        start = timezone.now() + timedelta(days=1)
+        trip = ft_ops.create_field_trip(
+            sales_person=self.sales_person,
+            city=self.city,
+            village="Kamrej",
+            expected_start_at=start,
+            expected_end_at=start + timedelta(hours=8),
+        )
+        ft_ops.approve_field_trip(trip, self.admin_user)
+        ft_ops.start_field_trip(trip)
+        crop = Crop.objects.get(name="Castor")
+
+        def visit(contact):
+            return ft_ops.create_farmer_visit(
+                trip,
+                actor=self.sales_person,
+                farmer_name="Ramesh Patel",
+                contact_number=contact,
+                land_area_bigha=Decimal("2.5"),
+                crops=[crop],
+                products=[self.product] if contact == "9876500001" else [],
+            )
+
+        live = visit("9876500001")
+        old = visit("9876500002")
+        deleted = visit("9876500003")
+        self._backdate(old, _ist(self.today - timedelta(days=2)))
+        deleted.mark_deleted(self.admin_user)
+
+        resp = self._export(FARMER_VISITS_URL, self.today)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual([row["public_id"] for row in resp.data["results"]], [live.public_id])
+        row = resp.data["results"][0]
+        self.assertEqual(row["farmer_name"], "Ramesh Patel")
+        self.assertEqual(row["crops"], [{"id": crop.id, "name": "Castor"}])
+        self.assertTrue(row["uses_our_products"])
+        self.assertEqual(row["products"][0]["public_id"], self.product.public_id)
+        self.assertEqual(row["field_trip"]["public_id"], trip.public_id)
+        self.assertEqual(row["field_trip"]["city"], {"id": self.city.id, "name": "Surat"})
+        self.assertEqual(row["sales_person"]["id"], self.sales_person.id)
+        self.assertFalse(_keys(resp.data) & AUDIT_KEYS)
+        self.assertEqual(
+            _documented_keys_mismatches(ExportFarmerVisitsResponseSerializer(), resp.data), []
+        )
 
     # -- dispatch receipts ----------------------------------------------------
 

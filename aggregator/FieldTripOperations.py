@@ -298,6 +298,16 @@ def create_farmer_visit(
     return visit
 
 
+@transaction.atomic
+def rename_farmer_visit(visit: FarmerVisit, farmer_name: str) -> FarmerVisit:
+    """Correct the farmer's name -- the only editable field, and only while the trip is in progress."""
+    assert_field_trip_status(visit.field_trip, FARMER_VISIT_STATUS_CODES, "edit a farmer on")
+    visit.farmer_name = farmer_name
+    visit.full_clean()
+    visit.save(update_fields=["farmer_name", "updated_at"])
+    return visit
+
+
 def _user_ref(user: User | None) -> dict | None:
     if user is None:
         return None
@@ -343,6 +353,20 @@ def farmer_visit_payload(visit: FarmerVisit) -> dict:
         "uses_our_products": bool(products),
         "products": [{"public_id": p.public_id, "name": p.name} for p in products],
         "created_at": _isoformat(visit.created_at),
+    }
+
+
+def farmer_visit_export_payload(visit: FarmerVisit) -> dict:
+    """A visit payload plus the trip it was recorded on and the sales person who met the farmer."""
+    trip = visit.field_trip
+    return {
+        **farmer_visit_payload(visit),
+        "field_trip": {
+            "public_id": trip.public_id,
+            "village": trip.village,
+            "city": {"id": trip.city_id, "name": trip.city.name},
+        },
+        "sales_person": _user_ref(trip.created_by),
     }
 
 
