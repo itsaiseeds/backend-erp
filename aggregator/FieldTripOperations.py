@@ -298,13 +298,80 @@ def create_farmer_visit(
     return visit
 
 
+def _sync_visit_links(
+    visit: FarmerVisit, link_model, field: str, wanted: list, actor: User
+) -> None:
+    """Make the visit's live ``link_model`` rows match ``wanted``.
+
+    Dropped links are soft-deleted and a re-added one is restored, because the
+    (visit, target) pair is unique even across soft-deleted rows.
+    """
+    wanted_ids = {target.pk for target in wanted}
+    existing = {
+        getattr(link, f"{field}_id"): link
+        for link in link_model.all_objects.filter(farmer_visit=visit)
+    }
+    for target_id, link in existing.items():
+        if target_id not in wanted_ids:
+            link.mark_deleted(actor)
+        elif link.is_deleted:
+            link.restore()
+    link_model.objects.bulk_create(
+        link_model(farmer_visit=visit, created_by=actor, **{field: target})
+        for target in wanted
+        if target.pk not in existing
+    )
+
+
 @transaction.atomic
-def rename_farmer_visit(visit: FarmerVisit, farmer_name: str) -> FarmerVisit:
-    """Correct the farmer's name -- the only editable field, and only while the trip runs."""
+def update_farmer_visit(
+    visit: FarmerVisit,
+    *,
+    actor: User,
+    farmer_name: str | None = None,
+    contact_number: str | None = None,
+    village: str | None = None,
+    land_area_bigha: Decimal | None = None,
+    crops: Iterable[Crop] | None = None,
+    products: Iterable[Product] | None = None,
+) -> FarmerVisit:
+    """Correct a recorded farmer; only the fields passed (not ``None``) change.
+
+    Only while the trip is in progress. The name, contact number, village and
+    crop list are required on a farmer, so none may be made blank or empty;
+    ``products=[]`` is fine and records that the farmer does not use our products.
+    """
     assert_field_trip_status(visit.field_trip, FARMER_VISIT_STATUS_CODES, "edit a farmer on")
-    visit.farmer_name = farmer_name
-    visit.full_clean()
-    visit.save(update_fields=["farmer_name", "updated_at"])
+    fields = {
+        "farmer_name": farmer_name,
+        "contact_number": contact_number,
+        "village": village,
+        "land_area_bigha": land_area_bigha,
+    }
+    changed = [name for name, value in fields.items() if value is not None]
+    if changed:
+        if contact_number is not None and (
+            FarmerVisit.all_objects.filter(
+                field_trip=visit.field_trip, contact_number=contact_number
+            )
+            .exclude(pk=visit.pk)
+            .exists()
+        ):
+            raise ValidationError(
+                {"contact_number": "This contact number is already recorded on this field trip."}
+            )
+        for name in changed:
+            setattr(visit, name, fields[name])
+        visit.full_clean()
+        visit.save(update_fields=[*changed, "updated_at"])
+    if crops is not None:
+        unique_crops = list(dict.fromkeys(crops))
+        if not unique_crops:
+            raise ValidationError({"crop_ids": "At least one crop is required."})
+        _sync_visit_links(visit, FarmerVisitCrop, "crop", unique_crops, actor)
+    if products is not None:
+        unique_products = list(dict.fromkeys(products))
+        _sync_visit_links(visit, FarmerVisitProduct, "product", unique_products, actor)
     return visit
 
 

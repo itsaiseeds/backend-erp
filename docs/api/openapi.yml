@@ -9699,13 +9699,41 @@ components:
     PatchedEditFarmerVisitRequest:
       type: object
       description: |-
-        A correction to a recorded farmer. The name is the only editable field;
-        anything else sent is ignored.
+        A partial correction to a recorded farmer: send only what changed.
+
+        Every field is optional, but one that is sent may not be blank: the name,
+        contact number and village must have text and ``crop_ids`` at least one
+        crop. ``product_public_ids`` may be empty -- the farmer does not use our
+        products. Anything else sent is ignored.
       properties:
         farmer_name:
           type: string
           minLength: 1
           maxLength: 255
+        contact_number:
+          type: string
+          minLength: 1
+        village:
+          type: string
+          minLength: 1
+          maxLength: 255
+        land_area_bigha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          description: Land held, in bigha.
+        crop_ids:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+          description: Replaces the farmer's crops; at least one.
+        product_public_ids:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: Replaces the products the farmer uses; empty if none.
     PatchedFieldTripWriteRequest:
       type: object
       description: |-
