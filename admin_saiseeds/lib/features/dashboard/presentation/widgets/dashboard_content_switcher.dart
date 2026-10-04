@@ -20,6 +20,8 @@ import '../../../product_stock/presentation/views/product_stock_view.dart';
 import '../../../raw_material_stock/presentation/views/raw_material_stock_view.dart';
 import '../../../other_material_stock/presentation/views/other_material_stock_view.dart';
 import '../../../sales_people/presentation/views/sales_people_view.dart';
+import '../../../field_trips/presentation/views/field_trips_view.dart';
+import '../../../field_trips/presentation/views/farmers_view.dart';
 
 class DashboardContentSwitcher {
   DashboardContentSwitcher._();
@@ -64,6 +66,10 @@ class DashboardContentSwitcher {
         return const RawMaterialStockView();
       case TabIds.OTHER_MATERIAL_STOCK:
         return const OtherMaterialStockView();
+      case TabIds.FIELD_TRIPS:
+        return const FieldTripsView();
+      case TabIds.FARMERS:
+        return const FarmersView();
       case TabIds.DASHBOARD:
       default:
         return const DashboardOverviewView();

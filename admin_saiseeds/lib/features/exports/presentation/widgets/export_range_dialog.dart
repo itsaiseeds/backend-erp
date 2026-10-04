@@ -19,8 +19,8 @@ class ExportRangeDialog extends StatefulWidget {
 
   static final DateFormat isoDate = DateFormat('yyyy-MM-dd');
 
-  /// The API caps a window at 31 days including both ends.
-  static const int maxWindowDays = 31;
+  /// The API caps a window at 62 days including both ends.
+  static const int maxWindowDays = 62;
 
   static Future<void> show(
     BuildContext context, {
@@ -48,6 +48,7 @@ class _ExportRangeDialogState extends State<ExportRangeDialog> {
     DateRangePreset(AppStrings.DATE_RANGE_TODAY, 0),
     DateRangePreset(AppStrings.DATE_RANGE_LAST_7, 7),
     DateRangePreset(AppStrings.DATE_RANGE_LAST_30, 30),
+    DateRangePreset(AppStrings.DATE_RANGE_LAST_60, 60),
   ];
 
   DateTime? _start;
