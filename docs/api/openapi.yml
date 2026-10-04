@@ -4362,6 +4362,41 @@ paths:
       responses:
         '204':
           description: No response body
+    patch:
+      operationId: api_sales_admin_raw_material_waste_partial_update
+      description: |-
+        Edit (PATCH) or soft-delete (DELETE) a raw-material waste row (app admin
+        only). PATCH changes quantity_kg and/or reason; raising the quantity beyond
+        the product's unpacked raw kilograms is refused (400).
+      summary: Edit a raw-material waste row (quantity / reason)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin · Inward
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialWastePayload'
+          description: ''
   /api/sales-admin/raw-material-wastes:
     get:
       operationId: sales_admin_raw_material_wastes_list
@@ -9993,6 +10028,23 @@ components:
           description: Feature bullets, in display order. Sending the list replaces
             it wholesale; [] clears it.
           maxItems: 30
+    PatchedUpdateRawMaterialWasteRequest:
+      type: object
+      description: |-
+        Request validation for a partial edit of a raw-material waste row.
+
+        Send only what changed. The product is fixed -- delete and re-record to move
+        waste to another product -- and ``quantity_kg``, when sent, must be above
+        zero. ``reason`` is free text and may be cleared.
+      properties:
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms of raw material wasted.
+        reason:
+          type: string
+          maxLength: 255
     PatchedUpdateSalesPersonRequest:
       type: object
       description: |-
