@@ -1,7 +1,8 @@
 """Daily stock-count helpers for the ``aggregator`` sales domain.
 
 The stock model is a **daily physical count**, not a running ledger. An admin
-holding ``can_update_stock_count`` uploads what is on the floor; that count is
+holding ``can_update_stock_count`` -- or a godown manager, who counts the floor
+from the Android app -- uploads what is on the floor; that count is
 the day's opening balance. Every day's count is kept as history; reads always
 pick **one** ``snapshot_date`` (today, an explicit date, or the latest counted
 date), so older days never leak into a computed figure.
@@ -100,20 +101,18 @@ def today() -> date:
 def _assert_can_update_stock_count(actor: User | None) -> None:
     """Raise unless ``actor`` may write a stock count.
 
-    ``Admin.can_update_stock_count`` gates exactly this and nothing else -- in
+    ``User.can_update_stock_count`` gates exactly this and nothing else -- in
     particular it does **not** gate order verification.
     """
     if actor is None:
         raise PermissionDenied("A user must be provided to record a stock count.")
-    if getattr(actor, "is_superuser", False):
+    if actor.can_update_stock_count:
         return
-    admin = getattr(actor, "live_admin_profile", None)
-    if admin is None:
-        raise PermissionDenied("Stock counts can only be recorded by a sales admin.")
-    if not admin.can_update_stock_count:
+    if actor.live_admin_profile is None:
         raise PermissionDenied(
-            f"User '{actor}' is not allowed to update the stock count."
+            "Stock counts can only be recorded by a sales admin or a godown manager."
         )
+    raise PermissionDenied(f"User '{actor}' is not allowed to update the stock count.")
 
 
 # -- Writing the count --------------------------------------------------------

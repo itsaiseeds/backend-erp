@@ -128,17 +128,15 @@ class LooseStockSnapshot(
         errors = {}
 
         # ``can_update_stock_count`` gates exactly one thing: writing a stock
-        # count. It deliberately does not gate order verification.
-        if self.created_by_id and not self.created_by.is_superuser:
-            admin = self.created_by.live_admin_profile
-            if admin is None:
-                errors["created_by"] = (
-                    "Stock counts can only be recorded by a sales admin."
-                )
-            elif not admin.can_update_stock_count:
-                errors["created_by"] = (
-                    "This admin is not allowed to update the stock count."
-                )
+        # count. It deliberately does not gate order verification, and a godown
+        # manager holds it by role (they count the floor from the app).
+        actor = self.created_by
+        if self.created_by_id and not actor.can_update_stock_count:
+            errors["created_by"] = (
+                "This admin is not allowed to update the stock count."
+                if actor.live_admin_profile is not None
+                else "Stock counts can only be recorded by a sales admin or a godown manager."
+            )
 
         if errors:
             raise ValidationError(errors)
