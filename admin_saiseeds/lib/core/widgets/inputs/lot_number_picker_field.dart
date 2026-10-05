@@ -5,6 +5,7 @@ import 'searchable_field.dart';
 
 class LotNumberPickerField extends StatelessWidget {
   final DispatchLotNumberModel? value;
+  final String  productPackagingName ;
   final List<DispatchLotNumberModel> lotNumbers;
   final ValueChanged<DispatchLotNumberModel> onSelected;
   final ValueChanged<String> onFreeEntry;
@@ -15,6 +16,7 @@ class LotNumberPickerField extends StatelessWidget {
   const LotNumberPickerField({
     super.key,
     required this.value,
+    required this.productPackagingName,
     required this.lotNumbers,
     required this.onSelected,
     required this.onFreeEntry,
@@ -30,7 +32,7 @@ class LotNumberPickerField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SearchableField<DispatchLotNumberModel>(
-      label: AppStrings.FIELD_LOT_NUMBER,
+      label: "${AppStrings.FIELD_LOT_NUMBER} : $productPackagingName",
       hintText: AppStrings.FIELD_LOT_NUMBER_RECENT_HINT,
       value: value,
       items: lotNumbers,

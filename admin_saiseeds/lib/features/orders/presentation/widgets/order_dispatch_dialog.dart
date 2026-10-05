@@ -327,6 +327,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
             isUnavailable: _lotsUnavailable,
             onSelected: (lot) => _setLot(line.publicId, lot),
             onFreeEntry: (typed) => _setFreeLot(line.publicId, typed),
+            productPackagingName: line.productName + "("+line.packets.toString()+" x "+line.quantity.toString()+" Kg)",
           ),
           const SizedBox(height: AppSpacing.md),
         ],
