@@ -1,7 +1,8 @@
 """Daily stock-count helpers for the ``aggregator`` sales domain.
 
 The stock model is a **daily physical count**, not a running ledger. An admin
-holding ``can_update_stock_count`` uploads what is on the floor; that count is
+holding ``can_update_stock_count`` -- or a godown manager, who counts the floor
+from the Android app -- uploads what is on the floor; that count is
 the day's opening balance. Every day's count is kept as history; reads always
 pick **one** ``snapshot_date`` (today, an explicit date, or the latest counted
 date), so older days never leak into a computed figure.
@@ -100,20 +101,18 @@ def today() -> date:
 def _assert_can_update_stock_count(actor: User | None) -> None:
     """Raise unless ``actor`` may write a stock count.
 
-    ``Admin.can_update_stock_count`` gates exactly this and nothing else -- in
+    ``User.can_update_stock_count`` gates exactly this and nothing else -- in
     particular it does **not** gate order verification.
     """
     if actor is None:
         raise PermissionDenied("A user must be provided to record a stock count.")
-    if getattr(actor, "is_superuser", False):
+    if actor.can_update_stock_count:
         return
-    admin = getattr(actor, "live_admin_profile", None)
-    if admin is None:
-        raise PermissionDenied("Stock counts can only be recorded by a sales admin.")
-    if not admin.can_update_stock_count:
+    if actor.live_admin_profile is None:
         raise PermissionDenied(
-            f"User '{actor}' is not allowed to update the stock count."
+            "Stock counts can only be recorded by a sales admin or a godown manager."
         )
+    raise PermissionDenied(f"User '{actor}' is not allowed to update the stock count.")
 
 
 # -- Writing the count --------------------------------------------------------
@@ -1394,6 +1393,50 @@ def record_raw_waste(
         _assert_raw_available([product.id])
         rec.source = waste
     return waste
+
+
+@transaction.atomic
+def update_raw_waste(
+    entry: RawMaterialWaste,
+    *,
+    actor: User,
+    quantity_kg: Decimal | None = None,
+    reason: str | None = None,
+) -> RawMaterialWaste:
+    """Correct a waste row's kilograms and/or reason; only what is passed changes.
+
+    The product is not editable: moving waste to another product is a delete
+    and a fresh record, so each product's raw pool is only ever touched by the
+    row that belongs to it. Takes the same locks as ``record_raw_waste`` and
+    re-checks the pool afterwards, so raising ``quantity_kg`` beyond the
+    product's unpacked raw kilograms is rejected (and rolled back) with
+    ``ValueError`` -- the view turns it into a 400. Lowering it only gives
+    kilograms back. The stock ledger records the change as ``WASTE_EDITED``.
+    """
+    from . import StockLedgerOperations
+
+    with StockLedgerOperations.recording(
+        StockEventType.RAW_WASTED,
+        StockEventDetail.WASTE_EDITED,
+        [entry.product_id],
+        actor=actor,
+        source=entry,
+    ):
+        assert_products_usable([entry.product_id], action="have its waste entry edited")
+        lock_raw_pools([entry.product_id])
+        entry = RawMaterialWaste.objects.select_for_update().get(pk=entry.pk)
+        changed = []
+        if quantity_kg is not None:
+            entry.quantity_kg = quantity_kg
+            changed.append("quantity_kg")
+        if reason is not None:
+            entry.reason = reason.strip()
+            changed.append("reason")
+        if changed:
+            entry.full_clean()
+            entry.save(update_fields=[*changed, "updated_at"])
+            _assert_raw_available([entry.product_id])
+    return entry
 
 
 # -- Packing (other) material backing -----------------------------------------

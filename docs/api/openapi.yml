@@ -316,8 +316,8 @@ paths:
   /android/api/v1/edit-farmer-visit/{public_id}:
     patch:
       operationId: android_api_v1_edit_farmer_visit_partial_update
-      description: Rename a farmer recorded on the caller's in-progress field trip.
-      summary: Rename a farmer on my in-progress field trip
+      description: Edit a farmer recorded on the caller's in-progress field trip.
+      summary: Edit a farmer on my in-progress field trip
       parameters:
       - in: path
         name: public_id
@@ -874,6 +874,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReturnOrderListPage'
           description: ''
+  /android/api/v1/godown/check-todays-inventory:
+    get:
+      operationId: android_api_v1_godown_check_todays_inventory
+      description: '``is_complete`` covers sealed bags only -- the loose count is
+        optional and never blocks order verification. ``stock_admins`` lists the admins
+        who may upload the count; a godown manager counts from the app without an
+        admin profile and is therefore not listed.'
+      summary: Check whether today's stock count is complete
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckTodaysInventoryPayload'
+          description: ''
+  /android/api/v1/godown/export/inventory-snapshots:
+    get:
+      operationId: android_api_v1_godown_export_inventory_snapshots
+      description: Export bag and loose stock counts, interleaved and paginated.
+      summary: Export bag and loose stock counts, interleaved and paginated
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). Optional -- give together
+          with start_date, or omit both for the full history.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST). Optional -- give together
+          with end_date, or omit both for the full history.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportInventorySnapshotsPage'
+          description: ''
   /android/api/v1/godown/inward-other-material/{public_id}:
     patch:
       operationId: android_api_v1_godown_inward_other_material_partial_update
@@ -1227,6 +1294,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/OtherMaterialStock'
           description: ''
+  /android/api/v1/godown/product-packagings:
+    get:
+      operationId: android_api_v1_godown_product_packagings_list
+      description: Packagings of usable products only by default, so this list is
+        the set of packagings ``update-bag-stock`` will accept. ``?is_usable=all``
+        (or ``false``) also returns the packagings of frozen products, which cannot
+        be counted. Each row carries its product's ``image_url`` so the app needs
+        no second lookup.
+      summary: List product packagings (filter by product usability)
+      parameters:
+      - in: query
+        name: is_usable
+        schema:
+          type: string
+          enum:
+          - all
+          - 'false'
+          - 'true'
+        description: 'Usability of the packaging''s product: ``true`` (default) usable
+          only, ``false`` frozen only, ``all`` both.'
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GodownProductPackagingPayload'
+          description: ''
   /android/api/v1/godown/raw-material-stock:
     get:
       operationId: android_api_v1_godown_raw_material_stock_retrieve
@@ -1242,6 +1342,163 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
+  /android/api/v1/godown/update-bag-stock:
+    post:
+      operationId: android_api_v1_godown_update_bag_stock
+      description: 'Sealed-bag counts only: every active packaging of a usable product
+        receives a snapshot row for today, and packagings absent from ``counts`` are
+        recorded as zero bags. Packagings of an unusable product cannot be counted
+        (naming one is a 400); their last figure is carried forward. Loose packets
+        are not accepted here -- record them at ``/android/api/v1/godown/update-sample-packet-stock``.'
+      summary: Replace today's entire sealed-bag stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+            examples:
+              Whole-dayBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                    PP-A1B2C3D4E0F2: 0
+                summary: Whole-day bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
+          description: ''
+    patch:
+      operationId: android_api_v1_godown_update_bag_stock_partial
+      description: 'Sealed-bag counts only: only the packagings named in ``counts``
+        are written; the rest of today''s rows are left as they are. Loose packets
+        are not accepted here -- record them at ``/android/api/v1/godown/update-sample-packet-stock``.'
+      summary: Partially update today's sealed-bag stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+            examples:
+              PartialBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                summary: Partial bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
+          description: ''
+  /android/api/v1/godown/update-sample-packet-stock:
+    post:
+      operationId: android_api_v1_godown_update_sample_packet_stock
+      description: Every (product, packet_weight) pair the business packs receives
+        a loose row for today. Pairs absent from ``counts`` are recorded as zero packets.
+        Does not touch the sealed-bag snapshot.
+      summary: Replace the whole loose-packet stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+            examples:
+              Whole-dayLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '0.500'
+                    packets: 0
+                summary: Whole-day loose count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LooseStockPayload'
+          description: ''
+    patch:
+      operationId: android_api_v1_godown_update_sample_packet_stock_partial
+      description: Only the pairs named in ``counts`` are written; every other loose
+        row is left as it is.
+      summary: Partially update the loose-packet stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+            examples:
+              PartialLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                summary: Partial loose count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LooseStockPayload'
           description: ''
   /android/api/v1/notification/{id}/read:
     post:
@@ -4345,9 +4602,43 @@ paths:
                 $ref: '#/components/schemas/RawMaterialStock'
           description: ''
   /api/sales-admin/raw-material-waste/{public_id}:
+    patch:
+      operationId: api_sales_admin_raw_material_waste_partial_update
+      description: Edit (PATCH) or soft-delete (DELETE) a raw-material waste row (app
+        admin only).
+      summary: Edit a raw-material waste row (quantity / reason)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin · Inward
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateRawMaterialWasteRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialWastePayload'
+          description: ''
     delete:
       operationId: api_sales_admin_raw_material_waste_destroy
-      description: Soft-delete a raw-material waste row (app admin only).
+      description: Edit (PATCH) or soft-delete (DELETE) a raw-material waste row (app
+        admin only).
       summary: Delete a raw-material waste row
       parameters:
       - in: path
@@ -7649,7 +7940,7 @@ components:
       - $ref: '#/components/schemas/ExportCustomDispatchReceipt'
     ExportFarmerVisit:
       type: object
-      description: '``FieldTripOperations.farmer_visit_export_payload``: a visit with
+      description: '``FieldTripOperations.farmer_visit_export_payload``: a visit,
         its trip and sales person.'
       properties:
         public_id:
@@ -8380,6 +8671,54 @@ components:
       - name
       - phone_number
       - role
+    GodownPackagingProductRef:
+      type: object
+      description: The product a packaging belongs to, plus the picture the app shows.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        is_usable:
+          type: boolean
+        image_url:
+          type: string
+          description: Product picture; empty when the product has no image set.
+      required:
+      - image_url
+      - is_usable
+      - name
+      - public_id
+    GodownProductPackagingPayload:
+      type: object
+      description: The web row plus ``product.image_url`` (schema only).
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/GodownPackagingProductRef'
+        packet_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,3})?$
+        packets:
+          type: integer
+          minimum: 1
+        total_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,3})?$
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - packet_weight
+      - packets
+      - product
+      - public_id
+      - selling_price
+      - total_weight
     IdName:
       type: object
       description: An ``{id, name}`` reference (a city, a crop).
@@ -9699,13 +10038,40 @@ components:
     PatchedEditFarmerVisitRequest:
       type: object
       description: |-
-        A correction to a recorded farmer. The name is the only editable field;
-        anything else sent is ignored.
+        A partial correction to a recorded farmer: send only what changed.
+
+        Every field is optional, but one that is sent may not be blank: the name,
+        contact number and village must have text and ``crop_ids`` at least one
+        crop. ``product_public_ids`` may be empty -- the farmer does not use our
+        products. Anything else sent is ignored.
       properties:
         farmer_name:
           type: string
           minLength: 1
           maxLength: 255
+        contact_number:
+          type: string
+          minLength: 1
+        village:
+          type: string
+          minLength: 1
+          maxLength: 255
+        land_area_bigha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          description: Land held, in bigha.
+        crop_ids:
+          type: array
+          items:
+            type: integer
+          description: Replaces the farmer's crops; at least one.
+        product_public_ids:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: Replaces the products the farmer uses; empty if none.
     PatchedFieldTripWriteRequest:
       type: object
       description: |-
@@ -9965,6 +10331,23 @@ components:
           description: Feature bullets, in display order. Sending the list replaces
             it wholesale; [] clears it.
           maxItems: 30
+    PatchedUpdateRawMaterialWasteRequest:
+      type: object
+      description: |-
+        Request validation for a partial edit of a raw-material waste row.
+
+        Send only what changed. The product is fixed -- delete and re-record to move
+        waste to another product -- and ``quantity_kg``, when sent, must be above
+        zero. ``reason`` is free text and may be cleared.
+      properties:
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms of raw material wasted.
+        reason:
+          type: string
+          maxLength: 255
     PatchedUpdateSalesPersonRequest:
       type: object
       description: |-

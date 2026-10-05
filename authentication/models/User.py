@@ -311,6 +311,25 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
         """Only staff log in with a password (Django admin); everyone else uses OTP."""
         return self.is_staff
 
+    @property
+    def can_update_stock_count(self):
+        """Whether this user may write a daily stock count.
+
+        A superuser, an Admin holding ``Admin.can_update_stock_count``, or a
+        godown manager: the godown floor is counted from the Android app, so
+        that role grants it by itself and needs no Admin profile. Everyone else
+        -- a salesperson, a plain account -- may never count stock.
+
+        This gates writing a stock count and **nothing else**: it deliberately
+        does not gate order verification (see ``aggregator.OrderOperations``).
+        """
+        if self.is_superuser:
+            return True
+        admin = self.live_admin_profile
+        if admin is not None:
+            return admin.can_update_stock_count
+        return self.is_godown_manager
+
     # -- TOTP (authenticator app) helpers --------------------------------------
 
     def generate_totp_secret(self) -> str:

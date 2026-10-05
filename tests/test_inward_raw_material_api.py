@@ -72,6 +72,33 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         }
         return self.client.post(LOTS_URL, body, format="json")
 
+    # -- permission -----------------------------------------------------------
+
+    def test_writing_inward_needs_can_update_stock_count_but_viewing_does_not(self):
+        """An admin without can_update_stock_count can list lots but not book, change or delete.
+
+        tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_writing_inward_needs_can_update_stock_count_but_viewing_does_not
+        """
+        self.login_as(self.seed_admin)
+        lot = self._create_lot().data
+        Admin.objects.filter(user=self.seed_admin).update(can_update_stock_count=False)
+
+        self.assertEqual(self.client.get(LOTS_URL).status_code, status.HTTP_200_OK)
+        refused = {
+            "create": self._create_lot(lot_no="SUP-2"),
+            "update": self.client.patch(
+                self._url(lot), {"status": "In Use"}, format="json"
+            ),
+            "delete": self.client.delete(self._url(lot)),
+        }
+        for name, response in refused.items():
+            with self.subTest(action=name):
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.content)
+        self.assertEqual(InwardRawMaterial.objects.count(), 1)
+
+        Admin.objects.filter(user=self.seed_admin).update(can_update_stock_count=True)
+        self.assertEqual(self._create_lot(lot_no="SUP-3").status_code, status.HTTP_201_CREATED)
+
     # -- creation -------------------------------------------------------------
 
     def test_a_new_lot_starts_lab_testing_sampled_today_and_undated(self):

@@ -174,6 +174,26 @@ EXPECTED_CONTRACTS = {
         "GodownOtherMaterialRecipesView",
         TOKEN_GODOWN,
     ),
+    "android/api/v1/godown/check-todays-inventory": (
+        "GodownCheckTodaysInventoryView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/export/inventory-snapshots": (
+        "GodownExportInventorySnapshotsView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/update-bag-stock": (
+        "GodownUpdateBagStockView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/update-sample-packet-stock": (
+        "GodownUpdateSamplePacketStockView",
+        TOKEN_GODOWN,
+    ),
+    "android/api/v1/godown/product-packagings": (
+        "GodownProductPackagingsView",
+        TOKEN_GODOWN,
+    ),
     "android/api/v1/utilities/countries": ("CountriesView", TOKEN_ANDROID),
     "android/api/v1/utilities/states": ("StatesView", TOKEN_ANDROID),
     "android/api/v1/utilities/crops": ("CropsView", TOKEN_ANDROID),
