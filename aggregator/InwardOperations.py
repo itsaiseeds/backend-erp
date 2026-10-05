@@ -38,7 +38,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet, Sum
+from django.db.models import F, Q, QuerySet, Sum
 from django.http import Http404
 
 from . import InventoryOperations
@@ -47,7 +47,9 @@ from .models import (
     InwardOtherMaterial,
     InwardRawMaterial,
     InwardRawMaterialStatus,
+    OtherMaterialRecipe,
     OtherMaterialType,
+    PackedRecipeLayer,
     Product,
     RawMaterialWaste,
     Status,
@@ -416,6 +418,107 @@ def other_material_on_hand(
             id__in=active
         ).order_by("name")
     ]
+
+
+def other_material_on_hand_by_configuration(
+    as_of: date | None = None, *, material_type_ids: list[int] | None = None
+) -> list[dict]:
+    """Packing-material position per ``(product, packet weight, material type)``.
+
+    Other-material inward entries and packed-recipe layers both retain the recipe
+    that identifies this configuration.  This view deliberately keeps those
+    configurations separate even when several recipes name the same material
+    type: stock received for one product/weight is not presented as stock for
+    another product/weight.
+
+    ``on_hand`` is the configuration's reached inward quantity less the material
+    used by packets packed under its recipes.  A live recipe with no movement is
+    included as a zero balance so the stock screen still exposes every current
+    product configuration.
+    """
+    as_of = as_of or today()
+    zero = Decimal("0.000")
+    material_filter = Q()
+    if material_type_ids is not None:
+        material_filter = Q(recipe__material_type_id__in=material_type_ids)
+
+    Key = tuple[int, Decimal, int]
+    incoming: dict[Key, Decimal] = {}
+    incoming_rows = (
+        InwardOtherMaterial.objects.filter(
+            effective_date__isnull=False, effective_date__lte=as_of
+        )
+        .filter(material_filter)
+        .values(
+            "recipe__product_id", "recipe__packet_weight", "recipe__material_type_id"
+        )
+        .annotate(total=Sum("quantity"))
+    )
+    for row in incoming_rows:
+        key = (
+            row["recipe__product_id"],
+            Decimal(row["recipe__packet_weight"]),
+            row["recipe__material_type_id"],
+        )
+        incoming[key] = row["total"] or zero
+
+    bag_date = InventoryOperations.latest_snapshot_date()
+    loose_date = InventoryOperations.latest_loose_snapshot_date()
+    latest_rows = Q(
+        inventory_snapshot__is_deleted=False,
+        inventory_snapshot__snapshot_date=bag_date,
+    ) | Q(
+        loose_stock_snapshot__is_deleted=False,
+        loose_stock_snapshot__snapshot_date=loose_date,
+    )
+    if bag_date is None:
+        latest_rows &= Q(inventory_snapshot__isnull=True)
+    if loose_date is None:
+        latest_rows &= Q(loose_stock_snapshot__isnull=True)
+    used_rows = (
+        PackedRecipeLayer.objects.filter(recipe__isnull=False)
+        .filter(latest_rows)
+        .filter(material_filter)
+        .values("recipe__product_id", "recipe__packet_weight", "material_type_id")
+        .annotate(total=Sum(F("recipe__quantity") * F("packets")))
+    )
+    used: dict[Key, Decimal] = {}
+    for row in used_rows:
+        key = (
+            row["recipe__product_id"],
+            Decimal(row["recipe__packet_weight"]),
+            row["material_type_id"],
+        )
+        used[key] = row["total"] or zero
+
+    recipe_filter = Q()
+    if material_type_ids is not None:
+        recipe_filter = Q(material_type_id__in=material_type_ids)
+    keys = set(incoming) | set(used) | {
+        (recipe.product_id, Decimal(recipe.packet_weight), recipe.material_type_id)
+        for recipe in OtherMaterialRecipe.objects.filter(recipe_filter)
+    }
+    products = Product.all_objects.in_bulk(key[0] for key in keys)
+    materials = OtherMaterialType.all_objects.in_bulk(key[2] for key in keys)
+    rows = []
+    for product_id, packet_weight, material_type_id in keys:
+        product = products[product_id]
+        material = materials[material_type_id]
+        rows.append(
+            {
+                "product_public_id": product.public_id,
+                "product_name": product.name,
+                "packet_weight": packet_weight,
+                "material_type_id": material_type_id,
+                "name": material.name,
+                "unit_type": material.unit_type,
+                "on_hand": incoming.get(
+                    (product_id, packet_weight, material_type_id), zero
+                )
+                - used.get((product_id, packet_weight, material_type_id), zero),
+            }
+        )
+    return sorted(rows, key=lambda row: (row["product_name"], row["packet_weight"], row["name"]))
 
 
 def locked_raw_lot(queryset: QuerySet, public_id: str) -> InwardRawMaterial:
