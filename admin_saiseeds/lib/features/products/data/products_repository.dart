@@ -12,7 +12,7 @@ class ProductsRepository {
     : _apiClient = apiClient;
 
   Future<List<ProductModel>> fetchProducts() async {
-    final dynamic response = await _apiClient.get(ProductsEndpoints.list);
+    final dynamic response = await _apiClient.get(ProductsEndpoints.UsableList);
 
     if (response is! List) {
       throw const ApiException(message: AppStrings.SOMETHING_WENT_WRONG);
