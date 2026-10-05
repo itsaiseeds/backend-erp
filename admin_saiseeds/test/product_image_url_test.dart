@@ -16,7 +16,9 @@ void main() {
     });
 
     debugPrint('image URL -> ${p.imageDisplayUrl}');
-    expect(p.imageDisplayUrl,
-        'http://localhost:8000/media/products/16ae50b2731b4a30ab3b086d64a63c9e.jpg');
+    expect(
+      p.imageDisplayUrl,
+      'http://localhost:8000/media/products/16ae50b2731b4a30ab3b086d64a63c9e.jpg',
+    );
   });
 }

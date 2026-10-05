@@ -57,8 +57,7 @@ class _ExportRangeDialogState extends State<ExportRangeDialog> {
   bool _isSubmitting = false;
   String? _error;
 
-  String get _rangeValue =>
-      DateRangeValue(start: _start, end: _end).wireValue;
+  String get _rangeValue => DateRangeValue(start: _start, end: _end).wireValue;
 
   void _onRangeChanged(String raw) {
     final DateRangeValue parsed = DateRangeValue.parse(raw);
@@ -231,7 +230,6 @@ class _ExportRangeDialogState extends State<ExportRangeDialog> {
   }
 }
 
-
 /// Spreadsheet or a zip of challans. Two options, so both stay visible
 /// rather than hiding behind a dropdown.
 class _FormatChoice extends StatelessWidget {
@@ -310,9 +308,7 @@ class _FormatTile extends StatelessWidget {
             color: isSelected ? AppColors.PRIMARY_SURFACE : AppColors.SURFACE,
             border: Border.all(
               color: isSelected ? AppColors.PRIMARY : AppColors.BORDER,
-              width: isSelected
-                  ? AppSizes.borderMedium
-                  : AppSizes.borderThin,
+              width: isSelected ? AppSizes.borderMedium : AppSizes.borderThin,
             ),
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),

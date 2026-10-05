@@ -36,15 +36,19 @@ Widget _row({required double searchBarIntrinsicHeight}) {
 }
 
 void main() {
-  testWidgets('action keeps its height when the search bar is one row',
-      (tester) async {
+  testWidgets('action keeps its height when the search bar is one row', (
+    tester,
+  ) async {
     await tester.pumpWidget(_row(searchBarIntrinsicHeight: kBarHeight));
-    expect(tester.getSize(find.byKey(const ValueKey('refresh'))).height,
-        kBarHeight);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('refresh'))).height,
+      kBarHeight,
+    );
   });
 
-  testWidgets('action keeps its height when filter chips wrap to two rows',
-      (tester) async {
+  testWidgets('action keeps its height when filter chips wrap to two rows', (
+    tester,
+  ) async {
     await tester.pumpWidget(_row(searchBarIntrinsicHeight: 96));
 
     expect(

@@ -254,8 +254,7 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
                   label: _statusActionLabel(next),
                   icon: _statusActionIcon(next),
                   tone: _statusActionTone(next),
-                  onSelected:
-                      widget.isMutating || widget.onChangeStatus == null
+                  onSelected: widget.isMutating || widget.onChangeStatus == null
                       ? null
                       : () => widget.onChangeStatus!(lot, next),
                 ),

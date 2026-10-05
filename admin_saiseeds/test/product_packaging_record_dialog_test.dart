@@ -61,21 +61,35 @@ Future<void> _pump(WidgetTester tester, RecordDialogMode mode) async {
 void main() {
   testWidgets('view and edit share one title', (tester) async {
     await _pump(tester, RecordDialogMode.view);
-    expect(find.text(AppStrings.PRODUCT_PACKAGING_DETAIL_TITLE), findsOneWidget);
+    expect(
+      find.text(AppStrings.PRODUCT_PACKAGING_DETAIL_TITLE),
+      findsOneWidget,
+    );
 
     await _pump(tester, RecordDialogMode.edit);
-    expect(find.text(AppStrings.PRODUCT_PACKAGING_DETAIL_TITLE), findsOneWidget);
+    expect(
+      find.text(AppStrings.PRODUCT_PACKAGING_DETAIL_TITLE),
+      findsOneWidget,
+    );
   });
 
   testWidgets('every field is present in both modes', (tester) async {
     await _pump(tester, RecordDialogMode.view);
     for (final String label in _labels) {
-      expect(find.text(label), findsOneWidget, reason: '$label missing in view');
+      expect(
+        find.text(label),
+        findsOneWidget,
+        reason: '$label missing in view',
+      );
     }
 
     await _pump(tester, RecordDialogMode.edit);
     for (final String label in _labels) {
-      expect(find.text(label), findsOneWidget, reason: '$label missing in edit');
+      expect(
+        find.text(label),
+        findsOneWidget,
+        reason: '$label missing in edit',
+      );
     }
   });
 

@@ -15,18 +15,19 @@ void main() {
 
     expect(base, 'https://sai-seeds-preprod.onrender.com');
     expect(base.contains('localhost'), isFalse);
-    
   });
 
   test('otp verify composes to the production URL', () async {
     await dotenv.load(fileName: AppConfigKeys.ENV_FILE_PROD);
 
-    final url = Uri.parse(ApiConfig.baseUrl)
-        .resolve('/api/sales-admin/auth/otp/verify')
-        .toString();
+    final url = Uri.parse(
+      ApiConfig.baseUrl,
+    ).resolve('/api/sales-admin/auth/otp/verify').toString();
     debugPrint('verify URL = $url');
 
-    expect(url,
-        'https://sai-seeds-preprod.onrender.com/api/sales-admin/auth/otp/verify');
+    expect(
+      url,
+      'https://sai-seeds-preprod.onrender.com/api/sales-admin/auth/otp/verify',
+    );
   });
 }

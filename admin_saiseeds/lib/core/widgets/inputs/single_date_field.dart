@@ -87,7 +87,8 @@ class _SingleDateFieldState extends State<SingleDateField> {
     final RenderObject? box = context.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return false;
 
-    final double fieldBottom = box.localToGlobal(Offset.zero).dy + box.size.height;
+    final double fieldBottom =
+        box.localToGlobal(Offset.zero).dy + box.size.height;
     final double available =
         MediaQuery.sizeOf(overlayContext).height - fieldBottom;
 
@@ -268,9 +269,7 @@ class _DateAction extends StatelessWidget {
         onTap: onTap,
         child: Text(
           label,
-          style: AppTypography.button.copyWith(
-            color: AppColors.TEXT_SECONDARY,
-          ),
+          style: AppTypography.button.copyWith(color: AppColors.TEXT_SECONDARY),
         ),
       ),
     );

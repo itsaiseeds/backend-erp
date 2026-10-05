@@ -25,6 +25,11 @@ class SidebarItems {
       icon: Icons.groups_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.GODOWN_MANAGERS,
+      label: AppStrings.GODOWN_MANAGERS,
+      icon: Icons.warehouse_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.CLIENTS,
       label: AppStrings.CLIENTS,
       icon: Icons.storefront_outlined,
@@ -90,6 +95,11 @@ class SidebarItems {
       icon: Icons.inventory_2_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.WASTE_MANAGEMENT,
+      label: AppStrings.WASTE_MANAGEMENT,
+      icon: Icons.delete_sweep_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.PRODUCT_STOCK,
       label: AppStrings.PRODUCT_STOCK,
       icon: Icons.inventory_outlined,
@@ -151,6 +161,11 @@ class SidebarItems {
         label: AppStrings.GROUP_INWARD,
         itemIds: [TabIds.INWARD_RAW_MATERIALS, TabIds.OTHER_MATERIAL_INWARD],
       ),
+      SidebarGroupModel(
+        id: 'ops-waste',
+        label: AppStrings.GROUP_WASTE_MANAGEMENT,
+        itemIds: [TabIds.WASTE_MANAGEMENT],
+      ),
       SidebarGroupModel(id: 'ops-exports', itemIds: [TabIds.EXPORTS]),
     ],
   );
@@ -183,7 +198,7 @@ class SidebarItems {
       SidebarGroupModel(
         id: 'setup-users',
         label: AppStrings.GROUP_USER_MANAGEMENT,
-        itemIds: [TabIds.SALES_PEOPLE, TabIds.ADMINS],
+        itemIds: [TabIds.SALES_PEOPLE, TabIds.GODOWN_MANAGERS, TabIds.ADMINS],
       ),
     ],
   );

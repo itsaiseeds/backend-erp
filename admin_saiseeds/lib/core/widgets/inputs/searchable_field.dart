@@ -25,6 +25,8 @@ class SearchableField<T> extends StatefulWidget {
   final String? helperText;
   final String? emptyHint;
   final VoidCallback? onBlockedTap;
+  final bool allowFreeEntry;
+  final ValueChanged<String>? onFreeEntry;
 
   const SearchableField({
     super.key,
@@ -43,6 +45,8 @@ class SearchableField<T> extends StatefulWidget {
     this.helperText,
     this.emptyHint,
     this.onBlockedTap,
+    this.allowFreeEntry = false,
+    this.onFreeEntry,
   });
 
   @override
@@ -94,7 +98,9 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
 
   bool get _canOpen =>
       widget.enabled &&
-      (widget.items.isNotEmpty || widget.optionsBuilder != null);
+      (widget.items.isNotEmpty ||
+          widget.optionsBuilder != null ||
+          widget.allowFreeEntry);
 
   void _onFocusChanged() {
     if (_focusNode.hasFocus) {
@@ -148,6 +154,33 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
   String _haystack(T item) =>
       widget.searchText?.call(item) ?? widget.itemToString(item);
 
+  String get _typedText => _controller.text.trim();
+
+  bool get _canCommitFreeEntry {
+    if (!widget.allowFreeEntry || widget.onFreeEntry == null) return false;
+    final String typed = _typedText;
+    if (typed.isEmpty) return false;
+    return !_suggestions.any(
+      (T item) =>
+          widget.itemToString(item).trim().toLowerCase() == typed.toLowerCase(),
+    );
+  }
+
+  int get _rowCount => _suggestions.length + (_canCommitFreeEntry ? 1 : 0);
+
+  void _commitFreeEntry() {
+    if (!_canCommitFreeEntry) return;
+    final String typed = _typedText;
+    _isPointerInMenu = false;
+    widget.onFreeEntry!(typed);
+    _controller.text = typed;
+    _controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: typed.length),
+    );
+    _closeMenu();
+    _focusNode.unfocus();
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
@@ -166,17 +199,23 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
       return KeyEventResult.ignored;
     }
 
-    if (_suggestions.isEmpty) return KeyEventResult.ignored;
+    final bool hasFreeRow = _canCommitFreeEntry;
 
-    final bool isDown = event.logicalKey == LogicalKeyboardKey.arrowDown;
-    final bool isUp = event.logicalKey == LogicalKeyboardKey.arrowUp;
-    if (isDown || isUp) {
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
+        event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      final bool isDown = event.logicalKey == LogicalKeyboardKey.arrowDown;
+      if (_suggestions.isEmpty && !hasFreeRow) return KeyEventResult.ignored;
+
       setState(() {
-        _highlightedIndex = isDown
-            ? (_highlightedIndex + 1) % _suggestions.length
-            : _highlightedIndex <= 0
-            ? _suggestions.length - 1
-            : _highlightedIndex - 1;
+        if (isDown) {
+          _highlightedIndex = _highlightedIndex + 1 >= _rowCount
+              ? (hasFreeRow ? -1 : 0)
+              : _highlightedIndex + 1;
+        } else {
+          _highlightedIndex = _highlightedIndex <= (hasFreeRow ? -1 : 0)
+              ? _suggestions.length - 1
+              : _highlightedIndex - 1;
+        }
       });
       _overlayEntry?.markNeedsBuild();
       _scrollToHighlighted();
@@ -210,8 +249,23 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
   }
 
   void _selectHighlighted() {
-    if (!_isOpen || _suggestions.isEmpty) return;
-    final int index = _highlightedIndex < 0 ? 0 : _highlightedIndex;
+    if (!_isOpen) return;
+    if (_highlightedIndex < 0) {
+      if (_canCommitFreeEntry) {
+        _commitFreeEntry();
+        return;
+      }
+      final String typed = _typedText.toLowerCase();
+      for (final T item in _suggestions) {
+        if (widget.itemToString(item).trim().toLowerCase() == typed) {
+          _selectItem(item);
+          return;
+        }
+      }
+      return;
+    }
+    if (_suggestions.isEmpty) return;
+    final int index = _highlightedIndex;
     if (index >= _suggestions.length) return;
     _selectItem(_suggestions[index]);
   }
@@ -260,18 +314,30 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: _suggestions.isEmpty
+                      child: _suggestions.isEmpty && !_canCommitFreeEntry
                           ? const Padding(
                               padding: EdgeInsets.all(AppSpacing.md),
                               child: Text(AppStrings.NO_RESULTS_FOUND),
                             )
-                          : ListView.builder(
-                              controller: _listController,
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              itemCount: _suggestions.length,
-                              itemBuilder: (context, index) =>
-                                  _buildOption(_suggestions[index], index),
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_canCommitFreeEntry) _buildFreeEntryRow(),
+                                Flexible(
+                                  child: ListView.builder(
+                                    controller: _listController,
+                                    padding: EdgeInsets.zero,
+                                    shrinkWrap: true,
+                                    itemCount: _suggestions.length,
+                                    itemBuilder: (context, index) =>
+                                        _buildOption(
+                                          _suggestions[index],
+                                          index,
+                                        ),
+                                  ),
+                                ),
+                              ],
                             ),
                     ),
                   ),
@@ -281,6 +347,46 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildFreeEntryRow() {
+    final bool isHighlighted = _highlightedIndex < 0;
+
+    return Material(
+      color: isHighlighted ? AppColors.PRIMARY_SURFACE : AppColors.TRANSPARENT,
+      child: InkWell(
+        onTap: _commitFreeEntry,
+        mouseCursor: SystemMouseCursors.click,
+        child: Container(
+          height: AppSizes.searchOptionHeight,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              const Icon(
+                Icons.add_rounded,
+                size: AppSizes.iconMd,
+                color: AppColors.PRIMARY,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  _typedText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.PRIMARY,
+                    fontWeight: isHighlighted
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -358,69 +464,69 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
         _BlockedTapCatcher(
           onBlockedTap: _canOpen ? null : widget.onBlockedTap,
           child: CompositedTransformTarget(
-          link: _layerLink,
-          child: Shortcuts(
-            shortcuts: const <ShortcutActivator, Intent>{
-              SingleActivator(LogicalKeyboardKey.enter):
-                  _SelectHighlightedIntent(),
-              SingleActivator(LogicalKeyboardKey.numpadEnter):
-                  _SelectHighlightedIntent(),
-            },
-            child: Actions(
-              actions: <Type, Action<Intent>>{
-                _SelectHighlightedIntent:
-                    CallbackAction<_SelectHighlightedIntent>(
-                      onInvoke: (intent) {
-                        _selectHighlighted();
-                        return null;
-                      },
-                    ),
+            link: _layerLink,
+            child: Shortcuts(
+              shortcuts: const <ShortcutActivator, Intent>{
+                SingleActivator(LogicalKeyboardKey.enter):
+                    _SelectHighlightedIntent(),
+                SingleActivator(LogicalKeyboardKey.numpadEnter):
+                    _SelectHighlightedIntent(),
               },
-              child: TextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                enabled: _canOpen,
-                style: AppTypography.bodyMedium,
-                cursorColor: AppColors.PRIMARY,
-                onChanged: (_) {
-                  _highlightedIndex = -1;
-                  if (!_isOpen) _openMenu();
-                  _overlayEntry?.markNeedsBuild();
+              child: Actions(
+                actions: <Type, Action<Intent>>{
+                  _SelectHighlightedIntent:
+                      CallbackAction<_SelectHighlightedIntent>(
+                        onInvoke: (intent) {
+                          _selectHighlighted();
+                          return null;
+                        },
+                      ),
                 },
-                decoration: InputDecoration(
-                  hintText: isEmptySource && emptyHint != null
-                      ? emptyHint
-                      : widget.hintText,
-                  hintStyle: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.TEXT_DISABLED,
-                  ),
-                  filled: true,
-                  fillColor: _canOpen
-                      ? AppColors.SURFACE
-                      : AppColors.SURFACE_VARIANT,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.smd,
-                  ),
-                  suffixIcon: Icon(
-                    _isOpen
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    size: AppSizes.iconLg,
-                    color: AppColors.TEXT_SECONDARY,
-                  ),
-                  border: _border(hasError ? AppColors.ERROR : null),
-                  enabledBorder: _border(hasError ? AppColors.ERROR : null),
-                  disabledBorder: _border(null),
-                  focusedBorder: _border(
-                    hasError ? AppColors.ERROR : AppColors.BORDER_FOCUSED,
-                    width: AppSizes.borderMedium,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  enabled: _canOpen,
+                  style: AppTypography.bodyMedium,
+                  cursorColor: AppColors.PRIMARY,
+                  onChanged: (_) {
+                    _highlightedIndex = -1;
+                    if (!_isOpen) _openMenu();
+                    _overlayEntry?.markNeedsBuild();
+                  },
+                  decoration: InputDecoration(
+                    hintText: isEmptySource && emptyHint != null
+                        ? emptyHint
+                        : widget.hintText,
+                    hintStyle: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.TEXT_DISABLED,
+                    ),
+                    filled: true,
+                    fillColor: _canOpen
+                        ? AppColors.SURFACE
+                        : AppColors.SURFACE_VARIANT,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.smd,
+                    ),
+                    suffixIcon: Icon(
+                      _isOpen
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: AppSizes.iconLg,
+                      color: AppColors.TEXT_SECONDARY,
+                    ),
+                    border: _border(hasError ? AppColors.ERROR : null),
+                    enabledBorder: _border(hasError ? AppColors.ERROR : null),
+                    disabledBorder: _border(null),
+                    focusedBorder: _border(
+                      hasError ? AppColors.ERROR : AppColors.BORDER_FOCUSED,
+                      width: AppSizes.borderMedium,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
         ),
         if (hasError) ...[
           const SizedBox(height: AppSpacing.xs),

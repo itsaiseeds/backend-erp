@@ -361,8 +361,7 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
               RowAction(
                 label: AppStrings.DOWNLOAD,
                 icon: Icons.download_outlined,
-                onSelected:
-                    widget.isMutating || widget.onDownload == null
+                onSelected: widget.isMutating || widget.onDownload == null
                     ? null
                     : () => widget.onDownload!(challan),
               ),

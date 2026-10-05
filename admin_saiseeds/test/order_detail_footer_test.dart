@@ -54,7 +54,8 @@ Future<void> _pumpDialog(WidgetTester tester) async {
       home: Scaffold(
         body: Builder(
           builder: (context) => TextButton(
-            onPressed: () => OrderDetailDialog.show(context, _order, cubit: _cubit()),
+            onPressed: () =>
+                OrderDetailDialog.show(context, _order, cubit: _cubit()),
             child: const Text('open'),
           ),
         ),
@@ -82,8 +83,9 @@ double _cardWidth(WidgetTester tester) => tester
     )
     .width;
 
-OrdersCubit _cubit() =>
-    OrdersCubit(repository: OrdersRepository(apiClient: ApiClient(dio: Dio())));
+OrdersCubit _cubit() => OrdersCubit(
+  repository: OrdersRepository(apiClient: ApiClient(dio: Dio())),
+);
 
 void main() {
   testWidgets('the header is a full-bleed accent bar', (tester) async {

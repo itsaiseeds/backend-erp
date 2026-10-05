@@ -252,10 +252,7 @@ class AppDialogHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-          if (badge != null) ...[
-            badge!,
-            const SizedBox(width: AppSpacing.smd),
-          ],
+          if (badge != null) ...[badge!, const SizedBox(width: AppSpacing.smd)],
           if (actionButton != null) ...[
             actionButton!,
             const SizedBox(width: AppSpacing.xs),

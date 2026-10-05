@@ -9,8 +9,7 @@ class CustomOrdersEndpoints {
 
   static String detail(String publicId) => '$_base/custom-order/$publicId';
 
-  static String edit(String publicId) =>
-      '$_base/edit-custom-order/$publicId';
+  static String edit(String publicId) => '$_base/edit-custom-order/$publicId';
 
   static String dispatch(String publicId) =>
       '$_base/dispatch-custom-order/$publicId';

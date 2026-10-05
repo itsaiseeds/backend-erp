@@ -177,7 +177,10 @@ class ClientsTableState extends State<ClientsTable> {
       return parsed.isEmpty ? value : parsed.displayValue;
     }
     if (key == AppStrings.FILTER_BY_STATUS) {
-      return _statusLabel(value, _filterFor(key)?.labelForValue(value) ?? value);
+      return _statusLabel(
+        value,
+        _filterFor(key)?.labelForValue(value) ?? value,
+      );
     }
     return _filterFor(key)?.labelForValue(value) ?? value;
   }

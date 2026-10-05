@@ -53,9 +53,7 @@ class OrderStatusX {
   };
 
   // Revert undoes a dispatch, so it only applies once already dispatched.
-  static const Set<OrderStatus> REVERTABLE_DISPATCH = {
-    OrderStatus.dispatched,
-  };
+  static const Set<OrderStatus> REVERTABLE_DISPATCH = {OrderStatus.dispatched};
 
   static const Set<OrderStatus> EDITABLE = {
     OrderStatus.booked,
@@ -136,8 +134,7 @@ class OrderStatusX {
 
   static bool canReject(OrderStatus status) => REJECTABLE.contains(status);
 
-  static bool canDispatch(OrderStatus status) =>
-      DISPATCHABLE.contains(status);
+  static bool canDispatch(OrderStatus status) => DISPATCHABLE.contains(status);
 
   static bool canRevertDispatch(OrderStatus status) =>
       REVERTABLE_DISPATCH.contains(status);

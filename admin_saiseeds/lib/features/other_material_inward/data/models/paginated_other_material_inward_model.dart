@@ -33,7 +33,10 @@ class PaginatedOtherMaterialInwardModel {
         json['available_filters'],
         ClientFilterModel.fromJson,
       ),
-      availableSorts: _listOf(json['available_sorts'], ClientSortModel.fromJson),
+      availableSorts: _listOf(
+        json['available_sorts'],
+        ClientSortModel.fromJson,
+      ),
     );
   }
 

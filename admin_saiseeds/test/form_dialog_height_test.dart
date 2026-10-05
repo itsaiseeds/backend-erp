@@ -38,8 +38,9 @@ Future<double> _heightWith(WidgetTester tester, int rows) async {
 }
 
 void main() {
-  testWidgets('footer sits at the bottom of the fixed-height dialog',
-      (tester) async {
+  testWidgets('footer sits at the bottom of the fixed-height dialog', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -73,18 +74,23 @@ void main() {
     );
   });
 
-  testWidgets('dialog height stays fixed as description points are added',
-      (tester) async {
+  testWidgets('dialog height stays fixed as description points are added', (
+    tester,
+  ) async {
     final small = await _heightWith(tester, 1);
     final large = await _heightWith(tester, 12);
 
-    expect(large, small,
-        reason: 'adding points must scroll, not grow the dialog');
+    expect(
+      large,
+      small,
+      reason: 'adding points must scroll, not grow the dialog',
+    );
     expect(small, AppSizes.formDialogFixedHeight);
   });
 
-  testWidgets('content scrolls when it overflows the fixed height',
-      (tester) async {
+  testWidgets('content scrolls when it overflows the fixed height', (
+    tester,
+  ) async {
     await _heightWith(tester, 12);
 
     expect(find.byType(Scrollable), findsWidgets);

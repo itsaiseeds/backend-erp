@@ -8,7 +8,6 @@ class PartiesService {
 
   static final PartiesService instance = PartiesService._();
 
-
   PartiesRepository? _repository;
   final List<PartyModel> _parties = [];
   bool _isLoaded = false;

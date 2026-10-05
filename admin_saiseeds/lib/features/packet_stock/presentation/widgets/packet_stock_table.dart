@@ -122,8 +122,7 @@ class PacketStockTableState extends State<PacketStockTable> {
         .toList();
   }
 
-  static String _filterLabel(String key) =>
-      key == AppStrings.FILTER_BY_PRODUCT
+  static String _filterLabel(String key) => key == AppStrings.FILTER_BY_PRODUCT
       ? AppStrings.FILTER_LABEL_PRODUCT
       : key;
 

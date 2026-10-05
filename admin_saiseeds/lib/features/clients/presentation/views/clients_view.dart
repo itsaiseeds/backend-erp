@@ -84,11 +84,7 @@ class _ClientsContentState extends State<_ClientsContent> {
     final ClientModel? detail = await cubit.fetchClient(client.publicId);
     if (!mounted) return;
 
-    ClientRecordDialog.show(
-      context,
-      cubit: cubit,
-      client: detail ?? client,
-    );
+    ClientRecordDialog.show(context, cubit: cubit, client: detail ?? client);
   }
 
   @override
@@ -128,8 +124,8 @@ class _ClientsContentState extends State<_ClientsContent> {
                   availableFilters: state.availableFilters,
                   availableSorts: state.availableSorts,
                   onFetchData: _onFetchData,
-            hasMore: state.hasMore,
-            onLoadMore: cubit.loadMore,
+                  hasMore: state.hasMore,
+                  onLoadMore: cubit.loadMore,
                   onView: _onView,
                   onAccept: isPending ? _onAccept : null,
                   emptyTitle: isPending

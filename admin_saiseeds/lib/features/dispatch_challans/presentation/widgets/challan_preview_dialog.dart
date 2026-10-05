@@ -19,10 +19,7 @@ class ChallanPreviewDialog extends StatefulWidget {
 
   const ChallanPreviewDialog({super.key, required this.challan});
 
-  static Future<void> show(
-    BuildContext context,
-    DispatchChallanModel challan,
-  ) {
+  static Future<void> show(BuildContext context, DispatchChallanModel challan) {
     return showDialog<void>(
       context: context,
       barrierColor: AppColors.OVERLAY,
@@ -87,10 +84,7 @@ class _ChallanPreviewDialogState extends State<ChallanPreviewDialog> {
     try {
       final Uint8List bytes = await _buildPdf();
       if (!mounted) return;
-      await Printing.layoutPdf(
-        onLayout: (_) => bytes,
-        name: _fileName,
-      );
+      await Printing.layoutPdf(onLayout: (_) => bytes, name: _fileName);
     } catch (_) {
       if (!mounted) return;
       ToastUtils.showError(context, AppStrings.CHALLAN_PRINT_FAILED);
@@ -128,7 +122,10 @@ class _ChallanPreviewDialogState extends State<ChallanPreviewDialog> {
         width: viewport.width * 0.72,
         height: viewport.height * 0.9,
         child: Column(
-          children: [_buildHeader(), Expanded(child: _buildPreview())],
+          children: [
+            _buildHeader(),
+            Expanded(child: _buildPreview()),
+          ],
         ),
       ),
     );

@@ -53,8 +53,9 @@ OrderModel _orderWith(OrderStatus status) => OrderModel(
   ],
 );
 
-OrdersCubit _cubit() =>
-    OrdersCubit(repository: OrdersRepository(apiClient: ApiClient(dio: Dio())));
+OrdersCubit _cubit() => OrdersCubit(
+  repository: OrdersRepository(apiClient: ApiClient(dio: Dio())),
+);
 
 Future<void> _pump(
   WidgetTester tester, {
@@ -195,9 +196,7 @@ void main() {
     );
   });
 
-  testWidgets('edit mode keeps the compact row with a stepper', (
-    tester,
-  ) async {
+  testWidgets('edit mode keeps the compact row with a stepper', (tester) async {
     await _pump(tester, mode: RecordDialogMode.edit);
     await _goToItems(tester);
 
@@ -211,10 +210,12 @@ void main() {
     await _goToItems(tester);
 
     final Finder stepperCount = find.descendant(
-      of: find.ancestor(
-        of: find.byIcon(Icons.add_rounded).first,
-        matching: find.byType(Row),
-      ).first,
+      of: find
+          .ancestor(
+            of: find.byIcon(Icons.add_rounded).first,
+            matching: find.byType(Row),
+          )
+          .first,
       matching: find.byType(Text),
     );
 

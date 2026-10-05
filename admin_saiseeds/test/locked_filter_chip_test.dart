@@ -48,11 +48,7 @@ void main() {
   });
 
   testWidgets('a locked chip offers no remove button', (tester) async {
-    await _pumpBar(
-      tester,
-      filters: {'status': 'VERIFIED'},
-      locked: {'status'},
-    );
+    await _pumpBar(tester, filters: {'status': 'VERIFIED'}, locked: {'status'});
 
     expect(find.text('status'), findsOneWidget);
     expect(_removeButtonCount(tester), 0);
@@ -71,11 +67,7 @@ void main() {
   });
 
   testWidgets('a locked chip survives a discarded edit', (tester) async {
-    await _pumpBar(
-      tester,
-      filters: {'status': 'VERIFIED'},
-      locked: {'status'},
-    );
+    await _pumpBar(tester, filters: {'status': 'VERIFIED'}, locked: {'status'});
 
     await tester.tap(find.text('status'));
     await tester.pumpAndSettle();

@@ -172,9 +172,7 @@ class _EntryRailTile extends StatelessWidget {
                     duration: _duration,
                     curve: Curves.easeOutCubic,
                     width: AppSizes.entryRailIndicator,
-                    height: isSelected
-                        ? AppSizes.entryRailIndicatorHeight
-                        : 0,
+                    height: isSelected ? AppSizes.entryRailIndicatorHeight : 0,
                     decoration: const BoxDecoration(
                       color: AppColors.PRIMARY,
                       borderRadius: BorderRadius.all(

@@ -49,9 +49,7 @@ class AppDialogShell extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.SURFACE,
           borderRadius: BorderRadius.circular(AppRadius.dialog),
-          border: Border.all(
-            color: _isAccented ? _accent : AppColors.BORDER,
-          ),
+          border: Border.all(color: _isAccented ? _accent : AppColors.BORDER),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

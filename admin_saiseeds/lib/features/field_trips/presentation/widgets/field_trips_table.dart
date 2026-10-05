@@ -252,7 +252,9 @@ class FieldTripsTableState extends State<FieldTripsTable> {
       case FieldTripsTable.COLUMN_STATUS:
         return FieldTripStatusBadge(trip: trip);
       case FieldTripsTable.COLUMN_EXPECTED_START:
-        return _textCell(DateFormatter.instantLabel(trip.expectedStartDateTime));
+        return _textCell(
+          DateFormatter.instantLabel(trip.expectedStartDateTime),
+        );
       case FieldTripsTable.COLUMN_EXPECTED_END:
         return _textCell(DateFormatter.instantLabel(trip.expectedEndDateTime));
       case FieldTripsTable.COLUMN_STARTED_AT:

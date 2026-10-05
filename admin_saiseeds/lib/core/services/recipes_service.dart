@@ -8,7 +8,6 @@ class RecipesService {
 
   static final RecipesService instance = RecipesService._();
 
-
   OtherRawMaterialsRepository? _repository;
   final List<OtherMaterialRecipeModel> _recipes = [];
   bool _isLoaded = false;

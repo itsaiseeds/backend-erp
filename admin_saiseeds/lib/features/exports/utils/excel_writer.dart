@@ -58,9 +58,9 @@ class ExcelWriter {
     );
 
     for (int column = 0; column < sheet.headers.length; column++) {
-      target.cell(
-        CellIndex.indexByColumnRow(columnIndex: column, rowIndex: 0),
-      ).cellStyle = CellStyle(
+      target
+          .cell(CellIndex.indexByColumnRow(columnIndex: column, rowIndex: 0))
+          .cellStyle = CellStyle(
         bold: true,
         fontColorHex: ExcelColor.white,
         backgroundColorHex: _headerFill,
@@ -75,9 +75,14 @@ class ExcelWriter {
       final bool opensGroup = row == 0 || groups[row] != groups[row - 1];
 
       for (int column = 0; column < sheet.headers.length; column++) {
-        target.cell(
-          CellIndex.indexByColumnRow(columnIndex: column, rowIndex: row + 1),
-        ).cellStyle = CellStyle(
+        target
+            .cell(
+              CellIndex.indexByColumnRow(
+                columnIndex: column,
+                rowIndex: row + 1,
+              ),
+            )
+            .cellStyle = CellStyle(
           backgroundColorHex: isTinted ? _bandFill : ExcelColor.none,
           topBorder: opensGroup ? rule : null,
         );

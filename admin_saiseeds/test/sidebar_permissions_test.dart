@@ -12,6 +12,7 @@ void main() {
       TabIds.DASHBOARD,
       TabIds.ADMINS,
       TabIds.SALES_PEOPLE,
+      TabIds.GODOWN_MANAGERS,
       TabIds.CLIENTS,
       TabIds.ORDERS,
       TabIds.DISPATCH_CHALLANS,
@@ -25,6 +26,7 @@ void main() {
       TabIds.INWARD_RAW_MATERIALS,
       TabIds.OTHER_RAW_MATERIALS,
       TabIds.OTHER_MATERIAL_INWARD,
+      TabIds.WASTE_MANAGEMENT,
       TabIds.PRODUCT_STOCK,
       TabIds.RAW_MATERIAL_STOCK,
       TabIds.OTHER_MATERIAL_STOCK,
@@ -40,6 +42,7 @@ void main() {
     expect(ids, [
       TabIds.DASHBOARD,
       TabIds.SALES_PEOPLE,
+      TabIds.GODOWN_MANAGERS,
       TabIds.CLIENTS,
       TabIds.ORDERS,
       TabIds.DISPATCH_CHALLANS,
@@ -53,6 +56,7 @@ void main() {
       TabIds.INWARD_RAW_MATERIALS,
       TabIds.OTHER_RAW_MATERIALS,
       TabIds.OTHER_MATERIAL_INWARD,
+      TabIds.WASTE_MANAGEMENT,
       TabIds.PRODUCT_STOCK,
       TabIds.RAW_MATERIAL_STOCK,
       TabIds.OTHER_MATERIAL_STOCK,
@@ -113,8 +117,10 @@ void main() {
   });
 
   test('product packagings is visible to superuser and admin alike', () {
-    expect(idsFor(UserRoles.SUPERUSER).contains(TabIds.PRODUCT_PACKAGINGS),
-        isTrue);
+    expect(
+      idsFor(UserRoles.SUPERUSER).contains(TabIds.PRODUCT_PACKAGINGS),
+      isTrue,
+    );
     expect(idsFor(UserRoles.ADMIN).contains(TabIds.PRODUCT_PACKAGINGS), isTrue);
   });
 

@@ -3,8 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:admin_saiseeds/features/clients/presentation/widgets/client_form_steps.dart';
 
 void main() {
-  testWidgets('collapsed card hides its body and shows the summary',
-      (tester) async {
+  testWidgets('collapsed card hides its body and shows the summary', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -22,8 +23,9 @@ void main() {
 
     expect(find.text('Shop, Line 1, Ahmedabad'), findsOneWidget);
 
-    final double collapsedHeight =
-        tester.getSize(find.byType(EntryCard)).height;
+    final double collapsedHeight = tester
+        .getSize(find.byType(EntryCard))
+        .height;
 
     await tester.pumpWidget(
       const MaterialApp(
@@ -67,18 +69,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.getSize(find.text('body field')).height, greaterThan(0));
-    expect(find.text('Shop, Line 1'), findsNothing,
-        reason: 'summary is replaced by the body when expanded');
+    expect(
+      find.text('Shop, Line 1'),
+      findsNothing,
+      reason: 'summary is replaced by the body when expanded',
+    );
   });
 
   testWidgets('expanded card shows its body immediately', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
-          body: EntryCard(
-            title: 'Addresses 1',
-            child: Text('body field'),
-          ),
+          body: EntryCard(title: 'Addresses 1', child: Text('body field')),
         ),
       ),
     );

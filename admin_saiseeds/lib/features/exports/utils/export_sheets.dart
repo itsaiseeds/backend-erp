@@ -171,11 +171,7 @@ class ExportSheets {
       }
     }
 
-    return ExportSheet(
-      headers: headers,
-      rows: rows,
-      headSpan: 13,
-    );
+    return ExportSheet(headers: headers, rows: rows, headSpan: 13);
   }
 
   // ──────────────────────── custom orders ───────────────────────
@@ -243,11 +239,7 @@ class ExportSheets {
       }
     }
 
-    return ExportSheet(
-      headers: headers,
-      rows: rows,
-      headSpan: 11,
-    );
+    return ExportSheet(headers: headers, rows: rows, headSpan: 11);
   }
 
   // ─────────────────────── dispatch receipts ────────────────────
@@ -345,11 +337,7 @@ class ExportSheets {
       }
     }
 
-    return ExportSheet(
-      headers: headers,
-      rows: rows,
-      headSpan: 20,
-    );
+    return ExportSheet(headers: headers, rows: rows, headSpan: 20);
   }
 
   // ───────────────────────── inward entries ─────────────────────
@@ -394,7 +382,9 @@ class ExportSheets {
         ]);
       }
 
-      for (final Map<String, dynamic> other in _listOf(day['other_materials'])) {
+      for (final Map<String, dynamic> other in _listOf(
+        day['other_materials'],
+      )) {
         final Map<String, dynamic> recipe = _mapOf(other['recipe']);
         rows.add([
           date,
@@ -414,11 +404,7 @@ class ExportSheets {
       }
     }
 
-    return ExportSheet(
-      headers: headers,
-      rows: rows,
-      headSpan: 1,
-    );
+    return ExportSheet(headers: headers, rows: rows, headSpan: 1);
   }
 
   // ─────────────────────── inventory snapshots ──────────────────
@@ -473,13 +459,16 @@ class ExportSheets {
 
   static String _address(Map<String, dynamic> address) {
     return [
-      address['line_1'],
-      address['line_2'],
-      address['city'],
-      address['state'],
-      address['pincode'],
-      address['country'],
-    ].map((part) => '${part ?? ''}'.trim()).where((p) => p.isNotEmpty).join(', ');
+          address['line_1'],
+          address['line_2'],
+          address['city'],
+          address['state'],
+          address['pincode'],
+          address['country'],
+        ]
+        .map((part) => '${part ?? ''}'.trim())
+        .where((p) => p.isNotEmpty)
+        .join(', ');
   }
 
   /// Dates are written as "YYYY-MM-DD HH:MM" so a spreadsheet sorts them in

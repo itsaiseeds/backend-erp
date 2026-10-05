@@ -213,10 +213,7 @@ class ClientsCubit extends SafeCubit<ClientsState> {
   }
 
   Map<String, dynamic> _buildQueryParams(int page) {
-    final Map<String, dynamic> params = {
-      'page': page,
-      'page_size': PAGE_SIZE,
-    };
+    final Map<String, dynamic> params = {'page': page, 'page_size': PAGE_SIZE};
 
     state.filters.forEach((key, value) {
       final String trimmed = value.trim();

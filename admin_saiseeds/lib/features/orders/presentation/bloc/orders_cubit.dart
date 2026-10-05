@@ -42,9 +42,7 @@ class OrdersState extends Equatable {
     this.search,
     this.sortBy,
     this.sortOrder,
-    this.filters = const {
-      OrdersCubit.STATUS_FILTER: OrderStatusX.BOOKED,
-    },
+    this.filters = const {OrdersCubit.STATUS_FILTER: OrderStatusX.BOOKED},
     this.isTodaysStockComplete = false,
     this.isMutating = false,
     this.errorMessage,
@@ -175,10 +173,7 @@ class OrdersCubit extends SafeCubit<OrdersState> {
     required String lrNumber,
   }) {
     return _mutate(
-      () => _repository.uploadLrNumber(
-        publicId: publicId,
-        lrNumber: lrNumber,
-      ),
+      () => _repository.uploadLrNumber(publicId: publicId, lrNumber: lrNumber),
     );
   }
 

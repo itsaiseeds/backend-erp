@@ -59,9 +59,7 @@ Widget _harness() {
     value: _stubClient(),
     child: MaterialApp(
       theme: AppTheme.light,
-      home: Scaffold(
-        body: DashboardContentSwitcher.screenFor(TabIds.PRODUCTS),
-      ),
+      home: Scaffold(body: DashboardContentSwitcher.screenFor(TabIds.PRODUCTS)),
     ),
   );
 }

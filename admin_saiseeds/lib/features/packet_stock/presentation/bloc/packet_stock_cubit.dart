@@ -190,8 +190,7 @@ class PacketStockCubit extends SafeCubit<PacketStockState> {
     emit(state.copyWith(isSubmitting: true, clearError: true));
 
     try {
-      final bool alreadyRecorded = await _repository
-          .fetchTodaysStockComplete();
+      final bool alreadyRecorded = await _repository.fetchTodaysStockComplete();
 
       if (alreadyRecorded) {
         await _repository.patchPacketStock(entries);
@@ -202,7 +201,9 @@ class PacketStockCubit extends SafeCubit<PacketStockState> {
       await loadPacketStock();
       return true;
     } catch (error) {
-      emit(state.copyWith(isSubmitting: false, errorMessage: _messageOf(error)));
+      emit(
+        state.copyWith(isSubmitting: false, errorMessage: _messageOf(error)),
+      );
       return false;
     }
   }

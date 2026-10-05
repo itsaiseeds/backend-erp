@@ -81,9 +81,7 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
           ? null
           : AppStrings.VALIDATION_PRODUCT_REQUIRED;
       _partyError = isPartyValid ? null : AppStrings.VALIDATION_PARTY_REQUIRED;
-      _dateError = isDateValid
-          ? null
-          : AppStrings.VALIDATION_LAB_DATE_REQUIRED;
+      _dateError = isDateValid ? null : AppStrings.VALIDATION_LAB_DATE_REQUIRED;
     });
 
     if (!isFormValid || !isProductValid || !isPartyValid || !isDateValid) {

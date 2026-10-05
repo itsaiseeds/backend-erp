@@ -235,16 +235,10 @@ class _FieldTripDetailDialogState extends State<FieldTripDetailDialog> {
   Widget _buildPlanFields() {
     return DetailFieldGrid(
       fields: [
-        DetailField(
-          label: AppStrings.COLUMN_TRIP_ID,
-          value: _trip.publicId,
-        ),
+        DetailField(label: AppStrings.COLUMN_TRIP_ID, value: _trip.publicId),
         DetailField(label: AppStrings.COLUMN_CITY, value: _trip.cityName),
         DetailField(label: AppStrings.COLUMN_VILLAGE, value: _trip.village),
-        DetailField(
-          label: AppStrings.COLUMN_STATUS,
-          value: _trip.statusLabel,
-        ),
+        DetailField(label: AppStrings.COLUMN_STATUS, value: _trip.statusLabel),
         DetailField(
           label: AppStrings.COLUMN_EXPECTED_START,
           value: DateFormatter.instantLabel(_trip.expectedStartDateTime),
@@ -438,9 +432,7 @@ class _TimelineStep extends StatelessWidget {
             width: AppSizes.iconLg,
             child: Column(
               children: [
-                Expanded(
-                  child: _rail(isVisible: !isFirst),
-                ),
+                Expanded(child: _rail(isVisible: !isFirst)),
                 Container(
                   width: AppSizes.profileMarkerDot,
                   height: AppSizes.profileMarkerDot,

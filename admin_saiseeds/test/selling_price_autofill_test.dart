@@ -161,23 +161,26 @@ void main() {
       );
     });
 
-    test('a field change that is not the autofilled value is a manual edit', () {
-      final SellingPriceAutofill autofill = SellingPriceAutofill();
+    test(
+      'a field change that is not the autofilled value is a manual edit',
+      () {
+        final SellingPriceAutofill autofill = SellingPriceAutofill();
 
-      final String? computed = autofill.nextValue(
-        productSellingPrice: 120,
-        packetWeight: '2',
-        packets: '5',
-      );
-      expect(computed, '1200.00');
+        final String? computed = autofill.nextValue(
+          productSellingPrice: 120,
+          packetWeight: '2',
+          packets: '5',
+        );
+        expect(computed, '1200.00');
 
-      // Echoing back the autofilled value must not count as an edit.
-      autofill.registerFieldChange(computed!);
-      expect(autofill.isManuallyEdited, isFalse);
+        // Echoing back the autofilled value must not count as an edit.
+        autofill.registerFieldChange(computed!);
+        expect(autofill.isManuallyEdited, isFalse);
 
-      autofill.registerFieldChange('50');
-      expect(autofill.isManuallyEdited, isTrue);
-    });
+        autofill.registerFieldChange('50');
+        expect(autofill.isManuallyEdited, isTrue);
+      },
+    );
 
     test('returns null for missing or non-positive inputs', () {
       final SellingPriceAutofill autofill = SellingPriceAutofill();

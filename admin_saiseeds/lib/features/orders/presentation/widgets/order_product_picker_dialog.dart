@@ -483,9 +483,7 @@ class _PackagingCard extends StatelessWidget {
   Widget _buildDetails() {
     final ProductModel? product = _product;
     final String stage = product?.stageName ?? '';
-    final num? price = isPerPacket
-        ? _packetPrice
-        : packaging.sellingPriceValue;
+    final num? price = isPerPacket ? _packetPrice : packaging.sellingPriceValue;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -795,9 +793,7 @@ class _Tag extends StatelessWidget {
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: AppTypography.labelSmall.copyWith(
-          color: AppColors.TEXT_PRIMARY,
-        ),
+        style: AppTypography.labelSmall.copyWith(color: AppColors.TEXT_PRIMARY),
       ),
     );
   }
