@@ -105,9 +105,7 @@ class FieldTripModel {
       startedAt: _stringOf(json['started_at']),
       endedAt: _stringOf(json['ended_at']),
       salesPerson: salesPerson is Map
-          ? FieldTripPersonRef.fromJson(
-              Map<String, dynamic>.from(salesPerson),
-            )
+          ? FieldTripPersonRef.fromJson(Map<String, dynamic>.from(salesPerson))
           : null,
       approvedBy: approvedBy is Map
           ? FieldTripPersonRef.fromJson(Map<String, dynamic>.from(approvedBy))

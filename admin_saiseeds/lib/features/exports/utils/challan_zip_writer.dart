@@ -15,9 +15,7 @@ class ChallanZipWriter {
 
   static const String mimeType = 'application/zip';
 
-  static Future<Uint8List> build(
-    List<DispatchChallanModel> challans,
-  ) async {
+  static Future<Uint8List> build(List<DispatchChallanModel> challans) async {
     final Archive archive = Archive();
     final Set<String> used = {};
 
@@ -37,10 +35,7 @@ class ChallanZipWriter {
   /// Two challans can share a reference if the API ever repeats one, and a
   /// zip with duplicate entries extracts unpredictably -- so a clash gets a
   /// numeric suffix rather than silently overwriting.
-  static String _uniqueName(
-    DispatchChallanModel challan,
-    Set<String> used,
-  ) {
+  static String _uniqueName(DispatchChallanModel challan, Set<String> used) {
     final String stem = _safeStem(challan.fileReference);
     String name = '$stem.pdf';
     int suffix = 2;
@@ -54,9 +49,7 @@ class ChallanZipWriter {
   }
 
   static String _safeStem(String raw) {
-    final String cleaned = raw
-        .trim()
-        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '-');
+    final String cleaned = raw.trim().replaceAll(RegExp(r'[\\/:*?"<>|]'), '-');
     return cleaned.isEmpty ? 'challan' : cleaned;
   }
 }

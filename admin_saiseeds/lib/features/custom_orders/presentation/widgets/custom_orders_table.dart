@@ -262,9 +262,7 @@ class CustomOrdersTableState extends State<CustomOrdersTable> {
       case CustomOrdersTable.COLUMN_STATUS:
         return Center(child: OrderStatusBadge(status: order.statusValue));
       case CustomOrdersTable.COLUMN_AMOUNT:
-        return _textCell(
-          CurrencyFormatter.rupees(order.totalAmountValue ?? 0),
-        );
+        return _textCell(CurrencyFormatter.rupees(order.totalAmountValue ?? 0));
       case CustomOrdersTable.COLUMN_ITEMS:
         return _textCell('${order.itemCount}');
       case CustomOrdersTable.COLUMN_PACKETS:
@@ -301,7 +299,8 @@ class CustomOrdersTableState extends State<CustomOrdersTable> {
             icon: Icons.local_shipping_outlined,
             tone: RowActionTone.success,
             blockedHint: AppStrings.ORDER_DISPATCH_BLOCKED,
-            onSelected: !order.canDispatch || isBusy || widget.onDispatch == null
+            onSelected:
+                !order.canDispatch || isBusy || widget.onDispatch == null
                 ? null
                 : () => widget.onDispatch!(order),
           ),

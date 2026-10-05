@@ -33,9 +33,7 @@ class FarmerVisitSummary {
     return FarmerVisitSummary(
       publicId: FarmerModel.stringOf(json['public_id']),
       fieldTripPublicId: trip is Map
-          ? FarmerModel.stringOf(
-              Map<String, dynamic>.from(trip)['public_id'],
-            )
+          ? FarmerModel.stringOf(Map<String, dynamic>.from(trip)['public_id'])
           : FarmerModel.stringOf(json['field_trip_public_id'] ?? trip),
       village: FarmerModel.stringOf(json['village']),
       landAreaBigha: FarmerModel.decimalOf(json['land_area_bigha']),
@@ -47,9 +45,7 @@ class FarmerVisitSummary {
       salesPerson: salesPerson is Map
           ? FieldTripPersonRef.fromJson(Map<String, dynamic>.from(salesPerson))
           : null,
-      visitedAt: FarmerModel.stringOf(
-        json['visited_at'] ?? json['created_at'],
-      ),
+      visitedAt: FarmerModel.stringOf(json['visited_at'] ?? json['created_at']),
     );
   }
 

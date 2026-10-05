@@ -57,12 +57,11 @@ Future<void> _openItems(
       home: Scaffold(
         body: Builder(
           builder: (context) => TextButton(
-            onPressed: () =>
-                OrderDetailDialog.show(
-                  context,
-                  _orderWith(lineCount),
-                  cubit: _cubit(),
-                ),
+            onPressed: () => OrderDetailDialog.show(
+              context,
+              _orderWith(lineCount),
+              cubit: _cubit(),
+            ),
             child: const Text('open'),
           ),
         ),
@@ -88,8 +87,9 @@ double _cardHeight(WidgetTester tester) => tester
     )
     .height;
 
-OrdersCubit _cubit() =>
-    OrdersCubit(repository: OrdersRepository(apiClient: ApiClient(dio: Dio())));
+OrdersCubit _cubit() => OrdersCubit(
+  repository: OrdersRepository(apiClient: ApiClient(dio: Dio())),
+);
 
 void main() {
   testWidgets('a long order scrolls rather than overflowing', (tester) async {

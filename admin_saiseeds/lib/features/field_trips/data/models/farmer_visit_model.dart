@@ -53,8 +53,7 @@ class FarmerVisitModel {
 
   String get cropNames => crops.map((crop) => crop.name).join(', ');
 
-  String get productNames =>
-      products.map((product) => product.name).join(', ');
+  String get productNames => products.map((product) => product.name).join(', ');
 
   num? get landAreaValue => num.tryParse(landAreaBigha);
 

@@ -570,7 +570,10 @@ class ChallanGenerator {
           child: pw.Column(
             children: [
               _totalLine('Total Items', '${challan.itemCount}'),
-              _totalLine('Total Weight', '${totalWeight.toStringAsFixed(3)} kg'),
+              _totalLine(
+                'Total Weight',
+                '${totalWeight.toStringAsFixed(3)} kg',
+              ),
               _totalLine('Total Bags', '$totalBags'),
               _totalLine(
                 'Total Packets',

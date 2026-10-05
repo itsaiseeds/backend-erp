@@ -151,8 +151,7 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
   }
 
   Future<void> _addLine() async {
-    final ProductPackagingsRepository? repository =
-        widget.packagingsRepository;
+    final ProductPackagingsRepository? repository = widget.packagingsRepository;
     if (repository == null) return;
 
     final List<PickedPackaging>? picked = await OrderProductPickerDialog.show(
@@ -353,8 +352,7 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
     );
   }
 
-  int get _liveItemCount =>
-      _isEditing ? _lines.length : _order.itemCount;
+  int get _liveItemCount => _isEditing ? _lines.length : _order.itemCount;
 
   int get _liveBagCount => _isEditing
       ? _lines.fold(0, (total, line) => total + line.quantity)
@@ -471,8 +469,7 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
         SingleDateField(
           value: _expectedDeliveryDate,
           enabled: _canEdit,
-          onChanged: (picked) =>
-              setState(() => _expectedDeliveryDate = picked),
+          onChanged: (picked) => setState(() => _expectedDeliveryDate = picked),
         ),
       ],
     );
@@ -785,32 +782,32 @@ class _ItemRow extends StatelessWidget {
                       onChanged: onPriceChanged,
                     )
                   : Row(
-                children: [
-                  Text(
-                    CurrencyFormatter.rupees(line.effectivePrice),
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.TEXT_PRIMARY,
+                      children: [
+                        Text(
+                          CurrencyFormatter.rupees(line.effectivePrice),
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.TEXT_PRIMARY,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xxs),
+                        Text(
+                          AppStrings.ORDER_PER_BAG,
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.TEXT_DISABLED,
+                          ),
+                        ),
+                        if (line.isNegotiated) ...[
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            CurrencyFormatter.rupees(line.sellingPrice),
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.TEXT_DISABLED,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.xxs),
-                  Text(
-                    AppStrings.ORDER_PER_BAG,
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.TEXT_DISABLED,
-                    ),
-                  ),
-                  if (line.isNegotiated) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      CurrencyFormatter.rupees(line.sellingPrice),
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.TEXT_DISABLED,
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
             ),
             const SizedBox(width: AppSpacing.sm),
             Text(

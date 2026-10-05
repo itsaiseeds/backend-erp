@@ -14,9 +14,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('App boots and renders MaterialApp', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('App boots and renders MaterialApp', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1600, 1000));
 
     await tester.pumpWidget(const AdminSaiseedsApp());

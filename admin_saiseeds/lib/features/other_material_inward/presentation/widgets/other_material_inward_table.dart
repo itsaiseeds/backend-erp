@@ -231,7 +231,8 @@ class OtherMaterialInwardTableState extends State<OtherMaterialInwardTable> {
     final String quantity = lot.quantity.trim();
     if (quantity.isEmpty) return quantity;
 
-    final String unit = RecipesService.instance
+    final String unit =
+        RecipesService.instance
             .recipeByPublicId(lot.recipePublicId)
             ?.unitType
             .trim() ??

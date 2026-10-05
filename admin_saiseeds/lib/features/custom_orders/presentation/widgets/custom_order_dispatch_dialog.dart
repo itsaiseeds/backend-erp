@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/models/city_model.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -11,8 +12,11 @@ import '../../../../core/utils/validators/form_validators.dart';
 import '../../../../core/widgets/dialogs/app_record_dialog.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
 import '../../../../core/widgets/inputs/city_picker_field.dart';
+import '../../../../core/widgets/inputs/lot_number_picker_field.dart';
 import '../../../../core/widgets/layout/record_field_row.dart';
 import '../../../../core/widgets/feedback/section_title.dart';
+import '../../../dispatch_challans/data/dispatch_lot_numbers_repository.dart';
+import '../../../dispatch_challans/data/models/dispatch_lot_number_model.dart';
 import '../../data/models/custom_order_model.dart';
 import '../bloc/custom_orders_cubit.dart';
 
@@ -69,7 +73,10 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
   final TextEditingController _vehicleController = TextEditingController();
   final TextEditingController _driverNameController = TextEditingController();
   final TextEditingController _driverNumberController = TextEditingController();
-  final Map<String, TextEditingController> _lotControllers = {};
+  final Map<String, DispatchLotNumberModel?> _lotValues = {};
+  List<DispatchLotNumberModel> _lotNumbers = const [];
+  bool _isLoadingLots = true;
+  bool _lotsUnavailable = false;
 
   int _stepIndex = 0;
   CityModel? _fromCity;
@@ -88,8 +95,33 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
   void initState() {
     super.initState();
     for (final CustomOrderItemModel item in _lines) {
-      _lotControllers[_keyOf(item)] = TextEditingController();
+      _lotValues[_keyOf(item)] = null;
     }
+    _loadLotNumbers();
+  }
+
+  Future<void> _loadLotNumbers() async {
+    final List<DispatchLotNumberModel> lots =
+        await DispatchLotNumbersRepository(
+          apiClient: context.read<ApiClient>(),
+        ).fetchLotNumbers();
+
+    if (!mounted) return;
+    setState(() {
+      _lotNumbers = lots;
+      _isLoadingLots = false;
+      _lotsUnavailable = lots.isEmpty;
+    });
+  }
+
+  void _setLot(String key, DispatchLotNumberModel lot) {
+    setState(() => _lotValues[key] = lot);
+  }
+
+  String _lotFor(String key) => _lotValues[key]?.lotNumber.trim() ?? '';
+
+  void _setFreeLot(String key, String typed) {
+    setState(() => _lotValues[key] = DispatchLotNumberModel(lotNumber: typed));
   }
 
   @override
@@ -97,9 +129,6 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
     _vehicleController.dispose();
     _driverNameController.dispose();
     _driverNumberController.dispose();
-    for (final TextEditingController controller in _lotControllers.values) {
-      controller.dispose();
-    }
     super.dispose();
   }
 
@@ -150,7 +179,7 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
             {
               'product_public_id': item.productPublicId,
               'packet_weight': item.packetWeight,
-              'lot_number': _lotControllers[_keyOf(item)]?.text.trim() ?? '',
+              'lot_number': _lotFor(_keyOf(item)),
             },
         ],
       },
@@ -282,16 +311,27 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
       );
     }
 
+    if (_isLoadingLots) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final CustomOrderItemModel item in _lines) ...[
-          AppTextField(
-            controller: _lotControllers[_keyOf(item)],
-            label: _lineLabel(item),
-            hint: AppStrings.FIELD_LOT_NUMBER_HINT,
+          LotNumberPickerField(
+            value: _lotValues[_keyOf(item)],
+            lotNumbers: _lotNumbers,
             enabled: !_isSubmitting,
+            isUnavailable: _lotsUnavailable,
+            onSelected: (lot) => _setLot(_keyOf(item), lot),
+            onFreeEntry: (typed) => _setFreeLot(_keyOf(item), typed),
           ),
           const SizedBox(height: AppSpacing.md),
         ],
@@ -328,10 +368,7 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
         ),
         const SizedBox(height: AppSpacing.sm),
         for (final CustomOrderItemModel item in _lines)
-          _SummaryRow(
-            label: _lineLabel(item),
-            value: _lotControllers[_keyOf(item)]?.text.trim() ?? '',
-          ),
+          _SummaryRow(label: _lineLabel(item), value: _lotFor(_keyOf(item))),
       ],
     );
   }

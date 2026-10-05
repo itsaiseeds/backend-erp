@@ -305,7 +305,8 @@ class _DateRangeFieldState extends State<DateRangeField> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final preset in (widget.presets ?? DateRangeField.defaultPresets))
+          for (final preset
+              in (widget.presets ?? DateRangeField.defaultPresets))
             InkWell(
               onTap: () => _applyPreset(preset),
               child: Padding(

@@ -209,9 +209,7 @@ class OtherMaterialInwardCubit extends SafeCubit<OtherMaterialInwardState> {
       emit(
         state.copyWith(
           status: OtherMaterialInwardStatus.loaded,
-          lots: append
-              ? [...state.lots, ...result.results]
-              : result.results,
+          lots: append ? [...state.lots, ...result.results] : result.results,
           availableFilters: result.availableFilters.isEmpty
               ? state.availableFilters
               : result.availableFilters,

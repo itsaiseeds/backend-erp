@@ -1,4 +1,5 @@
 import '../../../../core/constants/app_strings.dart';
+
 class ChallanAddressModel {
   final String line1;
   final String line2;

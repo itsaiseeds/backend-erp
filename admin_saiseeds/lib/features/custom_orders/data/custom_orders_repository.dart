@@ -48,10 +48,7 @@ class CustomOrdersRepository {
     required String publicId,
     required Map<String, dynamic> changes,
   }) async {
-    await _apiClient.patch(
-      CustomOrdersEndpoints.edit(publicId),
-      body: changes,
-    );
+    await _apiClient.patch(CustomOrdersEndpoints.edit(publicId), body: changes);
   }
 
   Future<void> deleteCustomOrder(String publicId) async {
@@ -62,10 +59,7 @@ class CustomOrdersRepository {
     required String publicId,
     required Map<String, dynamic> body,
   }) async {
-    await _apiClient.post(
-      CustomOrdersEndpoints.dispatch(publicId),
-      body: body,
-    );
+    await _apiClient.post(CustomOrdersEndpoints.dispatch(publicId), body: body);
   }
 
   Future<void> revertDispatch(String publicId) async {

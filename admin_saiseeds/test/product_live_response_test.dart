@@ -31,25 +31,14 @@ void main() {
   });
 
   test('keeps real decimals but trims a bare .0', () {
-    expect(
-      ProductModel.fromJson({'selling_price': 30.0}).sellingPrice,
-      '30',
-    );
-    expect(
-      ProductModel.fromJson({'selling_price': 30.5}).sellingPrice,
-      '30.5',
-    );
-    expect(
-      ProductModel.fromJson({'selling_price': '250'}).sellingPrice,
-      '250',
-    );
+    expect(ProductModel.fromJson({'selling_price': 30.0}).sellingPrice, '30');
+    expect(ProductModel.fromJson({'selling_price': 30.5}).sellingPrice, '30.5');
+    expect(ProductModel.fromJson({'selling_price': '250'}).sellingPrice, '250');
     expect(ProductModel.fromJson({}).sellingPrice, '');
   });
 
   test('resolves a relative media path against the API host', () {
-    final p = ProductModel.fromJson({
-      'image_url': '/media/products/abc.jpg',
-    });
+    final p = ProductModel.fromJson({'image_url': '/media/products/abc.jpg'});
     expect(p.imageUrl, '/media/products/abc.jpg');
     expect(p.imageDisplayUrl.endsWith('/media/products/abc.jpg'), isTrue);
 

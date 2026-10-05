@@ -34,11 +34,7 @@ class OtherMaterialInwardRepository {
   }) async {
     await _apiClient.post(
       RawMaterialsEndpoints.otherInwardCreate,
-      body: {
-        'party': partyId,
-        'recipe': recipePublicId,
-        'quantity': quantity,
-      },
+      body: {'party': partyId, 'recipe': recipePublicId, 'quantity': quantity},
     );
   }
 

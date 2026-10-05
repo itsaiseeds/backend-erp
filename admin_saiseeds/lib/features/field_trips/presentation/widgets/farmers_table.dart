@@ -305,7 +305,12 @@ class FarmersTableState extends State<FarmersTable> {
     return OverflowTooltip(
       text: joined,
       style: style,
-      child: Text(joined, maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+      child: Text(
+        joined,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      ),
     );
   }
 

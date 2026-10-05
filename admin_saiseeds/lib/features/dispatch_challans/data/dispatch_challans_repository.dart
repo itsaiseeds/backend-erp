@@ -26,5 +26,4 @@ class DispatchChallansRepository {
       Map<String, dynamic>.from(response),
     );
   }
-
 }

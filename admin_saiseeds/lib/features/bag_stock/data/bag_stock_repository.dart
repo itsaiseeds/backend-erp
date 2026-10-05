@@ -10,7 +10,6 @@ class BagStockRepository {
   const BagStockRepository({required ApiClient apiClient})
     : _apiClient = apiClient;
 
-
   /// Whether today's inventory has already been recorded. The first update of
   /// the day creates it (POST); later ones amend it (PATCH).
   Future<bool> fetchTodaysStockComplete() async {

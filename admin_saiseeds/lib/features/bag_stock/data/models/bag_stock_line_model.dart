@@ -61,8 +61,9 @@ class BagStockSnapshotModel {
           ? lines
                 .whereType<Map>()
                 .map(
-                  (line) =>
-                      BagStockLineModel.fromJson(Map<String, dynamic>.from(line)),
+                  (line) => BagStockLineModel.fromJson(
+                    Map<String, dynamic>.from(line),
+                  ),
                 )
                 .toList()
           : const [],

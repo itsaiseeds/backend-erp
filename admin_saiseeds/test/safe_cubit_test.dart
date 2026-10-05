@@ -30,14 +30,17 @@ void main() {
     expect(cubit.state, 0);
   });
 
-  test('an in-flight async emit resolving after close does not throw', () async {
-    final cubit = _CounterCubit();
-    final gate = Future<void>.delayed(const Duration(milliseconds: 20));
+  test(
+    'an in-flight async emit resolving after close does not throw',
+    () async {
+      final cubit = _CounterCubit();
+      final gate = Future<void>.delayed(const Duration(milliseconds: 20));
 
-    final pending = cubit.bumpAfter(gate);
-    await cubit.close();
+      final pending = cubit.bumpAfter(gate);
+      await cubit.close();
 
-    await expectLater(pending, completes);
-    expect(cubit.state, 0);
-  });
+      await expectLater(pending, completes);
+      expect(cubit.state, 0);
+    },
+  );
 }

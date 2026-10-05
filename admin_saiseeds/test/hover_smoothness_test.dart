@@ -4,8 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:admin_saiseeds/core/widgets/buttons/outlined_action_button.dart';
 
 void main() {
-  testWidgets('outlined button fades its hover tint instead of snapping',
-      (tester) async {
+  testWidgets('outlined button fades its hover tint instead of snapping', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

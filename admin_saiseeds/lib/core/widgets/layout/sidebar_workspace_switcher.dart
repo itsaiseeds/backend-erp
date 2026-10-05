@@ -97,7 +97,8 @@ class SidebarWorkspaceSwitcher extends StatelessWidget {
     );
 
     return Tooltip(
-      message: '${AppStrings.WORKSPACE_SWITCH_LABEL}: ${active.workspace.label}',
+      message:
+          '${AppStrings.WORKSPACE_SWITCH_LABEL}: ${active.workspace.label}',
       preferBelow: false,
       child: PopupMenuButton<String>(
         tooltip: '',

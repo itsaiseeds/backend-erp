@@ -145,8 +145,6 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
     }
   }
 
-
-
   Future<void> _loadAddresses(ClientModel client) async {
     setState(() {
       _isLoadingAddresses = true;
@@ -184,9 +182,7 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
     final bool addressValid = _address != null;
 
     setState(() {
-      _clientError = clientValid
-          ? null
-          : AppStrings.VALIDATION_CLIENT_REQUIRED;
+      _clientError = clientValid ? null : AppStrings.VALIDATION_CLIENT_REQUIRED;
       _addressError = addressValid
           ? null
           : AppStrings.VALIDATION_ADDRESS_REQUIRED;

@@ -28,9 +28,7 @@ class StockStatusChip extends StatelessWidget {
           width: double.infinity,
           height: double.infinity,
           decoration: BoxDecoration(
-            color: isComplete
-                ? AppColors.SUCCESS_LIGHT
-                : AppColors.TRANSPARENT,
+            color: isComplete ? AppColors.SUCCESS_LIGHT : AppColors.TRANSPARENT,
             border: Border.all(
               color: isComplete ? AppColors.SUCCESS_BORDER : AppColors.BORDER,
             ),

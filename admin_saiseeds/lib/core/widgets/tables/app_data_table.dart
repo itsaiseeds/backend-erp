@@ -223,8 +223,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     super.initState();
     _searchController = TextEditingController();
     _bodyScrollController = ScrollController();
-    _rowScrollController = ScrollController()
-      ..addListener(_onRowScroll);
+    _rowScrollController = ScrollController()..addListener(_onRowScroll);
     _pinnedColumns = List<String>.from(widget.initialPinnedColumns);
     _hiddenColumns = List<String>.from(widget.initialHiddenColumns);
     _selection.addAll(widget.initialSelection);
@@ -250,8 +249,7 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
     if (!widget.isInfiniteScroll || !_rowScrollController.hasClients) return;
 
     final ScrollPosition position = _rowScrollController.position;
-    if (position.pixels <
-        position.maxScrollExtent - _loadMoreThreshold) {
+    if (position.pixels < position.maxScrollExtent - _loadMoreThreshold) {
       return;
     }
     _requestMore();
@@ -1086,22 +1084,22 @@ class AppDataTableState<T> extends State<AppDataTable<T>> {
             itemBuilder: (context, index) => index >= data.length
                 ? const _LoadMoreRow()
                 : _TableRow<T>(
-              item: data[index],
-              rowIndex: index,
-              stickyColumns: stickyCols,
-              scrollableColumns: scrollCols,
-              scaleFactor: scaleFactor,
-              rowHeight: widget.rowHeight,
-              isBusy: widget.isLoading || widget.isOperationInProgress,
-              scrollController: _bodyScrollController,
-              onTap: widget.onRowTap,
-              stickyWidth:
-                  (_effectiveColumnsWidth(stickyCols) * scaleFactor) +
-                  _dividerTotal(stickyCols.length),
-              trailingColumns: _trailingColumns,
-              viewportWidth: maxWidth - (AppSizes.borderThin * 2),
-              cellBuilder: _buildDataCell,
-            ),
+                    item: data[index],
+                    rowIndex: index,
+                    stickyColumns: stickyCols,
+                    scrollableColumns: scrollCols,
+                    scaleFactor: scaleFactor,
+                    rowHeight: widget.rowHeight,
+                    isBusy: widget.isLoading || widget.isOperationInProgress,
+                    scrollController: _bodyScrollController,
+                    onTap: widget.onRowTap,
+                    stickyWidth:
+                        (_effectiveColumnsWidth(stickyCols) * scaleFactor) +
+                        _dividerTotal(stickyCols.length),
+                    trailingColumns: _trailingColumns,
+                    viewportWidth: maxWidth - (AppSizes.borderThin * 2),
+                    cellBuilder: _buildDataCell,
+                  ),
           ),
         ),
       ),

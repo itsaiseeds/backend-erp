@@ -51,12 +51,20 @@ void main() {
   testWidgets('every admin field is present in both modes', (tester) async {
     await _pump(tester, RecordDialogMode.view);
     for (final String label in _labels) {
-      expect(find.text(label), findsOneWidget, reason: '$label missing in view');
+      expect(
+        find.text(label),
+        findsOneWidget,
+        reason: '$label missing in view',
+      );
     }
 
     await _pump(tester, RecordDialogMode.edit);
     for (final String label in _labels) {
-      expect(find.text(label), findsOneWidget, reason: '$label missing in edit');
+      expect(
+        find.text(label),
+        findsOneWidget,
+        reason: '$label missing in edit',
+      );
     }
   });
 

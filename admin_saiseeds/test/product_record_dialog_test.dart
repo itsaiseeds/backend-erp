@@ -37,8 +37,9 @@ Future<void> _pump(WidgetTester tester, RecordDialogMode mode) async {
   await tester.pumpAndSettle();
 }
 
-Finder _card() =>
-    find.descendant(of: find.byType(Dialog), matching: find.byType(Container)).first;
+Finder _card() => find
+    .descendant(of: find.byType(Dialog), matching: find.byType(Container))
+    .first;
 
 void main() {
   testWidgets('view and edit share one title', (tester) async {
@@ -83,9 +84,7 @@ void main() {
     tester,
   ) async {
     await _pump(tester, RecordDialogMode.view);
-    final Rect name = tester.getRect(
-      find.text(AppStrings.FIELD_PRODUCT_NAME),
-    );
+    final Rect name = tester.getRect(find.text(AppStrings.FIELD_PRODUCT_NAME));
     final Rect price = tester.getRect(
       find.text(AppStrings.FIELD_SELLING_PRICE),
     );
@@ -142,9 +141,7 @@ void main() {
   ) async {
     await _pump(tester, RecordDialogMode.edit);
 
-    final Rect stage = tester.getRect(
-      find.byType(SearchableField<StageModel>),
-    );
+    final Rect stage = tester.getRect(find.byType(SearchableField<StageModel>));
     final Rect price = tester.getRect(
       find.text(AppStrings.FIELD_SELLING_PRICE),
     );

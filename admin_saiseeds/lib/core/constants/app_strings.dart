@@ -46,6 +46,7 @@ class AppStrings {
   static const String PROFILE = 'Profile';
   static const String ADMINS = 'Admins';
   static const String SALES_PEOPLE = 'Sales People';
+  static const String GODOWN_MANAGERS = 'Godown Managers';
 
   static const String SIDEBAR_COLLAPSE = 'Collapse sidebar';
   static const String SIDEBAR_EXPAND = 'Expand sidebar';
@@ -278,6 +279,8 @@ class AppStrings {
 
   static const String ADMINS_TABLE_SEARCH_HINT = 'Search administrators...';
   static const String SALES_PEOPLE_TABLE_SEARCH_HINT = 'Search sales people...';
+  static const String GODOWN_MANAGERS_TABLE_SEARCH_HINT =
+      'Search godown managers...';
   static const String COLUMN_NAME = 'Name';
   static const String COLUMN_PHONE_NUMBER = 'Phone Number';
   static const String COLUMN_ROLE = 'Role';
@@ -306,6 +309,8 @@ class AppStrings {
   static const String EDIT_ADMIN = 'Edit Administrator';
   static const String ADD_SALES_PERSON = 'Add Sales Person';
   static const String EDIT_SALES_PERSON = 'Edit Sales Person';
+  static const String ADD_GODOWN_MANAGER = 'Add Godown Manager';
+  static const String EDIT_GODOWN_MANAGER = 'Edit Godown Manager';
   static const String ADD_ADMIN_SUBTITLE =
       'Create an administrator account with platform access.';
   static const String EDIT_ADMIN_SUBTITLE =
@@ -314,6 +319,10 @@ class AppStrings {
       'Register a field sales account on the platform.';
   static const String EDIT_SALES_PERSON_SUBTITLE =
       'Update the sales person account details.';
+  static const String ADD_GODOWN_MANAGER_SUBTITLE =
+      'Register a godown manager account on the platform.';
+  static const String EDIT_GODOWN_MANAGER_SUBTITLE =
+      'Update the godown manager account details.';
 
   static const String FIELD_NAME = 'Name';
   static const String FIELD_NAME_HINT = 'Full name';
@@ -344,6 +353,9 @@ class AppStrings {
   static const String SALES_PERSON_CREATED_TITLE = 'Sales person created';
   static const String SALES_PERSON_UPDATED_TITLE = 'Sales person updated';
   static const String SALES_PERSON_DELETED_TITLE = 'Sales person deleted';
+  static const String GODOWN_MANAGER_CREATED_TITLE = 'Godown manager created';
+  static const String GODOWN_MANAGER_UPDATED_TITLE = 'Godown manager updated';
+  static const String GODOWN_MANAGER_DELETED_TITLE = 'Godown manager deleted';
 
   static const String DELETE_ADMIN_TITLE = 'Delete administrator';
   static const String DELETE_ADMIN_BODY =
@@ -353,9 +365,14 @@ class AppStrings {
   static const String DELETE_SALES_PERSON_BODY =
       'This permanently removes the sales person account. This cannot be '
       'undone.';
+  static const String DELETE_GODOWN_MANAGER_TITLE = 'Delete godown manager';
+  static const String DELETE_GODOWN_MANAGER_BODY =
+      'This permanently removes the godown manager account. This cannot be '
+      'undone.';
 
   static const String ADMIN_DETAIL_TITLE = 'Administrator details';
   static const String SALES_PERSON_DETAIL_TITLE = 'Sales person details';
+  static const String GODOWN_MANAGER_DETAIL_TITLE = 'Godown manager details';
   static const String DETAIL_SECTION_ACCOUNT = 'Account';
   static const String DETAIL_SECTION_ACCOUNT_HINT =
       'Identity and contact details on record.';
@@ -366,6 +383,8 @@ class AppStrings {
   static const String DETAIL_FIELD_CREATED_AT = 'Created At';
   static const String SALES_PERSON_EDIT_HINT =
       'Update the sales person account details.';
+  static const String GODOWN_MANAGER_EDIT_HINT =
+      'Update the godown manager account details.';
   static const String VIEW_MODE_TOAST_TITLE = 'View mode';
   static const String VIEW_MODE_TOAST_BODY =
       'Select the edit action in the header to change these details.';
@@ -411,6 +430,12 @@ class AppStrings {
   static const String SALES_PEOPLE_EMPTY_STATE_TITLE = 'No sales people yet';
   static const String SALES_PEOPLE_EMPTY_STATE_BODY =
       'Add a sales person to register a field account.';
+  static const String GODOWN_MANAGERS_LOAD_FAILED_TITLE =
+      'Could not load godown managers';
+  static const String GODOWN_MANAGERS_EMPTY_STATE_TITLE =
+      'No godown managers yet';
+  static const String GODOWN_MANAGERS_EMPTY_STATE_BODY =
+      'Add a godown manager to register a warehouse account.';
   static const String CITIES_UNAVAILABLE =
       'City list is unavailable. Refresh the page and try again.';
   static const String SORT_BY_EMAIL = 'email';
@@ -586,6 +611,7 @@ class AppStrings {
   static const String COLUMN_ORDER_EXPECTED = 'Expected';
   static const String COLUMN_ORDER_SALES_PERSON = 'Sales Person';
   static const String COLUMN_ORDER_ACTIONS = 'Order Actions';
+  static const String COLUMN_ORDER_SPECIAL_COMMENTS = 'Special Comments';
 
   static const String ORDER_VERIFY = 'Verify';
   static const String ORDER_UNVERIFY = 'Unverify';
@@ -755,8 +781,7 @@ class AppStrings {
   static const String EXPORT_CARD_ACTION = 'Choose dates';
   static const String EXPORT_BUILDING = 'Building...';
   static const String EXPORT_HINT_TITLE = 'Good to know';
-  static const String EXPORT_HINT_WINDOW =
-      'A window can cover up to 62 days.';
+  static const String EXPORT_HINT_WINDOW = 'A window can cover up to 62 days.';
   static const String EXPORT_HINT_ROWS =
       'Every report lands as one row per line, ready to filter or pivot.';
   static const String EXPORT_HINT_HISTORY =
@@ -864,8 +889,7 @@ class AppStrings {
       'Choose a product first';
   static const String FIELD_PACKET_WEIGHT_NONE =
       'This product has no packagings configured.';
-  static const String CHALLAN_PRINT_FAILED =
-      'Could not open the print dialog.';
+  static const String CHALLAN_PRINT_FAILED = 'Could not open the print dialog.';
   static const String CHALLAN_DOWNLOAD_FAILED =
       'Could not generate the challan PDF.';
   static const String CHALLAN_DETAIL_TITLE = 'Dispatch challan';
@@ -931,6 +955,10 @@ class AppStrings {
   static const String FIELD_VEHICLE_NUMBER_HINT = 'e.g. GJ01AB1234';
   static const String FIELD_LOT_NUMBER = 'Lot number';
   static const String FIELD_LOT_NUMBER_HINT = 'Lot number for this bag';
+  static const String FIELD_LOT_NUMBER_RECENT_HINT =
+      'Pick a recent lot number or type a new one';
+  static const String LOT_NUMBERS_UNAVAILABLE =
+      'Recent lot numbers could not be loaded';
   static const String DISPATCH_ITEMS_EMPTY = 'This order has no bags.';
   static const String DISPATCHED_TITLE = 'Order dispatched';
   static const String VALIDATION_FROM_CITY_REQUIRED = 'From city is required.';
@@ -1040,7 +1068,8 @@ class AppStrings {
   static const String INWARD_DETAIL_SUBTITLE =
       'Product, party and lab sampling details for this lot.';
   static const String ADD_INWARD = 'Add lot';
-  static const String ADD_INWARD_SUBTITLE = 'Record an inward raw-material lot.';
+  static const String ADD_INWARD_SUBTITLE =
+      'Record an inward raw-material lot.';
   static const String EDIT_INWARD_SUBTITLE =
       'Update the sampling date or mark the lot in use.';
   static const String INWARD_CREATED_TITLE = 'Lot recorded';
@@ -1136,8 +1165,7 @@ class AppStrings {
   static const String BAG_STOCK_LOAD_FAILED_TITLE = 'Could not load bag stock';
   static const String BAG_STOCK_UPDATED_TITLE = 'Bag stock updated';
 
-  static const String PACKET_STOCK_TABLE_SEARCH_HINT =
-      'Search packet stock...';
+  static const String PACKET_STOCK_TABLE_SEARCH_HINT = 'Search packet stock...';
   static const String PACKET_STOCK_EMPTY_STATE_TITLE = 'No packet stock yet';
   static const String PACKET_STOCK_EMPTY_STATE_BODY =
       'Add a product to start counting loose sample packets.';
@@ -1256,4 +1284,38 @@ class AppStrings {
   static const String FARMER_VISITS_EMPTY = 'No visits recorded yet.';
   static const String FARMER_USES_PRODUCTS_YES = 'Yes';
   static const String FARMER_USES_PRODUCTS_NO = 'No';
+
+  static const String GROUP_WASTE_MANAGEMENT = 'Waste Management';
+
+  static const String WASTE_MANAGEMENT = 'Waste Management';
+
+  static const String WASTE_DETAIL_TITLE = 'Raw material waste';
+  static const String WASTE_DETAIL_SUBTITLE =
+      'Product, quantity and reason for this write-off.';
+  static const String ADD_WASTE = 'Record waste';
+  static const String ADD_WASTE_SUBTITLE =
+      "Write off unusable kilograms from a product's raw material.";
+  static const String EDIT_WASTE_SUBTITLE =
+      'Correct the wasted quantity or the reason.';
+  static const String WASTE_CREATED_TITLE = 'Waste recorded';
+  static const String WASTE_UPDATED_TITLE = 'Waste updated';
+  static const String WASTE_DELETED_TITLE = 'Waste entry deleted';
+  static const String DELETE_WASTE_TITLE = 'Delete waste entry';
+  static const String DELETE_WASTE_BODY =
+      "This returns the kilograms to the product's available raw material. "
+      'This cannot be undone.';
+  static const String WASTE_TABLE_SEARCH_HINT = 'Search waste entries...';
+  static const String WASTE_EMPTY_STATE_TITLE = 'No waste recorded yet';
+  static const String WASTE_EMPTY_STATE_BODY =
+      'Record a write-off when raw material is spoiled or spilled.';
+  static const String WASTE_LOAD_FAILED_TITLE = 'Could not load waste entries';
+
+  static const String WASTE_EDIT = 'Edit entry';
+  static const String WASTE_REASON_MISSING = 'No reason given';
+
+  static const String COLUMN_REASON = 'Reason';
+  static const String COLUMN_REFERENCE = 'Reference';
+
+  static const String FIELD_REASON = 'Reason';
+  static const String FIELD_REASON_HINT = 'Why it was wasted (optional)';
 }

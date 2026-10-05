@@ -17,13 +17,14 @@ class OrdersEndpoints {
 
   static String reject(String publicId) => '$_base/reject-order/$publicId';
 
-  static String dispatch(String publicId) =>
-      '$_base/dispatch-order/$publicId';
+  static String dispatch(String publicId) => '$_base/dispatch-order/$publicId';
 
   static String revertDispatch(String publicId) =>
       '$_base/revert-dispatch/$publicId';
 
   static const String dispatchChallans = '$_base/dispatch-challans/';
+
+  static const String dispatchLotNumbers = '$_base/dispatch-lot-numbers';
 
   static String uploadLrNumber(String publicId) =>
       '$_base/upload-lr-number/$publicId';

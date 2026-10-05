@@ -32,11 +32,7 @@ class PartiesRepository {
   }) async {
     await _apiClient.post(
       PartiesEndpoints.create,
-      body: {
-        'name': name,
-        'city': cityId,
-        'contact_number': contactNumber,
-      },
+      body: {'name': name, 'city': cityId, 'contact_number': contactNumber},
     );
   }
 
@@ -48,11 +44,7 @@ class PartiesRepository {
   }) async {
     await _apiClient.patch(
       PartiesEndpoints.detail(id),
-      body: {
-        'name': name,
-        'city': cityId,
-        'contact_number': contactNumber,
-      },
+      body: {'name': name, 'city': cityId, 'contact_number': contactNumber},
     );
   }
 

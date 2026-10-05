@@ -79,9 +79,7 @@ class _CustomOrdersContentState extends State<_CustomOrdersContent> {
 
   Future<void> _onView(CustomOrderModel order) async {
     final CustomOrdersCubit cubit = context.read<CustomOrdersCubit>();
-    final CustomOrderModel? full = await cubit.fetchCustomOrder(
-      order.publicId,
-    );
+    final CustomOrderModel? full = await cubit.fetchCustomOrder(order.publicId);
     if (!mounted) return;
 
     await CustomOrderDetailDialog.show(
@@ -120,9 +118,7 @@ class _CustomOrdersContentState extends State<_CustomOrdersContent> {
     final CustomOrdersCubit cubit = context.read<CustomOrdersCubit>();
     // The list payload carries no lines, but the dispatch form needs one lot
     // number per line, so the full order is pulled first.
-    final CustomOrderModel? full = await cubit.fetchCustomOrder(
-      order.publicId,
-    );
+    final CustomOrderModel? full = await cubit.fetchCustomOrder(order.publicId);
     if (!mounted) return;
 
     await CustomOrderDispatchDialog.show(
@@ -138,7 +134,8 @@ class _CustomOrdersContentState extends State<_CustomOrdersContent> {
     final bool confirmed = await ConfirmationDialog.show(
       context,
       title: AppStrings.ORDER_REVERT_DISPATCH_TITLE,
-      message: '${order.publicId} - '
+      message:
+          '${order.publicId} - '
           '${AppStrings.ORDER_REVERT_DISPATCH_BODY}',
       confirmLabel: AppStrings.ORDER_REVERT_DISPATCH,
     );

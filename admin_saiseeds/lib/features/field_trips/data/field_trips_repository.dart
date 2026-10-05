@@ -35,21 +35,20 @@ class FieldTripsRepository {
   Future<PaginatedFarmersModel> fetchFarmers({
     required Map<String, dynamic> queryParams,
   }) async {
-    final dynamic response = await _apiClient.get(
-      FieldTripsEndpoints.farmers,
-      queryParams: queryParams,
-    ).catchError((Object error) {
-      // The endpoint is specified but not yet deployed. A bare 404 reads as
-      // "this farmer is missing", which is the wrong thing to tell someone
-      // looking at an empty tab.
-      if (error is ApiException && error.statusCode == _notFound) {
-        throw const ApiException(
-          message: AppStrings.FARMERS_ENDPOINT_MISSING,
-          statusCode: _notFound,
-        );
-      }
-      throw error;
-    });
+    final dynamic response = await _apiClient
+        .get(FieldTripsEndpoints.farmers, queryParams: queryParams)
+        .catchError((Object error) {
+          // The endpoint is specified but not yet deployed. A bare 404 reads as
+          // "this farmer is missing", which is the wrong thing to tell someone
+          // looking at an empty tab.
+          if (error is ApiException && error.statusCode == _notFound) {
+            throw const ApiException(
+              message: AppStrings.FARMERS_ENDPOINT_MISSING,
+              statusCode: _notFound,
+            );
+          }
+          throw error;
+        });
 
     if (response is! Map) {
       throw const ApiException(message: AppStrings.SOMETHING_WENT_WRONG);
@@ -87,7 +86,8 @@ class FieldTripsRepository {
     return results
         .whereType<Map>()
         .map(
-          (entry) => FarmerVisitModel.fromJson(Map<String, dynamic>.from(entry)),
+          (entry) =>
+              FarmerVisitModel.fromJson(Map<String, dynamic>.from(entry)),
         )
         .toList();
   }

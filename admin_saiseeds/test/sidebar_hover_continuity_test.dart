@@ -68,7 +68,6 @@ Future<void> _pumpSidebar(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-
 // Hover is signalled by the label colour, not a background fill: the row
 // stays flat and only its text and icon brighten.
 bool _isHovered(WidgetTester tester, String label) {

@@ -41,8 +41,7 @@ class PartiesState extends Equatable {
     this.errorMessage,
   });
 
-  bool get isEmptySource =>
-      (search?.trim().isEmpty ?? true) && filters.isEmpty;
+  bool get isEmptySource => (search?.trim().isEmpty ?? true) && filters.isEmpty;
 
   bool get hasMore => currentPage < totalPages;
 

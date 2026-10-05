@@ -46,10 +46,7 @@ class ProductRecordDialog extends StatefulWidget {
       barrierDismissible: false,
       builder: (_) => BlocProvider<ProductsCubit>.value(
         value: cubit,
-        child: ProductRecordDialog(
-          product: product,
-          initialMode: initialMode,
-        ),
+        child: ProductRecordDialog(product: product, initialMode: initialMode),
       ),
     );
   }
@@ -491,7 +488,8 @@ class _ProductRecordDialogState extends State<ProductRecordDialog> {
                 ? Image.network(
                     existing,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stack) => _buildPlaceholder(),
+                    errorBuilder: (context, error, stack) =>
+                        _buildPlaceholder(),
                   )
                 : _buildPlaceholder()),
     );

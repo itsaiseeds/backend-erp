@@ -187,8 +187,7 @@ class BagStockCubit extends SafeCubit<BagStockState> {
     emit(state.copyWith(isSubmitting: true, clearError: true));
 
     try {
-      final bool alreadyRecorded = await _repository
-          .fetchTodaysStockComplete();
+      final bool alreadyRecorded = await _repository.fetchTodaysStockComplete();
 
       if (alreadyRecorded) {
         await _repository.patchBagStock(draft);
@@ -199,7 +198,9 @@ class BagStockCubit extends SafeCubit<BagStockState> {
       await loadBagStock();
       return true;
     } catch (error) {
-      emit(state.copyWith(isSubmitting: false, errorMessage: _messageOf(error)));
+      emit(
+        state.copyWith(isSubmitting: false, errorMessage: _messageOf(error)),
+      );
       return false;
     }
   }
@@ -230,23 +231,25 @@ class BagStockCubit extends SafeCubit<BagStockState> {
   }
 
   BagStockState _projected(BagStockState source, {required int page}) {
-    final List<BagStockLineModel> searched = ListQuery.search<BagStockLineModel>(
-      source: source.allLines,
-      query: source.search,
-      searchableValues: (line) => [
-        line.productName,
-        line.packetWeight,
-        '${line.onHand}',
-        '${line.available}',
-      ],
-    );
+    final List<BagStockLineModel> searched =
+        ListQuery.search<BagStockLineModel>(
+          source: source.allLines,
+          query: source.search,
+          searchableValues: (line) => [
+            line.productName,
+            line.packetWeight,
+            '${line.onHand}',
+            '${line.available}',
+          ],
+        );
 
-    final List<BagStockLineModel> filtered = ListQuery.filter<BagStockLineModel>(
-      source: searched,
-      filters: source.filters,
-      fieldValue: _fieldValue,
-      exactFields: const {AppStrings.FILTER_BY_PRODUCT},
-    );
+    final List<BagStockLineModel> filtered =
+        ListQuery.filter<BagStockLineModel>(
+          source: searched,
+          filters: source.filters,
+          fieldValue: _fieldValue,
+          exactFields: const {AppStrings.FILTER_BY_PRODUCT},
+        );
 
     final List<BagStockLineModel> sorted = ListQuery.sort<BagStockLineModel>(
       source: filtered,

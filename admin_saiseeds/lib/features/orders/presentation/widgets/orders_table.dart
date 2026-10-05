@@ -25,6 +25,7 @@ class OrdersTable extends StatefulWidget {
   static const String COLUMN_SALES_PERSON = 'sales_person';
   static const String COLUMN_VERIFIED_BY = 'verified_by';
   static const String COLUMN_CLIENT_ADDED_BY = 'client_created_by';
+  static const String COLUMN_SPECIAL_COMMENTS = 'special_comments';
   static const String COLUMN_ORDER_ACTIONS = 'order_actions';
 
   final List<OrderModel> orders;
@@ -143,6 +144,12 @@ class OrdersTableState extends State<OrdersTable> {
       id: OrdersTable.COLUMN_CLIENT_ADDED_BY,
       label: AppStrings.COLUMN_ORDER_CLIENT_ONBOARDED_BY,
       width: AppSizes.tableColumnWidthMedium,
+      isCenter: true,
+    ),
+    AppDataColumn(
+      id: OrdersTable.COLUMN_SPECIAL_COMMENTS,
+      label: AppStrings.COLUMN_ORDER_SPECIAL_COMMENTS,
+      width: AppSizes.tableColumnWidthWide,
       isCenter: true,
     ),
     AppDataColumn(
@@ -267,6 +274,8 @@ class OrdersTableState extends State<OrdersTable> {
         return _textCell(order.verifiedBy);
       case OrdersTable.COLUMN_CLIENT_ADDED_BY:
         return _textCell(order.clientCreatedBy);
+      case OrdersTable.COLUMN_SPECIAL_COMMENTS:
+        return _textCell(order.specialComments);
       case OrdersTable.COLUMN_ORDER_ACTIONS:
         return _buildOrderActions(order);
       default:

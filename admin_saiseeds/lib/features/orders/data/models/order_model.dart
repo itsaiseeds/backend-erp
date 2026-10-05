@@ -150,6 +150,7 @@ class OrderModel {
   final int totalPackets;
   final int itemCount;
   final List<OrderPackagingModel> packagings;
+  final String specialComments;
 
   const OrderModel({
     this.publicId = '',
@@ -168,6 +169,7 @@ class OrderModel {
     this.totalPackets = 0,
     this.itemCount = 0,
     this.packagings = const [],
+    this.specialComments = '',
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -197,6 +199,7 @@ class OrderModel {
       totalAmount: _asNum(json['total_amount']),
       totalPackets: _asInt(json['total_packets']),
       itemCount: _asInt(json['item_count']),
+      specialComments: json['special_comments'] as String? ?? '',
       packagings: json['packagings'] is List
           ? (json['packagings'] as List)
                 .whereType<Map>()

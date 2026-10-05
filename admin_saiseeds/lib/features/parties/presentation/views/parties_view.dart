@@ -36,8 +36,7 @@ class _PartiesContent extends StatefulWidget {
 }
 
 class _PartiesContentState extends State<_PartiesContent> {
-  final GlobalKey<PartiesTableState> _tableKey =
-      GlobalKey<PartiesTableState>();
+  final GlobalKey<PartiesTableState> _tableKey = GlobalKey<PartiesTableState>();
 
   void _onFetchData({
     required int page,

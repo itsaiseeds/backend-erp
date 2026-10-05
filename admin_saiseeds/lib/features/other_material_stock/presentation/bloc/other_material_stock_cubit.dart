@@ -99,7 +99,10 @@ class OtherMaterialStockCubit extends SafeCubit<OtherMaterialStockState> {
 
   Future<void> loadOtherMaterialStock() async {
     emit(
-      state.copyWith(status: OtherMaterialStockStatus.loading, clearError: true),
+      state.copyWith(
+        status: OtherMaterialStockStatus.loading,
+        clearError: true,
+      ),
     );
 
     try {

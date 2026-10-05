@@ -30,11 +30,7 @@ class RowActionsMenu extends StatefulWidget {
   final List<RowAction> actions;
   final bool enabled;
 
-  const RowActionsMenu({
-    super.key,
-    required this.actions,
-    this.enabled = true,
-  });
+  const RowActionsMenu({super.key, required this.actions, this.enabled = true});
 
   @override
   State<RowActionsMenu> createState() => _RowActionsMenuState();
@@ -136,10 +132,7 @@ class _RowActionsMenuState extends State<RowActionsMenu> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final action in widget.actions)
-                      _MenuItem(
-                        action: action,
-                        onTap: () => _select(action),
-                      ),
+                      _MenuItem(action: action, onTap: () => _select(action)),
                   ],
                 ),
               ),

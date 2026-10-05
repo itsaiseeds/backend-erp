@@ -200,7 +200,9 @@ class FarmersCubit extends SafeCubit<FarmersState> {
         ),
       );
     } on ApiException catch (e) {
-      emit(state.copyWith(status: FarmersStatus.failure, errorMessage: e.message));
+      emit(
+        state.copyWith(status: FarmersStatus.failure, errorMessage: e.message),
+      );
     } catch (_) {
       emit(
         state.copyWith(

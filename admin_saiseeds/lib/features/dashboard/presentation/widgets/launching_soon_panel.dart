@@ -56,5 +56,4 @@ class LaunchingSoonPanel extends StatelessWidget {
       ),
     );
   }
-
 }

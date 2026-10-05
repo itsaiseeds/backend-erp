@@ -188,8 +188,9 @@ void main() {
 
   group('ListQuery.withoutPagination', () {
     test('returns every item and reports no pages', () {
-      final ListQueryResult<AdminModel> result =
-          ListQuery.withoutPagination(source: _admins);
+      final ListQueryResult<AdminModel> result = ListQuery.withoutPagination(
+        source: _admins,
+      );
 
       expect(result.items.length, _admins.length);
       expect(result.totalItems, _admins.length);

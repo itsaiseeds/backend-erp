@@ -50,10 +50,7 @@ class CustomOrderDetailDialog extends StatefulWidget {
       barrierDismissible: false,
       builder: (_) => BlocProvider<CustomOrdersCubit>.value(
         value: cubit,
-        child: CustomOrderDetailDialog(
-          order: order,
-          initialMode: initialMode,
-        ),
+        child: CustomOrderDetailDialog(order: order, initialMode: initialMode),
       ),
     );
   }
@@ -119,7 +116,6 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
     ]);
     if (mounted) setState(() {});
   }
-
 
   void _resetDraft() {
     _commentsController.text = _order.specialComments;
@@ -347,10 +343,7 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
   Widget _buildSummary() {
     return DetailFieldGrid(
       fields: [
-        DetailField(
-          label: AppStrings.COLUMN_ORDER_ID,
-          value: _order.publicId,
-        ),
+        DetailField(label: AppStrings.COLUMN_ORDER_ID, value: _order.publicId),
         DetailField(
           label: AppStrings.COLUMN_ORDER_CLIENT,
           value: _order.clientName,

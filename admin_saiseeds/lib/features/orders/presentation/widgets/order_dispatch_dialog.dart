@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/models/city_model.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -12,7 +13,10 @@ import '../../../../core/widgets/dialogs/app_record_dialog.dart';
 import '../../../../core/widgets/feedback/section_title.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
 import '../../../../core/widgets/inputs/city_picker_field.dart';
+import '../../../../core/widgets/inputs/lot_number_picker_field.dart';
 import '../../../../core/widgets/layout/record_field_row.dart';
+import '../../../dispatch_challans/data/dispatch_lot_numbers_repository.dart';
+import '../../../dispatch_challans/data/models/dispatch_lot_number_model.dart';
 import '../../data/models/dispatch_request_model.dart';
 import '../../data/models/order_model.dart';
 import '../bloc/orders_cubit.dart';
@@ -65,7 +69,10 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
   final TextEditingController _driverNumberController = TextEditingController();
   final TextEditingController _vehicleController = TextEditingController();
 
-  late final Map<String, TextEditingController> _lotControllers;
+  late final Map<String, DispatchLotNumberModel?> _lotValues;
+  List<DispatchLotNumberModel> _lotNumbers = const [];
+  bool _isLoadingLots = true;
+  bool _lotsUnavailable = false;
 
   CityModel? _fromCity;
   String? _cityError;
@@ -83,10 +90,37 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
   @override
   void initState() {
     super.initState();
-    _lotControllers = {
-      for (final OrderPackagingModel line in _lines)
-        line.publicId: TextEditingController(),
+    _lotValues = {
+      for (final OrderPackagingModel line in _lines) line.publicId: null,
     };
+    _loadLotNumbers();
+  }
+
+  Future<void> _loadLotNumbers() async {
+    final List<DispatchLotNumberModel> lots =
+        await DispatchLotNumbersRepository(
+          apiClient: context.read<ApiClient>(),
+        ).fetchLotNumbers();
+
+    if (!mounted) return;
+    setState(() {
+      _lotNumbers = lots;
+      _isLoadingLots = false;
+      _lotsUnavailable = lots.isEmpty;
+    });
+  }
+
+  void _setLot(String publicId, DispatchLotNumberModel lot) {
+    setState(() => _lotValues[publicId] = lot);
+  }
+
+  String _lotFor(String publicId) =>
+      _lotValues[publicId]?.lotNumber.trim() ?? '';
+
+  void _setFreeLot(String publicId, String typed) {
+    setState(
+      () => _lotValues[publicId] = DispatchLotNumberModel(lotNumber: typed),
+    );
   }
 
   @override
@@ -94,9 +128,6 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
     _driverNameController.dispose();
     _driverNumberController.dispose();
     _vehicleController.dispose();
-    for (final TextEditingController controller in _lotControllers.values) {
-      controller.dispose();
-    }
     super.dispose();
   }
 
@@ -141,7 +172,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
           for (final OrderPackagingModel line in _lines)
             DispatchItemModel(
               productPackagingPublicId: line.publicId,
-              lotNumber: _lotControllers[line.publicId]?.text.trim() ?? '',
+              lotNumber: _lotFor(line.publicId),
             ),
         ],
       ),
@@ -275,16 +306,27 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
       );
     }
 
+    if (_isLoadingLots) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final OrderPackagingModel line in _lines) ...[
-          AppTextField(
-            controller: _lotControllers[line.publicId],
-            label: '${line.productName} · ${line.packetSummary}',
-            hint: AppStrings.FIELD_LOT_NUMBER_HINT,
+          LotNumberPickerField(
+            value: _lotValues[line.publicId],
+            lotNumbers: _lotNumbers,
             enabled: !_isSubmitting,
+            isUnavailable: _lotsUnavailable,
+            onSelected: (lot) => _setLot(line.publicId, lot),
+            onFreeEntry: (typed) => _setFreeLot(line.publicId, typed),
           ),
           const SizedBox(height: AppSpacing.md),
         ],
@@ -323,7 +365,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
         for (final OrderPackagingModel line in _lines)
           _SummaryRow(
             label: '${line.productName} · ${line.packetSummary}',
-            value: _lotControllers[line.publicId]?.text.trim() ?? '',
+            value: _lotFor(line.publicId),
           ),
       ],
     );

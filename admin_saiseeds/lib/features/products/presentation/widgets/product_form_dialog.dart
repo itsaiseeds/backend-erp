@@ -333,9 +333,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildStepBody(),
-          ],
+          children: [_buildStepBody()],
         ),
       ),
     );

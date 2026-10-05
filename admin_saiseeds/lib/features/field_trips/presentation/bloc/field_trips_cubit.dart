@@ -260,7 +260,10 @@ class FieldTripsCubit extends SafeCubit<FieldTripsState> {
       );
     } on ApiException catch (e) {
       emit(
-        state.copyWith(status: FieldTripsStatus.failure, errorMessage: e.message),
+        state.copyWith(
+          status: FieldTripsStatus.failure,
+          errorMessage: e.message,
+        ),
       );
     } catch (_) {
       emit(

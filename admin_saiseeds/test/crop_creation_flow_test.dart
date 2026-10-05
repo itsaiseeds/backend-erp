@@ -114,10 +114,7 @@ void main() {
 
       expect(options.first.isCreate, isTrue);
       expect(options.first.createName, 'Maize');
-      expect(
-        CropPickerField.optionLabel(options.first),
-        contains('Maize'),
-      );
+      expect(CropPickerField.optionLabel(options.first), contains('Maize'));
     });
 
     test('an exact existing name offers no create option', () {
@@ -166,32 +163,35 @@ void main() {
       );
     });
 
-    test('a duplicate name surfaces the server message and adds nothing', () async {
-      final _CropsStubAdapter adapter = _CropsStubAdapter(
-        listPayload: const [
-          {'id': 1, 'name': 'Cotton'},
-        ],
-        createStatusCode: 400,
-        createErrorDetail: 'A crop with this name already exists.',
-      );
-      CropsService.instance.repository = _repositoryWith(adapter);
+    test(
+      'a duplicate name surfaces the server message and adds nothing',
+      () async {
+        final _CropsStubAdapter adapter = _CropsStubAdapter(
+          listPayload: const [
+            {'id': 1, 'name': 'Cotton'},
+          ],
+          createStatusCode: 400,
+          createErrorDetail: 'A crop with this name already exists.',
+        );
+        CropsService.instance.repository = _repositoryWith(adapter);
 
-      await CropsService.instance.loadCrops();
-      expect(CropsService.instance.crops, hasLength(1));
+        await CropsService.instance.loadCrops();
+        expect(CropsService.instance.crops, hasLength(1));
 
-      await expectLater(
-        CropsService.instance.createCrop('Cotton'),
-        throwsA(
-          isA<ApiException>().having(
-            (error) => error.message,
-            'message',
-            contains('already exists'),
+        await expectLater(
+          CropsService.instance.createCrop('Cotton'),
+          throwsA(
+            isA<ApiException>().having(
+              (error) => error.message,
+              'message',
+              contains('already exists'),
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(CropsService.instance.crops, hasLength(1));
-    });
+        expect(CropsService.instance.crops, hasLength(1));
+      },
+    );
 
     test('a failed fetch fails soft with an empty list', () async {
       final Dio dio = Dio(
@@ -200,9 +200,7 @@ void main() {
           validateStatus: (status) => status != null && status < 500,
         ),
       );
-      dio.httpClientAdapter = _CropsStubAdapter(
-        listPayload: const [],
-      );
+      dio.httpClientAdapter = _CropsStubAdapter(listPayload: const []);
       CropsService.instance.repository = CropsRepository(
         apiClient: ApiClient(dio: dio),
       );
