@@ -649,6 +649,128 @@ class AppStrings {
   static const String ORDER_EDIT_BLOCKED =
       'A dispatched or delivered order can no longer be edited.';
 
+  // -- Return orders --------------------------------------------------------
+
+  static const String RETURN_ORDERS = 'Return Orders';
+
+  static const String RETURN_ORDER_STATUS_PENDING = 'Pending';
+  static const String RETURN_ORDER_STATUS_ACCEPTED = 'Accepted';
+  static const String RETURN_ORDER_STATUS_REJECTED = 'Rejected';
+
+  static const String RETURN_ORDERS_EMPTY_STATE_TITLE = 'No returns found';
+  static const String RETURN_ORDERS_EMPTY_STATE_BODY =
+      'Returns raised by your sales team will appear here.';
+  static const String RETURN_ORDERS_TABLE_SEARCH_HINT =
+      'Search by client or order';
+  static const String RETURN_ORDERS_LOAD_FAILED_TITLE =
+      'Could not load returns';
+
+  static const String COLUMN_RETURN_ID = 'Return ID';
+  static const String COLUMN_RETURN_CLIENT = 'Client';
+  static const String COLUMN_RETURN_ORDER = 'Order';
+  static const String COLUMN_RETURN_STATUS = 'Status';
+  static const String COLUMN_RETURN_DATE = 'Return Date';
+  static const String COLUMN_RETURN_KG = 'Weight';
+  static const String COLUMN_RETURN_PACKETS = 'Packets';
+  static const String COLUMN_RETURN_AMOUNT = 'Amount';
+  static const String COLUMN_RETURN_RAISED_BY = 'Raised By';
+  static const String COLUMN_RETURN_DECIDED_BY = 'Decided By';
+  static const String COLUMN_RETURN_ACTIONS = 'Return Actions';
+
+  static const String RETURN_ORDER_DETAILS_TITLE = 'Return details';
+  static const String RETURN_ORDER_ITEMS_TITLE_ONE = '1 returned line';
+  static const String RETURN_ORDER_ITEMS_TITLE_MANY = '%s returned lines';
+  static const String RETURN_ORDER_ITEM_PACKET_SUMMARY = '%s x %t packets';
+  static const String RETURN_ORDER_INWARD_RAW_TITLE = 'Raw material lots';
+  static const String RETURN_ORDER_INWARD_OTHER_TITLE = 'Other material lots';
+  static const String RETURN_ORDER_MATERIALS_BOOKED_YES =
+      'Packing materials were booked back in as other raw material.';
+  static const String RETURN_ORDER_MATERIALS_BOOKED_NO =
+      'Packing materials were not booked back in.';
+  static const String RETURN_ORDER_ACCEPT = 'Accept';
+  static const String RETURN_ORDER_REJECT = 'Reject';
+  static const String RETURN_ORDER_UNREJECT = 'Unreject';
+  static const String RETURN_ORDER_REVERT_ACCEPT = 'Revert accept';
+  static const String RETURN_ORDER_EDIT = 'Edit';
+
+  static const String RETURN_ORDER_ACCEPT_TITLE = 'Accept this return?';
+  static const String RETURN_ORDER_ACCEPT_BODY =
+      'The returned packets are booked back in as raw material stock, dated today.';
+  static const String RETURN_ORDER_ACCEPT_DONE = 'Return accepted';
+
+  static const String RETURN_ORDER_REJECT_TITLE = 'Reject this return?';
+  static const String RETURN_ORDER_REJECT_BODY =
+      'The return is rejected and its packets stay claimed on the order until it is unrejected or the return is deleted.';
+  static const String RETURN_ORDER_REJECT_DONE = 'Return rejected';
+
+  static const String RETURN_ORDER_UNREJECT_TITLE = 'Bring this return back?';
+  static const String RETURN_ORDER_UNREJECT_BODY =
+      'The return goes back to pending so it can be accepted or rejected again.';
+  static const String RETURN_ORDER_UNREJECT_DONE = 'Return back to pending';
+
+  static const String RETURN_ORDER_REVERT_ACCEPT_TITLE =
+      'Undo this acceptance?';
+  static const String RETURN_ORDER_REVERT_ACCEPT_BODY =
+      'The inward stock booked by this acceptance is reversed and the return goes back to pending.';
+  static const String RETURN_ORDER_REVERT_ACCEPT_DONE = 'Acceptance undone';
+
+  static const String RETURN_ORDER_ACCEPT_BLOCKED =
+      'Only a pending return can be accepted.';
+  static const String RETURN_ORDER_REJECT_BLOCKED =
+      'Only a pending return can be rejected.';
+  static const String RETURN_ORDER_UNREJECT_BLOCKED =
+      'Only a rejected return can be brought back.';
+  static const String RETURN_ORDER_REVERT_ACCEPT_BLOCKED =
+      'Only an accepted return can have its acceptance undone.';
+  static const String RETURN_ORDER_EDIT_BLOCKED =
+      'Only a pending return can be edited.';
+
+  static const String RETURN_ORDER_ACCEPT_INCLUDE_MATERIALS =
+      'Book the packing materials back in too';
+  static const String RETURN_ORDER_ACCEPT_INCLUDE_MATERIALS_HINT =
+      'The bags and labels come back with the packets. Tick each recipe below to say what they are made of.';
+  static const String RETURN_ORDER_ACCEPT_RECIPES_TITLE =
+      'Packing material recipes';
+  static const String RETURN_ORDER_ACCEPT_RECIPES_EMPTY =
+      'No recipes are defined for these lines, so the packing materials cannot be booked in.';
+  static const String RETURN_ORDER_ACCEPT_PICK_AT_LEAST_ONE =
+      'Every line needs at least one recipe, and one recipe per material type.';
+  static const String RETURN_ORDER_ACCEPT_LOADING_RECIPES =
+      'Loading recipes...';
+  static const String RETURN_ORDER_ACCEPT_PENDING_SUMMARY =
+      '%p packets, %w kg, worth %a';
+  static const String RETURN_ORDER_ACCEPT_LINE_TITLE = '%s (%w packets)';
+  static const String RETURN_ORDER_ACCEPT_RECIPE_SUMMARY = 'Uses %q';
+  static const String RETURN_ORDER_ACCEPT_RECIPE_DELETED =
+      '%s (recipe since deleted)';
+
+  static const String RETURN_ORDER_EDIT_TITLE = 'Edit return';
+  static const String RETURN_ORDER_EDIT_DATE = 'Return date';
+  static const String RETURN_ORDER_EDIT_PACKETS = 'Packets';
+  static const String RETURN_ORDER_EDIT_PRICE = 'Price per packet';
+  static const String RETURN_ORDER_EDIT_TOTAL = 'Total';
+  static const String RETURN_ORDER_EDIT_SAVE = 'Save changes';
+  static const String RETURN_ORDER_EDIT_REPLACEMENT_WARNING =
+      'Saving replaces every line of this return. Remove a line to delete it.';
+  static const String RETURN_ORDER_EDIT_DONE = 'Return updated';
+  static const String RETURN_ORDER_EDIT_EMPTY =
+      'A return must keep at least one line.';
+  static const String RETURN_ORDER_EDIT_WILL_BE_REMOVED = 'Dropped on save';
+  static const String RETURN_ORDER_EDIT_PACKETS_MIN = 'At least 1 packet';
+  static const String RETURN_ORDER_EDIT_PRICE_INVALID = 'Enter a price';
+  static const String RETURN_ORDER_EDIT_RESTORE = 'Put back';
+  static const String RETURN_ORDER_EDIT_REMOVE = 'Remove';
+
+  static const String RETURN_ORDER_ITEM_COUNT_ONE = 'item';
+  static const String RETURN_ORDER_ITEM_COUNT_MANY = 'items';
+  static const String RETURN_ORDER_MATERIALS_BOOKED =
+      'Packing materials booked: %s';
+  static const String RETURN_ORDER_MATERIALS_NOT_BOOKED =
+      'Packing materials were not booked in.';
+  static const String RETURN_ORDER_ACCEPTED_BY = 'Accepted by %s';
+  static const String RETURN_ORDER_REJECTED_BY = 'Rejected by %s';
+  static const String RETURN_ORDER_INWARD_LOTS = 'Inward lots';
+
   static const String ORDER_DETAILS_TITLE = 'Order details';
   static const String ORDER_UPDATED_TITLE = 'Order updated';
   static const String ORDER_EDIT_LOCKED_TITLE = 'Order locked';

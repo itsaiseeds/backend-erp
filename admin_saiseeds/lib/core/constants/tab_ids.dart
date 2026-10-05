@@ -7,6 +7,7 @@ class TabIds {
   static const String GODOWN_MANAGERS = 'godown-managers';
   static const String CLIENTS = 'clients';
   static const String ORDERS = 'orders';
+  static const String RETURN_ORDERS = 'return-orders';
   static const String DISPATCH_CHALLANS = 'dispatch-challans';
   static const String CUSTOM_ORDERS = 'custom-orders';
   static const String EXPORTS = 'exports';
