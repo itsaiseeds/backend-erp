@@ -28,6 +28,7 @@ from .GetFieldTripsView import GetFieldTripsView
 from .GetNotificationsView import GetNotificationsView
 from .GetOrdersView import GetOrdersView
 from .GetReturnOrdersView import GetReturnOrdersView
+from .GodownBagStockView import GodownBagStockView
 from .GodownCheckTodaysInventoryView import GodownCheckTodaysInventoryView
 from .GodownExportInventorySnapshotsView import GodownExportInventorySnapshotsView
 from .GodownInwardOtherMaterialsView import GodownInwardOtherMaterialsView
@@ -36,6 +37,7 @@ from .GodownOtherMaterialRecipesView import GodownOtherMaterialRecipesView
 from .GodownOtherMaterialStockView import GodownOtherMaterialStockView
 from .GodownProductPackagingsView import GodownProductPackagingsView
 from .GodownRawMaterialStockView import GodownRawMaterialStockView
+from .GodownSamplePacketStockView import GodownSamplePacketStockView
 from .GodownUpdateBagStockView import GodownUpdateBagStockView
 from .GodownUpdateSamplePacketStockView import GodownUpdateSamplePacketStockView
 from .LoginView import LoginView
@@ -110,5 +112,7 @@ ROUTES: dict[str, type] = {
     "godown/export/inventory-snapshots": GodownExportInventorySnapshotsView,
     "godown/update-bag-stock": GodownUpdateBagStockView,
     "godown/update-sample-packet-stock": GodownUpdateSamplePacketStockView,
+    "godown/bag-stock": GodownBagStockView,
+    "godown/sample-packet-stock": GodownSamplePacketStockView,
     "godown/product-packagings": GodownProductPackagingsView,
 }
