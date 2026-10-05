@@ -39,6 +39,11 @@ class SidebarItems {
       label: AppStrings.ORDERS,
       icon: Icons.receipt_long_outlined,
     ),
+    // SidebarItemModel(
+    //   id: TabIds.RETURN_ORDERS,
+    //   label: AppStrings.RETURN_ORDERS,
+    //   icon: Icons.assignment_return_outlined,
+    // ),
     SidebarItemModel(
       id: TabIds.DISPATCH_CHALLANS,
       label: AppStrings.DISPATCH_CHALLANS,
@@ -138,6 +143,7 @@ class SidebarItems {
         label: AppStrings.GROUP_ORDERS,
         itemIds: [
           TabIds.ORDERS,
+          TabIds.RETURN_ORDERS,
           TabIds.CUSTOM_ORDERS,
           TabIds.DISPATCH_CHALLANS,
         ],
