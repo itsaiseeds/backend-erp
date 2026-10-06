@@ -32,6 +32,7 @@ from .models import (
     InwardOtherMaterial,
     InwardRawMaterial,
     LooseStockSnapshot,
+    NonStockInward,
     Notification,
     Order,
     OrderItem,
@@ -898,7 +899,8 @@ class CustomOrderItemAdmin(ViewOnlyAdminMixin, SoftDeleteModelAdmin):
 
 @admin.register(Party)
 class PartyAdmin(SoftDeleteModelAdmin):
-    list_display = ("name", "city", "created_by", "created_at")
+    list_display = ("name", "city", "party_type", "created_by", "created_at")
+    list_filter = ("party_type",)
     search_fields = ("name", "city__name", "city__state__name")
     autocomplete_fields = ("city",)
     list_select_related = ("city__state",)
@@ -923,6 +925,7 @@ class InwardRawMaterialAdmin(
         "product",
         "party",
         "lot_no",
+        "farmer_name",
         "quantity_kg",
         "status",
         "effective_date",
@@ -936,6 +939,7 @@ class InwardRawMaterialAdmin(
         "product__crop__name",
         "party__name",
         "lot_no",
+        "farmer_name",
     )
     list_filter = ("status", "effective_date")
     autocomplete_fields = ("product", "party", "status")
@@ -966,6 +970,24 @@ class RawMaterialWasteAdmin(
     search_fields = ("public_id", "product__name", "reason")
     autocomplete_fields = ("product",)
     list_select_related = ("product",)
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+
+
+@admin.register(NonStockInward)
+class NonStockInwardAdmin(SoftDeleteModelAdmin):
+    list_display = (
+        "public_id",
+        "name",
+        "company_name",
+        "quantity",
+        "unit",
+        "price",
+        "created_by",
+        "created_at",
+    )
+    search_fields = ("public_id", "name", "company_name", "description")
+    list_filter = ("unit",)
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
 

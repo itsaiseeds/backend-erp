@@ -18,6 +18,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Product,
     ProductPackaging,
 )
@@ -64,7 +65,11 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
             created_by=cls.seed_admin,
         )
         cls.party = Party.objects.create(
-            name="ABC Traders", city_id=1, created_by=cls.seed_admin
+            name="ABC Traders", city_id=1, party_type=PartyType.OTHER_MATERIAL, created_by=cls.seed_admin
+        )
+        cls.raw_party = Party.objects.create(
+            name="Seed Growers", city_id=1, party_type=PartyType.RAW_MATERIAL,
+            created_by=cls.seed_admin,
         )
 
     # -- helpers --------------------------------------------------------------
@@ -144,6 +149,14 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
                     self.client.post(LOTS_URL, body, format="json").status_code,
                     status.HTTP_400_BAD_REQUEST,
                 )
+
+        wrong_party = self._create_lot(party=self.raw_party.id)
+        self.assertEqual(wrong_party.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            wrong_party.data["detail"],
+            "Party 'Seed Growers' is of type Raw Material; "
+            "this booking needs a party of type Other Material.",
+        )
 
         response = self._create_lot(effective_date="2026-09-15")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)

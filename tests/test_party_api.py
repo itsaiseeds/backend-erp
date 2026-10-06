@@ -11,7 +11,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
-from aggregator.models import City, Party
+from aggregator.models import City, Party, PartyType
 from authentication.models import Admin
 from tests.common import WebApiTestCase
 
@@ -48,7 +48,7 @@ class PartyApiTest(WebApiTestCase):
         cls.surat = City.objects.get(name="Surat")
         cls.ahmedabad = City.objects.get(name="Ahmedabad")
         cls.party = Party.objects.create(
-            name="ABC Traders", city=cls.surat, created_by=cls.seed_admin
+            name="ABC Traders", city=cls.surat, party_type=PartyType.RAW_MATERIAL, created_by=cls.seed_admin
         )
 
     # -- helpers --------------------------------------------------------------
@@ -57,10 +57,12 @@ class PartyApiTest(WebApiTestCase):
         """Return the update/delete URL for a party (by primary key)."""
         return f"{PARTIES_URL}/{party.id}"
 
-    def _create_party(self, name="ZZZ Traders", city=None):
+    def _create_party(self, name="ZZZ Traders", city=None, party_type="RAW_MATERIAL"):
         """POST a party (the seeded city by default) and return the response."""
         return self.client.post(
-            PARTIES_URL, {"name": name, "city": (city or self.surat).id}, format="json"
+            PARTIES_URL,
+            {"name": name, "city": (city or self.surat).id, "party_type": party_type},
+            format="json",
         )
 
     # -- creation -------------------------------------------------------------
@@ -81,6 +83,7 @@ class PartyApiTest(WebApiTestCase):
         self.assertEqual(party["id"], self.party.id + 1)
         self.assertEqual(party["name"], "Green Agro")  # surrounding whitespace stripped
         self.assertEqual(party["city"], {"id": self.surat.id, "name": "Surat"})
+        self.assertEqual(party["party_type"], "RAW_MATERIAL")
 
         created = Party.all_objects.get(pk=party["id"])
         self.assertEqual(created.name, "Green Agro")
@@ -107,16 +110,25 @@ class PartyApiTest(WebApiTestCase):
         """
         self.login_as(self.seed_admin)
         other = Party.objects.create(
-            name="Private Ltd", city=self.surat, created_by=self.seed_admin
+            name="Private Ltd", city=self.surat, party_type=PartyType.RAW_MATERIAL, created_by=self.seed_admin
         )
 
+        raw = "RAW_MATERIAL"
         create_cases = [
-            ("blank name", {"name": "", "city": self.surat.id}),
-            ("whitespace only", {"name": "   ", "city": self.surat.id}),
+            ("blank name", {"name": "", "city": self.surat.id, "party_type": raw}),
+            ("whitespace only", {"name": "   ", "city": self.surat.id, "party_type": raw}),
             ("missing", {}),
-            ("missing city", {"name": "Any Name"}),
-            ("unknown city", {"name": "Any Name", "city": 999999}),
-            ("duplicate in same city", {"name": "ABC Traders", "city": self.surat.id}),
+            ("missing city", {"name": "Any Name", "party_type": raw}),
+            ("unknown city", {"name": "Any Name", "city": 999999, "party_type": raw}),
+            ("missing party type", {"name": "Any Name", "city": self.surat.id}),
+            (
+                "unknown party type",
+                {"name": "Any Name", "city": self.surat.id, "party_type": "SEEDS"},
+            ),
+            (
+                "duplicate in same city",
+                {"name": "ABC Traders", "city": self.surat.id, "party_type": raw},
+            ),
         ]
         for label, body in create_cases:
             with self.subTest(verb="POST", case=label):
@@ -128,6 +140,7 @@ class PartyApiTest(WebApiTestCase):
         update_cases = [
             ("blank name", {"name": "   "}),
             ("duplicate of another party", {"name": self.party.name}),
+            ("unknown party type", {"party_type": "SEEDS"}),
         ]
         for label, body in update_cases:
             with self.subTest(verb="PATCH", case=label):
@@ -173,7 +186,12 @@ class PartyApiTest(WebApiTestCase):
 
         response = self.client.post(
             PARTIES_URL,
-            {"name": "DEF Traders", "city": self.surat.id, "contact_number": "1234567890"},
+            {
+                "name": "DEF Traders",
+                "city": self.surat.id,
+                "party_type": "RAW_MATERIAL",
+                "contact_number": "1234567890",
+            },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
@@ -182,8 +200,19 @@ class PartyApiTest(WebApiTestCase):
         self.assertEqual(created.contact_number, "1234567890")
 
         for label, body in (
-            ("omitted", {"name": "No Phone Traders", "city": self.surat.id}),
-            ("blank", {"name": "Blank Phone Traders", "city": self.surat.id, "contact_number": ""}),
+            (
+                "omitted",
+                {"name": "No Phone Traders", "city": self.surat.id, "party_type": "RAW_MATERIAL"},
+            ),
+            (
+                "blank",
+                {
+                    "name": "Blank Phone Traders",
+                    "city": self.surat.id,
+                    "party_type": "RAW_MATERIAL",
+                    "contact_number": "",
+                },
+            ),
         ):
             with self.subTest(case=label):
                 response = self.client.post(PARTIES_URL, body, format="json")
@@ -195,7 +224,12 @@ class PartyApiTest(WebApiTestCase):
             with self.subTest(case=label):
                 response = self.client.post(
                     PARTIES_URL,
-                    {"name": "Bad Phone Traders", "city": self.surat.id, "contact_number": bad_value},
+                    {
+                        "name": "Bad Phone Traders",
+                        "city": self.surat.id,
+                        "party_type": "RAW_MATERIAL",
+                        "contact_number": bad_value,
+                    },
                     format="json",
                 )
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -277,6 +311,54 @@ class PartyApiTest(WebApiTestCase):
         self.assertEqual(
             [item["name"] for item in response.data["results"]], ["Delta Traders"]
         )
+
+    def test_type_filter_narrows_the_list_and_party_types_are_listed(self):
+        """``?type=`` keeps only that type; every list carries ``party_types``.
+
+        tests/test_party_api.py::PartyApiTest::test_type_filter_narrows_the_list_and_party_types_are_listed
+        """
+        self.login_as(self.seed_admin)
+        response = self._create_party("Poly Packers", party_type="OTHER_MATERIAL")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        self.assertEqual(response.data["party_type"], "OTHER_MATERIAL")
+
+        expected_types = [
+            {"value": "RAW_MATERIAL", "label": "Raw Material"},
+            {"value": "OTHER_MATERIAL", "label": "Other Material"},
+        ]
+        listing = self.client.get(PARTIES_URL)
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+        self.assertEqual(listing.data["party_types"], expected_types)
+        self.assertEqual(listing.data["total_count"], 2)
+
+        for party_type, names in (
+            ("RAW_MATERIAL", ["ABC Traders"]),
+            ("OTHER_MATERIAL", ["Poly Packers"]),
+            ("RAW_MATERIAL,OTHER_MATERIAL", ["ABC Traders", "Poly Packers"]),
+        ):
+            with self.subTest(type=party_type):
+                response = self.client.get(PARTIES_URL, {"type": party_type})
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual([item["name"] for item in response.data["results"]], names)
+                self.assertEqual(response.data["party_types"], expected_types)
+
+        self.assertEqual(
+            self.client.get(PARTIES_URL, {"type": "SEEDS"}).status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        entry = next(f for f in listing.data["available_filters"] if f["filter"] == "type")
+        self.assertEqual(entry["options"], expected_types)
+
+    def test_admin_can_change_a_party_type(self):
+        """tests/test_party_api.py::PartyApiTest::test_admin_can_change_a_party_type"""
+        self.login_as(self.seed_admin)
+        response = self.client.patch(
+            self._url(self.party), {"party_type": "OTHER_MATERIAL"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["party_type"], "OTHER_MATERIAL")
+        self.party.refresh_from_db()
+        self.assertEqual(self.party.party_type, PartyType.OTHER_MATERIAL)
 
     # -- deletion -------------------------------------------------------------
 

@@ -24,6 +24,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Pincode,
     ProductPackaging,
     Stage,
@@ -86,7 +87,9 @@ class StockLedgerGoldenTest(DMLTestCase):
             product=cls.product, material_type=cls.pouch, packet_weight=W1,
             quantity=Decimal("1.000"), created_by=cls.su,
         )
-        cls.party = Party.objects.create(name="Golden Party", city=cls.city, created_by=cls.su)
+        cls.party = Party.objects.create(
+            name="Golden Party", city=cls.city, party_type=PartyType.RAW_MATERIAL, created_by=cls.su
+        )
 
     # -- the script ------------------------------------------------------------
 
@@ -121,12 +124,14 @@ class StockLedgerGoldenTest(DMLTestCase):
         # 1-2: raw lots in use and rejected.
         lot1 = InwardOperations.create_raw_lot(
             product=self.product, party=self.party, lot_no="IR-1",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("500.000"), lab_sampling_date=D1, actor=self.su,
         )
         self._lot_status(lot1, "IN_USE")
         self._stamp(D1, 9, 0)
         lot2 = InwardOperations.create_raw_lot(
             product=self.product, party=self.party, lot_no="IR-2",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("100.000"), lab_sampling_date=D1, actor=self.su,
         )
         self._lot_status(lot2, "RAW_MATERIAL_REJECTED")

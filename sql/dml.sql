@@ -68,6 +68,7 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(53, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(54, 'aggregator', 'stockevent');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(55, 'aggregator', 'pushdevice');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(56, 'aggregator', 'notification');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(57, 'aggregator', 'nonstockinward');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -278,6 +279,10 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(199, 'Can change notification', 56, 'change_notification');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(200, 'Can delete notification', 56, 'delete_notification');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(201, 'Can view notification', 56, 'view_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(202, 'Can add non-stock inward', 57, 'add_nonstockinward');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(203, 'Can change non-stock inward', 57, 'change_nonstockinward');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(204, 'Can delete non-stock inward', 57, 'delete_nonstockinward');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(205, 'Can view non-stock inward', 57, 'view_nonstockinward');
 -- Custom permission (authentication.User.Meta.permissions): gates POST /api/execute-code/.
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(165, 'Can execute Python code on the server', 1, 'execute_python_code');
 
@@ -448,12 +453,14 @@ INSERT INTO public.aggregator_contact (id, created_at, updated_at, is_deleted, c
 (4, now(), now(), false, 3, 'Rakesh Sharma', '9829011004'),
 (5, now(), now(), false, 3, 'Bhanwar Singh', '9829011005');
 
-INSERT INTO public.aggregator_party (id, created_at, updated_at, is_deleted, created_by_id, "name", city_id, contact_number) VALUES
-(1, now(), now(), false, 4, 'Shree Agro Traders', 1, '9898100001'),
-(2, now(), now(), false, 4, 'Gujarat Seed Suppliers', 2, '9898100002'),
-(3, now(), now(), false, 4, 'Rajkot Packaging Co', 3, '9898100003'),
-(4, now(), now(), false, 4, 'Jaipur Poly Industries', 4, '9898100004'),
-(5, now(), now(), false, 4, 'Marwar Agro Inputs', 5, '9898100005');
+-- Parties 1, 2, 5 supply raw material (the raw lots below); 3, 4 supply
+-- packing material (the other-material lots below).
+INSERT INTO public.aggregator_party (id, created_at, updated_at, is_deleted, created_by_id, "name", city_id, party_type, contact_number) VALUES
+(1, now(), now(), false, 4, 'Shree Agro Traders', 1, 'RAW_MATERIAL', '9898100001'),
+(2, now(), now(), false, 4, 'Gujarat Seed Suppliers', 2, 'RAW_MATERIAL', '9898100002'),
+(3, now(), now(), false, 4, 'Rajkot Packaging Co', 3, 'OTHER_MATERIAL', '9898100003'),
+(4, now(), now(), false, 4, 'Jaipur Poly Industries', 4, 'OTHER_MATERIAL', '9898100004'),
+(5, now(), now(), false, 4, 'Marwar Agro Inputs', 5, 'RAW_MATERIAL', '9898100005');
 
 INSERT INTO public.aggregator_productdescriptionitem (id, created_at, updated_at, is_deleted, created_by_id, product_id, "text", sequence) VALUES
 (1, now(), now(), false, 1, 1, 'High-yielding castor hybrid', 1),
@@ -498,12 +505,12 @@ INSERT INTO public.aggregator_clienttransportagency (id, created_at, updated_at,
 -- Inward raw material (SAI-33 gets four lots, SAI-3353 one)
 --   status 10 = Lab Testing (not in stock yet), 11 = In Use.
 -- -------------------------------------------------------------------------
-INSERT INTO public.aggregator_inwardrawmaterial (id, created_at, updated_at, is_deleted, created_by_id, public_id, lot_no, effective_date, lab_sampling_date, product_id, party_id, quantity_kg, status_id) VALUES
-(1, now(), now(), false, 6, 'IR-DUMMY0000001', 'SUP-LOT-A1', pg_temp.today_ist() - 24, pg_temp.today_ist() - 27, 1, 1, 1000.000, 11),
-(2, now(), now(), false, 6, 'IR-DUMMY0000002', 'SUP-LOT-A2', pg_temp.today_ist() - 14, pg_temp.today_ist() - 17, 1, 2, 500.000, 11),
-(3, now(), now(), false, 6, 'IR-DUMMY0000003', 'SUP-LOT-A3', pg_temp.today_ist() - 4, pg_temp.today_ist() - 7, 1, 1, 400.000, 11),
-(4, now(), now(), false, 6, 'IR-DUMMY0000004', 'SUP-LOT-A4', pg_temp.today_ist() - 6, pg_temp.today_ist() - 9, 1, 2, 300.000, 16),
-(5, now(), now(), false, 6, 'IR-DUMMY0000005', 'SUP-LOT-A5', pg_temp.today_ist() - 20, pg_temp.today_ist() - 23, 2, 5, 400.000, 11);
+INSERT INTO public.aggregator_inwardrawmaterial (id, created_at, updated_at, is_deleted, created_by_id, public_id, lot_no, effective_date, lab_sampling_date, product_id, party_id, farmer_name, quantity_kg, status_id) VALUES
+(1, now(), now(), false, 6, 'IR-DUMMY0000001', 'SUP-LOT-A1', pg_temp.today_ist() - 24, pg_temp.today_ist() - 27, 1, 1, 'Ramesh Chaudhary', 1000.000, 11),
+(2, now(), now(), false, 6, 'IR-DUMMY0000002', 'SUP-LOT-A2', pg_temp.today_ist() - 14, pg_temp.today_ist() - 17, 1, 2, 'Bhavesh Thakor', 500.000, 11),
+(3, now(), now(), false, 6, 'IR-DUMMY0000003', 'SUP-LOT-A3', pg_temp.today_ist() - 4, pg_temp.today_ist() - 7, 1, 1, 'Ramesh Chaudhary', 400.000, 11),
+(4, now(), now(), false, 6, 'IR-DUMMY0000004', 'SUP-LOT-A4', pg_temp.today_ist() - 6, pg_temp.today_ist() - 9, 1, 2, 'Naran Rabari', 300.000, 16),
+(5, now(), now(), false, 6, 'IR-DUMMY0000005', 'SUP-LOT-A5', pg_temp.today_ist() - 20, pg_temp.today_ist() - 23, 2, 5, 'Gopal Jat', 400.000, 11);
 
 -- Raw material written off as waste (undated)
 INSERT INTO public.aggregator_rawmaterialwaste (id, created_at, updated_at, is_deleted, created_by_id, public_id, product_id, quantity_kg, reason) VALUES
@@ -512,6 +519,12 @@ INSERT INTO public.aggregator_rawmaterialwaste (id, created_at, updated_at, is_d
 (3, now(), now(), false, 4, 'WS-DUMMY0000003', 1, 5.000, 'Rodent damage'),
 (4, now(), now(), false, 4, 'WS-DUMMY0000004', 2, 5.000, 'Moisture / fungus'),
 (5, now(), now(), false, 4, 'WS-DUMMY0000005', 2, 0.500, 'Sampling loss');
+
+-- Non-stock inward (consumables; linked to nothing, never counted as stock)
+INSERT INTO public.aggregator_nonstockinward (id, created_at, updated_at, is_deleted, created_by_id, public_id, "name", description, company_name, price, quantity, unit) VALUES
+(1, now(), now(), false, 4, 'NS-DUMMY0000001', 'Imidacloprid 17.8% SL', 'Seed-store insecticide spray', 'Bayer CropScience', 1850.00, 5.000, 'litre'),
+(2, now(), now(), false, 4, 'NS-DUMMY0000002', 'Grader sieve 4mm', '', 'Rajkot Engineering Works', NULL, 2.000, 'count'),
+(3, now(), now(), false, 4, 'NS-DUMMY0000003', 'Aluminium phosphide tablets', 'Godown fumigation', '', 640.00, 3.000, 'packet');
 
 -- -------------------------------------------------------------------------
 -- Packing (other) material: recipes + inward lots
@@ -652,6 +665,7 @@ SELECT setval(pg_get_serial_sequence('public.aggregator_clientcontact', 'id'),  
 SELECT setval(pg_get_serial_sequence('public.aggregator_clienttransportagency', 'id'),  (SELECT MAX(id) FROM public.aggregator_clienttransportagency));
 SELECT setval(pg_get_serial_sequence('public.aggregator_inwardrawmaterial', 'id'),      (SELECT MAX(id) FROM public.aggregator_inwardrawmaterial));
 SELECT setval(pg_get_serial_sequence('public.aggregator_rawmaterialwaste', 'id'),       (SELECT MAX(id) FROM public.aggregator_rawmaterialwaste));
+SELECT setval(pg_get_serial_sequence('public.aggregator_nonstockinward', 'id'),        (SELECT MAX(id) FROM public.aggregator_nonstockinward));
 SELECT setval(pg_get_serial_sequence('public.aggregator_othermaterialrecipe', 'id'),    (SELECT MAX(id) FROM public.aggregator_othermaterialrecipe));
 SELECT setval(pg_get_serial_sequence('public.aggregator_inwardothermaterial', 'id'),    (SELECT MAX(id) FROM public.aggregator_inwardothermaterial));
 SELECT setval(pg_get_serial_sequence('public.aggregator_inventorysnapshot', 'id'),      (SELECT MAX(id) FROM public.aggregator_inventorysnapshot));
