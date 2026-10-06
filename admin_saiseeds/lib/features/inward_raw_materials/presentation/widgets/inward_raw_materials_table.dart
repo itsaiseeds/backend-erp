@@ -17,6 +17,7 @@ class InwardRawMaterialsTable extends StatefulWidget {
   static const String CONFIG_KEY = 'inward-raw-materials';
   static const String COLUMN_PRODUCT = 'product';
   static const String COLUMN_PARTY = 'party';
+  static const String COLUMN_FARMER = 'farmer_name';
   static const String COLUMN_LOT_NO = 'lot_no';
   static const String COLUMN_QUANTITY = 'quantity_kg';
   static const String COLUMN_STATUS = 'status';
@@ -84,6 +85,11 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
     AppDataColumn(
       id: InwardRawMaterialsTable.COLUMN_PARTY,
       label: AppStrings.COLUMN_PARTY,
+      width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: InwardRawMaterialsTable.COLUMN_FARMER,
+      label: AppStrings.COLUMN_FARMER_NAME,
       width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
@@ -224,6 +230,8 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
         return _textCell(lot.productName, isStrong: true);
       case InwardRawMaterialsTable.COLUMN_PARTY:
         return _textCell(lot.partyName);
+      case InwardRawMaterialsTable.COLUMN_FARMER:
+        return _textCell(lot.farmerLabel);
       case InwardRawMaterialsTable.COLUMN_LOT_NO:
         return _textCell(lot.lotNo);
       case InwardRawMaterialsTable.COLUMN_QUANTITY:

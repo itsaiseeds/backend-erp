@@ -668,6 +668,7 @@ class AppStrings {
   static const String COLUMN_RETURN_ID = 'Return ID';
   static const String COLUMN_RETURN_CLIENT = 'Client';
   static const String COLUMN_RETURN_ORDER = 'Order';
+  static const String RETURN_ORDER_ORDER_STATUS = 'Order status';
   static const String COLUMN_RETURN_STATUS = 'Status';
   static const String COLUMN_RETURN_DATE = 'Return Date';
   static const String COLUMN_RETURN_KG = 'Weight';
@@ -756,10 +757,21 @@ class AppStrings {
   static const String RETURN_ORDER_EDIT_EMPTY =
       'A return must keep at least one line.';
   static const String RETURN_ORDER_EDIT_WILL_BE_REMOVED = 'Dropped on save';
+  static const String RETURN_ORDER_EDIT_NOTHING_DROPPED =
+      'Nothing queued to drop. Use Remove on the Items step and the line '
+      'shows up here until you save.';
   static const String RETURN_ORDER_EDIT_PACKETS_MIN = 'At least 1 packet';
   static const String RETURN_ORDER_EDIT_PRICE_INVALID = 'Enter a price';
   static const String RETURN_ORDER_EDIT_RESTORE = 'Put back';
   static const String RETURN_ORDER_EDIT_REMOVE = 'Remove';
+
+  static const String RETURN_ORDER_STEP_SUMMARY = 'Summary';
+  static const String RETURN_ORDER_STEP_ITEMS = 'Items';
+  static const String RETURN_ORDER_STEP_REVIEW = 'Review';
+  static const String RETURN_ORDER_STEP_SUMMARY_CAPTION = 'Return overview';
+  static const String RETURN_ORDER_STEP_ITEMS_CAPTION = 'Returned lines';
+  static const String RETURN_ORDER_STEP_REVIEW_CAPTION =
+      'Dropped lines and totals';
 
   static const String RETURN_ORDER_ITEM_COUNT_ONE = 'item';
   static const String RETURN_ORDER_ITEM_COUNT_MANY = 'items';
@@ -807,8 +819,14 @@ class AppStrings {
       'This permanently removes the party. This cannot be undone.';
   static const String COLUMN_PARTY_NAME = 'Party Name';
   static const String COLUMN_PARTY_CONTACT = 'Contact Number';
+  static const String COLUMN_PARTY_TYPE = 'Type';
   static const String FIELD_PARTY_NAME_HINT = 'Party name';
   static const String FIELD_PARTY_CONTACT_HINT = '10-digit mobile number';
+  static const String FIELD_PARTY_TYPE = 'Party type';
+  static const String FIELD_PARTY_TYPE_HINT = 'Search a party type';
+  static const String PARTY_TYPE_RAW_MATERIAL = 'Raw Material';
+  static const String PARTY_TYPE_OTHER_MATERIAL = 'Other Material';
+  static const String VALIDATION_PARTY_TYPE_REQUIRED = 'Party type is required.';
   static const String PARTIES_TABLE_SEARCH_HINT = 'Search parties...';
   static const String PARTIES_EMPTY_STATE_TITLE = 'No parties yet';
   static const String PARTIES_EMPTY_STATE_BODY =
@@ -835,6 +853,15 @@ class AppStrings {
   static const String ORDER_STEP_SUMMARY = 'Summary';
   static const String ORDER_STEP_ITEMS = 'Items';
   static const String ORDER_STEP_DELIVERY = 'Delivery';
+  static const String ORDER_STEP_RETURNS = 'Returns';
+  static const String ORDER_STEP_NET_SALE = 'Net sale';
+  static const String ORDER_STEP_RETURNS_CAPTION = 'Goods that came back';
+  static const String ORDER_STEP_NET_SALE_CAPTION = 'What the sale is worth';
+  static const String ORDER_NO_RETURNS =
+      'No goods were returned against this order.';
+  static const String ORDER_FIELD_ORDER_VALUE = 'Order value';
+  static const String ORDER_FIELD_RETURNED_VALUE = 'Returned value';
+  static const String ORDER_FIELD_NET_SALE = 'Net sale';
 
   static const String ORDER_PUBLIC_ID_LABEL = 'Order ID';
   static const String ORDER_PLACED_BY_LABEL = 'Booked by';
@@ -1177,10 +1204,13 @@ class AppStrings {
   static const String STATUS_IN_USE = 'In Use';
 
   static const String FIELD_PARTY = 'Party';
+  static const String FIELD_ORGANIZER = 'Organizer';
   static const String FIELD_PARTY_HINT = 'Search a party';
   static const String FIELD_QUANTITY_KG = 'Quantity (kg)';
   static const String FIELD_QUANTITY_KG_HINT = 'Weight received in kg';
   static const String FIELD_LAB_SAMPLING_DATE = 'Lab sampling date';
+  static const String FIELD_FARMER_NAME = 'Farmer name';
+  static const String FIELD_FARMER_NAME_HINT = "Supplier's farmer or village name";
   static const String FIELD_MATERIAL_TYPE = 'Material type';
   static const String FIELD_MATERIAL_TYPE_HINT = 'Search a material type';
   static const String FIELD_RECIPE_QUANTITY = 'Quantity';

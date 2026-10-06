@@ -18,6 +18,14 @@ class PartiesService {
 
   List<PartyModel> get parties => List.unmodifiable(_parties);
 
+  /// Parties the raw-material inward form may pick from.
+  List<PartyModel> get rawMaterialParties =>
+      List.unmodifiable(_parties.where((party) => party.isRawMaterial));
+
+  /// Parties the other-material inward form may pick from.
+  List<PartyModel> get otherMaterialParties =>
+      List.unmodifiable(_parties.where((party) => party.isOtherMaterial));
+
   PartiesRepository get _resolvedRepository =>
       _repository ??= PartiesRepository(apiClient: ApiClient());
 

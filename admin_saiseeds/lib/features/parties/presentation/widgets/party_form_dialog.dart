@@ -9,6 +9,8 @@ import '../../../../core/utils/validators/form_validators.dart';
 import '../../../../core/widgets/dialogs/app_form_dialog.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
 import '../../../../core/widgets/inputs/city_picker_field.dart';
+import '../../../../core/widgets/inputs/party_type_picker_field.dart';
+import '../../data/models/party_model.dart';
 import '../bloc/parties_cubit.dart';
 
 class PartyFormDialog extends StatefulWidget {
@@ -38,8 +40,10 @@ class _PartyFormDialogState extends State<PartyFormDialog> {
   final TextEditingController _contactController = TextEditingController();
 
   CityModel? _selectedCity;
+  String _partyType = PartyType.RAW_MATERIAL;
   bool _isSubmitting = false;
   String? _cityError;
+  String? _partyTypeError;
 
   @override
   void dispose() {
@@ -52,12 +56,14 @@ class _PartyFormDialogState extends State<PartyFormDialog> {
     final bool isFormValid = _formKey.currentState?.validate() ?? false;
     final bool isCityValid = _selectedCity != null;
 
-    setState(
-      () =>
-          _cityError = isCityValid ? null : AppStrings.VALIDATION_CITY_REQUIRED,
-    );
+    setState(() {
+      _cityError = isCityValid ? null : AppStrings.VALIDATION_CITY_REQUIRED;
+      _partyTypeError = _partyType.isEmpty
+          ? AppStrings.VALIDATION_PARTY_TYPE_REQUIRED
+          : null;
+    });
 
-    if (!isFormValid || !isCityValid) return;
+    if (!isFormValid || !isCityValid || _partyType.isEmpty) return;
 
     setState(() => _isSubmitting = true);
 
@@ -67,6 +73,7 @@ class _PartyFormDialogState extends State<PartyFormDialog> {
     final bool succeeded = await cubit.createParty(
       name: _nameController.text.trim(),
       cityId: _selectedCity!.id,
+      partyType: _partyType,
       contactNumber: contact.isEmpty ? null : contact,
     );
 
@@ -115,6 +122,16 @@ class _PartyFormDialogState extends State<PartyFormDialog> {
               onSelected: (city) => setState(() {
                 _selectedCity = city;
                 _cityError = null;
+              }),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            PartyTypePickerField(
+              value: _partyType,
+              enabled: !_isSubmitting,
+              errorText: _partyTypeError,
+              onSelected: (type) => setState(() {
+                _partyType = type;
+                _partyTypeError = null;
               }),
             ),
             const SizedBox(height: AppSpacing.md),

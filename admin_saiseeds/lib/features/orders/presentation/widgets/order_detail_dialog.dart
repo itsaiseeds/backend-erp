@@ -23,6 +23,9 @@ import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/widgets/buttons/secondary_button.dart';
 import '../../../../core/widgets/layout/app_hairline.dart';
 import '../../data/models/order_model.dart';
+import '../../../return_orders/data/models/return_order_model.dart';
+import '../../../return_orders/data/models/return_order_status.dart';
+import '../../../return_orders/presentation/widgets/return_order_status_badge.dart';
 import 'order_status_badge.dart';
 
 class OrderDetailDialog extends StatefulWidget {
@@ -67,12 +70,16 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
     Icons.summarize_outlined,
     Icons.inventory_2_outlined,
     Icons.local_shipping_outlined,
+    Icons.assignment_return_outlined,
+    Icons.payments_outlined,
   ];
 
   static const List<String> _steps = [
     AppStrings.ORDER_STEP_SUMMARY,
     AppStrings.ORDER_STEP_ITEMS,
     AppStrings.ORDER_STEP_DELIVERY,
+    AppStrings.ORDER_STEP_RETURNS,
+    AppStrings.ORDER_STEP_NET_SALE,
   ];
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
@@ -320,6 +327,8 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
     AppStrings.ORDER_STEP_SUMMARY_CAPTION,
     AppStrings.ORDER_STEP_ITEMS_CAPTION,
     AppStrings.ORDER_STEP_DELIVERY_CAPTION,
+    AppStrings.ORDER_STEP_RETURNS_CAPTION,
+    AppStrings.ORDER_STEP_NET_SALE_CAPTION,
   ];
 
   String get _stepSubtitle =>
@@ -364,6 +373,8 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
     final Widget step = switch (_stepIndex) {
       1 => _buildItems(order),
       2 => _buildDelivery(order),
+      3 => _ReturnsStep(order: order),
+      4 => _NetSaleStep(order: order),
       _ => _SummaryStep(order: order, bagCount: _liveBagCount),
     };
 
@@ -1056,6 +1067,356 @@ class _DeliveryStep extends StatelessWidget {
         DetailField(
           label: AppStrings.ORDER_EXPECTED_DELIVERY_LABEL,
           value: DateFormatter.dayLabel(order.expectedDeliveryDate),
+        ),
+      ],
+    );
+  }
+}
+
+/// Every return raised against the order, each expanded so its full detail is
+/// readable. A lone return is open by default; several become a stack of
+/// collapsible cards so the step does not swallow the whole dialog.
+class _ReturnsStep extends StatelessWidget {
+  final OrderModel order;
+
+  const _ReturnsStep({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final List<ReturnOrderModel> returns = order.returns;
+
+    if (returns.isEmpty) {
+      return Text(
+        AppStrings.ORDER_NO_RETURNS,
+        style: AppTypography.bodySmall.copyWith(
+          color: AppColors.TEXT_SECONDARY,
+        ),
+      );
+    }
+
+    if (returns.length == 1) {
+      return _ReturnCard(
+        returnOrder: returns.first,
+        initiallyExpanded: true,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int index = 0; index < returns.length; index++)
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: index == returns.length - 1 ? 0 : AppSpacing.sm,
+            ),
+            child: _ReturnCard(
+              returnOrder: returns[index],
+              initiallyExpanded: index == 0,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One collapsible return: who, when, what came back, and what was decided.
+class _ReturnCard extends StatelessWidget {
+  final ReturnOrderModel returnOrder;
+  final bool initiallyExpanded;
+
+  const _ReturnCard({
+    required this.returnOrder,
+    required this.initiallyExpanded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.SURFACE,
+        border: Border.all(color: AppColors.BORDER),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        childrenPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.xxs,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                returnOrder.publicId,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            ReturnOrderStatusBadge(status: returnOrder.status),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.xxs),
+          child: Text(
+            '${DateFormatter.dayLabel(returnOrder.returnDate)} · '
+            '${CurrencyFormatter.rupees(returnOrder.totalAmount)}',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.TEXT_SECONDARY,
+            ),
+          ),
+        ),
+        children: [_ReturnBody(returnOrder: returnOrder)],
+      ),
+    );
+  }
+}
+
+class _ReturnBody extends StatelessWidget {
+  final ReturnOrderModel returnOrder;
+
+  const _ReturnBody({required this.returnOrder});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DetailFieldGrid(
+          fields: [
+            DetailField(
+              label: AppStrings.COLUMN_RETURN_DATE,
+              value: DateFormatter.dayLabel(returnOrder.returnDate),
+            ),
+            DetailField(
+              label: AppStrings.COLUMN_RETURN_RAISED_BY,
+              value: returnOrder.createdByName.isEmpty
+                  ? AppStrings.TABLE_VALUE_UNAVAILABLE
+                  : returnOrder.createdByName,
+            ),
+            DetailField(
+              label: AppStrings.DETAIL_FIELD_CREATED_AT,
+              value: DateFormatter.instantLabel(returnOrder.createdAt),
+            ),
+            DetailField(
+              label: AppStrings.COLUMN_RETURN_ORDER,
+              value: _orderRefLabel(returnOrder),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (returnOrder.items.isNotEmpty) ...[
+          for (int index = 0; index < returnOrder.items.length; index++) ...[
+            if (index > 0) const AppHairline(),
+            _ReturnItemLine(line: returnOrder.items[index]),
+          ],
+          const SizedBox(height: AppSpacing.md),
+        ],
+        ..._decisionRows(),
+        const SizedBox(height: AppSpacing.sm),
+        const AppHairline(),
+        const SizedBox(height: AppSpacing.sm),
+        _ReturnTotalsRow(returnOrder: returnOrder),
+      ],
+    );
+  }
+
+  /// What the admin decided, if anything has been decided yet.
+  List<Widget> _decisionRows() {
+    switch (returnOrder.status) {
+      case ReturnOrderStatus.accepted:
+        return [
+          Text(
+            AppStrings.RETURN_ORDER_ACCEPTED_BY.replaceAll(
+              '%s',
+              returnOrder.verifiedByName,
+            ),
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.TEXT_SECONDARY,
+            ),
+          ),
+          if (returnOrder.includeInOtherRawMaterials != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              returnOrder.includeInOtherRawMaterials!
+                  ? AppStrings.RETURN_ORDER_MATERIALS_BOOKED_YES
+                  : AppStrings.RETURN_ORDER_MATERIALS_BOOKED_NO,
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.TEXT_SECONDARY,
+              ),
+            ),
+          ],
+        ];
+      case ReturnOrderStatus.rejected:
+        return [
+          Text(
+            AppStrings.RETURN_ORDER_REJECTED_BY.replaceAll(
+              '%s',
+              returnOrder.rejectedByName,
+            ),
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.TEXT_SECONDARY,
+            ),
+          ),
+        ];
+      case ReturnOrderStatus.pending:
+      case ReturnOrderStatus.unknown:
+        return const [];
+    }
+  }
+
+  static String _orderRefLabel(ReturnOrderModel returnOrder) {
+    final String orderId = returnOrder.order.publicId.trim();
+    if (orderId.isEmpty) return AppStrings.TABLE_VALUE_UNAVAILABLE;
+    return orderId;
+  }
+}
+
+class _ReturnItemLine extends StatelessWidget {
+  final ReturnOrderItemModel line;
+
+  const _ReturnItemLine({required this.line});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  line.product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodyMedium,
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  '${line.packets} x ${line.packetWeightLabel} · '
+                  '${_trim(line.kg)} kg',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.TEXT_SECONDARY,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            CurrencyFormatter.rupees(line.lineTotal),
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.PRIMARY,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _trim(num value) {
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return value.toString();
+  }
+}
+
+class _ReturnTotalsRow extends StatelessWidget {
+  final ReturnOrderModel returnOrder;
+
+  const _ReturnTotalsRow({required this.returnOrder});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _Metric(
+            value: CurrencyFormatter.rupees(returnOrder.totalAmount),
+            label: AppStrings.COLUMN_RETURN_AMOUNT,
+            isEmphasised: true,
+          ),
+        ),
+        const _MetricDivider(),
+        Expanded(
+          child: _Metric(
+            value: '${returnOrder.totalPackets}',
+            label: AppStrings.COLUMN_RETURN_PACKETS,
+          ),
+        ),
+        const _MetricDivider(),
+        Expanded(
+          child: _Metric(
+            value: '${_trim(returnOrder.totalKg)} kg',
+            label: AppStrings.COLUMN_RETURN_KG,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _trim(num value) {
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return value.toString();
+  }
+}
+
+/// The closing step: what the order was worth, what came back, and therefore
+/// what the sale is still worth.
+class _NetSaleStep extends StatelessWidget {
+  final OrderModel order;
+
+  const _NetSaleStep({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DetailFieldGrid(
+          fields: [
+            DetailField(
+              label: AppStrings.ORDER_FIELD_ORDER_VALUE,
+              value: CurrencyFormatter.rupees(order.totalAmount),
+            ),
+            DetailField(
+              label: AppStrings.ORDER_FIELD_RETURNED_VALUE,
+              value: CurrencyFormatter.rupees(order.returnedAmount),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.PRIMARY_SURFACE,
+            border: Border.all(color: AppColors.PRIMARY),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _Metric(
+                  value: CurrencyFormatter.rupees(order.netSaleAmount),
+                  label: AppStrings.ORDER_FIELD_NET_SALE,
+                  isEmphasised: true,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
