@@ -23,6 +23,7 @@ import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/widgets/buttons/secondary_button.dart';
 import '../../../../core/widgets/layout/app_hairline.dart';
 import '../../data/models/order_model.dart';
+import '../../data/models/order_status.dart';
 import '../../../return_orders/data/models/return_order_model.dart';
 import '../../../return_orders/data/models/return_order_status.dart';
 import '../../../return_orders/presentation/widgets/return_order_status_badge.dart';
@@ -66,20 +67,28 @@ class OrderDetailDialog extends StatefulWidget {
 }
 
 class _OrderDetailDialogState extends State<OrderDetailDialog> {
-  static const List<IconData> _stepIcons = [
+  /// Returns and the net-sale arithmetic only make sense once the order has
+  /// actually been dispatched, so those two steps are only offered then.
+  bool get _showsSettlement => _order.status == OrderStatus.dispatched;
+
+  List<IconData> get _stepIcons => [
     Icons.summarize_outlined,
     Icons.inventory_2_outlined,
     Icons.local_shipping_outlined,
-    Icons.assignment_return_outlined,
-    Icons.payments_outlined,
+    if (_showsSettlement) ...[
+      Icons.assignment_return_outlined,
+      Icons.payments_outlined,
+    ],
   ];
 
-  static const List<String> _steps = [
+  List<String> get _steps => [
     AppStrings.ORDER_STEP_SUMMARY,
     AppStrings.ORDER_STEP_ITEMS,
     AppStrings.ORDER_STEP_DELIVERY,
-    AppStrings.ORDER_STEP_RETURNS,
-    AppStrings.ORDER_STEP_NET_SALE,
+    if (_showsSettlement) ...[
+      AppStrings.ORDER_STEP_RETURNS,
+      AppStrings.ORDER_STEP_NET_SALE,
+    ],
   ];
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
@@ -323,12 +332,14 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
     );
   }
 
-  static const List<String> _captions = [
+  List<String> get _captions => [
     AppStrings.ORDER_STEP_SUMMARY_CAPTION,
     AppStrings.ORDER_STEP_ITEMS_CAPTION,
     AppStrings.ORDER_STEP_DELIVERY_CAPTION,
-    AppStrings.ORDER_STEP_RETURNS_CAPTION,
-    AppStrings.ORDER_STEP_NET_SALE_CAPTION,
+    if (_showsSettlement) ...[
+      AppStrings.ORDER_STEP_RETURNS_CAPTION,
+      AppStrings.ORDER_STEP_NET_SALE_CAPTION,
+    ],
   ];
 
   String get _stepSubtitle =>
@@ -1374,7 +1385,8 @@ class _ReturnTotalsRow extends StatelessWidget {
 }
 
 /// The closing step: what the order was worth, what came back, and therefore
-/// what the sale is still worth.
+/// what the sale is still worth. Laid out like a statement so the subtraction
+/// is obvious rather than implied by two labels in a grid.
 class _NetSaleStep extends StatelessWidget {
   final OrderModel order;
 
@@ -1382,40 +1394,112 @@ class _NetSaleStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final num returnedAmount = order.returnedAmount;
+    final bool hasReturns = returnedAmount > 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        DetailFieldGrid(
-          fields: [
-            DetailField(
-              label: AppStrings.ORDER_FIELD_ORDER_VALUE,
-              value: CurrencyFormatter.rupees(order.totalAmount),
-            ),
-            DetailField(
-              label: AppStrings.ORDER_FIELD_RETURNED_VALUE,
-              value: CurrencyFormatter.rupees(order.returnedAmount),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.PRIMARY_SURFACE,
-            border: Border.all(color: AppColors.PRIMARY),
+            color: AppColors.SURFACE,
+            border: Border.all(color: AppColors.BORDER),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: _Metric(
-                  value: CurrencyFormatter.rupees(order.netSaleAmount),
-                  label: AppStrings.ORDER_FIELD_NET_SALE,
-                  isEmphasised: true,
-                ),
+              _SettlementRow(
+                label: AppStrings.ORDER_FIELD_ORDER_VALUE,
+                value: CurrencyFormatter.rupees(order.totalAmount),
+              ),
+              const SizedBox(height: AppSpacing.smd),
+              _SettlementRow(
+                label: AppStrings.ORDER_FIELD_RETURNED_VALUE,
+                value: hasReturns
+                    ? '- ${CurrencyFormatter.rupees(returnedAmount)}'
+                    : CurrencyFormatter.rupees(returnedAmount),
+                valueColor: hasReturns
+                    ? AppColors.ERROR
+                    : AppColors.TEXT_SECONDARY,
+              ),
+              const SizedBox(height: AppSpacing.smd),
+              const AppHairline(),
+              const SizedBox(height: AppSpacing.smd),
+              _SettlementRow(
+                label: AppStrings.ORDER_FIELD_NET_SALE,
+                value: CurrencyFormatter.rupees(order.netSaleAmount),
+                isEmphasised: true,
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Icon(
+              Icons.functions_rounded,
+              size: AppSizes.iconSm,
+              color: AppColors.TEXT_SECONDARY,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                AppStrings.ORDER_NET_SALE_FORMULA,
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.TEXT_SECONDARY,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SettlementRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool isEmphasised;
+
+  const _SettlementRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.isEmphasised = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.TEXT_SECONDARY,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Text(
+          value,
+          style: (isEmphasised
+                  ? AppTypography.titleMedium
+                  : AppTypography.bodyMedium)
+              .copyWith(
+            color: valueColor ??
+                (isEmphasised
+                    ? AppColors.PRIMARY
+                    : AppColors.TEXT_PRIMARY),
+            fontWeight: isEmphasised ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
       ],
