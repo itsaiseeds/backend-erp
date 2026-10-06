@@ -37,7 +37,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import F, Q, QuerySet, Sum
 from django.http import Http404
 
@@ -647,7 +647,13 @@ def update_raw_lot(
 def create_other_lot(
     *, party: Party, recipe: OtherMaterialRecipe, quantity: Decimal, actor: User
 ) -> InwardOtherMaterial:
-    """Book an other-material lot; it is in stock the day it arrives."""
+    """Book an other-material lot; it is in stock the day it arrives.
+
+    Refused (``ValidationError``, a 400 -- and the booking rolls back) when the
+    material type's inward total, this lot included, still falls short of what
+    the bags and packets already packed use: bags exist that the inward lots
+    do not cover, so the lot must at least make up that gap.
+    """
     with recording(
         StockEventType.INWARD_OPERATIONS,
         StockEventDetail.OTHER_MATERIAL_RECEIVED,
@@ -662,5 +668,16 @@ def create_other_lot(
             effective_date=today(),
             created_by=actor,
         )
+        # recording() already locked the recipe's material type, so this read is stable.
+        material_type = recipe.material_type
+        available = InventoryOperations.other_material_available([material_type.id])[
+            material_type.id
+        ]
+        if available < 0:
+            raise ValidationError(
+                f"Not enough inward material for existing bags: '{material_type.name}' "
+                f"is still short by {-available} {material_type.unit_type} "
+                "for the bags already packed."
+            )
         rec.source = entry
     return entry

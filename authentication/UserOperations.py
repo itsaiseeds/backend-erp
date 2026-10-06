@@ -34,6 +34,15 @@ def _city_ref(city) -> dict | None:
     return {"id": city.id, "name": city.name}
 
 
+def _is_admin_account(user) -> bool:
+    """Whether the account behind a profile is an admin or superuser.
+
+    Such a profile is a fallback of that admin: its QR and deletion belong to the
+    superuser-only admin management, so clients hide both.
+    """
+    return bool(user.is_superuser or user.is_admin_user)
+
+
 class UserRefSerializer(serializers.Serializer):
     """Swagger schema for a compact ``{id, name}`` user reference."""
 
@@ -80,6 +89,7 @@ class SalesPersonPayloadSerializer(serializers.Serializer):
     created_by = UserRefSerializer(allow_null=True, required=False)
     created_at = serializers.DateTimeField()
     city = CityRefSerializer(allow_null=True, required=False)
+    is_admin = serializers.BooleanField()
     totp = TotpSerializer(required=False)
 
 
@@ -93,7 +103,20 @@ class GodownManagerPayloadSerializer(serializers.Serializer):
     role = serializers.CharField()
     created_by = UserRefSerializer(allow_null=True, required=False)
     created_at = serializers.DateTimeField()
+    is_admin = serializers.BooleanField()
     totp = TotpSerializer(required=False)
+
+
+def can_see_totp(viewer: User, target: User) -> bool:
+    """Whether ``viewer`` may be shown ``target``'s authenticator QR.
+
+    An admin's or superuser's secret is visible to a superuser, or to that
+    person themselves -- never to another admin, even through the admin's
+    fallback sales-person / godown-manager profile, which shares the secret.
+    """
+    if viewer.is_superuser or viewer.pk == target.pk:
+        return True
+    return not (target.is_superuser or target.is_admin_user)
 
 
 def admin_payload(admin: Admin, *, include_totp: bool = False) -> dict:
@@ -137,6 +160,7 @@ def salesperson_payload(salesperson: SalesPerson, *, include_totp: bool = False)
         "created_by": _user_ref(salesperson.created_by),
         "created_at": salesperson.created_at,
         "city": _city_ref(salesperson.city),
+        "is_admin": _is_admin_account(user),
     }
     if include_totp and user.totp is not None:
         payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
@@ -158,6 +182,7 @@ def godown_manager_payload(manager: GodownManager, *, include_totp: bool = False
         "role": "godown_manager",
         "created_by": _user_ref(manager.created_by),
         "created_at": manager.created_at,
+        "is_admin": _is_admin_account(user),
     }
     if include_totp and user.totp is not None:
         payload["totp"] = {"provisioning_uri": user.totp_provisioning_uri()}
@@ -183,6 +208,32 @@ def create_verified_user(data: dict, actor: User) -> User:
         verified_by=actor,
         totp_secret=pyotp.random_base32(),
         totp_enabled=True,
+    )
+
+
+def rotate_totp_secret(user: User) -> None:
+    """Replace ``user``'s TOTP secret so a fresh QR must be scanned.
+
+    The new secret is active straight away (like a freshly created account), the
+    replay counter and any brute-force lockout are cleared, and ``User.save``
+    revokes the sessions and tokens the old secret granted -- the old
+    authenticator entry stops working and the user logs in again.
+    """
+    user.generate_totp_secret()
+    user.totp_enabled = True
+    user.totp_last_counter = None
+    user.failed_totp_attempts = 0
+    user.totp_lockout_until = None
+    user.save(
+        skip_full_clean=True,
+        update_fields=[
+            "totp_secret",
+            "totp_enabled",
+            "totp_last_counter",
+            "failed_totp_attempts",
+            "totp_lockout_until",
+            "updated_at",
+        ],
     )
 
 

@@ -27,7 +27,7 @@ Figures per pool (see ``docs/prd/product-stock-ledger.md`` section 3.2):
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -286,6 +286,11 @@ class Recording:
     # Keyed by product too: two products can share a packet weight.
     carried: set[tuple[int, PoolKey]] = field(default_factory=set)
     events: list[StockEvent] = field(default_factory=list)
+    # Guards that need the packing-material figures *after* the write: material
+    # usage is read from the recipe layers, which are only brought up to date
+    # once the block ends, so a check inside the block cannot see the new
+    # packets. These run right after that sync; raising rolls the write back.
+    after_sync_checks: list[Callable[[], None]] = field(default_factory=list)
 
 
 def _lock_products(product_ids: Iterable[int]) -> None:
@@ -361,6 +366,8 @@ def recording(
         if _sync_recipe_layers(tracked, before, after):
             # Packing-material usage is read from the layers, so re-read.
             after = read_positions(tracked)
+        for check in handle.after_sync_checks:
+            check()
         _write_events(handle, tracked, before, after)
 
 

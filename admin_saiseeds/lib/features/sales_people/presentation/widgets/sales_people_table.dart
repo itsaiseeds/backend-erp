@@ -192,6 +192,8 @@ class SalesPeopleTableState extends State<SalesPeopleTable> {
       case SalesPeopleTable.COLUMN_CREATED_AT:
         return _textCell(DateFormatter.label(salesPerson.createdAt));
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:
+        // An admin's fallback profile is removed with the admin, not from here.
+        if (salesPerson.isAdmin) return const SizedBox.shrink();
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,

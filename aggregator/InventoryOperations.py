@@ -156,7 +156,7 @@ def record_stock_count(
             snapshot_date=snapshot_date,
         )
         _assert_raw_available([product_packaging.product_id])
-        _assert_material_available(materials_before)
+        rec.after_sync_checks.append(lambda: _assert_material_available(materials_before))
         _assert_bags_not_overreserved(bags_before)
         rec.sources = {product_packaging.product_id: snapshot}
     return snapshot
@@ -280,7 +280,7 @@ def record_stock_counts(
             for product_packaging, bags in counts.items()
         ]
         _assert_raw_available(product_ids)
-        _assert_material_available(materials_before)
+        rec.after_sync_checks.append(lambda: _assert_material_available(materials_before))
         _assert_bags_not_overreserved(bags_before)
         rec.sources = {
             snapshot.product_packaging.product_id: snapshot
@@ -922,7 +922,7 @@ def record_loose_stock(
             snapshot_date=snapshot_date,
         )
         _assert_raw_available([product.id])
-        _assert_material_available(materials_before)
+        rec.after_sync_checks.append(lambda: _assert_material_available(materials_before))
         _assert_loose_not_overreserved(loose_before)
         rec.sources = {product.id: snapshot}
     return snapshot
@@ -1040,7 +1040,7 @@ def record_loose_stocks(
             for (product, packet_weight), packets in counts.items()
         ]
         _assert_raw_available(product_ids)
-        _assert_material_available(materials_before)
+        rec.after_sync_checks.append(lambda: _assert_material_available(materials_before))
         _assert_loose_not_overreserved(loose_before)
         rec.sources = {
             snapshot.product_id: snapshot for snapshot in reversed(snapshots)
