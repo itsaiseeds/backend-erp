@@ -86,6 +86,7 @@ class InwardRawMaterialsView(AdminPaginatedDateRangeListView):
             product=data["product"],
             party=data["party"],
             lot_no=data["lot_no"],
+            farmer_name=data["farmer_name"],
             quantity_kg=data["quantity_kg"],
             lab_sampling_date=data.get("lab_sampling_date") or today(),
             actor=request.user,

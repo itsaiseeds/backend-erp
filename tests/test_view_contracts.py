@@ -349,6 +349,11 @@ EXPECTED_CONTRACTS = {
         SESSION_ADMIN,
     ),
     "api/sales-admin/raw-material-wastes": ("RawMaterialWastesView", SESSION_ADMIN),
+    "api/sales-admin/non-stock-inward/<str:public_id>": (
+        "UpdateNonStockInwardView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/non-stock-inwards": ("NonStockInwardsView", SESSION_ADMIN),
     "api/sales-admin/godown-managers": ("GodownManagersView", SESSION_ADMIN),
     "api/sales-admin/godown-managers/<int:id>": ("UpdateGodownManagerView", SESSION_ADMIN),
     "api/sales-admin/godown-managers/<int:id>/rotate-qr": (

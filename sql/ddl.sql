@@ -1170,6 +1170,9 @@ CREATE INDEX IF NOT EXISTS aggregator_customorderitem_deleted_by_id_idx ON publi
 -- A supplier/party that inward materials (raw or other) come from. Lookup
 -- master data: name is unique within its city. Referenced by
 -- aggregator_inwardrawmaterial and aggregator_inwardothermaterial.
+-- party_type says what the party supplies: a raw-material lot may only be
+-- booked against a RAW_MATERIAL party, an other-material lot only against an
+-- OTHER_MATERIAL one (a string enum checked by the API, not a FK).
 CREATE TABLE IF NOT EXISTS public.aggregator_party (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1180,10 +1183,13 @@ CREATE TABLE IF NOT EXISTS public.aggregator_party (
 	created_by_id int8 NULL,
 	"name" varchar(255) NOT NULL,
 	city_id int8 NOT NULL,
+	party_type varchar(32) NOT NULL,
 	contact_number varchar(10) NULL,
 	CONSTRAINT aggregator_party_pkey PRIMARY KEY (id),
-	CONSTRAINT uniq_party_name_city UNIQUE (name, city_id)
+	CONSTRAINT uniq_party_name_city UNIQUE (name, city_id),
+	CONSTRAINT ck_party_party_type CHECK (party_type IN ('RAW_MATERIAL', 'OTHER_MATERIAL'))
 );
+CREATE INDEX IF NOT EXISTS aggregator_party_party_type_idx ON public.aggregator_party USING btree (party_type);
 CREATE INDEX IF NOT EXISTS aggregator_party_city_id_idx ON public.aggregator_party USING btree (city_id);
 CREATE INDEX IF NOT EXISTS aggregator_party_is_deleted_idx ON public.aggregator_party USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_party_created_by_id_idx ON public.aggregator_party USING btree (created_by_id);
@@ -1201,6 +1207,8 @@ CREATE INDEX IF NOT EXISTS aggregator_party_deleted_by_id_idx ON public.aggregat
 -- own batch number for the consignment, required at booking. party_id is NULL
 -- only for a lot an accepted return order booked in (return_order_id set, lot_no
 -- = the return's public_id); such a lot is removed only by reverting the accept.
+-- farmer_name is the farmer the material came from (free text, required); a
+-- return-order lot reads 'Return Order (<ORD-...>)'.
 CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1216,11 +1224,13 @@ CREATE TABLE IF NOT EXISTS public.aggregator_inwardrawmaterial (
 	party_id int8 NULL,
 	return_order_id int8 NULL,
 	lot_no varchar(64) NOT NULL,
+	farmer_name varchar(255) NOT NULL,
 	quantity_kg numeric(10, 3) NOT NULL,
 	status_id int8 NOT NULL,
 	CONSTRAINT aggregator_inwardrawmaterial_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_inwardrawmaterial_public_id_key UNIQUE (public_id),
 	CONSTRAINT ck_inwardrawmaterial_quantity_kg_non_negative CHECK (quantity_kg >= 0),
+	CONSTRAINT ck_inwardrawmaterial_farmer_name_not_blank CHECK (farmer_name <> ''),
 	CONSTRAINT ck_inwardrawmaterial_party_or_return CHECK (party_id IS NOT NULL OR return_order_id IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_public_id_like ON public.aggregator_inwardrawmaterial USING btree (public_id varchar_pattern_ops);
@@ -1258,6 +1268,37 @@ CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_product_id_idx ON public.
 CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_is_deleted_idx ON public.aggregator_rawmaterialwaste USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_created_by_id_idx ON public.aggregator_rawmaterialwaste USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_deleted_by_id_idx ON public.aggregator_rawmaterialwaste USING btree (deleted_by_id);
+
+-- aggregator_nonstockinward ---------------------------------------------------
+-- Incoming consumables that are not seed stock (pesticides, insecticides,
+-- spare parts, ...). A standalone register: linked to nothing and never
+-- counted in any stock figure. description / company_name are optional ('' when
+-- unset), price is optional (NULL). unit is a fixed enum of units of measure.
+CREATE TABLE IF NOT EXISTS public.aggregator_nonstockinward (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	public_id varchar(20) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	description text NOT NULL DEFAULT '',
+	company_name varchar(255) NOT NULL DEFAULT '',
+	price numeric(12, 2) NULL,
+	quantity numeric(10, 3) NOT NULL,
+	unit varchar(16) NOT NULL,
+	CONSTRAINT aggregator_nonstockinward_pkey PRIMARY KEY (id),
+	CONSTRAINT aggregator_nonstockinward_public_id_key UNIQUE (public_id),
+	CONSTRAINT ck_nonstockinward_quantity_positive CHECK (quantity > 0),
+	CONSTRAINT ck_nonstockinward_price_non_negative CHECK (price IS NULL OR price >= 0),
+	CONSTRAINT ck_nonstockinward_unit CHECK (unit IN ('kg', 'g', 'litre', 'ml', 'count', 'packet'))
+);
+CREATE INDEX IF NOT EXISTS aggregator_nonstockinward_public_id_like ON public.aggregator_nonstockinward USING btree (public_id varchar_pattern_ops);
+CREATE INDEX IF NOT EXISTS aggregator_nonstockinward_is_deleted_idx ON public.aggregator_nonstockinward USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_nonstockinward_created_by_id_idx ON public.aggregator_nonstockinward USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_nonstockinward_deleted_by_id_idx ON public.aggregator_nonstockinward USING btree (deleted_by_id);
 
 -- aggregator_othermaterialtype ---------------------------------------------------
 -- Master list of "other material" kinds (bag_outer_cover, packet_outer_cover,
@@ -1638,6 +1679,8 @@ ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inward
 ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_nonstockinward ADD CONSTRAINT aggregator_nonstockinward_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_nonstockinward ADD CONSTRAINT aggregator_nonstockinward_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_othermaterialtype ADD CONSTRAINT aggregator_othermaterialtype_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_othermaterialtype ADD CONSTRAINT aggregator_othermaterialtype_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;

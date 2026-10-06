@@ -138,6 +138,9 @@ DELETE FROM public.aggregator_inwardothermaterial;
 -- Raw material written off as waste.
 DELETE FROM public.aggregator_rawmaterialwaste;
 
+-- Non-stock inward (consumables, linked to nothing).
+DELETE FROM public.aggregator_nonstockinward;
+
 -- The client's own lists, all keyed on aggregator_client.
 DELETE FROM public.aggregator_clientaddress;
 DELETE FROM public.aggregator_clientcontact;
@@ -246,6 +249,7 @@ DECLARE
         'aggregator_inwardrawmaterial',
         'aggregator_inwardothermaterial',
         'aggregator_rawmaterialwaste',
+        'aggregator_nonstockinward',
         'aggregator_clientaddress',
         'aggregator_clientcontact',
         'aggregator_clienttransportagency',

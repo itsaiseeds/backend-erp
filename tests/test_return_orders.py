@@ -255,6 +255,7 @@ class ReturnOrderOperationsTest(ReturnWorldTestCase):
         lot = InwardRawMaterial.objects.get(return_order=ret)
         self.assertIsNone(lot.party_id)
         self.assertEqual(lot.lot_no, ret.public_id)
+        self.assertEqual(lot.farmer_name, f"Return Order ({ret.order.public_id})")
         self.assertEqual(lot.status_id, StatusIds.IN_USE)
         self.assertEqual(lot.effective_date, inv.today())
         self.assertEqual(lot.quantity_kg, Decimal("10.000"))

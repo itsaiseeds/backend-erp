@@ -21,6 +21,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Pincode,
     ProductPackaging,
     Stage,
@@ -60,7 +61,9 @@ class LedgerWorldTestCase(DMLTestCase):
             company_name="Ledger Traders", gst_number="27AAPFU0939F1ZV", actor=cls.sp_user
         )
         add_client_address(cls.client_obj, cls.address, cls.sp_user, is_primary=True)
-        cls.party = Party.objects.create(name="Ledger Party", city=cls.city, created_by=cls.su)
+        cls.party = Party.objects.create(
+            name="Ledger Party", city=cls.city, party_type=PartyType.RAW_MATERIAL, created_by=cls.su
+        )
 
         stage = Stage.by_id(StageIds.BREEDER)
         cls.product = create_product(

@@ -193,16 +193,20 @@ def book_raw_material(product, quantity_kg, *, actor, effective_date=None, booke
     from datetime import date
 
     from aggregator import InwardOperations
-    from aggregator.models import InwardRawMaterial, Party, Status, StatusIds
+    from aggregator.models import InwardRawMaterial, Party, PartyType, Status, StatusIds
 
     party, _ = Party.objects.get_or_create(
-        name="Test Raw Material Party", city_id=1, defaults={"created_by": actor}
+        name="Test Raw Material Party", city_id=1, defaults={
+            "created_by": actor,
+            "party_type": PartyType.RAW_MATERIAL,
+        }
     )
     # Through the operations layer, so the stock ledger records the lot.
     lot = InwardOperations.create_raw_lot(
         product=product,
         party=party,
         lot_no="TEST-LOT",
+        farmer_name="Test Farmer",
         quantity_kg=quantity_kg,
         lab_sampling_date=date.today(),
         actor=actor,

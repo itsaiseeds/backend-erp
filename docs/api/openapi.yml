@@ -874,6 +874,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReturnOrderListPage'
           description: ''
+  /android/api/v1/godown/bag-stock:
+    get:
+      operationId: android_api_v1_godown_bag_stock
+      description: The live on-hand/reserved/consumed/available figures for every
+        counted sealed-bag packaging -- the same position ``godown/update-bag-stock``
+        would report back, but readable before (or without) submitting a count. ``snapshot_date``
+        is the date the bag count was last taken, null when none has ever been recorded.
+      summary: Read the bag-stock position
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BagStockPosition'
+          description: ''
   /android/api/v1/godown/check-todays-inventory:
     get:
       operationId: android_api_v1_godown_check_todays_inventory
@@ -1342,6 +1361,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
+  /android/api/v1/godown/sample-packet-stock:
+    get:
+      operationId: android_api_v1_godown_sample_packet_stock
+      description: The live on-hand/reserved/consumed/available figures for every
+        counted ``(product, packet_weight)`` pool -- the same position ``godown/update-sample-packet-stock``
+        would report back, but readable before (or without) submitting a count. ``snapshot_date``
+        is the date the loose count was last taken, null when none has ever been recorded.
+      summary: Read the sample-packet (loose) stock position
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LooseStockPosition'
           description: ''
   /android/api/v1/godown/update-bag-stock:
     post:
@@ -1909,8 +1947,17 @@ paths:
   /android/api/v1/utilities/parties:
     get:
       operationId: android_api_v1_utilities_parties_list
-      description: List every party.
-      summary: List every party (not paginated)
+      description: List every party, optionally of one type.
+      summary: List every party (not paginated; filter by type)
+      parameters:
+      - in: query
+        name: type
+        schema:
+          type: string
+          enum:
+          - OTHER_MATERIAL
+          - RAW_MATERIAL
+        description: Only parties of this type.
       tags:
       - Android · Utilities
       security:
@@ -3877,6 +3924,151 @@ paths:
               schema:
                 $ref: '#/components/schemas/InwardRawMaterialPayload'
           description: ''
+  /api/sales-admin/non-stock-inward/{public_id}:
+    patch:
+      operationId: api_sales_admin_non_stock_inward_partial_update
+      description: Edit (PATCH) or soft-delete (DELETE) a non-stock inward entry (stock
+        admins).
+      summary: Edit a non-stock inward entry
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin · Inward
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateNonStockInwardRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateNonStockInwardRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateNonStockInwardRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonStockInwardPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_non_stock_inward_destroy
+      description: Edit (PATCH) or soft-delete (DELETE) a non-stock inward entry (stock
+        admins).
+      summary: Delete a non-stock inward entry
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin · Inward
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/non-stock-inwards:
+    get:
+      operationId: sales_admin_non_stock_inwards_list
+      description: List (GET, any app admin) or record (POST, stock admins) non-stock
+        inwards.
+      summary: List non-stock inward entries (filter by name / company / unit, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: company_name
+        schema:
+          type: string
+        description: Case-insensitive substring of the company name. Single value;
+          AND-ed with the other filters.
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: Case-insensitive substring of the name. Single value; AND-ed
+          with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (NS-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, name); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: unit
+        schema:
+          type: string
+        description: Unit(s) of measure (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      tags:
+      - Admin · Inward
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonStockInwardListPage'
+          description: ''
+    post:
+      operationId: api_sales_admin_non_stock_inwards_create
+      description: List (GET, any app admin) or record (POST, stock admins) non-stock
+        inwards.
+      summary: Record a non-stock inward entry
+      tags:
+      - Admin · Inward
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NonStockInwardFieldsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NonStockInwardFieldsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NonStockInwardFieldsRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonStockInwardPayload'
+          description: ''
   /api/sales-admin/order/{public_id}:
     get:
       operationId: api_sales_admin_order_retrieve
@@ -4196,7 +4388,7 @@ paths:
     get:
       operationId: sales_admin_parties_list
       description: List (GET) or create (POST) parties (app admin only).
-      summary: List parties (filter by city / name, sortable)
+      summary: List parties (filter by city / name / type, sortable)
       parameters:
       - in: query
         name: all
@@ -4233,6 +4425,12 @@ paths:
           type: string
         description: Comma-separated sort keys (name, created_at); prefix a key with
           '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: type
+        schema:
+          type: string
+        description: 'Party type(s): RAW_MATERIAL / OTHER_MATERIAL (see options).
+          Comma-separated (any match); AND-ed with the other filters.'
       tags:
       - Admin · Master data
       security:
@@ -6804,7 +7002,8 @@ components:
         Request validation for booking a new other-material lot.
 
         ``effective_date`` is absent on purpose: booking stamps it with today
-        (see ``InwardOtherMaterialsView.post``).
+        (see ``InwardOtherMaterialsView.post``). ``party`` must be an
+        ``OTHER_MATERIAL`` party.
       properties:
         party:
           type: integer
@@ -6831,7 +7030,8 @@ components:
         ``lab_sampling_date`` may be given explicitly; left out, it defaults to
         today -- a lot never starts with no sampling date, since it arrives for
         lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
-        number on the consignment -- is required.
+        number on the consignment -- is required, as is ``farmer_name`` (free
+        text). ``party`` must be a ``RAW_MATERIAL`` party.
       properties:
         product:
           type: string
@@ -6843,6 +7043,11 @@ components:
           minLength: 1
           description: The supplier's own batch number for this consignment.
           maxLength: 64
+        farmer_name:
+          type: string
+          minLength: 1
+          description: The farmer the raw material came from.
+          maxLength: 255
         quantity_kg:
           type: string
           format: decimal
@@ -6853,6 +7058,7 @@ components:
           format: date
           nullable: true
       required:
+      - farmer_name
       - lot_no
       - party
       - product
@@ -6918,6 +7124,8 @@ components:
           maxLength: 255
         city:
           type: integer
+        party_type:
+          $ref: '#/components/schemas/PartyTypeEnum'
         contact_number:
           type: string
           nullable: true
@@ -6925,6 +7133,7 @@ components:
       required:
       - city
       - name
+      - party_type
     CreateProductPackagingRequest:
       type: object
       description: |-
@@ -8142,6 +8351,10 @@ components:
         lot_no:
           type: string
           description: The supplier's own batch number.
+        farmer_name:
+          type: string
+          description: The farmer the material came from; 'Return Order (<ORD-…>)'
+            for a return lot.
         quantity_kg:
           type: string
           description: Kilograms received.
@@ -8161,6 +8374,7 @@ components:
       required:
       - created_at
       - effective_date
+      - farmer_name
       - lab_sampling_date
       - lot_no
       - party
@@ -8937,6 +9151,10 @@ components:
         lot_no:
           type: string
           description: The supplier's own batch number.
+        farmer_name:
+          type: string
+          description: The farmer the material came from; 'Return Order (<ORD-…>)'
+            for a return lot.
         quantity_kg:
           type: string
           description: Kilograms received.
@@ -8958,6 +9176,7 @@ components:
       required:
       - created_by
       - effective_date
+      - farmer_name
       - lab_sampling_date
       - lot_no
       - party
@@ -9385,6 +9604,127 @@ components:
       required:
       - name
       - public_id
+    NonStockInwardFieldsRequest:
+      type: object
+      description: |-
+        The writable fields of a ``NonStockInward``, shared by create and update.
+
+        ``description`` / ``company_name`` are optional free text (blank or null
+        clears them); ``price`` is optional (null clears it) and never negative;
+        ``quantity`` must be above zero.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+          default: ''
+        company_name:
+          type: string
+          nullable: true
+          default: ''
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Amount received, in ``unit``.
+        unit:
+          allOf:
+          - $ref: '#/components/schemas/UnitEnum'
+          description: |-
+            Unit of measure for ``quantity``.
+
+            * `kg` - kg
+            * `g` - g
+            * `litre` - litre
+            * `ml` - ml
+            * `count` - count
+            * `packet` - packet
+      required:
+      - name
+      - quantity
+      - unit
+    NonStockInwardListPage:
+      type: object
+      description: Output shape for the paginated envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NonStockInwardPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    NonStockInwardPayload:
+      type: object
+      description: Output shape for one non-stock inward entry.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        company_name:
+          type: string
+        price:
+          type: string
+          nullable: true
+          description: Null when not given.
+        quantity:
+          type: string
+          description: Amount received, in ``unit``.
+        unit:
+          $ref: '#/components/schemas/UnitEnum'
+        created_at:
+          type: string
+          format: date-time
+          description: When the entry was recorded.
+        created_by:
+          allOf:
+          - $ref: '#/components/schemas/InwardCreatedByRef'
+          nullable: true
+      required:
+      - company_name
+      - created_at
+      - created_by
+      - description
+      - name
+      - price
+      - public_id
+      - quantity
+      - unit
     NotificationItem:
       type: object
       properties:
@@ -10009,10 +10349,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SortCatalogueEntry'
+        party_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/PartyTypeOption'
       required:
       - available_filters
       - available_sorts
       - next_page_number
+      - party_types
       - previous_page_number
       - results
       - total_count
@@ -10027,6 +10372,8 @@ components:
           type: string
         city:
           $ref: '#/components/schemas/PartyCityRef'
+        party_type:
+          $ref: '#/components/schemas/PartyTypeEnum'
         contact_number:
           type: string
           nullable: true
@@ -10035,6 +10382,26 @@ components:
       - contact_number
       - id
       - name
+      - party_type
+    PartyTypeEnum:
+      enum:
+      - RAW_MATERIAL
+      - OTHER_MATERIAL
+      type: string
+      description: |-
+        * `RAW_MATERIAL` - Raw Material
+        * `OTHER_MATERIAL` - Other Material
+    PartyTypeOption:
+      type: object
+      description: Output shape for one entry of ``party_types`` (schema only).
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+      required:
+      - label
+      - value
     PatchedEditFarmerVisitRequest:
       type: object
       description: |-
@@ -10221,6 +10588,46 @@ components:
           items:
             $ref: '#/components/schemas/LooseCountLineRequest'
           description: Loose lines, one per (product, packet_weight) pair.
+    PatchedUpdateNonStockInwardRequest:
+      type: object
+      description: Request validation for a partial edit (every field optional, at
+        least one).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+          default: ''
+        company_name:
+          type: string
+          nullable: true
+          default: ''
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Amount received, in ``unit``.
+        unit:
+          allOf:
+          - $ref: '#/components/schemas/UnitEnum'
+          description: |-
+            Unit of measure for ``quantity``.
+
+            * `kg` - kg
+            * `g` - g
+            * `litre` - litre
+            * `ml` - ml
+            * `count` - count
+            * `packet` - packet
     PatchedUpdateOrderRequest:
       type: object
       description: |-
@@ -10274,6 +10681,8 @@ components:
           maxLength: 255
         city:
           type: integer
+        party_type:
+          $ref: '#/components/schemas/PartyTypeEnum'
         contact_number:
           type: string
           nullable: true
@@ -11394,6 +11803,22 @@ components:
       required:
       - id
       - name
+    UnitEnum:
+      enum:
+      - kg
+      - g
+      - litre
+      - ml
+      - count
+      - packet
+      type: string
+      description: |-
+        * `kg` - kg
+        * `g` - g
+        * `litre` - litre
+        * `ml` - ml
+        * `count` - count
+        * `packet` - packet
     UnitTypeEnum:
       enum:
       - count
@@ -11545,6 +11970,8 @@ components:
           type: string
         city:
           $ref: '#/components/schemas/UtilityPartyCityRef'
+        party_type:
+          $ref: '#/components/schemas/PartyTypeEnum'
         contact_number:
           type: string
           nullable: true
@@ -11553,6 +11980,7 @@ components:
       - contact_number
       - id
       - name
+      - party_type
     UtilityPartyCityRef:
       type: object
       description: Output shape for the ``city`` reference on a party (schema only).
