@@ -217,23 +217,24 @@ class ClientModelTest(DMLTestCase):
                 self.sp_user,
             )
 
-    def test_sync_client_addresses_rejects_a_pincode_filed_under_another_city(self):
-        """A code is unique, so re-using one under a second city is a 400 rather
-        than a duplicate row.
+    def test_sync_client_addresses_adds_a_pincode_row_for_a_second_city(self):
+        """(code, A) existing and (code, B) being saved creates a new (code, B)
+        row; the existing one is untouched, and a repeat save reuses it.
 
-        tests/test_client_model.py::ClientModelTest::test_sync_client_addresses_rejects_a_pincode_filed_under_another_city
+        tests/test_client_model.py::ClientModelTest::test_sync_client_addresses_adds_a_pincode_row_for_a_second_city
         """
         client = create_client(
             company_name="Acme", gst_number="27AAPFU0939F1ZV", actor=self.sp_user
         )
         other_city = City.objects.create(name="Nagpur", state=self.state, created_by=self.su)
 
-        with self.assertRaises(ValidationError):
-            sync_client_addresses(
-                client, [self._sync_item(city=other_city)], self.sp_user
-            )
+        sync_client_addresses(client, [self._sync_item(city=other_city)], self.sp_user)
+        sync_client_addresses(client, [self._sync_item(city=other_city)], self.sp_user)
 
-        assert Pincode.objects.filter(code="411001").count() == 1
+        rows = Pincode.objects.filter(code="411001")
+        assert rows.count() == 2
+        assert set(rows.values_list("city_id", flat=True)) == {self.city.id, other_city.id}
+        assert Pincode.objects.get(pk=self.pincode.pk).city_id == self.city.id
 
     def test_sync_client_addresses_rejects_a_mismatch_even_on_an_unchanged_row(self):
         """The declarative sync matches an unchanged address by (line, pincode,

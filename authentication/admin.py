@@ -143,6 +143,34 @@ class UserAdmin(AuditFieldsAdminMixin, BaseUserAdmin):
 
     actions = ("generate_totp_qr",)
 
+    @staticmethod
+    def _is_hidden_from(request, target) -> bool:
+        """Whether ``target``'s authenticator secret is off limits to the viewer.
+
+        Only a superuser may see another admin's (or superuser's) QR and secret;
+        anyone may still see their own.
+        """
+        if request.user.is_superuser or target is None or target.pk == request.user.pk:
+            return False
+        return target.is_superuser or target.is_admin_user
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if not self._is_hidden_from(request, obj):
+            return fieldsets
+        return tuple(
+            (title, options)
+            for title, options in fieldsets
+            if title != "Authenticator app (TOTP)"
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        """Only a superuser may delete an admin's (or superuser's) account."""
+        if obj is not None and not request.user.is_superuser:
+            if obj.is_superuser or obj.is_admin_user:
+                return False
+        return super().has_delete_permission(request, obj)
+
     def save_model(self, request, obj, form, change):
         """Auto-assign audit fields on creation.
 
@@ -194,6 +222,8 @@ class UserAdmin(AuditFieldsAdminMixin, BaseUserAdmin):
         """Set a fresh (unverified) TOTP secret so a QR can be displayed."""
         updated = 0
         for user in queryset:
+            if self._is_hidden_from(request, user):
+                continue
             user.generate_totp_secret()
             user.save(update_fields=["totp_secret", "totp_enabled"])
             updated += 1
@@ -210,6 +240,20 @@ class AdminProfileAdmin(SoftDeleteModelAdmin):
 
     def has_add_permission(self, request):
         """Only a superuser may promote someone to an application Admin."""
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        """Admins may look at admin profiles but only a superuser may edit them.
+
+        The change form exposes ``is_deleted``, so this also keeps a plain admin
+        from deleting another admin by ticking it.
+        """
+        return request.user.is_superuser or (
+            obj is None and super().has_change_permission(request, obj)
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        """Only a superuser may delete an admin."""
         return request.user.is_superuser
 
 

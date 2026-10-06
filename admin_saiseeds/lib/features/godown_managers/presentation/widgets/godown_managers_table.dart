@@ -181,6 +181,8 @@ class GodownManagersTableState extends State<GodownManagersTable> {
       case GodownManagersTable.COLUMN_CREATED_AT:
         return _textCell(DateFormatter.label(godownManager.createdAt));
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:
+        // An admin's fallback profile is removed with the admin, not from here.
+        if (godownManager.isAdmin) return const SizedBox.shrink();
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,

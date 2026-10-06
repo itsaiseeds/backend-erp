@@ -55,6 +55,8 @@ from .ReturnOrderRecipesView import ReturnOrderRecipesView
 from .RevertAcceptReturnOrderView import RevertAcceptReturnOrderView
 from .RevertCustomOrderDispatchView import RevertCustomOrderDispatchView
 from .RevertDispatchView import RevertDispatchView
+from .RotateGodownManagerQrView import RotateGodownManagerQrView
+from .RotateSalesPersonQrView import RotateSalesPersonQrView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
 from .StockView import StockView
@@ -131,6 +133,16 @@ urlpatterns = [
         "sales-people/<int:id>",
         UpdateSalesPersonView.as_view(),
         name="update-sales-person",
+    ),
+    path(
+        "sales-people/<int:id>/rotate-qr",
+        RotateSalesPersonQrView.as_view(),
+        name="rotate-sales-person-qr",
+    ),
+    path(
+        "godown-managers/<int:id>/rotate-qr",
+        RotateGodownManagerQrView.as_view(),
+        name="rotate-godown-manager-qr",
     ),
     path("godown-managers", GodownManagersView.as_view(), name="godown-managers"),
     path(

@@ -351,6 +351,14 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/raw-material-wastes": ("RawMaterialWastesView", SESSION_ADMIN),
     "api/sales-admin/godown-managers": ("GodownManagersView", SESSION_ADMIN),
     "api/sales-admin/godown-managers/<int:id>": ("UpdateGodownManagerView", SESSION_ADMIN),
+    "api/sales-admin/godown-managers/<int:id>/rotate-qr": (
+        "RotateGodownManagerQrView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/sales-people/<int:id>/rotate-qr": (
+        "RotateSalesPersonQrView",
+        SESSION_ADMIN,
+    ),
     "api/sales-admin/sales-people": ("SalesPeopleView", SESSION_ADMIN),
     "api/sales-admin/sales-people/<int:id>": ("UpdateSalesPersonView", SESSION_ADMIN),
     "api/sales-admin/sample-packet-stock": ("LooseStockView", SESSION_ADMIN),

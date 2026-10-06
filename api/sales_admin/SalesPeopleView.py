@@ -19,6 +19,7 @@ from api.admin import AdminApiView
 from authentication.models import SalesPerson, User
 from authentication.UserOperations import (
     SalesPersonPayloadSerializer,
+    can_see_totp,
     create_verified_user,
     salesperson_payload,
 )
@@ -67,7 +68,12 @@ class SalesPeopleView(AdminApiView):
             "-id"
         )
         return Response(
-            [salesperson_payload(person, include_totp=True) for person in sales_people]
+            [
+                salesperson_payload(
+                    person, include_totp=can_see_totp(request.user, person.user)
+                )
+                for person in sales_people
+            ]
         )
 
     @extend_schema(

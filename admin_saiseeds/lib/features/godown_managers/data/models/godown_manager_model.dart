@@ -9,6 +9,7 @@ class GodownManagerModel {
   final CreatedByModel? createdBy;
   final String createdAt;
   final String provisioningUri;
+  final bool isAdmin;
 
   const GodownManagerModel({
     required this.id,
@@ -19,6 +20,7 @@ class GodownManagerModel {
     this.createdBy,
     this.createdAt = '',
     this.provisioningUri = '',
+    this.isAdmin = false,
   });
 
   factory GodownManagerModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class GodownManagerModel {
       provisioningUri: totp is Map
           ? (totp['provisioning_uri'] as String? ?? '')
           : '',
+      isAdmin: json['is_admin'] as bool? ?? false,
     );
   }
 
