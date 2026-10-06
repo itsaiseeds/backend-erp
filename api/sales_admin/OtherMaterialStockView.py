@@ -41,14 +41,30 @@ class OtherMaterialStockView(AdminApiView):
             [parse_int(part) for part in raw.split(",")] if raw else None
         )
         as_of = InwardOperations.today()
-        lines = InwardOperations.other_material_on_hand(
-            as_of, material_type_ids=material_type_ids
+        by_configuration = request.query_params.get("group_by") == "configuration"
+        lines = (
+            InwardOperations.other_material_on_hand_by_configuration(
+                as_of, material_type_ids=material_type_ids
+            )
+            if by_configuration
+            else InwardOperations.other_material_on_hand(as_of, material_type_ids=material_type_ids)
         )
         return Response(
             {
                 "as_of": as_of.isoformat(),
                 "lines": [
                     {
+                        **(
+                            {
+                                "product": {
+                                    "public_id": line["product_public_id"],
+                                    "name": line["product_name"],
+                                },
+                                "packet_weight": str(line["packet_weight"]),
+                            }
+                            if by_configuration
+                            else {}
+                        ),
                         "material_type": {
                             "id": line["material_type_id"],
                             "name": line["name"],
