@@ -800,6 +800,10 @@ class OtherMaterialTypeRefSerializer(serializers.Serializer):
 class OtherMaterialStockLineSerializer(serializers.Serializer):
     """Output shape for one material type's on-hand position."""
 
+    product = RecipeProductRefSerializer(required=False)
+    packet_weight = serializers.CharField(
+        required=False, help_text="Packet weight in kg when grouped by configuration."
+    )
     material_type = OtherMaterialTypeRefSerializer()
     on_hand = serializers.CharField(
         help_text=(

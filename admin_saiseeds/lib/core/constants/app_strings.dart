@@ -410,6 +410,8 @@ class AppStrings {
       'Attach the downloaded QR image to the chat.';
   static const String TOTP_UNAVAILABLE =
       'No authenticator setup code is available for this account.';
+  static const String TOTP_RESTRICTED =
+      'This account belongs to an admin. Its QR is managed from the Admins page.';
 
   static const String COLUMN_EMAIL = 'Email';
   static const String COLUMN_CITY = 'City';

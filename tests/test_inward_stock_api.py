@@ -507,3 +507,62 @@ class InwardStockApiTest(WebApiTestCase):
             self.client.get(f"{OTHER_STOCK_URL}?material_type=not-an-int").status_code,
             status.HTTP_400_BAD_REQUEST,
         )
+
+    def test_other_stock_can_separate_balances_by_product_configuration(self):
+        """tests/test_inward_stock_api.py::InwardStockApiTest::test_other_stock_can_separate_balances_by_product_configuration"""
+        self.login_as(self.seed_admin)
+        self._set_up_other_lots()
+        product2_leaflet_recipe = OtherMaterialRecipe.objects.create(
+            product=self.product2,
+            material_type=self.leaflets,
+            packet_weight=Decimal("1.000"),
+            quantity=Decimal("1.000"),
+            created_by=self.seed_admin,
+        )
+        InwardOtherMaterial.objects.create(
+            recipe=product2_leaflet_recipe,
+            party=self.party,
+            quantity=Decimal("8"),
+            effective_date=self.today,
+            created_by=self.seed_admin,
+        )
+
+        response = self.client.get(f"{OTHER_STOCK_URL}?group_by=configuration")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["lines"], [
+            {
+                "product": {
+                    "public_id": self.product1.public_id,
+                    "name": self.product1.name,
+                },
+                "packet_weight": "1.000",
+                "material_type": {"id": 3, "name": "leaflets", "unit_type": "count"},
+                "on_hand": "6.000",
+            },
+            {
+                "product": {
+                    "public_id": self.product2.public_id,
+                    "name": self.product2.name,
+                },
+                "packet_weight": "1.000",
+                "material_type": {
+                    "id": 1,
+                    "name": "bag_outer_cover",
+                    "unit_type": "kg",
+                },
+                "on_hand": "0.000",
+            },
+            {
+                "product": {
+                    "public_id": self.product2.public_id,
+                    "name": self.product2.name,
+                },
+                "packet_weight": "1.000",
+                "material_type": {
+                    "id": 3,
+                    "name": "leaflets",
+                    "unit_type": "count",
+                },
+                "on_hand": "8.000",
+            },
+        ])

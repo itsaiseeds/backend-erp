@@ -18,6 +18,7 @@ from api.admin import AdminApiView
 from authentication.models import GodownManager, User
 from authentication.UserOperations import (
     GodownManagerPayloadSerializer,
+    can_see_totp,
     create_verified_user,
     godown_manager_payload,
 )
@@ -60,7 +61,12 @@ class GodownManagersView(AdminApiView):
     def get(self, request):
         managers = GodownManager.objects.select_related("user", "created_by").order_by("-id")
         return Response(
-            [godown_manager_payload(manager, include_totp=True) for manager in managers]
+            [
+                godown_manager_payload(
+                    manager, include_totp=can_see_totp(request.user, manager.user)
+                )
+                for manager in managers
+            ]
         )
 
     @extend_schema(

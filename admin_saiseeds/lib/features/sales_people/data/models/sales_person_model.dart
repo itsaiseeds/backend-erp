@@ -11,6 +11,7 @@ class SalesPersonModel {
   final String createdAt;
   final CityModel? city;
   final String provisioningUri;
+  final bool isAdmin;
 
   const SalesPersonModel({
     required this.id,
@@ -22,6 +23,7 @@ class SalesPersonModel {
     this.createdAt = '',
     this.city,
     this.provisioningUri = '',
+    this.isAdmin = false,
   });
 
   factory SalesPersonModel.fromJson(Map<String, dynamic> json) {
@@ -45,6 +47,7 @@ class SalesPersonModel {
       provisioningUri: totp is Map
           ? (totp['provisioning_uri'] as String? ?? '')
           : '',
+      isAdmin: json['is_admin'] as bool? ?? false,
     );
   }
 
