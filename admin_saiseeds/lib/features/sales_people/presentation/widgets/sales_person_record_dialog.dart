@@ -175,6 +175,7 @@ class _SalesPersonRecordDialogState extends State<SalesPersonRecordDialog> {
           phoneNumber: _person.phoneNumber,
           subjectName: _person.name,
           isStacked: true,
+          isBlurred: _person.isAdmin,
         ),
       ),
     );
