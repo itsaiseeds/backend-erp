@@ -50,6 +50,7 @@ class InwardRawMaterialModel {
   final String publicId;
   final InwardProductRef? product;
   final InwardPartyRef? party;
+  final String farmerName;
   final String lotNo;
   final String quantityKg;
   final String status;
@@ -60,6 +61,7 @@ class InwardRawMaterialModel {
     required this.publicId,
     this.product,
     this.party,
+    this.farmerName = '',
     this.lotNo = '',
     this.quantityKg = '',
     this.status = '',
@@ -79,6 +81,7 @@ class InwardRawMaterialModel {
       party: party is Map
           ? InwardPartyRef.fromJson(Map<String, dynamic>.from(party))
           : null,
+      farmerName: '${json['farmer_name'] ?? ''}',
       lotNo: '${json['lot_no'] ?? ''}',
       quantityKg: _decimalOf(json['quantity_kg']),
       status: '${json['status'] ?? ''}',
@@ -92,6 +95,8 @@ class InwardRawMaterialModel {
   String get productPublicId => product?.publicId ?? '';
 
   String get partyName => party?.name ?? '';
+
+  String get farmerLabel => farmerName.trim().isEmpty ? '' : farmerName;
 
   int? get partyId => party?.id;
 

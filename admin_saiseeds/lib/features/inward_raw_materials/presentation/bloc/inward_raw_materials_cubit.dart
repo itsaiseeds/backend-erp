@@ -137,6 +137,7 @@ class InwardRawMaterialsCubit extends SafeCubit<InwardRawMaterialsState> {
     required String lotNo,
     required String quantityKg,
     required String labSamplingDate,
+    String? farmerName,
   }) {
     return _mutate(
       () => _repository.createInwardRawMaterial(
@@ -145,6 +146,7 @@ class InwardRawMaterialsCubit extends SafeCubit<InwardRawMaterialsState> {
         lotNo: lotNo,
         quantityKg: quantityKg,
         labSamplingDate: labSamplingDate,
+        farmerName: farmerName,
       ),
     );
   }

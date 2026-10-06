@@ -1,4 +1,6 @@
 import 'order_status.dart';
+import '../../../return_orders/data/models/return_order_model.dart';
+import '../../../return_orders/data/models/return_order_status.dart';
 
 class OrderRefModel {
   final String publicId;
@@ -152,6 +154,10 @@ class OrderModel {
   final List<OrderPackagingModel> packagings;
   final String specialComments;
 
+  /// The returns raised against this order, in the order the detail endpoint
+  /// sends them. One return is the common case; the payload still allows a list.
+  final List<ReturnOrderModel> returns;
+
   const OrderModel({
     this.publicId = '',
     this.createdAt,
@@ -170,6 +176,7 @@ class OrderModel {
     this.itemCount = 0,
     this.packagings = const [],
     this.specialComments = '',
+    this.returns = const [],
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -210,6 +217,73 @@ class OrderModel {
                 )
                 .toList()
           : const [],
+      returns: _returnList(json['return_order']),
+    );
+  }
+
+  /// The detail endpoint embeds the return (or returns) against this order.
+  /// A single object is the current shape; a list is accepted so the model does
+  /// not break if the backend ever returns several.
+  static List<ReturnOrderModel> _returnList(dynamic value) {
+    if (value is Map) {
+      return [
+        ReturnOrderModel.fromJson(Map<String, dynamic>.from(value)),
+      ];
+    }
+    if (value is List) {
+      return value
+          .whereType<Map>()
+          .map(
+            (entry) => ReturnOrderModel.fromJson(Map<String, dynamic>.from(entry)),
+          )
+          .toList();
+    }
+    return const [];
+  }
+
+  /// The detail endpoint only carries what the list leaves out: the return
+  /// block, transport, comments and dates. Merging fills those gaps without
+  /// discarding a single field of the list row, because the two endpoints use
+  /// different shapes for the goods (`items` vs `packagings`) and only the
+  /// list one supplies identity fields the steps read.
+  OrderModel mergedWithDetail(OrderModel detail) {
+    final OrderModel base = this;
+
+    return OrderModel(
+      publicId:
+          detail.publicId.isNotEmpty ? detail.publicId : base.publicId,
+      createdAt: detail.createdAt ?? base.createdAt,
+      status: detail.status != OrderStatus.unknown ? detail.status : base.status,
+      client: detail.client.name.isNotEmpty ? detail.client : base.client,
+      clientCreatedBy: detail.clientCreatedBy.isNotEmpty
+          ? detail.clientCreatedBy
+          : base.clientCreatedBy,
+      createdBy:
+          detail.createdBy.isNotEmpty ? detail.createdBy : base.createdBy,
+      verifiedBy:
+          detail.verifiedBy.isNotEmpty ? detail.verifiedBy : base.verifiedBy,
+      deliveryAddress: detail.deliveryAddress.isNotEmpty
+          ? detail.deliveryAddress
+          : base.deliveryAddress,
+      city: detail.city ?? base.city,
+      transportAgency: detail.transportAgency ?? base.transportAgency,
+      dispatchMode: detail.dispatchMode.isNotEmpty
+          ? detail.dispatchMode
+          : base.dispatchMode,
+      expectedDeliveryDate:
+          detail.expectedDeliveryDate ?? base.expectedDeliveryDate,
+      totalAmount: detail.totalAmount > 0 ? detail.totalAmount : base.totalAmount,
+      totalPackets:
+          detail.totalPackets > 0 ? detail.totalPackets : base.totalPackets,
+      itemCount: detail.itemCount > 0 ? detail.itemCount : base.itemCount,
+      packagings:
+          detail.packagings.isNotEmpty ? detail.packagings : base.packagings,
+      specialComments: detail.specialComments.isNotEmpty
+          ? detail.specialComments
+          : base.specialComments,
+      // The return block is the detail-only payload; when it came back empty
+      // there is nothing new to say, so the base (which never has one) wins.
+      returns: detail.returns.isNotEmpty ? detail.returns : base.returns,
     );
   }
 
@@ -221,6 +295,14 @@ class OrderModel {
 
   int get bagCount =>
       packagings.fold(0, (total, line) => total + line.quantity);
+
+  /// What of the order actually went out the door and stayed out: only accepted
+  /// returns bring the goods back and so reduce the value of the sale.
+  num get returnedAmount => returns
+      .where((returnOrder) => returnOrder.status == ReturnOrderStatus.accepted)
+      .fold(0, (total, returnOrder) => total + returnOrder.totalAmount);
+
+  num get netSaleAmount => totalAmount - returnedAmount;
 
   bool get canVerify => OrderStatusX.canVerify(status);
 

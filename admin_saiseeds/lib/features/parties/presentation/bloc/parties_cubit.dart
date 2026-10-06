@@ -134,12 +134,14 @@ class PartiesCubit extends SafeCubit<PartiesState> {
   Future<bool> createParty({
     required String name,
     required int cityId,
+    required String partyType,
     String? contactNumber,
   }) {
     return _mutate(
       () => _repository.createParty(
         name: name,
         cityId: cityId,
+        partyType: partyType,
         contactNumber: contactNumber,
       ),
     );
@@ -149,6 +151,7 @@ class PartiesCubit extends SafeCubit<PartiesState> {
     required int id,
     required String name,
     required int cityId,
+    required String partyType,
     String? contactNumber,
   }) {
     return _mutate(
@@ -156,6 +159,7 @@ class PartiesCubit extends SafeCubit<PartiesState> {
         id: id,
         name: name,
         cityId: cityId,
+        partyType: partyType,
         contactNumber: contactNumber,
       ),
     );

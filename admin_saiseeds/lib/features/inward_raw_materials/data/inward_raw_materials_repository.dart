@@ -33,6 +33,7 @@ class InwardRawMaterialsRepository {
     required String lotNo,
     required String quantityKg,
     required String labSamplingDate,
+    String? farmerName,
   }) async {
     await _apiClient.post(
       RawMaterialsEndpoints.inwardCreate,
@@ -42,6 +43,8 @@ class InwardRawMaterialsRepository {
         'lot_no': lotNo,
         'quantity_kg': quantityKg,
         'lab_sampling_date': labSamplingDate,
+        if (farmerName != null && farmerName.trim().isNotEmpty)
+          'farmer_name': farmerName.trim(),
       },
     );
   }

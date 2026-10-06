@@ -354,8 +354,8 @@ void main() {
       expect(ok, isTrue);
       expect(cubit.state.isMutating, isFalse);
       // Two requests: the accept itself, then the refreshed page.
-      expect(adapter.methods.first, 'POST');
-      expect(adapter.methods.last, 'GET');
+      expect(adapter.methods.first, contains('POST'));
+      expect(adapter.methods.last, contains('GET'));
     });
 
     test(

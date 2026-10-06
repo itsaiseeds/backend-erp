@@ -66,7 +66,17 @@ class _RowActionsMenuState extends State<RowActionsMenu> {
 
   void _select(RowAction action) {
     _removeOverlay();
-    action.onSelected?.call();
+
+    // The menu's overlay is torn down in the same turn as the tap, so the
+    // action runs after that frame has settled. Pushing a route straight away
+    // leaves the mouse tracker hit-testing a subtree that has not been laid
+    // out yet, and once that throws the tracker stops updating for the rest of
+    // the run -- every later frame then trips !_debugDuringDeviceUpdate.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      action.onSelected?.call();
+    });
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   /// Rough height of the popup: enough to decide which way it should open

@@ -9,6 +9,7 @@ import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/utils/validators/form_validators.dart';
 import '../../../../core/widgets/dialogs/app_record_dialog.dart';
 import '../../../../core/widgets/inputs/city_picker_field.dart';
+import '../../../../core/widgets/inputs/party_type_picker_field.dart';
 import '../../../../core/widgets/inputs/record_field.dart';
 import '../../../../core/widgets/layout/record_field_row.dart';
 import '../../data/models/party_model.dart';
@@ -52,8 +53,10 @@ class _PartyRecordDialogState extends State<PartyRecordDialog> {
 
   late RecordDialogMode _mode;
   late CityModel? _selectedCity;
+  late String _partyType;
   bool _isSubmitting = false;
   String? _cityError;
+  String? _partyTypeError;
 
   PartyModel get _party => widget.party;
 
@@ -68,6 +71,7 @@ class _PartyRecordDialogState extends State<PartyRecordDialog> {
     _nameController = TextEditingController(text: _party.name);
     _contactController = TextEditingController(text: _party.contactNumber);
     _selectedCity = _resolveCity();
+    _partyType = _party.partyType;
   }
 
   CityModel? _resolveCity() =>
@@ -88,7 +92,9 @@ class _PartyRecordDialogState extends State<PartyRecordDialog> {
 
     setState(() {
       _selectedCity = _resolveCity();
+      _partyType = _party.partyType;
       _cityError = null;
+      _partyTypeError = null;
       _mode = RecordDialogMode.view;
     });
   }
@@ -105,12 +111,14 @@ class _PartyRecordDialogState extends State<PartyRecordDialog> {
     final bool isFormValid = _formKey.currentState?.validate() ?? false;
     final bool isCityValid = _selectedCity != null;
 
-    setState(
-      () =>
-          _cityError = isCityValid ? null : AppStrings.VALIDATION_CITY_REQUIRED,
-    );
+    setState(() {
+      _cityError = isCityValid ? null : AppStrings.VALIDATION_CITY_REQUIRED;
+      _partyTypeError = _partyType.isEmpty
+          ? AppStrings.VALIDATION_PARTY_TYPE_REQUIRED
+          : null;
+    });
 
-    if (!isFormValid || !isCityValid) return;
+    if (!isFormValid || !isCityValid || _partyType.isEmpty) return;
 
     setState(() => _isSubmitting = true);
 
@@ -121,6 +129,7 @@ class _PartyRecordDialogState extends State<PartyRecordDialog> {
       id: _party.id,
       name: _nameController.text.trim(),
       cityId: _selectedCity!.id,
+      partyType: _partyType,
       contactNumber: contact.isEmpty ? null : contact,
     );
 
@@ -180,6 +189,17 @@ class _PartyRecordDialogState extends State<PartyRecordDialog> {
               _cityError = null;
             }),
           ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        PartyTypePickerField(
+          value: _partyType,
+          enabled: _canEdit,
+          errorText: _partyTypeError,
+          onBlockedTap: _notifyViewMode,
+          onSelected: (type) => setState(() {
+            _partyType = type;
+            _partyTypeError = null;
+          }),
         ),
         const SizedBox(height: AppSpacing.md),
         RecordFieldRow(
