@@ -9,6 +9,7 @@ tests/test_rotate_qr.py
 
 from __future__ import annotations
 
+import pyotp
 from django.contrib.admin.sites import site
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
@@ -27,7 +28,13 @@ GODOWN_URL = "/api/sales-admin/godown-managers/{id}/rotate-qr"
 
 def _make_user(phone, name, creator):
     return User.objects.create_user(
-        phone_number=phone, name=name, is_verified=True, created_by=creator, verified_by=creator
+        phone_number=phone,
+        name=name,
+        is_verified=True,
+        created_by=creator,
+        verified_by=creator,
+        totp_secret=pyotp.random_base32(),
+        totp_enabled=True,
     )
 
 
@@ -38,6 +45,8 @@ class RotateQrTest(WebApiTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
+        # ``admin_required`` needs an Admin profile; a bare superuser is refused.
+        Admin.objects.create(user=cls.superuser, created_by=cls.superuser)
         country, _ = Country.objects.get_or_create(
             name="India", defaults={"iso_code": "IN", "created_by": cls.superuser}
         )
