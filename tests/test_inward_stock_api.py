@@ -21,6 +21,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Product,
     ProductPackaging,
     StatusIds,
@@ -71,7 +72,7 @@ class InwardStockApiTest(WebApiTestCase):
         cls.product1 = Product.objects.get(name="SAI-33")
         cls.product2 = Product.objects.get(name="SAI-3353")
         cls.party = Party.objects.create(
-            name="ABC Traders", city_id=1, created_by=cls.seed_admin
+            name="ABC Traders", city_id=1, party_type=PartyType.RAW_MATERIAL, created_by=cls.seed_admin
         )
         cls.leaflets = OtherMaterialType.objects.get(name="leaflets")
         cls.bag_cover = OtherMaterialType.objects.get(name="bag_outer_cover")
@@ -99,6 +100,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product1,
             party=self.party,
             lot_no="LOT-COUNTING",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("100"),
             effective_date=self.today,
             status_id=StatusIds.IN_USE.value,
@@ -108,6 +110,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product1,
             party=self.party,
             lot_no="LOT-LAB-TESTING",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("20"),
             effective_date=self.today,
             status_id=StatusIds.LAB_TESTING.value,  # not cleared by the lab
@@ -117,6 +120,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product1,
             party=self.party,
             lot_no="LOT-FUTURE",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("50"),
             effective_date=self.tomorrow,  # dated, but not reached yet
             status_id=StatusIds.IN_USE.value,
@@ -126,6 +130,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product1,
             party=self.party,
             lot_no="LOT-UNDATED",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("30"),
             effective_date=None,  # never dated
             status_id=StatusIds.IN_USE.value,
@@ -135,6 +140,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product1,
             party=self.party,
             lot_no="LOT-DELETED",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("10"),
             effective_date=self.today,
             status_id=StatusIds.IN_USE.value,
@@ -210,6 +216,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product2,
             party=self.party,
             lot_no="LOT-P2",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("7"),
             effective_date=self.today,
             status_id=StatusIds.IN_USE.value,
@@ -241,6 +248,7 @@ class InwardStockApiTest(WebApiTestCase):
                 "product": self.product1.public_id,
                 "party": self.party.id,
                 "lot_no": "LOT-FLIP",
+                "farmer_name": "Test Farmer",
                 "quantity_kg": "25",
                 "lab_sampling_date": self.today.isoformat(),
             },
@@ -283,6 +291,7 @@ class InwardStockApiTest(WebApiTestCase):
                 "product": self.product1.public_id,
                 "party": self.party.id,
                 "lot_no": "LOT-REVERT",
+                "farmer_name": "Test Farmer",
                 "quantity_kg": "25",
             },
             format="json",
@@ -328,6 +337,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product1,
             party=self.party,
             lot_no="SUP-2026-A1",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("1000"),
             effective_date=self.today,
             status_id=StatusIds.IN_USE.value,
@@ -337,6 +347,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product1,
             party=self.party,
             lot_no="SUP-2026-B7",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("500"),
             effective_date=self.today,
             status_id=StatusIds.RAW_MATERIAL_REJECTED.value,
@@ -346,6 +357,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product1,
             party=self.party,
             lot_no="SUP-2026-C3",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("250"),
             status_id=StatusIds.LAB_TESTING.value,  # stays Lab Testing, undated
             created_by=self.seed_admin,
@@ -385,6 +397,7 @@ class InwardStockApiTest(WebApiTestCase):
             product=self.product2,
             party=self.party,
             lot_no="SUP-REJ-ONLY",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("80"),
             effective_date=self.today,
             status_id=StatusIds.RAW_MATERIAL_REJECTED.value,
@@ -417,6 +430,7 @@ class InwardStockApiTest(WebApiTestCase):
                 "product": self.product1.public_id,
                 "party": self.party.id,
                 "lot_no": "SUP-2026-B7",
+                "farmer_name": "Test Farmer",
                 "quantity_kg": "500",
             },
             format="json",
@@ -493,3 +507,62 @@ class InwardStockApiTest(WebApiTestCase):
             self.client.get(f"{OTHER_STOCK_URL}?material_type=not-an-int").status_code,
             status.HTTP_400_BAD_REQUEST,
         )
+
+    def test_other_stock_can_separate_balances_by_product_configuration(self):
+        """tests/test_inward_stock_api.py::InwardStockApiTest::test_other_stock_can_separate_balances_by_product_configuration"""
+        self.login_as(self.seed_admin)
+        self._set_up_other_lots()
+        product2_leaflet_recipe = OtherMaterialRecipe.objects.create(
+            product=self.product2,
+            material_type=self.leaflets,
+            packet_weight=Decimal("1.000"),
+            quantity=Decimal("1.000"),
+            created_by=self.seed_admin,
+        )
+        InwardOtherMaterial.objects.create(
+            recipe=product2_leaflet_recipe,
+            party=self.party,
+            quantity=Decimal("8"),
+            effective_date=self.today,
+            created_by=self.seed_admin,
+        )
+
+        response = self.client.get(f"{OTHER_STOCK_URL}?group_by=configuration")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["lines"], [
+            {
+                "product": {
+                    "public_id": self.product1.public_id,
+                    "name": self.product1.name,
+                },
+                "packet_weight": "1.000",
+                "material_type": {"id": 3, "name": "leaflets", "unit_type": "count"},
+                "on_hand": "6.000",
+            },
+            {
+                "product": {
+                    "public_id": self.product2.public_id,
+                    "name": self.product2.name,
+                },
+                "packet_weight": "1.000",
+                "material_type": {
+                    "id": 1,
+                    "name": "bag_outer_cover",
+                    "unit_type": "kg",
+                },
+                "on_hand": "0.000",
+            },
+            {
+                "product": {
+                    "public_id": self.product2.public_id,
+                    "name": self.product2.name,
+                },
+                "packet_weight": "1.000",
+                "material_type": {
+                    "id": 3,
+                    "name": "leaflets",
+                    "unit_type": "count",
+                },
+                "on_hand": "8.000",
+            },
+        ])

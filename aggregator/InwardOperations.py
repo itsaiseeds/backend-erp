@@ -37,8 +37,8 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet, Sum
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import F, Q, QuerySet, Sum
 from django.http import Http404
 
 from . import InventoryOperations
@@ -47,7 +47,10 @@ from .models import (
     InwardOtherMaterial,
     InwardRawMaterial,
     InwardRawMaterialStatus,
+    OtherMaterialRecipe,
     OtherMaterialType,
+    PackedRecipeLayer,
+    PartyType,
     Product,
     RawMaterialWaste,
     Status,
@@ -159,8 +162,28 @@ def party_payload(party: Party) -> dict:
         "id": party.id,
         "name": party.name,
         "city": {"id": party.city_id, "name": party.city.name},
+        "party_type": party.party_type,
         "contact_number": party.contact_number,
     }
+
+
+def party_type_options() -> list[dict]:
+    """Every ``PartyType`` as ``{value, label}``, for pickers and filters."""
+    return [{"value": choice.value, "label": choice.label} for choice in PartyType]
+
+
+def assert_party_type(party: Party, expected: PartyType) -> None:
+    """Raise unless ``party`` supplies ``expected`` material.
+
+    A raw-material lot may only be booked against a ``RAW_MATERIAL`` party and
+    an other-material lot only against an ``OTHER_MATERIAL`` one. Raises
+    ``ValueError`` with a message an API renders as a 400.
+    """
+    if party.party_type != expected:
+        raise ValueError(
+            f"Party '{party.name}' is of type {PartyType(party.party_type).label}; "
+            f"this booking needs a party of type {PartyType(expected).label}."
+        )
 
 
 def other_material_type_payload(material_type: OtherMaterialType) -> dict:
@@ -224,6 +247,7 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
         "party": _party_ref(entry),
         "return_order": _return_order_ref(entry),
         "lot_no": entry.lot_no,
+        "farmer_name": entry.farmer_name,
         "quantity_kg": str(entry.quantity_kg),
         "status": raw_status_of(entry).value,
         "lab_sampling_date": (
@@ -418,6 +442,107 @@ def other_material_on_hand(
     ]
 
 
+def other_material_on_hand_by_configuration(
+    as_of: date | None = None, *, material_type_ids: list[int] | None = None
+) -> list[dict]:
+    """Packing-material position per ``(product, packet weight, material type)``.
+
+    Other-material inward entries and packed-recipe layers both retain the recipe
+    that identifies this configuration.  This view deliberately keeps those
+    configurations separate even when several recipes name the same material
+    type: stock received for one product/weight is not presented as stock for
+    another product/weight.
+
+    ``on_hand`` is the configuration's reached inward quantity less the material
+    used by packets packed under its recipes.  A live recipe with no movement is
+    included as a zero balance so the stock screen still exposes every current
+    product configuration.
+    """
+    as_of = as_of or today()
+    zero = Decimal("0.000")
+    material_filter = Q()
+    if material_type_ids is not None:
+        material_filter = Q(recipe__material_type_id__in=material_type_ids)
+
+    Key = tuple[int, Decimal, int]
+    incoming: dict[Key, Decimal] = {}
+    incoming_rows = (
+        InwardOtherMaterial.objects.filter(
+            effective_date__isnull=False, effective_date__lte=as_of
+        )
+        .filter(material_filter)
+        .values(
+            "recipe__product_id", "recipe__packet_weight", "recipe__material_type_id"
+        )
+        .annotate(total=Sum("quantity"))
+    )
+    for row in incoming_rows:
+        key = (
+            row["recipe__product_id"],
+            Decimal(row["recipe__packet_weight"]),
+            row["recipe__material_type_id"],
+        )
+        incoming[key] = row["total"] or zero
+
+    bag_date = InventoryOperations.latest_snapshot_date()
+    loose_date = InventoryOperations.latest_loose_snapshot_date()
+    latest_rows = Q(
+        inventory_snapshot__is_deleted=False,
+        inventory_snapshot__snapshot_date=bag_date,
+    ) | Q(
+        loose_stock_snapshot__is_deleted=False,
+        loose_stock_snapshot__snapshot_date=loose_date,
+    )
+    if bag_date is None:
+        latest_rows &= Q(inventory_snapshot__isnull=True)
+    if loose_date is None:
+        latest_rows &= Q(loose_stock_snapshot__isnull=True)
+    used_rows = (
+        PackedRecipeLayer.objects.filter(recipe__isnull=False)
+        .filter(latest_rows)
+        .filter(material_filter)
+        .values("recipe__product_id", "recipe__packet_weight", "material_type_id")
+        .annotate(total=Sum(F("recipe__quantity") * F("packets")))
+    )
+    used: dict[Key, Decimal] = {}
+    for row in used_rows:
+        key = (
+            row["recipe__product_id"],
+            Decimal(row["recipe__packet_weight"]),
+            row["material_type_id"],
+        )
+        used[key] = row["total"] or zero
+
+    recipe_filter = Q()
+    if material_type_ids is not None:
+        recipe_filter = Q(material_type_id__in=material_type_ids)
+    keys = set(incoming) | set(used) | {
+        (recipe.product_id, Decimal(recipe.packet_weight), recipe.material_type_id)
+        for recipe in OtherMaterialRecipe.objects.filter(recipe_filter)
+    }
+    products = Product.all_objects.in_bulk(key[0] for key in keys)
+    materials = OtherMaterialType.all_objects.in_bulk(key[2] for key in keys)
+    rows = []
+    for product_id, packet_weight, material_type_id in keys:
+        product = products[product_id]
+        material = materials[material_type_id]
+        rows.append(
+            {
+                "product_public_id": product.public_id,
+                "product_name": product.name,
+                "packet_weight": packet_weight,
+                "material_type_id": material_type_id,
+                "name": material.name,
+                "unit_type": material.unit_type,
+                "on_hand": incoming.get(
+                    (product_id, packet_weight, material_type_id), zero
+                )
+                - used.get((product_id, packet_weight, material_type_id), zero),
+            }
+        )
+    return sorted(rows, key=lambda row: (row["product_name"], row["packet_weight"], row["name"]))
+
+
 def locked_raw_lot(queryset: QuerySet, public_id: str) -> InwardRawMaterial:
     """Load a lot with its product's raw pool locked, for a revert or delete.
 
@@ -487,6 +612,7 @@ def create_raw_lot(
     product: Product,
     party: Party,
     lot_no: str,
+    farmer_name: str,
     quantity_kg: Decimal,
     lab_sampling_date: date,
     actor: User,
@@ -503,6 +629,7 @@ def create_raw_lot(
             product=product,
             party=party,
             lot_no=lot_no,
+            farmer_name=farmer_name,
             quantity_kg=quantity_kg,
             lab_sampling_date=lab_sampling_date,
             created_by=actor,
@@ -544,7 +671,13 @@ def update_raw_lot(
 def create_other_lot(
     *, party: Party, recipe: OtherMaterialRecipe, quantity: Decimal, actor: User
 ) -> InwardOtherMaterial:
-    """Book an other-material lot; it is in stock the day it arrives."""
+    """Book an other-material lot; it is in stock the day it arrives.
+
+    Refused (``ValidationError``, a 400 -- and the booking rolls back) when the
+    material type's inward total, this lot included, still falls short of what
+    the bags and packets already packed use: bags exist that the inward lots
+    do not cover, so the lot must at least make up that gap.
+    """
     with recording(
         StockEventType.INWARD_OPERATIONS,
         StockEventDetail.OTHER_MATERIAL_RECEIVED,
@@ -559,5 +692,16 @@ def create_other_lot(
             effective_date=today(),
             created_by=actor,
         )
+        # recording() already locked the recipe's material type, so this read is stable.
+        material_type = recipe.material_type
+        available = InventoryOperations.other_material_available([material_type.id])[
+            material_type.id
+        ]
+        if available < 0:
+            raise ValidationError(
+                f"Not enough inward material for existing bags: '{material_type.name}' "
+                f"is still short by {-available} {material_type.unit_type} "
+                "for the bags already packed."
+            )
         rec.source = entry
     return entry

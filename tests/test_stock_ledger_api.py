@@ -353,6 +353,8 @@ class StockLedgerAdminTest(LedgerWorldTestCase, WebApiTestCase):
     def setUp(self):
         super().setUp()
         self.raw(self.product, "1000")
+        # 5 bags x 20 packets x 1 leaflet: the count is refused without them.
+        self.pouches("100")
         self.count_everything({self.pp1: 5})
         self.event = StockEvent.objects.filter(product=self.product).first()
         self.login_as(self.su)

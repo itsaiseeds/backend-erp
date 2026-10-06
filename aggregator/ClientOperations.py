@@ -281,15 +281,10 @@ def resolve_pincode(code: str, city: City, actor: User) -> Pincode:
     Cities, states and countries are master data and must already exist;
     pincodes are created on demand because a sales person types them in.
 
-    ``Pincode.code`` is unique on its own -- a pincode belongs to exactly one
-    city -- so a code already filed under a different city is a payload error
-    rather than a second row.
+    A code may exist under several cities; ``(code, city)`` is the key. Saving
+    ``(code, A)`` when only ``(code, B)`` exists adds a new row for A.
     """
-    pincode = Pincode.all_objects.filter(code=code).first()
-    if pincode is not None and pincode.city_id != city.id:
-        raise ValidationError(
-            {"pincode": f"Pincode {code} belongs to {pincode.city.name}, not {city.name}."}
-        )
+    pincode = Pincode.all_objects.filter(code=code, city=city).first()
     if pincode is None:
         pincode = Pincode(code=code, city=city, created_by=actor)
         pincode.full_clean()

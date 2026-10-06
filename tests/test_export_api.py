@@ -27,6 +27,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Product,
     ProductPackaging,
     Stage,
@@ -172,7 +173,9 @@ class ExportApiTest(WebApiTestCase):
             selling_price=Decimal("1000.00"),
             created_by=cls.superuser,
         )
-        cls.party = Party.objects.create(name="ABC Traders", city_id=1, created_by=cls.admin_user)
+        cls.party = Party.objects.create(
+            name="ABC Traders", city_id=1, party_type=PartyType.RAW_MATERIAL, created_by=cls.admin_user
+        )
         # _dispatch and the direct record_* calls below count every
         # packaging, including the dml.sql seed rows, and every count is now
         # checked against raw material. Booked (backdated) well outside any
@@ -429,6 +432,7 @@ class ExportApiTest(WebApiTestCase):
             product=self.product,
             party=self.party,
             lot_no="LOT-OLD",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("100.000"),
             created_by=self.admin_user,
         )
@@ -437,6 +441,7 @@ class ExportApiTest(WebApiTestCase):
             product=self.product,
             party=self.party,
             lot_no="LOT-NEW",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("50.000"),
             created_by=self.admin_user,
         )

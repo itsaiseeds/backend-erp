@@ -410,6 +410,8 @@ class AppStrings {
       'Attach the downloaded QR image to the chat.';
   static const String TOTP_UNAVAILABLE =
       'No authenticator setup code is available for this account.';
+  static const String TOTP_RESTRICTED =
+      'This account belongs to an admin. Its QR is managed from the Admins page.';
 
   static const String COLUMN_EMAIL = 'Email';
   static const String COLUMN_CITY = 'City';
@@ -862,6 +864,8 @@ class AppStrings {
   static const String ORDER_FIELD_ORDER_VALUE = 'Order value';
   static const String ORDER_FIELD_RETURNED_VALUE = 'Returned value';
   static const String ORDER_FIELD_NET_SALE = 'Net sale';
+  static const String ORDER_NET_SALE_FORMULA =
+      'Net sale = order value − returned value';
 
   static const String ORDER_PUBLIC_ID_LABEL = 'Order ID';
   static const String ORDER_PLACED_BY_LABEL = 'Booked by';

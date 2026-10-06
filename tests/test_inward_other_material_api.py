@@ -8,6 +8,7 @@ type (``packet_outer_cover``) and a recipe fixture are built here.
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -18,6 +19,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Product,
     ProductPackaging,
 )
@@ -64,7 +66,11 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
             created_by=cls.seed_admin,
         )
         cls.party = Party.objects.create(
-            name="ABC Traders", city_id=1, created_by=cls.seed_admin
+            name="ABC Traders", city_id=1, party_type=PartyType.OTHER_MATERIAL, created_by=cls.seed_admin
+        )
+        cls.raw_party = Party.objects.create(
+            name="Seed Growers", city_id=1, party_type=PartyType.RAW_MATERIAL,
+            created_by=cls.seed_admin,
         )
 
     # -- helpers --------------------------------------------------------------
@@ -144,6 +150,14 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
                     self.client.post(LOTS_URL, body, format="json").status_code,
                     status.HTTP_400_BAD_REQUEST,
                 )
+
+        wrong_party = self._create_lot(party=self.raw_party.id)
+        self.assertEqual(wrong_party.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            wrong_party.data["detail"],
+            "Party 'Seed Growers' is of type Raw Material; "
+            "this booking needs a party of type Other Material.",
+        )
 
         response = self._create_lot(effective_date="2026-09-15")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
@@ -234,6 +248,91 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
         empty = self.client.get(LOTS_URL, {"product": "P-DOES-NOT-EXIST"})
         self.assertEqual(empty.status_code, status.HTTP_200_OK)
         self.assertEqual(empty.data["total_count"], 0)
+
+    def _pack_bags_with_no_inward_lot(self):
+        """Count 1 bag (4 packets x 3 covers = 12 covers) with no cover inward at all.
+
+        The count's own material guard would refuse this, so it is switched off
+        for the write: the legacy state is "bags counted, inward lots lagging".
+        """
+        packaging = ProductPackaging.objects.create(
+            product=self.product,
+            packet_weight=Decimal("2.500"),
+            packets=4,
+            selling_price=Decimal("1000.00"),
+            created_by=self.seed_admin,
+        )
+        book_raw_material(self.product, Decimal("1000"), actor=self.superuser)
+        with mock.patch.object(InventoryOperations, "_assert_material_available"):
+            InventoryOperations.record_stock_count(
+                product_packaging=packaging, bags=1, actor=self.seed_admin
+            )
+
+    def test_a_lot_smaller_than_the_existing_bags_use_is_refused(self):
+        """Existing bags use 12 covers; booking only 5 leaves them uncovered: 400, nothing saved.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_a_lot_smaller_than_the_existing_bags_use_is_refused
+        """
+        self.login_as(self.seed_admin)
+        self._pack_bags_with_no_inward_lot()
+
+        response = self._create_lot(quantity="5")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
+        self.assertIn("Not enough inward material for existing bags", response.data["detail"])
+        self.assertIn("short by 7.000", response.data["detail"])
+        self.assertEqual(InwardOtherMaterial.objects.count(), 0)
+
+    def test_a_lot_that_covers_the_existing_bags_is_accepted(self):
+        """Booking the full 12 covers the bags, so it goes through.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_a_lot_that_covers_the_existing_bags_is_accepted
+        """
+        self.login_as(self.seed_admin)
+        self._pack_bags_with_no_inward_lot()
+
+        response = self._create_lot(quantity="12")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+
+    def _bag_count(self, quantity_in: str, bags: int):
+        """PATCH today's count of 4-packet bags (3 covers a packet) after booking covers."""
+        packaging = ProductPackaging.objects.create(
+            product=self.product,
+            packet_weight=Decimal("2.500"),
+            packets=4,
+            selling_price=Decimal("1000.00"),
+            created_by=self.seed_admin,
+        )
+        book_raw_material(self.product, Decimal("1000"), actor=self.superuser)
+        self.login_as(self.seed_admin)
+        booked = self._create_lot(quantity=quantity_in)
+        self.assertEqual(booked.status_code, status.HTTP_201_CREATED, booked.content)
+        return self.client.patch(
+            "/api/sales-admin/update-bag-stock",
+            {"counts": {packaging.public_id: bags}},
+            format="json",
+        )
+
+    def test_bags_needing_more_other_material_than_inward_are_refused(self):
+        """One bag needs 12 covers; only 6 came in, so counting it is a 400.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_bags_needing_more_other_material_than_inward_are_refused
+        """
+        response = self._bag_count("6", bags=1)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
+        self.assertIn("Not enough packing material", str(response.data))
+        self.assertIn("short by 6.000", str(response.data))
+
+    def test_bags_that_the_inward_other_material_covers_are_accepted(self):
+        """With 12 covers in, counting one bag (12 covers) goes through.
+
+        tests/test_inward_other_material_api.py::InwardOtherMaterialApiTest::test_bags_that_the_inward_other_material_covers_are_accepted
+        """
+        response = self._bag_count("12", bags=1)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
 
     # -- deletion -------------------------------------------------------------
 

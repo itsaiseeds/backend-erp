@@ -20,13 +20,14 @@ from .FieldTrip import FieldTrip
 from .InwardEntryMixin import InwardEntryMixin
 from .InwardOtherMaterial import InwardOtherMaterial
 from .InwardRawMaterial import InwardRawMaterial, InwardRawMaterialStatus
+from .NonStockInward import NonStockInward, NonStockUnit
 from .Notification import Notification
 from .Order import Order
 from .OrderItem import OrderItem
 from .OtherMaterialRecipe import OtherMaterialRecipe
 from .OtherMaterialType import OtherMaterialType, OtherMaterialUnitType
 from .PackedRecipeLayer import PackedRecipeLayer
-from .Party import Party
+from .Party import Party, PartyType
 from .Pincode import Pincode
 from .PrivateDispatchDetails import PrivateDispatchDetails
 from .Product import Product
@@ -81,7 +82,10 @@ __all__ = [
     "OrderItem",
     "CustomOrder",
     "CustomOrderItem",
+    "NonStockInward",
+    "NonStockUnit",
     "Party",
+    "PartyType",
     "InwardEntryMixin",
     "InwardRawMaterial",
     "InwardRawMaterialStatus",

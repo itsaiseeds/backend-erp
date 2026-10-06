@@ -3,7 +3,8 @@
 Only an application Admin may update or delete a party. Soft-deleted parties are
 never found (404). ``name`` + ``city`` are validated for uniqueness, excluding
 the party being edited. ``contact_number`` is optional; a blank or null value
-clears it (stored as NULL).
+clears it (stored as NULL). ``party_type`` may be changed; lots already booked
+against the party are not re-checked -- only new bookings are.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from aggregator.InwardOperations import party_payload
-from aggregator.models import City, Party
+from aggregator.models import City, Party, PartyType
 from api.admin import AdminApiView
 from authentication.validators import validate_phone_number
 
@@ -32,6 +33,7 @@ class UpdatePartySerializer(serializers.Serializer):
     city = serializers.PrimaryKeyRelatedField(
         queryset=City.objects.all(), required=False
     )
+    party_type = serializers.ChoiceField(choices=PartyType.choices, required=False)
     contact_number = serializers.CharField(
         max_length=10,
         required=False,
@@ -78,7 +80,7 @@ class UpdatePartyView(AdminApiView):
         serializer = UpdatePartySerializer(instance=party, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         changed = False
-        for field in ("name", "city", "contact_number"):
+        for field in ("name", "city", "party_type", "contact_number"):
             if field in serializer.validated_data:
                 setattr(party, field, serializer.validated_data[field])
                 changed = True

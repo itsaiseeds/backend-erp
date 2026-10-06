@@ -538,6 +538,7 @@ def accept_return_order(
                 party=None,
                 return_order=ret,
                 lot_no=ret.public_id,
+                farmer_name=f"Return Order ({ret.order.public_id})",
                 quantity_kg=item.kg,
                 status=in_use,
                 effective_date=today,

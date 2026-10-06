@@ -13,6 +13,7 @@ from rest_framework.request import Request
 
 from aggregator.InwardOperations import (
     DATED_RAW_STATUSES,
+    assert_party_type,
     assert_raw_lot_removable,
     assert_raw_status_transition,
     raw_status_of,
@@ -26,6 +27,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Product,
     RawMaterialWaste,
 )
@@ -82,11 +84,33 @@ class InwardRawMaterialPayloadSerializer(serializers.Serializer):
         help_text="The accepted return that booked this lot; null for an ordinary lot.",
     )
     lot_no = serializers.CharField(help_text="The supplier's own batch number.")
+    farmer_name = serializers.CharField(
+        help_text="The farmer the material came from; 'Return Order (<ORD-…>)' for a return lot."
+    )
     quantity_kg = serializers.CharField(help_text="Kilograms received.")
     status = serializers.CharField()
     lab_sampling_date = serializers.DateField(allow_null=True)
     effective_date = serializers.DateField(allow_null=True)
     created_by = InwardCreatedByRefSerializer(allow_null=True, help_text="Who booked the lot.")
+
+
+def parse_party_type(raw: str) -> str:
+    """Parser for a ``?type=`` party filter: one ``PartyType`` value, else a 400."""
+    value = raw.strip()
+    if value not in PartyType.values:
+        raise serializers.ValidationError(
+            f"'{value}' is not a valid party type ({', '.join(PartyType.values)})."
+        )
+    return value
+
+
+def _party_of_type(party: Party, expected: PartyType) -> Party:
+    """``party`` if it supplies ``expected`` material, else a field error."""
+    try:
+        assert_party_type(party, expected)
+    except ValueError as exc:
+        raise serializers.ValidationError(str(exc)) from None
+    return party
 
 
 class CreateInwardRawMaterialSerializer(serializers.Serializer):
@@ -98,7 +122,8 @@ class CreateInwardRawMaterialSerializer(serializers.Serializer):
     ``lab_sampling_date`` may be given explicitly; left out, it defaults to
     today -- a lot never starts with no sampling date, since it arrives for
     lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
-    number on the consignment -- is required.
+    number on the consignment -- is required, as is ``farmer_name`` (free
+    text). ``party`` must be a ``RAW_MATERIAL`` party.
     """
 
     product = serializers.SlugRelatedField(
@@ -115,6 +140,15 @@ class CreateInwardRawMaterialSerializer(serializers.Serializer):
         error_messages={"required": "Lot number is required.", "blank": "Lot number is required."},
         help_text="The supplier's own batch number for this consignment.",
     )
+    farmer_name = serializers.CharField(
+        max_length=255,
+        error_messages={
+            "required": "Farmer name is required.",
+            "blank": "Farmer name is required.",
+            "null": "Farmer name is required.",
+        },
+        help_text="The farmer the raw material came from.",
+    )
     quantity_kg = serializers.DecimalField(
         max_digits=10,
         decimal_places=3,
@@ -123,6 +157,9 @@ class CreateInwardRawMaterialSerializer(serializers.Serializer):
         help_text="Kilograms received from the party.",
     )
     lab_sampling_date = serializers.DateField(required=False, allow_null=True)
+
+    def validate_party(self, value: Party) -> Party:
+        return _party_of_type(value, PartyType.RAW_MATERIAL)
 
 
 class InwardRawMaterialListPageSerializer(serializers.Serializer):
@@ -377,7 +414,8 @@ class CreateInwardOtherMaterialSerializer(serializers.Serializer):
     """Request validation for booking a new other-material lot.
 
     ``effective_date`` is absent on purpose: booking stamps it with today
-    (see ``InwardOtherMaterialsView.post``).
+    (see ``InwardOtherMaterialsView.post``). ``party`` must be an
+    ``OTHER_MATERIAL`` party.
     """
 
     party = serializers.PrimaryKeyRelatedField(
@@ -396,6 +434,9 @@ class CreateInwardOtherMaterialSerializer(serializers.Serializer):
         error_messages={"required": "Quantity is required."},
         help_text="Amount received, in the recipe's material unit.",
     )
+
+    def validate_party(self, value: Party) -> Party:
+        return _party_of_type(value, PartyType.OTHER_MATERIAL)
 
     def validate(self, attrs):
         if attrs["quantity"] <= 0:
@@ -759,6 +800,10 @@ class OtherMaterialTypeRefSerializer(serializers.Serializer):
 class OtherMaterialStockLineSerializer(serializers.Serializer):
     """Output shape for one material type's on-hand position."""
 
+    product = RecipeProductRefSerializer(required=False)
+    packet_weight = serializers.CharField(
+        required=False, help_text="Packet weight in kg when grouped by configuration."
+    )
     material_type = OtherMaterialTypeRefSerializer()
     on_hand = serializers.CharField(
         help_text=(
