@@ -20,12 +20,17 @@ class TotpQrPanel extends StatefulWidget {
   final String subjectName;
   final bool isStacked;
 
+  /// Shows a blurred placeholder instead of the real QR, with no share or
+  /// download actions. The real provisioning URI is never drawn.
+  final bool isBlurred;
+
   const TotpQrPanel({
     super.key,
     required this.provisioningUri,
     this.phoneNumber = '',
     this.subjectName = '',
     this.isStacked = false,
+    this.isBlurred = false,
   });
 
   @override
@@ -105,8 +110,43 @@ class _TotpQrPanelState extends State<TotpQrPanel> {
     }
   }
 
+  Widget _buildBlurred() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Center(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.all(AppSizes.qrFrameInset),
+                color: AppColors.WHITE,
+                child: QrImageView(
+                  data: AppStrings.TOTP_RESTRICTED,
+                  version: QrVersions.auto,
+                  size: AppSizes.qrCodeSize,
+                  backgroundColor: AppColors.WHITE,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          AppStrings.TOTP_RESTRICTED,
+          textAlign: TextAlign.center,
+          style: AppTypography.caption.copyWith(color: AppColors.TEXT_SECONDARY),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.isBlurred) return _buildBlurred();
+
     if (_uri.isEmpty) {
       return Text(
         AppStrings.TOTP_UNAVAILABLE,

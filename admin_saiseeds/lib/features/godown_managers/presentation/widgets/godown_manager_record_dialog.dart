@@ -156,6 +156,7 @@ class _GodownManagerRecordDialogState
           phoneNumber: _manager.phoneNumber,
           subjectName: _manager.name,
           isStacked: true,
+          isBlurred: _manager.isAdmin,
         ),
       ),
     );
