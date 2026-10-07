@@ -26,6 +26,7 @@ class AppTextField extends StatefulWidget {
   final FocusNode? focusNode;
   final String? prefixText;
   final TextStyle? labelStyle;
+  final bool inlineLabel;
 
   const AppTextField({
     super.key,
@@ -50,6 +51,7 @@ class AppTextField extends StatefulWidget {
     this.focusNode,
     this.prefixText,
     this.labelStyle,
+    this.inlineLabel = false,
   });
 
   @override
@@ -94,7 +96,9 @@ class _AppTextFieldState extends State<AppTextField> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.label != null && widget.label!.trim().isNotEmpty) ...[
+        if (widget.label != null &&
+            !widget.inlineLabel &&
+            widget.label!.trim().isNotEmpty) ...[
           Text(widget.label!, style: widget.labelStyle ?? AppTypography.label),
           const SizedBox(height: AppSpacing.sm),
         ],
@@ -114,6 +118,7 @@ class _AppTextFieldState extends State<AppTextField> {
           style: AppTypography.bodyMedium,
           decoration: InputDecoration(
             hintText: widget.hint,
+            labelText: widget.inlineLabel ? widget.label : null,
             errorText: widget.errorText,
             helperText: widget.helperText,
             helperMaxLines: 3,

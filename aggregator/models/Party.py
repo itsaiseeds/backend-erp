@@ -4,6 +4,18 @@ from authentication.validators import validate_phone_number
 from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
 
 
+class PartyType(models.TextChoices):
+    """What a party supplies: raw material lots or other (packing) material lots.
+
+    A raw-material lot may only be booked against a ``RAW_MATERIAL`` party and
+    an other-material lot only against an ``OTHER_MATERIAL`` one (see
+    ``InwardOperations.assert_party_type``). A plain string enum, not a lookup FK.
+    """
+
+    RAW_MATERIAL = "RAW_MATERIAL", "Raw Material"
+    OTHER_MATERIAL = "OTHER_MATERIAL", "Other Material"
+
+
 class Party(TimeStampedModel, SoftDeletedModel, CreatedByModel):
     """A supplier/party that inward materials (raw or other) come from.
 
@@ -18,6 +30,12 @@ class Party(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         verbose_name="city",
         on_delete=models.PROTECT,
         related_name="parties",
+    )
+    party_type = models.CharField(
+        "party type",
+        max_length=32,
+        choices=PartyType.choices,
+        help_text="What this party supplies (raw material or other material).",
     )
     contact_number = models.CharField(
         "contact number",
@@ -35,6 +53,10 @@ class Party(TimeStampedModel, SoftDeletedModel, CreatedByModel):
             models.UniqueConstraint(
                 fields=["name", "city"],
                 name="uniq_party_name_city",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(party_type__in=PartyType.values),
+                name="ck_party_party_type",
             ),
         ]
 

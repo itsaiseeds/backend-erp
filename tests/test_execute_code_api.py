@@ -66,7 +66,7 @@ class ExecuteCodeApiTest(WebApiTestCase):
     def test_a_successful_write_is_committed(self):
         """tests/test_execute_code_api.py::ExecuteCodeApiTest::test_a_successful_write_is_committed"""
         code = (
-            "Party.objects.create(name='Script Party', city_id=1, "
+            "Party.objects.create(name='Script Party', city_id=1, party_type='RAW_MATERIAL', "
             f"created_by=User.objects.get(id={self.runner.id}))"
         )
         data = self._run(code)
@@ -77,7 +77,7 @@ class ExecuteCodeApiTest(WebApiTestCase):
     def test_a_raised_exception_rolls_back_and_returns_the_traceback(self):
         """tests/test_execute_code_api.py::ExecuteCodeApiTest::test_a_raised_exception_rolls_back_and_returns_the_traceback"""
         code = (
-            "Party.objects.create(name='Doomed Party', city_id=1, "
+            "Party.objects.create(name='Doomed Party', city_id=1, party_type='RAW_MATERIAL', "
             f"created_by=User.objects.get(id={self.runner.id}))\n"
             "print('before')\n"
             "raise ValueError('boom')"

@@ -14,6 +14,7 @@ class PartiesTable extends StatefulWidget {
   static const String CONFIG_KEY = 'parties';
   static const String COLUMN_NAME = 'name';
   static const String COLUMN_CITY = 'city';
+  static const String COLUMN_PARTY_TYPE = 'party_type';
   static const String COLUMN_CONTACT = 'contact_number';
 
   final List<PartyModel> parties;
@@ -72,6 +73,11 @@ class PartiesTableState extends State<PartiesTable> {
       id: PartiesTable.COLUMN_CITY,
       label: AppStrings.COLUMN_CITY,
       width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: PartiesTable.COLUMN_PARTY_TYPE,
+      label: AppStrings.COLUMN_PARTY_TYPE,
+      width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
       id: PartiesTable.COLUMN_CONTACT,
@@ -177,6 +183,8 @@ class PartiesTableState extends State<PartiesTable> {
         return _textCell(party.name, isStrong: true);
       case PartiesTable.COLUMN_CITY:
         return _textCell(party.cityName);
+      case PartiesTable.COLUMN_PARTY_TYPE:
+        return _textCell(party.partyTypeLabel);
       case PartiesTable.COLUMN_CONTACT:
         return _textCell(party.contactNumber);
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:

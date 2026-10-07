@@ -62,6 +62,10 @@ class InwardRawMaterial(
     free text, required at booking, unrelated to the per-line lot number
     captured at dispatch.
 
+    ``farmer_name`` is the farmer the material came from -- free text,
+    required at booking. A lot an accepted return booked reads
+    ``Return Order (<ORD-…>)``.
+
     Exposed to the frontend by its ``public_id`` (``IR-…``).
     """
 
@@ -87,6 +91,11 @@ class InwardRawMaterial(
         "lot number",
         max_length=64,
         help_text="The supplier's own batch number for this consignment.",
+    )
+    farmer_name = models.CharField(
+        "farmer name",
+        max_length=255,
+        help_text="The farmer the raw material came from (free text, required).",
     )
     status = models.ForeignKey(
         "aggregator.Status",
@@ -116,6 +125,10 @@ class InwardRawMaterial(
             models.CheckConstraint(
                 condition=models.Q(quantity_kg__gte=0),
                 name="ck_inwardrawmaterial_quantity_kg_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(farmer_name=""),
+                name="ck_inwardrawmaterial_farmer_name_not_blank",
             ),
         ]
 

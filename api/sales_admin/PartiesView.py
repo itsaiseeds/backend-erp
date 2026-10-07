@@ -4,6 +4,10 @@ Only an application Admin may view or create parties (``admin_required`` on
 ``AdminApiView``). Soft-deleted parties are never returned. A party is a lookup
 row addressed by its primary key (like ``Crop``); it is never exposed as a
 public id.
+
+Every party has a ``party_type`` (``RAW_MATERIAL`` / ``OTHER_MATERIAL``):
+``?type=<value>`` narrows the list to one type, and every list response carries
+the full set of types as ``party_types`` (beside ``results``) for the picker.
 """
 
 from __future__ import annotations
@@ -14,8 +18,9 @@ from rest_framework import serializers, status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from aggregator.InwardOperations import party_payload
-from aggregator.models import City, Party
+from aggregator.InwardOperations import party_payload, party_type_options
+from aggregator.models import City, Party, PartyType
+from api.inward_serializers import parse_party_type
 from api.paginated_views import AdminPaginatedDateRangeListView
 from authentication.validators import validate_phone_number
 from common.views.paginated_date_range import (
@@ -41,7 +46,15 @@ class PartyPayloadSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
     city = PartyCityRefSerializer()
+    party_type = serializers.ChoiceField(choices=PartyType.choices)
     contact_number = serializers.CharField(allow_null=True)
+
+
+class PartyTypeOptionSerializer(serializers.Serializer):
+    """Output shape for one entry of ``party_types`` (schema only)."""
+
+    value = serializers.CharField()
+    label = serializers.CharField()
 
 
 class CreatePartySerializer(serializers.Serializer):
@@ -57,6 +70,10 @@ class CreatePartySerializer(serializers.Serializer):
     city = serializers.PrimaryKeyRelatedField(
         queryset=City.objects.all(),
         error_messages={"required": "City is required."},
+    )
+    party_type = serializers.ChoiceField(
+        choices=PartyType.choices,
+        error_messages={"required": "Party type is required."},
     )
     contact_number = serializers.CharField(
         max_length=10,
@@ -89,6 +106,7 @@ class PartyListPageSerializer(serializers.Serializer):
     results = PartyPayloadSerializer(many=True)
     available_filters = FilterCatalogueEntrySerializer(many=True)
     available_sorts = SortCatalogueEntrySerializer(many=True)
+    party_types = PartyTypeOptionSerializer(many=True)
 
 
 def _party_cities(request: Request) -> list[dict]:
@@ -117,6 +135,14 @@ _QUERYSET_FILTERS = (
         multi=False,
         description="Case-insensitive substring of the party name.",
     ),
+    QuerysetFilter(
+        "type",
+        label="Type",
+        lookup="party_type__in",
+        parse=parse_party_type,
+        description="Party type(s): RAW_MATERIAL / OTHER_MATERIAL (see options).",
+        options=party_type_options(),
+    ),
 )
 _SORT_OPTIONS = (
     SortOption("name", label="Name", description="Party name, A->Z (default)."),
@@ -135,7 +161,7 @@ class PartiesView(AdminPaginatedDateRangeListView):
 
     @extend_schema(
         operation_id="sales_admin_parties_list",
-        summary="List parties (filter by city / name, sortable)",
+        summary="List parties (filter by city / name / type, sortable)",
         parameters=list_query_parameters(
             queryset_filters=_QUERYSET_FILTERS,
             sort_options=_SORT_OPTIONS,
@@ -144,7 +170,9 @@ class PartiesView(AdminPaginatedDateRangeListView):
         responses={200: PartyListPageSerializer},
     )
     def get(self, request: Request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+        response = super().get(request, *args, **kwargs)
+        response.data["party_types"] = party_type_options()
+        return response
 
     def get_queryset(self, request: Request) -> QuerySet:
         return Party.objects.select_related("city")
@@ -164,6 +192,7 @@ class PartiesView(AdminPaginatedDateRangeListView):
         party = Party.objects.create(
             name=data["name"],
             city=data["city"],
+            party_type=data["party_type"],
             contact_number=data.get("contact_number"),
             created_by=request.user,
         )

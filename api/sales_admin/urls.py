@@ -43,6 +43,7 @@ from .LabTestersView import LabTestersView
 from .LabTestingDetailView import LabTestingDetailView
 from .LabTestingsView import LabTestingsView
 from .LogoutView import LogoutView
+from .NonStockInwardsView import NonStockInwardsView
 from .OtherMaterialRecipesView import OtherMaterialRecipesView
 from .OtherMaterialStockView import OtherMaterialStockView
 from .OtherMaterialTypesView import OtherMaterialTypesView
@@ -77,6 +78,7 @@ from .UpdateGodownManagerView import UpdateGodownManagerView
 from .UpdateInwardOtherMaterialView import UpdateInwardOtherMaterialView
 from .UpdateInwardRawMaterialView import UpdateInwardRawMaterialView
 from .UpdateLabTesterView import UpdateLabTesterView
+from .UpdateNonStockInwardView import UpdateNonStockInwardView
 from .UpdateOrderView import UpdateOrderView
 from .UpdateOtherMaterialTypeView import UpdateOtherMaterialTypeView
 from .UpdatePartyView import UpdatePartyView
@@ -371,6 +373,18 @@ urlpatterns = [
         "raw-material-waste/<str:public_id>",
         UpdateRawMaterialWasteView.as_view(),
         name="update-raw-material-waste",
+    ),
+    # Consumables that are not stock (pesticides, spare parts, ...): linked to
+    # nothing, addressed by public id (NS-...).
+    path(
+        "non-stock-inwards",
+        NonStockInwardsView.as_view(),
+        name="non-stock-inwards",
+    ),
+    path(
+        "non-stock-inward/<str:public_id>",
+        UpdateNonStockInwardView.as_view(),
+        name="update-non-stock-inward",
     ),
     path(
         "raw-material-stock",

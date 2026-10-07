@@ -364,6 +364,11 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/lab-testers/<int:id>/rotate-qr": ("RotateLabTesterQrView", SESSION_ADMIN),
     "api/sales-admin/lab-testings": ("LabTestingsView", SESSION_ADMIN),
     "api/sales-admin/lab-testing/<str:public_id>": ("LabTestingDetailView", SESSION_ADMIN),
+    "api/sales-admin/non-stock-inward/<str:public_id>": (
+        "UpdateNonStockInwardView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/non-stock-inwards": ("NonStockInwardsView", SESSION_ADMIN),
     "api/sales-admin/godown-managers": ("GodownManagersView", SESSION_ADMIN),
     "api/sales-admin/godown-managers/<int:id>": ("UpdateGodownManagerView", SESSION_ADMIN),
     "api/sales-admin/godown-managers/<int:id>/rotate-qr": (

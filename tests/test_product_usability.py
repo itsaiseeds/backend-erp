@@ -38,6 +38,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Pincode,
     Product,
     ProductPackaging,
@@ -136,7 +137,9 @@ class ProductUsabilityOperationsTest(DMLTestCase):
         )
         cls.pack = add_packaging(cls.product, packet_weight=WEIGHT, packets=40, actor=cls.su)
         cls.pack2 = add_packaging(cls.product2, packet_weight=WEIGHT, packets=40, actor=cls.su)
-        cls.party = Party.objects.create(name="Usable Party", city_id=1, created_by=cls.su)
+        cls.party = Party.objects.create(
+            name="Usable Party", city_id=1, party_type=PartyType.RAW_MATERIAL, created_by=cls.su
+        )
         cls.today = datetime.date.today()
         book_raw_material_for_every_product(actor=cls.su)
 
@@ -225,12 +228,14 @@ class ProductUsabilityOperationsTest(DMLTestCase):
         """
         lot = create_raw_lot(
             product=self.product, party=self.party, lot_no="L1",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("10"), lab_sampling_date=self.today, actor=self.su,
         )
         freeze(self.product)
 
         self._refused("product", lambda: create_raw_lot(
             product=self.product, party=self.party, lot_no="L2",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("5"), lab_sampling_date=self.today, actor=self.su,
         ))
         self._refused("status", lambda: update_raw_lot(
@@ -518,7 +523,13 @@ class ProductUsabilityApiTest(WebApiTestCase):
         )
         Admin.objects.create(user=cls.admin, can_update_stock_count=True, created_by=cls.superuser)
         cls.product = Product.objects.get(name="SAI-33")
-        cls.party = Party.objects.create(name="API Party", city_id=1, created_by=cls.admin)
+        cls.party = Party.objects.create(
+            name="API Party", city_id=1, party_type=PartyType.RAW_MATERIAL, created_by=cls.admin
+        )
+        cls.other_party = Party.objects.create(
+            name="API Packaging Party", city_id=1, party_type=PartyType.OTHER_MATERIAL,
+            created_by=cls.admin,
+        )
 
     def setUp(self):
         super().setUp()
@@ -627,6 +638,7 @@ class ProductUsabilityApiTest(WebApiTestCase):
         book_raw_material(self.product, Decimal("500"), actor=self.admin)
         lot = create_raw_lot(
             product=self.product, party=self.party, lot_no="API-1",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("10"), lab_sampling_date=datetime.date.today(), actor=self.admin,
         )
         # In Use, so the admin's only status write -- the revert to Lab Testing -- is a
@@ -650,7 +662,7 @@ class ProductUsabilityApiTest(WebApiTestCase):
 
         refused(self.client.post(self.LOTS, {
             "product": self.product.public_id, "party": self.party.id,
-            "lot_no": "API-2", "quantity_kg": "5",
+            "lot_no": "API-2", "farmer_name": "Test Farmer", "quantity_kg": "5",
         }, format="json"))
         refused(self.client.patch(
             f"/api/sales-admin/inward-raw-material/{lot.public_id}", {"status": "Lab Testing"},
@@ -675,7 +687,7 @@ class ProductUsabilityApiTest(WebApiTestCase):
         }, format="json"))
         refused(self.client.delete(f"/api/sales-admin/other-material-recipe/{recipe.public_id}"))
         refused(self.client.post(self.OTHER_LOTS, {
-            "party": self.party.id, "recipe": recipe.public_id, "quantity": "5",
+            "party": self.other_party.id, "recipe": recipe.public_id, "quantity": "5",
         }, format="json"))
         counted = self.client.patch(
             self.BAG_COUNT, {"counts": {packaging.public_id: 3}}, format="json"

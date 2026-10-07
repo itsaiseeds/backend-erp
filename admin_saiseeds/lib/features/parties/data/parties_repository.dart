@@ -28,11 +28,17 @@ class PartiesRepository {
   Future<void> createParty({
     required String name,
     required int cityId,
+    required String partyType,
     String? contactNumber,
   }) async {
     await _apiClient.post(
       PartiesEndpoints.create,
-      body: {'name': name, 'city': cityId, 'contact_number': contactNumber},
+      body: {
+        'name': name,
+        'city': cityId,
+        'contact_number': contactNumber,
+        'party_type': partyType,
+      },
     );
   }
 
@@ -40,11 +46,17 @@ class PartiesRepository {
     required int id,
     required String name,
     required int cityId,
+    required String partyType,
     String? contactNumber,
   }) async {
     await _apiClient.patch(
       PartiesEndpoints.detail(id),
-      body: {'name': name, 'city': cityId, 'contact_number': contactNumber},
+      body: {
+        'name': name,
+        'city': cityId,
+        'contact_number': contactNumber,
+        'party_type': partyType,
+      },
     );
   }
 

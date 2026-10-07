@@ -48,6 +48,7 @@ class InwardRecordDialog extends StatefulWidget {
 class _InwardRecordDialogState extends State<InwardRecordDialog> {
   late final TextEditingController _productController;
   late final TextEditingController _partyController;
+  late final TextEditingController _farmerController;
   late final TextEditingController _quantityController;
 
   late RecordDialogMode _mode;
@@ -67,6 +68,7 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
     _mode = widget.initialMode;
     _productController = TextEditingController(text: _lot.productName);
     _partyController = TextEditingController(text: _lot.partyName);
+    _farmerController = TextEditingController(text: _lot.farmerLabel);
     _quantityController = TextEditingController(text: _lot.quantityKg);
     _labSamplingDate = _lot.labSamplingDateTime;
   }
@@ -75,6 +77,7 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
   void dispose() {
     _productController.dispose();
     _partyController.dispose();
+    _farmerController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
@@ -172,12 +175,21 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
         const SizedBox(height: AppSpacing.md),
         RecordFieldRow(
           left: RecordField(
+            controller: _farmerController,
+            label: AppStrings.FIELD_FARMER_NAME,
+            isEditable: false,
+            isLocked: true,
+          ),
+          right: RecordField(
             controller: _quantityController,
             label: AppStrings.COLUMN_QUANTITY_KG,
             isEditable: false,
             isLocked: true,
           ),
-          right: SingleDateField(
+        ),
+        const SizedBox(height: AppSpacing.md),
+        RecordFieldRow(
+          left: SingleDateField(
             label: AppStrings.FIELD_LAB_SAMPLING_DATE,
             value: _labSamplingDate,
             enabled: _canEdit,

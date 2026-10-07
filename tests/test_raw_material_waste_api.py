@@ -16,6 +16,7 @@ from aggregator import InventoryOperations
 from aggregator.models import (
     InwardRawMaterial,
     Party,
+    PartyType,
     Product,
     ProductPackaging,
     RawMaterialWaste,
@@ -62,7 +63,7 @@ class RawMaterialWasteApiTest(WebApiTestCase):
         )
         cls.product = Product.objects.get(name="SAI-33")
         cls.party = Party.objects.create(
-            name="ABC Traders", city_id=1, created_by=cls.seed_admin
+            name="ABC Traders", city_id=1, party_type=PartyType.RAW_MATERIAL, created_by=cls.seed_admin
         )
 
     # -- helpers --------------------------------------------------------------
@@ -73,6 +74,7 @@ class RawMaterialWasteApiTest(WebApiTestCase):
             product=self.product,
             party=self.party,
             lot_no="SUP-T1",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal(kg),
             status_id=status_id,
             effective_date=InventoryOperations.today(),

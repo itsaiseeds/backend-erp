@@ -20,6 +20,7 @@ from aggregator.models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
+    PartyType,
     Product,
     ProductPackaging,
     RawMaterialWaste,
@@ -73,7 +74,13 @@ class GodownManagerApiTest(AndroidApiTestCase):
         cls.plain = make_user("7000000003", "plain", totp_secret=TOTP_SECRET, totp_enabled=True)
 
         cls.product = Product.objects.get(name="SAI-33")
-        cls.party = Party.objects.create(name="ABC Traders", city_id=1, created_by=cls.superuser)
+        cls.party = Party.objects.create(
+            name="ABC Traders", city_id=1, party_type=PartyType.RAW_MATERIAL, created_by=cls.superuser
+        )
+        cls.other_party = Party.objects.create(
+            name="XYZ Packaging", city_id=1, party_type=PartyType.OTHER_MATERIAL,
+            created_by=cls.superuser,
+        )
         cls.material_type = OtherMaterialType.objects.order_by("id").first()
 
     def _book_raw(self, **overrides):
@@ -81,6 +88,7 @@ class GodownManagerApiTest(AndroidApiTestCase):
             "product": self.product.public_id,
             "party": self.party.id,
             "lot_no": "SUP-1",
+            "farmer_name": "Test Farmer",
             "quantity_kg": "40",
             **overrides,
         }
@@ -256,7 +264,7 @@ class GodownManagerApiTest(AndroidApiTestCase):
         before = self._on_hand(self.material_type.id)
         booked = self.client.post(
             BASE + "godown/inward-other-materials",
-            {"party": self.party.id, "recipe": recipe.public_id, "quantity": "25"},
+            {"party": self.other_party.id, "recipe": recipe.public_id, "quantity": "25"},
             format="json",
         )
         self.assertEqual(booked.status_code, 201, booked.content)
@@ -280,15 +288,26 @@ class GodownManagerApiTest(AndroidApiTestCase):
         parties = self.client.get(BASE + "utilities/parties")
         self.assertEqual(parties.status_code, 200)
         self.assertEqual(
-            parties.data,
+            [p["name"] for p in parties.data], ["ABC Traders", "XYZ Packaging"]
+        )
+        raw_parties = self.client.get(BASE + "utilities/parties", {"type": "RAW_MATERIAL"})
+        self.assertEqual(raw_parties.status_code, 200)
+        self.assertEqual(
+            raw_parties.data,
             [
                 {
                     "id": self.party.id,
                     "name": "ABC Traders",
                     "city": {"id": 1, "name": self.party.city.name},
+                    "party_type": "RAW_MATERIAL",
                     "contact_number": self.party.contact_number,
                 }
             ],
+        )
+        other_parties = self.client.get(BASE + "utilities/parties", {"type": "OTHER_MATERIAL"})
+        self.assertEqual([p["id"] for p in other_parties.data], [self.other_party.id])
+        self.assertEqual(
+            self.client.get(BASE + "utilities/parties", {"type": "SEEDS"}).status_code, 400
         )
         types = self.client.get(BASE + "utilities/other-material-types")
         self.assertEqual(types.status_code, 200)

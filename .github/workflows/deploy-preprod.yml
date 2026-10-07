@@ -2,10 +2,15 @@ name: Sync preprod
 
 on:
   push:
-    branches: [master]
+    branches: [master, preprod]
 
 permissions:
   contents: write
+
+# Never let two syncs race to force-push preprod; the newest push wins.
+concurrency:
+  group: sync-preprod
+  cancel-in-progress: true
 
 jobs:
   sync-preprod:
@@ -13,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout master
+      - name: Checkout pushed branch
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Set up Flutter
@@ -40,6 +45,14 @@ jobs:
           git add admin_saiseeds/build
           git diff --cached --quiet || git commit -m "Build Flutter web app for preprod API"
 
+      # Preprod only: this job must never update master (that would trigger a
+      # prod deploy). The target is pinned and checked before pushing.
       - name: Push to preprod
+        env:
+          TARGET_BRANCH: preprod
         run: |
-          git push origin HEAD:refs/heads/preprod --force
+          if [ "$TARGET_BRANCH" != "preprod" ]; then
+            echo "Refusing to push to '$TARGET_BRANCH': this workflow only deploys preprod." >&2
+            exit 1
+          fi
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH" --force
