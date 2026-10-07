@@ -629,6 +629,13 @@ class ProductUsabilityApiTest(WebApiTestCase):
             product=self.product, party=self.party, lot_no="API-1",
             quantity_kg=Decimal("10"), lab_sampling_date=datetime.date.today(), actor=self.admin,
         )
+        # In Use, so the admin's only status write -- the revert to Lab Testing -- is a
+        # valid transition and the freeze is what refuses it.
+        update_raw_lot(
+            lot,
+            {"status": Status.by_id(StatusIds.IN_USE), "effective_date": datetime.date.today()},
+            self.admin,
+        )
         waste = inv.record_raw_waste(
             product=self.product, quantity_kg=Decimal("2"), reason="x", actor=self.admin
         )
@@ -646,7 +653,7 @@ class ProductUsabilityApiTest(WebApiTestCase):
             "lot_no": "API-2", "quantity_kg": "5",
         }, format="json"))
         refused(self.client.patch(
-            f"/api/sales-admin/inward-raw-material/{lot.public_id}", {"status": "In Use"},
+            f"/api/sales-admin/inward-raw-material/{lot.public_id}", {"status": "Lab Testing"},
             format="json",
         ))
         refused(self.client.delete(f"/api/sales-admin/inward-raw-material/{lot.public_id}"))

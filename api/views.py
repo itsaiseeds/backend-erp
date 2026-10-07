@@ -22,6 +22,7 @@ from .permissions import (
     IsAdminUser,
     IsAndroidRole,
     IsGodownManager,
+    IsLabTester,
     IsSalesPerson,
     IsSuperUser,
 )
@@ -37,8 +38,9 @@ class BaseApiView(APIView):
     * ``superuser_required`` - additionally require a Django superuser.
     * ``salesperson_required`` - additionally require a ``SalesPerson`` profile.
     * ``godown_manager_required`` - additionally require a ``GodownManager`` profile.
-    * ``android_role_required`` - additionally require *either* Android role
-      (a ``SalesPerson`` or a ``GodownManager`` profile).
+    * ``lab_tester_required`` - additionally require a ``LabTester`` profile.
+    * ``android_role_required`` - additionally require *any* Android role
+      (a ``SalesPerson``, ``GodownManager`` or ``LabTester`` profile).
     * ``required_permission`` - additionally require this Django permission
       (``"<app_label>.<codename>"``), regardless of role; ``None`` for none.
 
@@ -59,6 +61,7 @@ class BaseApiView(APIView):
     superuser_required = False
     salesperson_required = False
     godown_manager_required = False
+    lab_tester_required = False
     android_role_required = False
     required_permission: str | None = None
 
@@ -74,6 +77,8 @@ class BaseApiView(APIView):
             permissions.append(IsSalesPerson())
         if self.godown_manager_required:
             permissions.append(IsGodownManager())
+        if self.lab_tester_required:
+            permissions.append(IsLabTester())
         if self.android_role_required:
             permissions.append(IsAndroidRole())
         if self.required_permission is not None:

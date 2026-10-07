@@ -51,6 +51,7 @@ class CreateFarmerVisitSerializer(serializers.Serializer):
     farmer does not use our products.
     """
 
+    is_lead = serializers.BooleanField(required=False, default=False)
     field_trip_public_id = serializers.CharField(max_length=20)
     farmer_name = serializers.CharField(max_length=255)
     contact_number = serializers.CharField(validators=[validate_phone_number])
@@ -84,6 +85,43 @@ class CreateFarmerVisitSerializer(serializers.Serializer):
         return value.strip()
 
 
+class CreateFarmerSerializer(serializers.Serializer):
+    """A farmer a sales person records on their own, outside any field trip.
+
+    Same fields as :class:`CreateFarmerVisitSerializer` minus the trip; with no
+    trip to default from, ``village`` is required.
+    """
+
+    farmer_name = serializers.CharField(max_length=255)
+    contact_number = serializers.CharField(validators=[validate_phone_number])
+    village = serializers.CharField(max_length=255)
+    land_area_bigha = serializers.DecimalField(
+        max_digits=12, decimal_places=4, min_value=0, help_text="Land held, in bigha."
+    )
+    is_lead = serializers.BooleanField(required=False, default=False)
+    crop_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Crop.objects.all(),
+        many=True,
+        allow_empty=False,
+        source="crops",
+        help_text="At least one crop the farmer grows.",
+    )
+    product_public_ids = serializers.SlugRelatedField(
+        queryset=Product.objects.all(),
+        slug_field="public_id",
+        many=True,
+        required=False,
+        source="products",
+        help_text="Our products the farmer uses; empty if none.",
+    )
+
+    def validate_farmer_name(self, value: str) -> str:
+        return value.strip()
+
+    def validate_village(self, value: str) -> str:
+        return value.strip()
+
+
 class EditFarmerVisitSerializer(serializers.Serializer):
     """A partial correction to a recorded farmer: send only what changed.
 
@@ -93,6 +131,7 @@ class EditFarmerVisitSerializer(serializers.Serializer):
     products. Anything else sent is ignored.
     """
 
+    is_lead = serializers.BooleanField(required=False)
     farmer_name = serializers.CharField(max_length=255, required=False)
     contact_number = serializers.CharField(required=False, validators=[validate_phone_number])
     village = serializers.CharField(max_length=255, required=False)
@@ -130,7 +169,7 @@ class EditFarmerVisitSerializer(serializers.Serializer):
         if not attrs:
             raise serializers.ValidationError(
                 "Send at least one of farmer_name, contact_number, village, land_area_bigha, "
-                "crop_ids, product_public_ids."
+                "is_lead, crop_ids, product_public_ids."
             )
         return attrs
 
@@ -193,6 +232,10 @@ class FarmerVisitPayloadSerializer(serializers.Serializer):
     contact_number = serializers.CharField()
     village = serializers.CharField()
     land_area_bigha = serializers.CharField()
+    is_lead = serializers.BooleanField()
+    field_trip_public_id = serializers.CharField(
+        allow_null=True, help_text="Null for a farmer recorded outside any trip."
+    )
     crops = IdNameSerializer(many=True)
     uses_our_products = serializers.BooleanField()
     products = ProductRefSerializer(many=True)
@@ -224,8 +267,12 @@ class FarmerPayloadSerializer(serializers.Serializer):
     contact_number = serializers.CharField(help_text="The farmer's identity across trips.")
     farmer_name = serializers.CharField(help_text="Name given at the latest visit.")
     village = serializers.CharField(help_text="Village of the latest visit.")
-    city = IdNameSerializer(help_text="City of the latest visit's field trip.")
+    city = IdNameSerializer(
+        allow_null=True,
+        help_text="City of the latest visit's field trip; null for a farmer recorded without a trip.",
+    )
     land_area_bigha = serializers.CharField(help_text="Land held at the latest visit, in bigha.")
+    is_lead = serializers.BooleanField(help_text="Lead flag of the latest record.")
     crops = IdNameSerializer(many=True, help_text="Every crop they grow, merged over visits.")
     uses_our_products = serializers.BooleanField()
     products = ProductRefSerializer(

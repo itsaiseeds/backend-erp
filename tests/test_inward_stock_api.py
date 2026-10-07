@@ -26,7 +26,7 @@ from aggregator.models import (
     StatusIds,
 )
 from authentication.models import Admin
-from tests.common import WebApiTestCase
+from tests.common import WebApiTestCase, lab_verdict
 
 User = get_user_model()
 
@@ -247,14 +247,8 @@ class InwardStockApiTest(WebApiTestCase):
             format="json",
         )
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
-        url = f"/api/sales-admin/inward-raw-material/{created.data['public_id']}"
-        flipped = self.client.patch(
-            url,
-            {"status": "In Use"},
-            format="json",
-        )
-        self.assertEqual(flipped.status_code, status.HTTP_200_OK, flipped.content)
-        self.assertEqual(flipped.data["effective_date"], self.today.isoformat())
+        passed = lab_verdict(created.data["public_id"], "Pass", actor=self.seed_admin)
+        self.assertEqual(passed.inward_raw_material.effective_date, self.today)
 
         response = self.client.get(
             f"{RAW_STOCK_URL}?product={self.product1.public_id}"
@@ -290,8 +284,7 @@ class InwardStockApiTest(WebApiTestCase):
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
         url = f"/api/sales-admin/inward-raw-material/{created.data['public_id']}"
 
-        flipped = self.client.patch(url, {"status": "In Use"}, format="json")
-        self.assertEqual(flipped.status_code, status.HTTP_200_OK, flipped.content)
+        lab_verdict(created.data["public_id"], "Pass", actor=self.seed_admin)
 
         counting = self.client.get(f"{RAW_STOCK_URL}?product={self.product1.public_id}")
         self.assertEqual(counting.status_code, status.HTTP_200_OK)
@@ -424,8 +417,7 @@ class InwardStockApiTest(WebApiTestCase):
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
         url = f"/api/sales-admin/inward-raw-material/{created.data['public_id']}"
 
-        rejected = self.client.patch(url, {"status": "Rejected"}, format="json")
-        self.assertEqual(rejected.status_code, status.HTTP_200_OK, rejected.content)
+        lab_verdict(created.data["public_id"], "Fail", actor=self.seed_admin)
 
         counting = self.client.get(f"{RAW_STOCK_URL}?product={self.product1.public_id}")
         self.assertEqual(counting.data["lines"][0]["rejected_kg"], "500.000")

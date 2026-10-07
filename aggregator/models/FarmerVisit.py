@@ -10,10 +10,11 @@ from common.models import (
 
 
 class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel):
-    """One farmer a sales person met on a ``FieldTrip``.
+    """One farmer a sales person met on a ``FieldTrip``, or recorded on their own.
 
     A visit, not a farmer master record: the same farmer met on two trips is
-    two rows. The crops they grow are ``FarmerVisitCrop`` rows; the products of
+    two rows. A farmer a sales person enters outside any trip has
+    ``field_trip`` empty (:attr:`is_independent`) and belongs to ``created_by``. The crops they grow are ``FarmerVisitCrop`` rows; the products of
     ours they use are ``FarmerVisitProduct`` rows, and having none is what
     "doesn't use our products" means (:attr:`uses_our_products`).
 
@@ -30,6 +31,9 @@ class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         verbose_name="field trip",
         on_delete=models.PROTECT,
         related_name="farmer_visits",
+        null=True,
+        blank=True,
+        help_text="Empty for a farmer recorded independently of any trip.",
     )
     farmer_name = models.CharField("farmer name", max_length=255)
     contact_number = models.CharField(
@@ -44,6 +48,7 @@ class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         max_digits=12,
         decimal_places=4,
     )
+    is_lead = models.BooleanField("is lead", default=False)
 
     class Meta:
         verbose_name = "farmer visit"
@@ -54,6 +59,13 @@ class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
                 fields=["field_trip", "contact_number"],
                 name="uniq_farmervisit_trip_contact",
             ),
+            # A trip-less farmer is unique per sales person (NULL trips never
+            # collide in the constraint above).
+            models.UniqueConstraint(
+                fields=["created_by", "contact_number"],
+                condition=models.Q(field_trip__isnull=True, is_deleted=False),
+                name="uniq_farmervisit_independent_contact",
+            ),
             models.CheckConstraint(
                 condition=models.Q(land_area_bigha__gte=0),
                 name="ck_farmervisit_land_area_non_negative",
@@ -62,6 +74,10 @@ class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
 
     def __str__(self):
         return f"{self.public_id}: {self.farmer_name}" if self.public_id else self.farmer_name
+
+    @property
+    def is_independent(self) -> bool:
+        return self.field_trip_id is None
 
     @property
     def uses_our_products(self) -> bool:

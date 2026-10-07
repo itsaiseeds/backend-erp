@@ -35,6 +35,7 @@ from aggregator.OrderOperations import (
     verify_order,
 )
 from aggregator.ProductOperations import add_packaging
+from tests.common import lab_verdict
 from tests.stock_ledger_support import W1, LedgerWorldTestCase
 
 
@@ -221,6 +222,60 @@ class StockLedgerOperationsTest(LedgerWorldTestCase):
         line = line_for(self.events_since(before)[0], StockPoolKind.RAW)
         self.assertEqual(line.d_incoming, Decimal("-40"))
         self.assertEqual(self.events_since(before)[0].actor_id, self.su.pk)
+
+    def test_every_lab_verdict_is_recorded_once_in_the_ledger(self):
+        """A lab tester's verdict moves the raw pools through the one lot write: one
+        event per step, with the same details and deltas as the plain lot transitions.
+
+        tests/test_stock_ledger_operations.py::StockLedgerOperationsTest::test_every_lab_verdict_is_recorded_once_in_the_ledger
+        """
+        from django.db import transaction
+
+        from aggregator.InwardOperations import locked_raw_lot
+        from aggregator.LabTestingOperations import update_lab_test
+        from aggregator.models import InwardRawMaterial
+
+        today = datetime.date.today()
+        lot = InwardOperations.create_raw_lot(
+            product=self.product, party=self.party, lot_no="L-LAB",
+            quantity_kg=Decimal("40.000"), lab_sampling_date=today, actor=self.su,
+        )
+
+        def expect(before, detail, raw_deltas):
+            [event] = self.events_since(before)
+            self.assertEqual(self.kinds_since(before), [("INWARD_OPERATIONS", detail)])
+            self.assertEqual(event.inward_raw_material_id, lot.pk)
+            line = line_for(event, StockPoolKind.RAW)
+            self.assertEqual((line.d_incoming, line.d_rejected), raw_deltas, detail)
+
+        def edit_verdict(result):
+            with transaction.atomic():
+                locked = locked_raw_lot(InwardRawMaterial.objects.all(), lot.public_id)
+                update_lab_test(locked, {"result": result}, self.su)
+
+        before = self.marker()
+        lab_verdict(lot.public_id, "Pass", actor=self.su)
+        expect(before, "RAW_LOT_IN_USE", (Decimal("40"), None))
+
+        before = self.marker()
+        edit_verdict("Fail")  # nothing packed, so a Pass can be corrected
+        expect(before, "RAW_LOT_REJECTED", (Decimal("-40"), Decimal("40")))
+
+        before = self.marker()
+        edit_verdict("Pass")
+        expect(before, "RAW_LOT_IN_USE", (Decimal("40"), Decimal("-40")))
+
+        before = self.marker()
+        InwardOperations.update_raw_lot(
+            locked_raw_lot(InwardRawMaterial.objects.all(), lot.public_id),
+            {"status": Status.objects.get(code="LAB_TESTING"), "effective_date": None},
+            self.su,
+        )
+        expect(before, "RAW_LOT_BACK_TO_LAB", (Decimal("-40"), None))
+
+        before = self.marker()
+        lab_verdict(lot.public_id, "Fail", actor=self.su)  # the re-test, on the same record
+        expect(before, "RAW_LOT_REJECTED", (None, Decimal("40")))
 
     def test_a_shared_material_lot_is_recorded_once_and_listed_for_both_products(self):
         """tests/test_stock_ledger_operations.py::StockLedgerOperationsTest::test_a_shared_material_lot_is_recorded_once_and_listed_for_both_products"""

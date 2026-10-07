@@ -1,4 +1,5 @@
-"""Notifications for the sales person whose work an admin just acted on.
+"""Notifications for the sales person whose work an admin just acted on, and for
+the lab testers when a raw-material lot needs testing.
 
 Order status changes, a field trip being approved or un-approved, a client being
 verified and a return being accepted or rejected each call a ``notify_*_event``
@@ -26,10 +27,19 @@ from typing import TYPE_CHECKING
 
 from django.utils import timezone
 
+from authentication.models import LabTester
 from common.background import fire_and_forget
 from common.push import send_push
 
-from .models import Client, FieldTrip, Notification, Order, PushDevice, ReturnOrder
+from .models import (
+    Client,
+    FieldTrip,
+    InwardRawMaterial,
+    Notification,
+    Order,
+    PushDevice,
+    ReturnOrder,
+)
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -50,6 +60,7 @@ class NotificationEvent(StrEnum):
     CLIENT_VERIFIED = "CLIENT_VERIFIED"
     RETURN_ACCEPTED = "RETURN_ACCEPTED"
     RETURN_REJECTED = "RETURN_REJECTED"
+    LAB_TEST_REQUESTED = "LAB_TEST_REQUESTED"
 
 
 class Screen(StrEnum):
@@ -59,6 +70,7 @@ class Screen(StrEnum):
     FIELD_TRIP_DETAIL = "field_trip_detail"
     CLIENT_DETAIL = "client_detail"
     RETURN_ORDER_DETAIL = "return_order_detail"
+    LAB_TEST_PENDING = "lab_test_pending"
 
 
 @dataclass(frozen=True)
@@ -99,14 +111,17 @@ _SPECS: dict[NotificationEvent, EventSpec] = {
     _E.CLIENT_VERIFIED: EventSpec("Client verified", "was verified", Screen.CLIENT_DETAIL),
     _E.RETURN_ACCEPTED: EventSpec("Return accepted", "was accepted", Screen.RETURN_ORDER_DETAIL),
     _E.RETURN_REJECTED: EventSpec("Return rejected", "was rejected", Screen.RETURN_ORDER_DETAIL),
+    _E.LAB_TEST_REQUESTED: EventSpec(
+        "Lab test requested", "was sent for lab testing", Screen.LAB_TEST_PENDING
+    ),
 }
 
 
 @dataclass(frozen=True)
 class Message:
-    """What one notification is about and to whom; ``recipient_id`` None means nobody."""
+    """What one notification is about and to whom; no ``recipient_ids`` means nobody."""
 
-    recipient_id: int | None
+    recipient_ids: tuple[int, ...]
     subject: str
     data: dict[str, str]
     order_id: int | None = None
@@ -136,6 +151,17 @@ def notify_return_order_event(ret: ReturnOrder, event: NotificationEvent, *, act
     _notify(event, actor, lambda: _return_order_message(return_id))
 
 
+def notify_lab_test_requested(lot: InwardRawMaterial, *, actor: User) -> None:
+    """Tell every lab tester that ``lot`` is waiting in Lab Testing (booked, or sent back)."""
+    lot_id = lot.pk
+    _notify(NotificationEvent.LAB_TEST_REQUESTED, actor, lambda: _lab_test_message(lot_id))
+
+
+def _only(user_id: int | None) -> tuple[int, ...]:
+    """A single recipient as ``Message.recipient_ids``; none when there is no user."""
+    return () if user_id is None else (user_id,)
+
+
 def _notify(event: NotificationEvent, actor: User, build: Callable[[], Message]) -> None:
     """Queue the notification: it runs after commit, off the request thread.
 
@@ -149,7 +175,7 @@ def _notify(event: NotificationEvent, actor: User, build: Callable[[], Message])
 def _order_message(order_id: int) -> Message:
     order = Order.objects.select_related("client").get(pk=order_id)
     return Message(
-        recipient_id=order.created_by_id,
+        recipient_ids=_only(order.created_by_id),
         subject=f"{order.public_id} for {order.client.company_name}",
         data={"order_public_id": order.public_id},
         order_id=order.pk,
@@ -159,7 +185,7 @@ def _order_message(order_id: int) -> Message:
 def _field_trip_message(trip_id: int) -> Message:
     trip = FieldTrip.objects.get(pk=trip_id)
     return Message(
-        recipient_id=trip.created_by_id,
+        recipient_ids=_only(trip.created_by_id),
         subject=f"{trip.public_id} to {trip.village}",
         data={"field_trip_public_id": trip.public_id},
     )
@@ -168,7 +194,7 @@ def _field_trip_message(trip_id: int) -> Message:
 def _client_message(client_id: int) -> Message:
     client = Client.objects.get(pk=client_id)
     return Message(
-        recipient_id=client.created_by_id,
+        recipient_ids=_only(client.created_by_id),
         subject=client.company_name,
         data={"client_public_id": client.public_id},
     )
@@ -178,40 +204,51 @@ def _return_order_message(return_id: int) -> Message:
     ret = ReturnOrder.objects.select_related("order__client").get(pk=return_id)
     order = ret.order
     return Message(
-        recipient_id=ret.created_by_id,
+        recipient_ids=_only(ret.created_by_id),
         subject=f"{ret.public_id} against {order.public_id} for {order.client.company_name}",
         data={"return_order_public_id": ret.public_id, "order_public_id": order.public_id},
         order_id=order.pk,
     )
 
 
+def _lab_test_message(lot_id: int) -> Message:
+    lot = InwardRawMaterial.objects.select_related("product").get(pk=lot_id)
+    testers = LabTester.objects.order_by("user_id").values_list("user_id", flat=True)
+    return Message(
+        recipient_ids=tuple(testers),
+        subject=f"{lot.public_id} ({lot.product.name}, {lot.quantity_kg} kg)",
+        data={"inward_raw_material_public_id": lot.public_id},
+    )
+
+
 def deliver_event(
     event: NotificationEvent, actor_name: str, build: Callable[[], Message]
 ) -> Notification | None:
-    """Save the inbox row for ``event`` and push it; ``None`` when nobody is to be told."""
+    """Save an inbox row per recipient of ``event`` and push each; the first row, or
+    ``None`` when nobody is to be told."""
     message = build()
-    if message.recipient_id is None:
-        return None
-
     spec = _SPECS[event]
     body = f"{message.subject} {spec.outcome} by {actor_name}."
-    notification = Notification.objects.create(
-        recipient_id=message.recipient_id,
-        event_type=event.value,
-        title=spec.title,
-        body=body,
-        data=message.data,
-        order_id=message.order_id,
-    )
-    # FCM data values must be strings, so the screen's data travels as a JSON string.
-    push = {
-        "type": event.value,
-        "screen": spec.screen.value,
-        "notification_id": str(notification.pk),
-        "data": json.dumps(notification.data),
-    }
-    push_to_user(message.recipient_id, spec.title, body, push)
-    return notification
+    first: Notification | None = None
+    for recipient_id in message.recipient_ids:
+        notification = Notification.objects.create(
+            recipient_id=recipient_id,
+            event_type=event.value,
+            title=spec.title,
+            body=body,
+            data=message.data,
+            order_id=message.order_id,
+        )
+        first = first or notification
+        # FCM data values must be strings, so the screen's data travels as a JSON string.
+        push = {
+            "type": event.value,
+            "screen": spec.screen.value,
+            "notification_id": str(notification.pk),
+            "data": json.dumps(notification.data),
+        }
+        push_to_user(recipient_id, spec.title, body, push)
+    return first
 
 
 def push_to_user(user_id: int, title: str, body: str, data: dict[str, str]) -> None:

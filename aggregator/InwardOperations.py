@@ -57,6 +57,7 @@ from .models import (
     StockEventDetail,
     StockEventType,
 )
+from .NotificationOperations import notify_lab_test_requested
 from .ProductOperations import assert_products_usable
 from .StockLedgerOperations import recording
 
@@ -66,20 +67,19 @@ if TYPE_CHECKING:
     from .models import OtherMaterialRecipe, Party
 
 
-# Two-way status transitions for an ``InwardRawMaterial`` lot. Editing this dict
-# is the **only** change needed to change the flips: every guard below re-reads
-# it on each call. ``Lab Testing`` is the hub -- every route into or out of a
-# dated status (``In Use``, ``Rejected``) passes through it, so ``In Use`` and
-# ``Rejected`` never transition directly into one another; a lot already in
-# use is reverted to ``Lab Testing`` first, which is where the packed-stock
-# guard lives (see ``assert_raw_lot_removable``). Entering either dated status
-# stamps ``effective_date`` with today; reverting either to ``Lab Testing``
-# clears it (see ``UpdateInwardRawMaterialView``).
+# Status transitions an **admin** may request on an ``InwardRawMaterial`` lot
+# through the status PATCH: only a *revert* back to ``Lab Testing``. Leaving
+# ``Lab Testing`` -- to ``In Use`` (Pass) or ``Rejected`` (Fail) -- is the lab
+# tester's decision alone and goes through ``LabTestingOperations``, which
+# does not consult this table. Editing this dict is the only change needed to
+# change what the PATCH accepts: every guard below re-reads it on each call.
+# ``Lab Testing`` is the hub -- ``In Use`` and ``Rejected`` never transition
+# directly into one another; a lot already in use is reverted to ``Lab
+# Testing`` first, which is where the packed-stock guard lives (see
+# ``assert_raw_lot_removable``). Entering either dated status stamps
+# ``effective_date`` with today; reverting either to ``Lab Testing`` clears it
+# (see ``UpdateInwardRawMaterialSerializer``).
 ALLOWED_RAW_STATUS_TRANSITIONS = {
-    InwardRawMaterialStatus.LAB_TESTING: (
-        InwardRawMaterialStatus.IN_USE,
-        InwardRawMaterialStatus.RAW_MATERIAL_REJECTED,
-    ),
     InwardRawMaterialStatus.IN_USE: (InwardRawMaterialStatus.LAB_TESTING,),
     InwardRawMaterialStatus.RAW_MATERIAL_REJECTED: (InwardRawMaterialStatus.LAB_TESTING,),
 }
@@ -102,6 +102,11 @@ def assert_raw_status_transition(current, requested) -> None:
     if requested not in allowed:
         current_label = InwardRawMaterialStatus(current).label
         requested_label = InwardRawMaterialStatus(requested).label
+        if current == InwardRawMaterialStatus.LAB_TESTING:
+            raise ValueError(
+                "Only a lab tester can move a lot out of Lab Testing: "
+                "a Pass makes it In Use and a Fail makes it Rejected."
+            )
         if not allowed:
             raise ValueError(
                 f"'{requested_label}' is not a valid transition from "
@@ -236,11 +241,27 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
         "effective_date": (
             entry.effective_date.isoformat() if entry.effective_date is not None else None
         ),
+        "lab_testing": lab_testing_ref(entry),
         "created_by": (
             {"id": entry.created_by_id, "name": entry.created_by.display_name}
             if entry.created_by_id is not None
             else None
         ),
+    }
+
+
+def lab_testing_ref(entry: InwardRawMaterial) -> dict | None:
+    """The ``lab_testing`` block of a lot payload; null until the lot is tested.
+
+    A lot waiting for a re-test keeps its record, with ``result`` null.
+    """
+    test = entry.lab_testing
+    if test is None:
+        return None
+    return {
+        "public_id": test.public_id,
+        "result": test.result,
+        "grow_out_test": str(test.grow_out_test),
     }
 
 
@@ -611,6 +632,7 @@ def create_raw_lot(
             created_by=actor,
         )
         rec.source = entry
+    notify_lab_test_requested(entry, actor=actor)
     return entry
 
 
@@ -624,8 +646,13 @@ def update_raw_lot(
 
     A lot an accepted return booked is refused (400): only reverting that
     return's accept moves it.
+
+    Sending a lot back to ``Lab Testing`` empties its lab test's ``result`` --
+    the inputs stay for the lab tester to correct -- and asks every lab tester
+    to test it again.
     """
     entry.refuse_return_lot_change()
+    previous = raw_status_of(entry)
     with recording(
         StockEventType.INWARD_OPERATIONS,
         StockEventDetail.RAW_LOT_IN_USE,
@@ -636,11 +663,21 @@ def update_raw_lot(
         assert_products_usable(
             [entry.product_id], field="status", action="have its inward lot changed"
         )
-        for field in ("lab_sampling_date", "effective_date", "status"):
+        for field in ("lab_sampling_date", "effective_date", "status", "lab_testing"):
             if field in values:
                 setattr(entry, field, values[field])
         entry.save()
         rec.detail = raw_status_detail(entry)
+        sent_back = (
+            previous != InwardRawMaterialStatus.LAB_TESTING
+            and raw_status_of(entry) == InwardRawMaterialStatus.LAB_TESTING
+        )
+        test = entry.lab_testing
+        if sent_back and test is not None and test.result is not None:
+            test.result = None
+            test.save(update_fields=["result", "updated_at"])
+    if sent_back:
+        notify_lab_test_requested(entry, actor=actor)
     return entry
 
 

@@ -19,6 +19,8 @@ from .CreateMultiSelectBagOrderView import CreateMultiSelectBagOrderView
 from .CropsView import CropsView
 from .DeleteFieldTripView import DeleteFieldTripView
 from .EndFieldTripView import EndFieldTripView
+from .FarmerDetailView import FarmerDetailView
+from .FarmersView import FarmersView
 from .GetChallansView import GetChallansView
 from .GetChallanView import GetChallanView
 from .GetClientsView import GetClientsView
@@ -40,6 +42,9 @@ from .GodownRawMaterialStockView import GodownRawMaterialStockView
 from .GodownSamplePacketStockView import GodownSamplePacketStockView
 from .GodownUpdateBagStockView import GodownUpdateBagStockView
 from .GodownUpdateSamplePacketStockView import GodownUpdateSamplePacketStockView
+from .LabPendingLotsView import LabPendingLotsView
+from .LabTestingDetailView import LabTestingDetailView
+from .LabTestingsView import LabTestingsView
 from .LoginView import LoginView
 from .LogoutView import LogoutView
 from .MarkNotificationsReadView import (
@@ -99,6 +104,8 @@ ROUTES: dict[str, type] = {
     "end-field-trip/<public_id>": EndFieldTripView,
     "delete-field-trip/<public_id>": DeleteFieldTripView,
     "field-trip-farmer-visits/<public_id>": GetFieldTripFarmerVisitsView,
+    "farmers": FarmersView,
+    "farmer/<public_id>": FarmerDetailView,
     "create-farmer-visit": CreateFarmerVisitView,
     "edit-farmer-visit/<public_id>": UpdateFarmerVisitView,
     "godown/raw-material-stock": GodownRawMaterialStockView,
@@ -115,4 +122,7 @@ ROUTES: dict[str, type] = {
     "godown/bag-stock": GodownBagStockView,
     "godown/sample-packet-stock": GodownSamplePacketStockView,
     "godown/product-packagings": GodownProductPackagingsView,
+    "lab/pending-lots": LabPendingLotsView,
+    "lab/lab-testings": LabTestingsView,
+    "lab/lab-testing/<public_id>": LabTestingDetailView,
 }

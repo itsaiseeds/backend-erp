@@ -39,6 +39,9 @@ from .GodownManagersView import GodownManagersView
 from .HoldOrderView import HoldOrderView
 from .InwardOtherMaterialsView import InwardOtherMaterialsView
 from .InwardRawMaterialsView import InwardRawMaterialsView
+from .LabTestersView import LabTestersView
+from .LabTestingDetailView import LabTestingDetailView
+from .LabTestingsView import LabTestingsView
 from .LogoutView import LogoutView
 from .OtherMaterialRecipesView import OtherMaterialRecipesView
 from .OtherMaterialStockView import OtherMaterialStockView
@@ -56,6 +59,7 @@ from .RevertAcceptReturnOrderView import RevertAcceptReturnOrderView
 from .RevertCustomOrderDispatchView import RevertCustomOrderDispatchView
 from .RevertDispatchView import RevertDispatchView
 from .RotateGodownManagerQrView import RotateGodownManagerQrView
+from .RotateLabTesterQrView import RotateLabTesterQrView
 from .RotateSalesPersonQrView import RotateSalesPersonQrView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
@@ -72,6 +76,7 @@ from .UpdateFieldTripView import UpdateFieldTripView
 from .UpdateGodownManagerView import UpdateGodownManagerView
 from .UpdateInwardOtherMaterialView import UpdateInwardOtherMaterialView
 from .UpdateInwardRawMaterialView import UpdateInwardRawMaterialView
+from .UpdateLabTesterView import UpdateLabTesterView
 from .UpdateOrderView import UpdateOrderView
 from .UpdateOtherMaterialTypeView import UpdateOtherMaterialTypeView
 from .UpdatePartyView import UpdatePartyView
@@ -145,6 +150,17 @@ urlpatterns = [
         name="rotate-godown-manager-qr",
     ),
     path("godown-managers", GodownManagersView.as_view(), name="godown-managers"),
+    path(
+        "lab-testers/<int:id>/rotate-qr",
+        RotateLabTesterQrView.as_view(),
+        name="rotate-lab-tester-qr",
+    ),
+    path("lab-testers", LabTestersView.as_view(), name="lab-testers"),
+    path(
+        "lab-testers/<int:id>",
+        UpdateLabTesterView.as_view(),
+        name="update-lab-tester",
+    ),
     path(
         "godown-managers/<int:id>",
         UpdateGodownManagerView.as_view(),
@@ -320,6 +336,16 @@ urlpatterns = [
         "inward-raw-materials",
         InwardRawMaterialsView.as_view(),
         name="inward-raw-materials",
+    ),
+    path(
+        "lab-testings",
+        LabTestingsView.as_view(),
+        name="lab-testings",
+    ),
+    path(
+        "lab-testing/<str:public_id>",
+        LabTestingDetailView.as_view(),
+        name="lab-testing-detail",
     ),
     path(
         "inward-raw-material/<str:public_id>",

@@ -50,6 +50,7 @@ class CreateFarmerVisitView(AndroidBaseView):
             land_area_bigha=data["land_area_bigha"],
             crops=data["crops"],
             products=data.get("products", []),
+            is_lead=data["is_lead"],
         )
         visit = farmer_visit_queryset().get(id=visit.id)
         return Response(farmer_visit_payload(visit), status=status.HTTP_201_CREATED)

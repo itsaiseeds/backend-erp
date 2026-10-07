@@ -20,6 +20,7 @@ from .FieldTrip import FieldTrip
 from .InwardEntryMixin import InwardEntryMixin
 from .InwardOtherMaterial import InwardOtherMaterial
 from .InwardRawMaterial import InwardRawMaterial, InwardRawMaterialStatus
+from .LabTesting import LabTesting, LabTestResult
 from .Notification import Notification
 from .Order import Order
 from .OrderItem import OrderItem
@@ -85,6 +86,8 @@ __all__ = [
     "InwardEntryMixin",
     "InwardRawMaterial",
     "InwardRawMaterialStatus",
+    "LabTesting",
+    "LabTestResult",
     "RawMaterialWaste",
     "ReturnOrder",
     "ReturnOrderItem",

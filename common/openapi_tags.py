@@ -34,6 +34,7 @@ ANDROID_NOTIFICATIONS = "Android · Notifications"
 ANDROID_CATALOGUE = "Android · Catalogue"
 ANDROID_FIELD_TRIPS = "Android · Field trips"
 ANDROID_GODOWN = "Android · Godown"
+ANDROID_LAB = "Android · Lab"
 ANDROID_UTILITIES = "Android · Utilities"
 DEVELOPER = "Developer tools"
 
@@ -42,7 +43,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {"name": ADMIN_AUTH, "description": "Sales-admin website sign-in and session."},
     {
         "name": ADMIN_USERS,
-        "description": "Admin, sales-person and godown-manager accounts.",
+        "description": "Admin, sales-person, godown-manager and lab-tester accounts.",
     },
     {"name": ADMIN_CLIENTS, "description": "Client records and verification."},
     {
@@ -95,6 +96,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Godown manager: inward lots, stock positions and recipes.",
     },
     {
+        "name": ANDROID_LAB,
+        "description": "Lab tester: lots waiting for a test, and submitting / editing lab tests.",
+    },
+    {
         "name": ANDROID_UTILITIES,
         "description": (
             "Look-ups for the app (either role): geography, crops, products, "
@@ -120,7 +125,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     # -- sales-admin website ------------------------------------------------
     (_route(_ADMIN, "auth"), (ADMIN_AUTH,)),
     (_route(_ADMIN_UTILITIES, "reauthenticate"), (ADMIN_AUTH,)),
-    (_route(_ADMIN, "admins", "sales-people", "godown-managers"), (ADMIN_USERS,)),
+    (_route(_ADMIN, "admins", "sales-people", "godown-managers", "lab-testers"), (ADMIN_USERS,)),
     (
         _route(_ADMIN, "client", "get-clients", "update-client", "verify-client"),
         (ADMIN_CLIENTS,),
@@ -171,6 +176,8 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "inward-other-materials",
             "raw-material-waste",
             "raw-material-wastes",
+            "lab-testing",
+            "lab-testings",
         ),
         (ADMIN_INWARD,),
     ),
@@ -255,6 +262,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     ),
     (_route(_ANDROID, "sales-person-catalogue"), (ANDROID_CATALOGUE,)),
     (_route(_ANDROID, "godown"), (ANDROID_GODOWN,)),
+    (_route(_ANDROID, "lab"), (ANDROID_LAB,)),
     (
         _route(
             _ANDROID,
