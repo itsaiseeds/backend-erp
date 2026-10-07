@@ -81,6 +81,15 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         blank=True,
         related_name="custom_orders",
     )
+    booked_for = models.ForeignKey(
+        "aggregator.ClientChildOrg",
+        verbose_name="booked for",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="custom_orders",
+        help_text="The client's child org this order was booked on behalf of.",
+    )
     special_comments = models.TextField("special comments", blank=True)
     verified_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -175,6 +184,13 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
                 errors["delivery_address"] = (
                     "Delivery address must belong to the selected client."
                 )
+
+        if (
+            self.client_id
+            and self.booked_for_id
+            and self.booked_for.client_id != self.client_id
+        ):
+            errors["booked_for"] = "Booked-for child org belongs to a different client."
 
         if self.dispatch_details_id and self.private_dispatch_details_id:
             errors["dispatch_details"] = (

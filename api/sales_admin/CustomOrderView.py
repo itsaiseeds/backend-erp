@@ -59,6 +59,11 @@ def custom_order_detail_queryset() -> QuerySet:
         "client__created_by",
         "client__verified_by",
         "delivery_address__city",
+        "booked_for__address__pincode",
+        "booked_for__address__city",
+        "booked_for__address__state",
+        "booked_for__address__country",
+        "booked_for",
     ).prefetch_related(
         Prefetch("items", queryset=CustomOrderItem.objects.select_related("product")),
         Prefetch(

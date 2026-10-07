@@ -240,6 +240,7 @@ class GetCustomOrdersView(AdminPaginatedDateRangeListView):
                 "client",
                 "client__created_by",
                 "delivery_address__city",
+                "booked_for",
             )
             .prefetch_related(
                 Prefetch(

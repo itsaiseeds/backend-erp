@@ -52,6 +52,7 @@ from aggregator.models import Order, OrderItem
 from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import order_list_payload
 from android.api.paginated_views import AndroidPaginatedDateRangeListView
+from api.client_serializers import ChildOrgSummarySerializer
 from api.order_serializers import OrderCardPackagingSerializer
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
@@ -105,6 +106,7 @@ class OrderListItemSerializer(serializers.Serializer):
     city = OrderListCitySerializer(allow_null=True)
     expected_delivery_date = serializers.DateField()
     dispatch_mode = serializers.CharField()
+    booked_for = ChildOrgSummarySerializer(allow_null=True)
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()
     item_count = serializers.IntegerField()
@@ -278,7 +280,11 @@ class GetOrdersView(AndroidPaginatedDateRangeListView):
         return (
             Order.objects.filter(created_by=request.user)
             .select_related(
-                "client", "status", "verified_by", "delivery_address__city"
+                "client",
+                "status",
+                "verified_by",
+                "delivery_address__city",
+                "booked_for",
             )
             .prefetch_related(
                 Prefetch(

@@ -55,6 +55,7 @@ from rest_framework.request import Request
 from aggregator.DispatchOperations import challan_entry_payload
 from aggregator.models import DispatchEntry, DispatchEntryItem
 from aggregator.models.Order import DISPATCH_REQUIRED_STATUS_CODES
+from api.client_serializers import ChildOrgPayloadSerializer
 from api.order_serializers import ProductRefSerializer, TransportAgencyRefSerializer
 from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import (
@@ -121,6 +122,16 @@ def challan_queryset() -> QuerySet:
     return challan_entries().select_related(
         "order__transport_agency",
         "custom_order",
+        "order__booked_for__address__pincode",
+        "order__booked_for__address__city",
+        "order__booked_for__address__state",
+        "order__booked_for__address__country",
+        "order__booked_for",
+        "custom_order__booked_for__address__pincode",
+        "custom_order__booked_for__address__city",
+        "custom_order__booked_for__address__state",
+        "custom_order__booked_for__address__country",
+        "custom_order__booked_for",
         "dispatch_details",
         "client",
         "client_address__pincode",
@@ -213,6 +224,7 @@ class DispatchChallanItemSerializer(serializers.Serializer):
     order_public_id = serializers.CharField()
     our_details = ChallanPartySerializer()
     receiver_details = ChallanReceiverSerializer()
+    booked_for = ChildOrgPayloadSerializer(allow_null=True)
     hsn_code = serializers.CharField()
     financial_year = serializers.CharField(help_text='Indian FY, e.g. "2026-2027".')
     dispatch = ChallanDispatchSerializer()
@@ -240,6 +252,7 @@ class CustomDispatchChallanItemSerializer(serializers.Serializer):
     order_type = serializers.ChoiceField(choices=["CUSTOM_ORDER"])
     our_details = ChallanPartySerializer()
     receiver_details = ChallanReceiverSerializer()
+    booked_for = ChildOrgPayloadSerializer(allow_null=True)
     hsn_code = serializers.CharField()
     financial_year = serializers.CharField(help_text='Indian FY, e.g. "2026-2027".')
     dispatch = ChallanDispatchSerializer()

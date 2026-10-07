@@ -24,6 +24,7 @@ from django.db import transaction
 
 from common.models import indian_now
 
+from .ClientChildOrgOperations import child_org_payload, child_org_summary_payload
 from .ClientOperations import (
     client_payload,
     client_summary_payload,
@@ -33,6 +34,7 @@ from .models import (
     Address,
     City,
     Client,
+    ClientChildOrg,
     CustomOrder,
     CustomOrderItem,
     DispatchDetails,
@@ -125,6 +127,7 @@ def create_custom_order(
     items: Iterable[dict],
     special_comments: str = "",
     expected_delivery_date=None,
+    booked_for: ClientChildOrg | None = None,
 ) -> CustomOrder:
     """Create a custom order and its loose-packet lines atomically.
 
@@ -163,6 +166,7 @@ def create_custom_order(
             verified_by=actor,
             verified_at=indian_now(),
             special_comments=special_comments,
+            booked_for=booked_for,
         )
         if expected_delivery_date is not None:
             order.expected_delivery_date = expected_delivery_date
@@ -452,6 +456,7 @@ DELETABLE_CUSTOM_ORDER_STATUS_CODES = frozenset({StatusIds.CONFIRMED.name})
 
 CUSTOM_ORDER_CORE_FIELDS = (
     "delivery_address",
+    "booked_for",
     "expected_delivery_date",
     "actual_delivery_date",
     "special_comments",
@@ -666,6 +671,7 @@ def custom_order_payload(order: CustomOrder) -> dict:
             order.actual_delivery_date.isoformat() if order.actual_delivery_date else None
         ),
         "special_comments": order.special_comments,
+        "booked_for": child_org_payload(order.booked_for),
         "verified_at": order.verified_at.isoformat() if order.verified_at else None,
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,
@@ -722,6 +728,7 @@ def custom_order_list_payload(order: CustomOrder) -> dict:
         "delivery_address": str(order.delivery_address),
         "city": order_city_payload(order),
         "expected_delivery_date": order.expected_delivery_date.isoformat(),
+        "booked_for": child_org_summary_payload(order.booked_for),
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,
         "item_count": len(items),

@@ -28,12 +28,14 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from aggregator.ClientChildOrgOperations import resolve_child_org
 from aggregator.CustomOrderOperations import (
     create_custom_order,
     custom_order_detail_payload,
@@ -41,6 +43,7 @@ from aggregator.CustomOrderOperations import (
 from aggregator.models import Client, ClientAddress, CustomOrder, Product
 from aggregator.models.Status import StatusIds
 from api.admin import AdminApiView
+from api.client_serializers import BookedForSerializer
 from api.custom_order_serializers import CustomOrderDetailPayloadSerializer
 
 from .CustomOrderView import custom_order_detail_queryset
@@ -179,6 +182,14 @@ class CreateCustomOrderSerializer(serializers.Serializer):
         help_text="Defaults to the day after booking.",
     )
     items = CustomOrderItemWriteSerializer(many=True)
+    booked_for = BookedForSerializer(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Optional child org the order is booked for: {id} to reuse one, or "
+            "{party_name, village_name, ...} to get-or-create it."
+        ),
+    )
 
     def validate_items(self, value: list[dict]) -> list[dict]:
         return validate_custom_order_item_list(value)
@@ -240,13 +251,20 @@ class CreateCustomOrderView(AdminApiView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        order = create_custom_order(
-            client=data["client"],
-            delivery_address=data["delivery_address"],
-            actor=request.user,
-            items=data["resolved_items"],
-            special_comments=data["special_comments"],
-            expected_delivery_date=data["expected_delivery_date"],
-        )
+        with transaction.atomic():
+            booked_for = (
+                resolve_child_org(data["client"], data["booked_for"], request.user)
+                if data.get("booked_for")
+                else None
+            )
+            order = create_custom_order(
+                client=data["client"],
+                delivery_address=data["delivery_address"],
+                actor=request.user,
+                items=data["resolved_items"],
+                special_comments=data["special_comments"],
+                expected_delivery_date=data["expected_delivery_date"],
+                booked_for=booked_for,
+            )
         order = custom_order_detail_queryset().get(pk=order.pk)
         return Response(custom_order_detail_payload(order), status=status.HTTP_201_CREATED)
