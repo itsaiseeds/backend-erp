@@ -50,6 +50,7 @@ from .models import (
     OtherMaterialRecipe,
     OtherMaterialType,
     PackedRecipeLayer,
+    PartyType,
     Product,
     RawMaterialWaste,
     Status,
@@ -166,8 +167,28 @@ def party_payload(party: Party) -> dict:
         "id": party.id,
         "name": party.name,
         "city": {"id": party.city_id, "name": party.city.name},
+        "party_type": party.party_type,
         "contact_number": party.contact_number,
     }
+
+
+def party_type_options() -> list[dict]:
+    """Every ``PartyType`` as ``{value, label}``, for pickers and filters."""
+    return [{"value": choice.value, "label": choice.label} for choice in PartyType]
+
+
+def assert_party_type(party: Party, expected: PartyType) -> None:
+    """Raise unless ``party`` supplies ``expected`` material.
+
+    A raw-material lot may only be booked against a ``RAW_MATERIAL`` party and
+    an other-material lot only against an ``OTHER_MATERIAL`` one. Raises
+    ``ValueError`` with a message an API renders as a 400.
+    """
+    if party.party_type != expected:
+        raise ValueError(
+            f"Party '{party.name}' is of type {PartyType(party.party_type).label}; "
+            f"this booking needs a party of type {PartyType(expected).label}."
+        )
 
 
 def other_material_type_payload(material_type: OtherMaterialType) -> dict:
@@ -231,6 +252,7 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
         "party": _party_ref(entry),
         "return_order": _return_order_ref(entry),
         "lot_no": entry.lot_no,
+        "farmer_name": entry.farmer_name,
         "quantity_kg": str(entry.quantity_kg),
         "status": raw_status_of(entry).value,
         "lab_sampling_date": (
@@ -611,6 +633,7 @@ def create_raw_lot(
     product: Product,
     party: Party,
     lot_no: str,
+    farmer_name: str,
     quantity_kg: Decimal,
     lab_sampling_date: date,
     actor: User,
@@ -627,6 +650,7 @@ def create_raw_lot(
             product=product,
             party=party,
             lot_no=lot_no,
+            farmer_name=farmer_name,
             quantity_kg=quantity_kg,
             lab_sampling_date=lab_sampling_date,
             created_by=actor,

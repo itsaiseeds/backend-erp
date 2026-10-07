@@ -10,6 +10,7 @@ class PartyPickerField extends StatelessWidget {
   final String? errorText;
   final bool enabled;
   final VoidCallback? onBlockedTap;
+  final bool isRawInward ;
 
   const PartyPickerField({
     super.key,
@@ -18,6 +19,7 @@ class PartyPickerField extends StatelessWidget {
     required this.onSelected,
     this.errorText,
     this.enabled = true,
+    this.isRawInward = false,
     this.onBlockedTap,
   });
 
@@ -29,7 +31,7 @@ class PartyPickerField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SearchableField<PartyModel>(
-      label: AppStrings.FIELD_PARTY,
+      label: !isRawInward ? AppStrings.FIELD_PARTY :  AppStrings.FIELD_ORGANIZER,
       hintText: AppStrings.FIELD_PARTY_HINT,
       value: value,
       items: parties,

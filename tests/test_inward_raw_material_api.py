@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 
 from aggregator import InventoryOperations, InwardOperations
-from aggregator.models import InwardRawMaterial, Party, Product, ProductPackaging
+from aggregator.models import InwardRawMaterial, Party, PartyType, Product, ProductPackaging
 from authentication.models import Admin
 from tests.common import WebApiTestCase, lab_verdict
 
@@ -47,7 +47,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
 
         cls.product = Product.objects.get(name="SAI-33")
         cls.party = Party.objects.create(
-            name="ABC Traders", city_id=1, created_by=cls.seed_admin
+            name="ABC Traders", city_id=1, party_type=PartyType.RAW_MATERIAL, created_by=cls.seed_admin
         )
 
     # -- helpers --------------------------------------------------------------
@@ -67,6 +67,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
             "product": self.product.public_id,
             "party": self.party.id,
             "lot_no": "SUP-2026-A1",
+            "farmer_name": "Test Farmer",
             "quantity_kg": "150.5",
             **overrides,
         }
@@ -115,6 +116,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(lot["product"], {"public_id": "P-I34V7RI1JPUH", "name": "SAI-33"})
         self.assertEqual(lot["party"], {"id": self.party.id, "name": "ABC Traders"})
         self.assertEqual(lot["lot_no"], "SUP-2026-A1")
+        self.assertEqual(lot["farmer_name"], "Test Farmer")
         self.assertEqual(lot["quantity_kg"], "150.500")
         self.assertEqual(lot["status"], "Lab Testing")
         self.assertEqual(lot["lab_sampling_date"], InwardOperations.today().isoformat())
@@ -125,6 +127,48 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         self.assertEqual(created.lab_sampling_date, InwardOperations.today())
         self.assertIsNone(created.effective_date)
         self.assertEqual(created.created_by_id, self.seed_admin.id)
+        self.assertEqual(created.farmer_name, "Test Farmer")
+
+        listed = self.client.get(LOTS_URL).data["results"]
+        self.assertEqual([row["farmer_name"] for row in listed], ["Test Farmer"])
+
+    def test_farmer_name_is_required_and_the_party_must_supply_raw_material(self):
+        """tests/test_inward_raw_material_api.py::InwardRawMaterialApiTest::test_farmer_name_is_required_and_the_party_must_supply_raw_material"""
+        self.login_as(self.seed_admin)
+        packer = Party.objects.create(
+            name="Packers", city_id=1, party_type=PartyType.OTHER_MATERIAL,
+            created_by=self.seed_admin,
+        )
+        no_farmer = {
+            "product": self.product.public_id,
+            "party": self.party.id,
+            "lot_no": "SUP-1",
+            "quantity_kg": "10",
+        }
+        wrong_party = (
+            "Party 'Packers' is of type Other Material; "
+            "this booking needs a party of type Raw Material."
+        )
+        for label, response, detail in (
+            (
+                "missing farmer",
+                self.client.post(LOTS_URL, no_farmer, format="json"),
+                "Farmer name is required.",
+            ),
+            ("blank farmer", self._create_lot(farmer_name="   "), "Farmer name is required."),
+            ("null farmer", self._create_lot(farmer_name=None), "Farmer name is required."),
+            ("other-material party", self._create_lot(party=packer.id), wrong_party),
+        ):
+            with self.subTest(case=label):
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST, response.content
+                )
+                self.assertEqual(response.data["detail"], detail)
+        self.assertFalse(InwardRawMaterial.objects.exists())
+
+        trimmed = self._create_lot(farmer_name="  Ramesh  ")
+        self.assertEqual(trimmed.status_code, status.HTTP_201_CREATED, trimmed.content)
+        self.assertEqual(trimmed.data["farmer_name"], "Ramesh")
 
     def test_lab_sampling_date_may_be_given_explicitly_at_create(self):
         """An explicit lab_sampling_date wins over today's default.
@@ -143,11 +187,11 @@ class InwardRawMaterialApiTest(WebApiTestCase):
         cases = [
             (
                 "missing product",
-                {"party": self.party.id, "lot_no": "SUP-1", "quantity_kg": "10"},
+                {"party": self.party.id, "lot_no": "SUP-1", "farmer_name": "Test Farmer", "quantity_kg": "10"},
             ),
             (
                 "missing party",
-                {"product": self.product.public_id, "lot_no": "SUP-1", "quantity_kg": "10"},
+                {"product": self.product.public_id, "lot_no": "SUP-1", "farmer_name": "Test Farmer", "quantity_kg": "10"},
             ),
             (
                 "missing lot_no",
@@ -160,11 +204,11 @@ class InwardRawMaterialApiTest(WebApiTestCase):
             ("negative quantity", {"quantity_kg": "-1"}),
             (
                 "unknown product",
-                {"product": "P-UNKNOWN0000", "lot_no": "SUP-1", "quantity_kg": "10"},
+                {"product": "P-UNKNOWN0000", "lot_no": "SUP-1", "farmer_name": "Test Farmer", "quantity_kg": "10"},
             ),
             (
                 "unknown party",
-                {"party": 999999, "lot_no": "SUP-1", "quantity_kg": "10"},
+                {"party": 999999, "lot_no": "SUP-1", "farmer_name": "Test Farmer", "quantity_kg": "10"},
             ),
         ]
         for label, body in cases:
@@ -424,6 +468,7 @@ class InwardRawMaterialApiTest(WebApiTestCase):
                 "product": 999999,
                 "party": 999999,
                 "lot_no": "SNEAKY-LOT",
+                "farmer_name": "Test Farmer",
                 "quantity_kg": "0.001",
                 "lab_sampling_date": "2026-09-12",
             },

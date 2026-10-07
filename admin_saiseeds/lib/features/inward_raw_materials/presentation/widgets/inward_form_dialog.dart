@@ -46,6 +46,7 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _lotNoController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
+  final TextEditingController _farmerController = TextEditingController();
 
   ProductModel? _product;
   PartyModel? _party;
@@ -67,6 +68,7 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
   void dispose() {
     _lotNoController.dispose();
     _quantityController.dispose();
+    _farmerController.dispose();
     super.dispose();
   }
 
@@ -99,6 +101,7 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
       lotNo: _lotNoController.text.trim(),
       quantityKg: _quantityController.text.trim(),
       labSamplingDate: InwardFormDialog.isoDate.format(_labSamplingDate!),
+      farmerName: _farmerController.text.trim(),
     );
 
     if (!mounted) return;
@@ -144,13 +147,21 @@ class _InwardFormDialogState extends State<InwardFormDialog> {
             const SizedBox(height: AppSpacing.md),
             PartyPickerField(
               value: _party,
-              parties: PartiesService.instance.parties,
+              isRawInward: true,
+              parties: PartiesService.instance.rawMaterialParties,
               enabled: !_isSubmitting,
               errorText: _partyError,
               onSelected: (party) => setState(() {
                 _party = party;
                 _partyError = null;
               }),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              controller: _farmerController,
+              label: AppStrings.FIELD_FARMER_NAME,
+              hint: AppStrings.FIELD_FARMER_NAME_HINT,
+              enabled: !_isSubmitting,
             ),
             const SizedBox(height: AppSpacing.md),
             AppTextField(

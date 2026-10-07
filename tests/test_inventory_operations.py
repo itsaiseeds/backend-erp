@@ -21,6 +21,7 @@ from aggregator.models import (
     InventorySnapshot,
     InwardRawMaterial,
     Party,
+    PartyType,
     Pincode,
     ProductPackaging,
     Stage,
@@ -473,10 +474,13 @@ class InventoryOperationsTest(DMLTestCase):
         """tests/test_inventory_operations.py::InventoryOperationsTest::test_lab_testing_lot_provides_no_raw_material"""
         product, pack = self._raw_pack(name="Raw Lab Testing")
         party, _ = Party.objects.get_or_create(
-            name="Raw Ops Test Party", city=self.city, defaults={"created_by": self.su}
+            name="Raw Ops Test Party", city=self.city, defaults={
+                "created_by": self.su,
+                "party_type": PartyType.RAW_MATERIAL,
+            }
         )
         InwardRawMaterial.objects.create(
-            product=product, party=party, lot_no="LOT-1", quantity_kg=Decimal("10.000"),
+            product=product, party=party, lot_no="LOT-1", farmer_name="Test Farmer", quantity_kg=Decimal("10.000"),
             created_by=self.su,
         )  # default status=lab_testing, effective_date=None
 

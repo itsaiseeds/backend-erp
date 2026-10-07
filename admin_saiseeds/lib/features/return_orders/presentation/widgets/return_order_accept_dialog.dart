@@ -284,41 +284,28 @@ class _RecipeSection extends StatelessWidget {
       );
     }
 
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SectionTitle(
-            title: AppStrings.RETURN_ORDER_ACCEPT_RECIPES_TITLE,
-            icon: Icons.layers_outlined,
-            hasRule: true,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final int index in withRecipes)
-                    _LineBlock(
-                      line: recipes.lines[index],
-                      selected: selected[index] ?? const {},
-                      onToggle: (ReturnRecipeOptionModel option, bool on) =>
-                          onToggle(
-                            lineIndex: index,
-                            line: recipes.lines[index],
-                            option: option,
-                            on: on,
-                          ),
-                    ),
-                ],
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SectionTitle(
+          title: AppStrings.RETURN_ORDER_ACCEPT_RECIPES_TITLE,
+          icon: Icons.layers_outlined,
+          hasRule: true,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final int index in withRecipes)
+          _LineBlock(
+            line: recipes.lines[index],
+            selected: selected[index] ?? const {},
+            onToggle: (ReturnRecipeOptionModel option, bool on) => onToggle(
+              lineIndex: index,
+              line: recipes.lines[index],
+              option: option,
+              on: on,
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }

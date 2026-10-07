@@ -127,7 +127,7 @@ class _OtherInwardFormDialogState extends State<OtherInwardFormDialog> {
             const SizedBox(height: AppSpacing.md),
             PartyPickerField(
               value: _party,
-              parties: PartiesService.instance.parties,
+              parties: PartiesService.instance.otherMaterialParties,
               enabled: !_isSubmitting,
               errorText: _partyError,
               onSelected: (party) => setState(() {

@@ -58,11 +58,20 @@ class _OrdersContentState extends State<_OrdersContent> {
     );
   }
 
-  void _onView(OrderModel order) {
+  Future<void> _onView(OrderModel order) async {
+    final OrdersCubit cubit = context.read<OrdersCubit>();
+
+    // The list row carries the steps' data but no return block; the detail
+    // endpoint carries the returns and delivery extras but a leaner item
+    // shape. Merge the two so neither loses anything.
+    final OrderModel? detail = await cubit.fetchOrder(order.publicId);
+    if (!mounted) return;
+    final OrderModel merged = detail == null ? order : order.mergedWithDetail(detail);
+
     OrderDetailDialog.show(
       context,
-      order,
-      cubit: context.read<OrdersCubit>(),
+      merged,
+      cubit: cubit,
       packagingsRepository: ProductPackagingsRepository(
         apiClient: context.read<ApiClient>(),
       ),

@@ -62,16 +62,31 @@ class _ReturnOrdersContentState extends State<_ReturnOrdersContent> {
     );
   }
 
-  void _onView(ReturnOrderModel returnOrder) {
-    ReturnOrderDetailDialog.show(context, returnOrder);
+  Future<void> _onView(ReturnOrderModel returnOrder) async {
+    final ReturnOrdersCubit cubit = context.read<ReturnOrdersCubit>();
+    final bool saved = await ReturnOrderDetailDialog.show(
+      context,
+      returnOrder,
+      repository: _repository,
+    );
+
+    // The dialog calls the repository itself so its own submit state is real,
+    // so the queue is refreshed here rather than through the cubit's path.
+    if (saved) await cubit.refresh();
+
+    if (!saved || !mounted) return;
+    ToastUtils.showSuccess(context, AppStrings.RETURN_ORDER_EDIT_DONE);
   }
 
   Future<void> _onEdit(ReturnOrderModel returnOrder) async {
+    final ReturnOrdersCubit cubit = context.read<ReturnOrdersCubit>();
     final bool saved = await ReturnOrderEditDialog.show(
       context,
       returnOrder: returnOrder,
       repository: _repository,
     );
+
+    if (saved) await cubit.refresh();
 
     if (!saved || !mounted) return;
     ToastUtils.showSuccess(context, AppStrings.RETURN_ORDER_EDIT_DONE);
