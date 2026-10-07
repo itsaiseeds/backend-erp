@@ -178,6 +178,8 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
             return False
         lot = rng.choice(self.lots)
         lot.refresh_from_db()
+        if lot.is_deleted:
+            return False
         current = InwardOperations.raw_status_of(lot)
         lab_testing = InwardOperations.InwardRawMaterialStatus.LAB_TESTING
         if current == lab_testing:

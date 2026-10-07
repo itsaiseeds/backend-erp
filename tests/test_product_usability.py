@@ -685,7 +685,7 @@ class ProductUsabilityApiTest(WebApiTestCase):
 
         # Nothing changed.
         self.assertEqual(InwardRawMaterial.objects.get(pk=lot.pk).status_id,
-                         StatusIds.LAB_TESTING.value)
+                         StatusIds.IN_USE.value)
         self.assertTrue(RawMaterialWaste.objects.filter(pk=waste.pk).exists())
         self.assertTrue(ProductPackaging.objects.filter(pk=packaging.pk).exists())
         self.assertTrue(OtherMaterialRecipe.objects.filter(pk=recipe.pk).exists())

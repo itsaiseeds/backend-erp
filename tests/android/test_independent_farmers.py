@@ -77,7 +77,7 @@ class IndependentFarmerApiTest(FieldTripFixtures, AndroidApiTestCase):
             with self.subTest(label):
                 response = self.client.post(
                     FARMERS_URL,
-                    self._body(contact_number="9876500102", **overrides),
+                    {**self._body(contact_number="9876500102"), **overrides},
                     format="json",
                 )
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

@@ -275,6 +275,8 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "field-trip-farmer-visits",
             "create-farmer-visit",
             "edit-farmer-visit",
+            "farmers",
+            "farmer",
         ),
         (ANDROID_FIELD_TRIPS,),
     ),
