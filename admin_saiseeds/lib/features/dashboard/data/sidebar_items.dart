@@ -30,6 +30,11 @@ class SidebarItems {
       icon: Icons.warehouse_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.LAB_TESTERS,
+      label: AppStrings.LAB_TESTERS,
+      icon: Icons.biotech_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.CLIENTS,
       label: AppStrings.CLIENTS,
       icon: Icons.storefront_outlined,
@@ -100,6 +105,11 @@ class SidebarItems {
       icon: Icons.inventory_2_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.PURCHASE_TRACKING,
+      label: AppStrings.PURCHASE_TRACKING,
+      icon: Icons.shopping_bag_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.WASTE_MANAGEMENT,
       label: AppStrings.WASTE_MANAGEMENT,
       icon: Icons.delete_sweep_outlined,
@@ -165,7 +175,11 @@ class SidebarItems {
       SidebarGroupModel(
         id: 'ops-inward',
         label: AppStrings.GROUP_INWARD,
-        itemIds: [TabIds.INWARD_RAW_MATERIALS, TabIds.OTHER_MATERIAL_INWARD],
+        itemIds: [
+          TabIds.INWARD_RAW_MATERIALS,
+          TabIds.OTHER_MATERIAL_INWARD,
+          TabIds.PURCHASE_TRACKING,
+        ],
       ),
       SidebarGroupModel(
         id: 'ops-waste',
@@ -204,7 +218,12 @@ class SidebarItems {
       SidebarGroupModel(
         id: 'setup-users',
         label: AppStrings.GROUP_USER_MANAGEMENT,
-        itemIds: [TabIds.SALES_PEOPLE, TabIds.GODOWN_MANAGERS, TabIds.ADMINS],
+        itemIds: [
+          TabIds.SALES_PEOPLE,
+          TabIds.GODOWN_MANAGERS,
+          TabIds.LAB_TESTERS,
+          TabIds.ADMINS,
+        ],
       ),
     ],
   );

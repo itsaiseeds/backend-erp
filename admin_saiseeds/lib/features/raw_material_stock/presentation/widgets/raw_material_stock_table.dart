@@ -13,6 +13,7 @@ class RawMaterialStockTable extends StatefulWidget {
   static const String COLUMN_PRODUCT = 'product';
   static const String COLUMN_INCOMING = 'incoming_kg';
   static const String COLUMN_PACKED = 'packed_kg';
+  static const String COLUMN_WASTED = 'wasted_kg';
   static const String COLUMN_REJECTED = 'rejected_kg';
   static const String COLUMN_AVAILABLE = 'available_kg';
 
@@ -66,6 +67,11 @@ class RawMaterialStockTableState extends State<RawMaterialStockTable> {
     AppDataColumn(
       id: RawMaterialStockTable.COLUMN_PACKED,
       label: AppStrings.COLUMN_PACKED_KG,
+      width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: RawMaterialStockTable.COLUMN_WASTED,
+      label: AppStrings.COLUMN_WASTED_KG,
       width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
@@ -155,6 +161,8 @@ class RawMaterialStockTableState extends State<RawMaterialStockTable> {
         return _textCell(line.incomingKg);
       case RawMaterialStockTable.COLUMN_PACKED:
         return _textCell(line.packedKg);
+      case RawMaterialStockTable.COLUMN_WASTED:
+        return _textCell(line.wastedKg);
       case RawMaterialStockTable.COLUMN_REJECTED:
         return _textCell(line.rejectedKg);
       case RawMaterialStockTable.COLUMN_AVAILABLE:

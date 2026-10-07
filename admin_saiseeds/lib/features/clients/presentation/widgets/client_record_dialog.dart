@@ -208,9 +208,12 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
     );
   }
 
+  /// GST is optional on a client -- a trader without one is still a valid
+  /// client -- but whatever is entered still has to be a real 15-character
+  /// GSTIN.
   String? _validateGst(String? value) {
     final String trimmed = value?.trim() ?? '';
-    if (trimmed.isEmpty) return AppStrings.VALIDATION_GST_REQUIRED;
+    if (trimmed.isEmpty) return null;
     if (trimmed.length != _gstLength) return AppStrings.VALIDATION_GST_INVALID;
     return null;
   }
@@ -329,7 +332,7 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
           RecordFieldRow(
             left: RecordField(
               controller: _gstController,
-              label: AppStrings.COLUMN_GST_NUMBER,
+              label: AppStrings.CLIENT_GST_FIELD_LABEL,
               hint: AppStrings.CLIENT_GST_HINT,
               isEditable: _canEdit,
               inputFormatters: [

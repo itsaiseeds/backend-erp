@@ -57,6 +57,16 @@ class FormValidators {
     return null;
   }
 
+  static String? optionalNonNegativeAmount(String? value) {
+    final String raw = (value ?? '').trim();
+    if (raw.isEmpty) return null;
+    final num? parsed = num.tryParse(raw);
+    if (parsed == null || parsed < 0) {
+      return AppStrings.VALIDATION_PRICE_INVALID;
+    }
+    return null;
+  }
+
   static String? optionalPhoneNumber(String? value) {
     final String raw = (value ?? '').trim();
     if (raw.isEmpty) return null;

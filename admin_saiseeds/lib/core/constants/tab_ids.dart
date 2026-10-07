@@ -5,6 +5,7 @@ class TabIds {
   static const String ADMINS = 'admins';
   static const String SALES_PEOPLE = 'sales-people';
   static const String GODOWN_MANAGERS = 'godown-managers';
+  static const String LAB_TESTERS = 'lab-testers';
   static const String CLIENTS = 'clients';
   static const String ORDERS = 'orders';
   static const String RETURN_ORDERS = 'return-orders';
@@ -19,6 +20,7 @@ class TabIds {
   static const String INWARD_RAW_MATERIALS = 'inward-raw-materials';
   static const String OTHER_RAW_MATERIALS = 'other-raw-materials';
   static const String OTHER_MATERIAL_INWARD = 'other-material-inward';
+  static const String PURCHASE_TRACKING = 'purchase-tracking';
   static const String WASTE_MANAGEMENT = 'waste-management';
   static const String PRODUCT_STOCK = 'product-stock';
   static const String RAW_MATERIAL_STOCK = 'raw-material-stock';

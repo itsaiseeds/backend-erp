@@ -109,13 +109,12 @@ class InwardRawMaterialModel {
 
   bool get isLabTesting => !isInUse && !isRejected;
 
-  /// The statuses this lot may move to. Lab Testing is the hub of the
-  /// workflow, so a settled lot can only revert to it, never cross over to
-  /// the other settled state.
+  /// The statuses this lot may move to. Deciding a lot is In Use or Rejected
+  /// is reserved for a future role -- the admin cannot make that call today,
+  /// only revert a settled lot back to Lab Testing. Mirrors
+  /// `InwardOperations.ALLOWED_RAW_STATUS_TRANSITIONS`.
   List<String> get allowedNextStatuses {
-    if (isLabTesting) {
-      return const [InwardStatus.IN_USE_WIRE, InwardStatus.REJECTED_WIRE];
-    }
+    if (isLabTesting) return const [];
     return const [InwardStatus.LAB_TESTING_WIRE];
   }
 

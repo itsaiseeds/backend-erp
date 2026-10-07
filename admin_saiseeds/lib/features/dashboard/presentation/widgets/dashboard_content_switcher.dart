@@ -17,11 +17,13 @@ import '../../../packet_stock/presentation/views/packet_stock_view.dart';
 import '../../../inward_raw_materials/presentation/views/inward_raw_materials_view.dart';
 import '../../../other_raw_materials/presentation/views/other_raw_materials_view.dart';
 import '../../../other_material_inward/presentation/views/other_material_inward_view.dart';
+import '../../../purchase_tracking/presentation/views/purchase_tracking_view.dart';
 import '../../../waste_management/presentation/views/waste_management_view.dart';
 import '../../../product_stock/presentation/views/product_stock_view.dart';
 import '../../../raw_material_stock/presentation/views/raw_material_stock_view.dart';
 import '../../../other_material_stock/presentation/views/other_material_stock_view.dart';
 import '../../../godown_managers/presentation/views/godown_managers_view.dart';
+import '../../../lab_testers/presentation/views/lab_testers_view.dart';
 import '../../../sales_people/presentation/views/sales_people_view.dart';
 import '../../../field_trips/presentation/views/field_trips_view.dart';
 import '../../../field_trips/presentation/views/farmers_view.dart';
@@ -51,6 +53,8 @@ class DashboardContentSwitcher {
         return const SalesPeopleView();
       case TabIds.GODOWN_MANAGERS:
         return const GodownManagersView();
+      case TabIds.LAB_TESTERS:
+        return const LabTestersView();
       case TabIds.PRODUCTS:
         return const ProductsView();
       case TabIds.PRODUCT_PACKAGINGS:
@@ -67,6 +71,8 @@ class DashboardContentSwitcher {
         return const OtherRawMaterialsView();
       case TabIds.OTHER_MATERIAL_INWARD:
         return const OtherMaterialInwardView();
+      case TabIds.PURCHASE_TRACKING:
+        return const PurchaseTrackingView();
       case TabIds.WASTE_MANAGEMENT:
         return const WasteManagementView();
       case TabIds.PRODUCT_STOCK:
