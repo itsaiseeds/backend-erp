@@ -42,16 +42,15 @@ class CreateClientSerializer(ClientListsSerializer):
     )
     gst_number = serializers.CharField(
         max_length=15,
+        required=False,
+        allow_blank=True,
+        default="",
         validators=[validate_gst_number],
-        error_messages={
-            "blank": "GST number is required.",
-            "required": "GST number is required.",
-        },
     )
 
     def validate_gst_number(self, value):
         value = value.strip().upper()
-        if Client.all_objects.filter(gst_number=value).exists():
+        if value and Client.all_objects.filter(gst_number=value).exists():
             raise serializers.ValidationError(
                 "A client with this GST number already exists."
             )

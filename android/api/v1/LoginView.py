@@ -46,6 +46,7 @@ class LoginUserSerializer(serializers.Serializer):
     is_sales_person = serializers.BooleanField()
     is_godown_manager = serializers.BooleanField()
     is_lab_tester = serializers.BooleanField()
+    is_sales_admin = serializers.BooleanField()
 
 
 class LoginResponseSerializer(serializers.Serializer):
@@ -134,6 +135,7 @@ class LoginView(APIView):
                     "is_sales_person": user.is_salesperson,
                     "is_godown_manager": user.is_godown_manager,
                     "is_lab_tester": user.is_lab_tester,
+                    "is_sales_admin": user.is_admin_user,
                 },
             }
         )

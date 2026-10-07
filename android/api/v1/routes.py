@@ -59,6 +59,7 @@ from .RegisterDeviceView import RegisterDeviceView
 from .ReturnOrderView import ReturnOrderView
 from .SalesAdminsView import SalesAdminsView
 from .SalesPersonCatalogueView import SalesPersonCatalogueView
+from .SalesPersonsView import SalesPersonsView
 from .StartFieldTripView import StartFieldTripView
 from .StatesView import StatesView
 from .UpdateClientView import UpdateClientView
@@ -81,6 +82,7 @@ ROUTES: dict[str, type] = {
     "utilities/parties": PartiesView,
     "utilities/other-material-types": OtherMaterialTypesView,
     "utilities/sales-admins": SalesAdminsView,
+    "utilities/sales-persons": SalesPersonsView,
     "analytics": AnalyticsView,
     "devices/register": RegisterDeviceView,
     "notifications": GetNotificationsView,

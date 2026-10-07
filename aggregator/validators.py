@@ -8,15 +8,15 @@ GST_NUMBER_RE = re.compile(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-
 
 
 def validate_gst_number(value):
-    """Ensure ``value`` is a syntactically valid 15-character GSTIN.
+    """Ensure ``value`` is empty or a syntactically valid 15-character GSTIN.
 
-    The value is matched case-sensitively against the standard GSTIN layout;
-    callers should upper-case it first (``Client.clean`` does).
+    GST is optional, so an empty value passes. A non-empty value is matched
+    case-sensitively against the standard GSTIN layout; callers should
+    upper-case it first (``Client.clean`` does).
     """
+    value = str(value or "").strip()
     if not value:
-        raise ValidationError("GST number is required.")
-
-    value = str(value).strip()
+        return
 
     if GST_NUMBER_RE.fullmatch(value) is None:
         raise ValidationError(

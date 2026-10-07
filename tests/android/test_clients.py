@@ -156,6 +156,31 @@ class AndroidClientApiTest(AndroidApiTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_gst_number_is_optional(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_gst_number_is_optional"""
+        omitted = self._body()
+        del omitted["gst_number"]
+        self.login_as(self.sales_person)
+
+        response = self.client.post(CREATE_CLIENT_URL, omitted, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["gst_number"], "")
+
+    def test_any_number_of_clients_may_have_no_gst(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_any_number_of_clients_may_have_no_gst"""
+        first = self._create(gst="")
+        second = self._create(gst="", actor=self.other_sales_person)
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED, second.data)
+
+    def test_an_invalid_non_blank_gst_is_still_rejected(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_an_invalid_non_blank_gst_is_still_rejected"""
+        response = self._create(gst="NOT-A-GSTIN")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_a_new_pincode_is_created_on_demand(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_a_new_pincode_is_created_on_demand"""
         response = self._create(addresses=[self._address(pincode="395009")])

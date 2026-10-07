@@ -78,6 +78,7 @@ TOKEN_SALESPERSON = "token:salesperson"
 TOKEN_GODOWN = "token:godown"
 TOKEN_LAB = "token:lab"
 TOKEN_ANDROID = "token:android"  # either Android role
+TOKEN_ANDROID_ADMIN = "token:androidadmin"  # an Android role AND an Admin profile
 
 _SCHEME_BASES = {"session": AdminApiView, "token": AndroidTokenView}
 _SCHEME_AUTHENTICATORS = {
@@ -93,15 +94,17 @@ _ROLE_FLAG_NAMES = (
     "android_role_required",
 )
 _ROLE_FLAGS = {
-    role: {name: name == flag for name in _ROLE_FLAG_NAMES}
-    for role, flag in {
-        "auth": None,
-        "admin": "admin_required",
-        "superuser": "superuser_required",
-        "salesperson": "salesperson_required",
-        "godown": "godown_manager_required",
-        "lab": "lab_tester_required",
-        "android": "android_role_required",
+    role: {name: name in flags for name in _ROLE_FLAG_NAMES}
+    for role, flags in {
+        "auth": (),
+        "admin": ("admin_required",),
+        "superuser": ("superuser_required",),
+        "salesperson": ("salesperson_required",),
+        "godown": ("godown_manager_required",),
+        "android": ("android_role_required",),
+        "lab": ("lab_tester_required",),
+        # An admin who also holds an Android role (the app's admin-only look-ups).
+        "androidadmin": ("android_role_required", "admin_required"),
     }.items()
 }
 
@@ -154,6 +157,7 @@ EXPECTED_CONTRACTS = {
     "android/api/v1/utilities/parties": ("PartiesView", TOKEN_ANDROID),
     "android/api/v1/utilities/other-material-types": ("OtherMaterialTypesView", TOKEN_ANDROID),
     "android/api/v1/utilities/sales-admins": ("SalesAdminsView", TOKEN_ANDROID),
+    "android/api/v1/utilities/sales-persons": ("SalesPersonsView", TOKEN_ANDROID_ADMIN),
     "android/api/v1/godown/raw-material-stock": ("GodownRawMaterialStockView", TOKEN_GODOWN),
     "android/api/v1/godown/other-material-stock": (
         "GodownOtherMaterialStockView",

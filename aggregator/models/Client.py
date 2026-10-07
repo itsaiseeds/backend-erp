@@ -40,8 +40,10 @@ class Client(
     gst_number = models.CharField(
         "GST number",
         max_length=15,
-        unique=True,
+        blank=True,
+        default="",
         validators=[validate_gst_number],
+        help_text="Optional. A missing GST is stored as an empty string.",
     )
     status = models.ForeignKey(
         "aggregator.Status",
@@ -64,6 +66,13 @@ class Client(
         verbose_name = "client"
         verbose_name_plural = "clients"
         ordering = ["company_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["gst_number"],
+                condition=~models.Q(gst_number=""),
+                name="uniq_client_gst_number_nonblank",
+            )
+        ]
 
     def __str__(self):
         return self.company_name
