@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from api.client_serializers import ClientPayloadSerializer
+from api.client_serializers import ChildOrgPayloadSerializer, ClientPayloadSerializer
 from api.return_order_serializers import ReturnOrderPayloadSerializer
 
 
@@ -106,6 +106,7 @@ class OrderDetailPayloadSerializer(serializers.Serializer):
     special_comments = serializers.CharField(allow_blank=True)
     transport_agency = TransportAgencyRefSerializer(allow_null=True)
     dispatch_mode = serializers.ChoiceField(choices=["AGENCY", "PRIVATE"])
+    booked_for = ChildOrgPayloadSerializer(allow_null=True)
     verified_at = serializers.DateTimeField(allow_null=True)
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()

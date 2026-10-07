@@ -78,6 +78,7 @@ graph TD
         TA["TransportAgency"]
         CON["Contact"]
         CA["ClientAddress (link)"]
+        CCO["ClientChildOrg<br/>(booked-for party of a client)"]
         CC["ClientContact (link)"]
         CTA["ClientTransportAgency (link)"]
         PROD["Product<br/>(public_id P-…)"]
@@ -94,6 +95,9 @@ graph TD
         COI["CustomOrderItem<br/>(product + packet_weight + packets)"]
 
         CL --> CA --> ADDR
+        CL --> CCO --> ADDR
+        CCO -.->|booked_for| ORD
+        CCO -.->|booked_for| CORD
         CL --> CC --> CON
         CL --> CTA --> TA
         CL --> STATUS
@@ -284,6 +288,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `FarmerVisit` | `aggregator/models/FarmerVisit.py` | One farmer met on a `FieldTrip` (`FV-…`): name, 10-digit `contact_number` (unique per trip), `village` (defaults to the trip's), `land_area_bigha`, `is_lead` (default false). A visit, not a farmer master record. Recorded only while the trip is IN_PROGRESS — or with no trip at all (`field_trip` null) as an *independent farmer* owned by `created_by`, unique per sales person + contact (`docs/prd/independent-farmers.md`). `uses_our_products` is derived from its `FarmerVisitProduct` rows, never stored | FK → `FieldTrip` (nullable); 1:N → `FarmerVisitCrop`, `FarmerVisitProduct` |
 | `FarmerVisitCrop` / `FarmerVisitProduct` | `aggregator/models/FarmerVisitCrop.py`, `FarmerVisitProduct.py` | Link rows: the crops a visited farmer grows (at least one) and our products they use (none = does not use ours) | FK → `FarmerVisit`, `Crop` / `Product` |
 | `Client` | `aggregator/models/Client.py` | Customer company (`C-…`); verification statuses limited to `StatusIds.client_statuses()`. Created by a sales person as `VERIFICATION_PENDING`, approved by an admin through `/api/sales-admin/verify-client/`. Always carries at least one address, contact and transport agency, each list with exactly one primary | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
+| `ClientChildOrg` | `aggregator/models/ClientChildOrg.py` | A downstream party a client books orders on behalf of ("booked for"): `party_name`, `village_name`, `address`, optional `transport_name` / `contact_number`; unique per client on case-insensitive (party, village). Integer `id`, no public id. Created only by order booking (`ClientChildOrgOperations.resolve_child_org`, get-or-create); never edited. Its address is informational — the order's `delivery_address` stays a client address | FK → `Client`, `Address`; referenced by `Order.booked_for` / `CustomOrder.booked_for` (nullable) |
 
 ### Reusable bases — common
 

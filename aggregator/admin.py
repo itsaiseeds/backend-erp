@@ -22,6 +22,7 @@ from .models import (
     City,
     Client,
     ClientAddress,
+    ClientChildOrg,
     ClientContact,
     ClientTransportAgency,
     Contact,
@@ -367,6 +368,23 @@ class ClientAddressAdmin(SoftDeleteModelAdmin):
     list_select_related = ("client", "address")
 
 
+@admin.register(ClientChildOrg)
+class ClientChildOrgAdmin(SoftDeleteModelAdmin):
+    """Children are created by order booking; the admin is for lookup."""
+
+    list_display = (
+        "party_name",
+        "village_name",
+        "client",
+        "transport_name",
+        "contact_number",
+        "created_at",
+    )
+    search_fields = ("party_name", "village_name", "client__company_name")
+    autocomplete_fields = ("client", "address")
+    list_select_related = ("client",)
+
+
 @admin.register(ClientContact)
 class ClientContactAdmin(SoftDeleteModelAdmin):
     list_display = ("client", "contact", "role", "is_primary", "created_at")
@@ -668,6 +686,7 @@ class OrderAdmin(SoftDeleteParentAdmin):
         "status",
         "dispatch_details",
         "private_dispatch_details",
+        "booked_for",
     )
     list_select_related = ("client", "status")
     inlines = (OrderItemInline,)
@@ -849,6 +868,7 @@ class CustomOrderAdmin(StockLedgerAdminMixin, SoftDeleteParentAdmin):
         "status",
         "dispatch_details",
         "private_dispatch_details",
+        "booked_for",
         "verified_by",
     )
     list_select_related = ("client", "status", "verified_by")

@@ -145,6 +145,9 @@ DELETE FROM public.aggregator_rawmaterialwaste;
 -- Non-stock inward (consumables, linked to nothing).
 DELETE FROM public.aggregator_nonstockinward;
 
+-- Child orgs orders were booked for; after the orders that point at them.
+DELETE FROM public.aggregator_clientchildorg;
+
 -- The client's own lists, all keyed on aggregator_client.
 DELETE FROM public.aggregator_clientaddress;
 DELETE FROM public.aggregator_clientcontact;
@@ -255,6 +258,7 @@ DECLARE
         'aggregator_labtesting',
         'aggregator_rawmaterialwaste',
         'aggregator_nonstockinward',
+        'aggregator_clientchildorg',
         'aggregator_clientaddress',
         'aggregator_clientcontact',
         'aggregator_clienttransportagency',

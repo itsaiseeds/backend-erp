@@ -14,11 +14,13 @@ from django.db import transaction
 
 from common.models import indian_now
 
+from .ClientChildOrgOperations import child_org_payload, child_org_summary_payload
 from .ClientOperations import client_payload, client_summary_payload, order_city_payload
 from .models import (
     Address,
     City,
     Client,
+    ClientChildOrg,
     DispatchDetails,
     Order,
     OrderItem,
@@ -52,6 +54,7 @@ def create_order(
     special_comments: str = "",
     expected_delivery_date=None,
     transport_agency: TransportAgency | None = None,
+    booked_for: ClientChildOrg | None = None,
 ) -> Order:
     """Create an order and its items atomically.
 
@@ -63,6 +66,9 @@ def create_order(
     ``transport_agency`` must be one of the client's own agencies (``Order.clean``
     enforces it). Leave it ``None`` for a private, own-vehicle dispatch -- the
     default assumption.
+
+    ``booked_for`` is the client's child org the order is booked on behalf of
+    (``Order.clean`` checks it belongs to the client).
 
     Refused (400) when any line's product is not usable.
     """
@@ -80,6 +86,7 @@ def create_order(
         created_by=actor,
         special_comments=special_comments,
         transport_agency=transport_agency,
+        booked_for=booked_for,
     )
     if expected_delivery_date is not None:
         order.expected_delivery_date = expected_delivery_date
@@ -731,6 +738,7 @@ def order_payload(order: Order) -> dict:
             else None
         ),
         "dispatch_mode": "AGENCY" if order.transport_agency_id else "PRIVATE",
+        "booked_for": child_org_payload(order.booked_for),
         "verified_at": order.verified_at.isoformat() if order.verified_at else None,
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,
@@ -799,6 +807,7 @@ def order_list_payload(order: Order) -> dict:
         "city": {"id": city.id, "name": city.name} if city else None,
         "expected_delivery_date": order.expected_delivery_date.isoformat(),
         "dispatch_mode": "AGENCY" if order.transport_agency_id else "PRIVATE",
+        "booked_for": child_org_summary_payload(order.booked_for),
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,
         "item_count": len(items),
@@ -841,6 +850,7 @@ def order_detail_payload(order: Order) -> dict:
 ORDER_CORE_FIELDS = (
     "delivery_address",
     "transport_agency",
+    "booked_for",
     "expected_delivery_date",
     "actual_delivery_date",
     "special_comments",

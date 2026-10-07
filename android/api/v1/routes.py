@@ -10,6 +10,7 @@ from __future__ import annotations
 from .AnalyticsView import AnalyticsView
 from .CitiesView import CitiesView
 from .ClientAddressesView import ClientAddressesView
+from .ClientChildOrgsView import ClientChildOrgsView
 from .ClientTransportAgenciesView import ClientTransportAgenciesView
 from .CountriesView import CountriesView
 from .CreateClientView import CreateClientView
@@ -76,6 +77,7 @@ ROUTES: dict[str, type] = {
     "utilities/states": StatesView,
     "utilities/cities": CitiesView,
     "utilities/client-addresses": ClientAddressesView,
+    "utilities/client-children": ClientChildOrgsView,
     "utilities/client-transport-agencies": ClientTransportAgenciesView,
     "utilities/crops": CropsView,
     "utilities/products": ProductsView,

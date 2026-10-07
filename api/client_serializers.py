@@ -60,6 +60,81 @@ class ClientAddressSerializer(serializers.Serializer):
     is_primary = serializers.BooleanField(required=False, default=False)
 
 
+class ChildOrgAddressSerializer(serializers.Serializer):
+    """The address of a new child org: a client address without label / primary."""
+
+    line_1 = serializers.CharField(
+        max_length=255,
+        error_messages={
+            "blank": "Address line 1 is required.",
+            "required": "Address line 1 is required.",
+        },
+    )
+    line_2 = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    pincode = serializers.CharField(
+        max_length=10,
+        error_messages={
+            "blank": "Pincode is required.",
+            "required": "Pincode is required.",
+        },
+    )
+    city = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        error_messages={"required": "City is required."},
+    )
+    state = serializers.PrimaryKeyRelatedField(
+        queryset=State.objects.all(),
+        error_messages={"required": "State is required."},
+    )
+    country = serializers.PrimaryKeyRelatedField(
+        queryset=Country.objects.all(),
+        error_messages={"required": "Country is required."},
+    )
+
+
+class BookedForSerializer(serializers.Serializer):
+    """The optional ``booked_for`` object on the order write endpoints.
+
+    Either ``id`` (reuse a child) or ``party_name`` + ``village_name``
+    (get-or-create). An address -- ``client_address_id`` or ``address``, never
+    both -- is needed only when a new child is created. No field declares a
+    default: the resolver compares only the fields that were actually sent.
+    """
+
+    id = serializers.IntegerField(required=False)
+    party_name = serializers.CharField(max_length=255, required=False)
+    village_name = serializers.CharField(max_length=255, required=False)
+    client_address_id = serializers.IntegerField(
+        required=False,
+        help_text="A ClientAddress link id of the order's client.",
+    )
+    address = ChildOrgAddressSerializer(required=False)
+    transport_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
+    contact_number = serializers.CharField(
+        max_length=10,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        validators=[validate_phone_number],
+    )
+
+    def validate(self, attrs):
+        if "id" not in attrs:
+            if not attrs.get("party_name", "").strip() or not attrs.get(
+                "village_name", ""
+            ).strip():
+                raise serializers.ValidationError(
+                    "booked_for needs either an id, or both party_name and village_name."
+                )
+        if "client_address_id" in attrs and "address" in attrs:
+            raise serializers.ValidationError(
+                "Send either client_address_id or address in booked_for, not both."
+            )
+        return attrs
+
+
 class ClientContactSerializer(serializers.Serializer):
     """One contact person of a client."""
 
@@ -192,3 +267,22 @@ class ClientPayloadSerializer(serializers.Serializer):
     addresses = ClientAddressPayloadSerializer(many=True)
     contacts = ClientContactPayloadSerializer(many=True)
     transport_agencies = ClientTransportAgencyPayloadSerializer(many=True)
+
+
+class ChildOrgPayloadSerializer(serializers.Serializer):
+    """Output shape for a child org in full (schema only)."""
+
+    id = serializers.IntegerField()
+    party_name = serializers.CharField()
+    village_name = serializers.CharField()
+    transport_name = serializers.CharField(allow_blank=True)
+    contact_number = serializers.CharField(allow_null=True)
+    address = serializers.DictField(help_text="Same shape as a client address, minus link fields.")
+
+
+class ChildOrgSummarySerializer(serializers.Serializer):
+    """Output shape for a child org on a list row (schema only)."""
+
+    id = serializers.IntegerField()
+    party_name = serializers.CharField()
+    village_name = serializers.CharField()

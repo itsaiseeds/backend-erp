@@ -446,6 +446,38 @@ Two traps that constraint sets, both handled in `sync_order_items`:
   is the shared bypass for every API-maintained table -- it still records
   `deleted_by`, and skips only the permission gate.
 
+## Booked-for child orgs
+
+A client may book orders on behalf of downstream parties ("child orgs",
+`aggregator.ClientChildOrg`). The four order write endpoints --
+Android `create-multi-select-bag-order`, admin `create-custom-order`,
+`edit-order/<id>` and `edit-custom-order/<id>` -- accept an optional
+`booked_for` object:
+
+- `{"id": 7}` reuses a child of this client (another client's id is a 400);
+- `{"party_name", "village_name", ...}` is **get-or-create**: matched on
+  `(client, party_name, village_name)` ignoring case and surrounding
+  whitespace. A match must agree with every other field that was sent
+  (`transport_name`, `contact_number`, `client_address_id` or `address`),
+  otherwise 400 and nothing is written. No match creates the child, which needs
+  exactly one of `client_address_id` (a link id of the parent) or `address`
+  (the `ClientAddressSerializer` shape without `label` / `is_primary`).
+
+Absent or `null` on create means no child. On the edit endpoints an absent key
+leaves `booked_for` unchanged, `null` clears it, an object sets it; the usual
+status gates apply. The child is resolved inside the caller's transaction, so a
+failed order never leaves one behind. The child's address is **not** the
+delivery address -- `client_address_id` stays required.
+
+Pickers (no CRUD exists): Android `GET utilities/client-children` (scoped like
+`utilities/client-addresses`) and web `GET /api/utilities/client-children`
+(admin only), both `?client_public_id=`.
+
+Responses gain a nullable `booked_for` key: the full child
+(`{id, party_name, village_name, transport_name, contact_number, address}`) on
+details, exports and challans (next to `receiver_details`), the short
+`{id, party_name, village_name}` on list rows.
+
 ## Field trips
 
 A sales person plans a trip to one village (`city` + free-text `village`,
