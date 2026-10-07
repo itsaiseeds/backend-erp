@@ -11,7 +11,13 @@ not read here. A lot's recency is the latest ``created_at`` of any live line tha
 carries it, so re-using a lot moves it back to the top and a lot nobody has
 dispatched in a while drops off the end of the ``limit``.
 
-* ``?limit=<n>`` -- how many to return; default 10, at most 50.
+Lots are listed across **all** products, each row naming the product it was used
+for (a bag line's product comes from its packaging, a loose line's from its own
+``product``). Rows are grouped by ``(lot_number, product)``, so a lot used for
+two products appears twice.
+
+* ``?limit=<n>`` -- how many lots to return **per product**; default 20, at
+  most 100.
 * ``?q=<text>`` -- keep only lot numbers starting with this text
   (case-insensitive), for type-ahead.
 """
@@ -19,6 +25,7 @@ dispatched in a while drops off the end of the ``limit``.
 from __future__ import annotations
 
 from django.db.models import Max
+from django.db.models.functions import Coalesce
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers
 from rest_framework.request import Request
@@ -35,6 +42,8 @@ class DispatchLotNumberSerializer(serializers.Serializer):
     """Output shape for one recently used lot number (schema only)."""
 
     lot_number = serializers.CharField()
+    product_id = serializers.IntegerField()
+    product_name = serializers.CharField()
     last_used_at = serializers.DateTimeField()
 
 
@@ -45,21 +54,43 @@ class DispatchLotNumbersSerializer(serializers.Serializer):
 
 
 def recent_dispatch_lot_numbers(limit: int, prefix: str = "") -> list[dict]:
-    """The ``limit`` most recently dispatched lot numbers, newest first.
+    """The ``limit`` most recently dispatched lots of *each* product, newest first.
 
     ``DispatchEntryItem``'s default manager already hides soft-deleted lines.
-    The ``lot_number`` tiebreak keeps the order stable when two lots share a
-    timestamp.
+    The ``lot_number``/``product_id`` tiebreaks keep the order stable when two
+    rows share a timestamp. Grouped rows are bounded by the distinct
+    ``(lot, product)`` pairs ever dispatched, so the per-product cut is made
+    here rather than with a window function.
     """
-    rows = DispatchEntryItem.objects.exclude(lot_number="")
+    rows = DispatchEntryItem.objects.exclude(lot_number="").annotate(
+        lot_product_id=Coalesce("product_packaging__product_id", "product_id"),
+        lot_product_name=Coalesce(
+            "product_packaging__product__name", "product__name"
+        ),
+    )
     if prefix:
         rows = rows.filter(lot_number__istartswith=prefix)
     rows = (
-        rows.values("lot_number")
+        rows.values("lot_number", "lot_product_id", "lot_product_name")
         .annotate(last_used_at=Max("created_at"))
-        .order_by("-last_used_at", "lot_number")[:limit]
+        .order_by("-last_used_at", "lot_number", "lot_product_id")
     )
-    return list(rows)
+    taken: dict[int, int] = {}
+    results = []
+    for row in rows:
+        product_id = row["lot_product_id"]
+        if taken.get(product_id, 0) >= limit:
+            continue
+        taken[product_id] = taken.get(product_id, 0) + 1
+        results.append(
+            {
+                "lot_number": row["lot_number"],
+                "product_id": product_id,
+                "product_name": row["lot_product_name"],
+                "last_used_at": row["last_used_at"],
+            }
+        )
+    return results
 
 
 def _parse_limit(raw: str | None) -> int:
@@ -88,7 +119,10 @@ class GetDispatchLotNumbersView(AdminApiView):
             OpenApiParameter(
                 "limit",
                 int,
-                description=f"Entries to return (default {DEFAULT_LIMIT}, max {MAX_LIMIT}).",
+                description=(
+                    f"Lots to return per product (default {DEFAULT_LIMIT}, "
+                    f"max {MAX_LIMIT})."
+                ),
             ),
             OpenApiParameter(
                 "q", str, description="Only lot numbers starting with this text."

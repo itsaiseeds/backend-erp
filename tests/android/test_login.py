@@ -67,6 +67,7 @@ class AndroidLoginTest(AndroidApiTestCase):
             response.data["user"]["phone_number"], self.salesperson.user.phone_number
         )
         self.assertEqual(response.data["user"]["role"], "salesperson")
+        self.assertIs(response.data["user"]["is_sales_admin"], False)
         # Session-only surfaces stay untouched.
         self.assertNotIn("sessionid", response.cookies)
 

@@ -25,6 +25,7 @@ from rest_framework.response import Response
 from aggregator.AddressOperations import address_payload
 from aggregator.models import Client
 from android.api.base import AndroidSharedView
+from android.api.sales_person_scope import sales_person_from_query
 
 CLIENT_PUBLIC_ID_PARAM = OpenApiParameter(
     "client_public_id",
@@ -32,6 +33,14 @@ CLIENT_PUBLIC_ID_PARAM = OpenApiParameter(
     OpenApiParameter.QUERY,
     required=True,
     description="Public id of one of your clients, e.g. C-E79QA0E2OIHF.",
+)
+
+SALES_PERSON_ID_PARAM = OpenApiParameter(
+    "sales_person_id",
+    OpenApiTypes.INT,
+    OpenApiParameter.QUERY,
+    required=False,
+    description="Admin only: read this sales person's client instead of your own.",
 )
 
 
@@ -69,6 +78,8 @@ class ClientPublicIdQuerySerializer(serializers.Serializer):
 def client_of_caller(request: Request) -> Client:
     """The caller's client named by ``?client_public_id=``, or a 404.
 
+    An admin may add ``?sales_person_id=`` to read that sales person's client.
+
     Shared by the two client-scoped link pickers, which differ only in which
     list they read off the client.
     """
@@ -77,7 +88,7 @@ def client_of_caller(request: Request) -> Client:
     return get_object_or_404(
         Client.objects.all(),
         public_id=params.validated_data["client_public_id"],
-        created_by=request.user,
+        created_by=sales_person_from_query(request),
     )
 
 
@@ -97,7 +108,7 @@ class ClientAddressesView(AndroidSharedView):
     @extend_schema(
         operation_id="android_api_v1_utilities_client_addresses",
         summary="List a client's address links (delivery address picker)",
-        parameters=[CLIENT_PUBLIC_ID_PARAM],
+        parameters=[CLIENT_PUBLIC_ID_PARAM, SALES_PERSON_ID_PARAM],
         responses={200: ClientAddressLinkSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:

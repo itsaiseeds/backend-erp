@@ -29,6 +29,7 @@ class AndroidReauthenticateUserSerializer(serializers.Serializer):
     role = serializers.CharField()
     is_sales_person = serializers.BooleanField()
     is_godown_manager = serializers.BooleanField()
+    is_sales_admin = serializers.BooleanField()
 
 
 class AndroidReauthenticateResponseSerializer(serializers.Serializer):
@@ -56,6 +57,7 @@ class ReauthenticateView(AndroidSharedView):
                     "role": user.role,
                     "is_sales_person": user.is_salesperson,
                     "is_godown_manager": user.is_godown_manager,
+                    "is_sales_admin": user.is_admin_user,
                 },
             }
         )

@@ -46,8 +46,8 @@ LinkT = TypeVar("LinkT", ClientAddress, ClientContact, ClientTransportAgency)
 def create_client(
     *,
     company_name: str,
-    gst_number: str,
     actor: User,
+    gst_number: str = "",
     company_phone: str = "",
 ) -> Client:
     """Create a client owned by ``actor`` (a sales person), pending verification."""
@@ -444,11 +444,11 @@ def sync_client_transport_agencies(
 def create_client_with_details(
     *,
     company_name: str,
-    gst_number: str,
     addresses: list[dict],
     contacts: list[dict],
     transport_agencies: list[dict],
     actor: User,
+    gst_number: str = "",
     company_phone: str = "",
 ) -> Client:
     """Create a pending client together with its three mandatory lists."""
