@@ -62,7 +62,10 @@ class AdminUpdateClientSerializer(ClientListsSerializer):
         validators=[validate_phone_number],
     )
     gst_number = serializers.CharField(
-        max_length=15, required=False, validators=[validate_gst_number]
+        max_length=15,
+        required=False,
+        allow_blank=True,
+        validators=[validate_gst_number],
     )
     addresses = ClientAddressSerializer(many=True, required=False)
     contacts = ClientContactSerializer(many=True, required=False)

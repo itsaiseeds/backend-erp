@@ -80,6 +80,22 @@ class ClientModelTest(DMLTestCase):
         with self.assertRaises(ValidationError):
             create_client(company_name="Bad", gst_number="INVALID", actor=self.sp_user)
 
+    def test_clients_without_gst_may_coexist(self):
+        """tests/test_client_model.py::ClientModelTest::test_clients_without_gst_may_coexist"""
+        first = create_client(company_name="No GST One", actor=self.sp_user)
+        second = create_client(company_name="No GST Two", actor=self.sp_user)
+        assert first.gst_number == second.gst_number == ""
+
+    def test_duplicate_non_blank_gst_rejected(self):
+        """tests/test_client_model.py::ClientModelTest::test_duplicate_non_blank_gst_rejected"""
+        create_client(
+            company_name="One", gst_number="27AAPFU0939F1ZV", actor=self.sp_user
+        )
+        with self.assertRaises(ValidationError):
+            create_client(
+                company_name="Two", gst_number="27AAPFU0939F1ZV", actor=self.sp_user
+            )
+
     def test_non_salesperson_creator_rejected(self):
         """tests/test_client_model.py::ClientModelTest::test_non_salesperson_creator_rejected"""
         with self.assertRaises(ValidationError):
