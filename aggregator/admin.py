@@ -1,6 +1,8 @@
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
+from django.http import Http404, HttpResponseRedirect
 from rest_framework.serializers import ValidationError as DRFValidationError
 
 from common.admin import AUDIT_FIELDS, SoftDeleteModelAdmin
@@ -8,7 +10,13 @@ from common.models import indian_now
 from common.storage import delete_image, upload_image
 
 from .CustomOrderOperations import assert_loose_stock_covers
-from .InwardOperations import raw_status_detail
+from .InwardOperations import locked_raw_lot, raw_status_detail
+from .LabTestingOperations import (
+    VALUE_FIELDS,
+    locked_lot_for_test,
+    submit_lab_test,
+    update_lab_test,
+)
 from .models import (
     Address,
     City,
@@ -31,6 +39,7 @@ from .models import (
     InventorySnapshot,
     InwardOtherMaterial,
     InwardRawMaterial,
+    LabTesting,
     LooseStockSnapshot,
     NonStockInward,
     Notification,
@@ -943,9 +952,155 @@ class InwardRawMaterialAdmin(
     )
     list_filter = ("status", "effective_date")
     autocomplete_fields = ("product", "party", "status")
+    # Set only by a lab tester's verdict (LabTestingOperations), never relinked by hand.
+    readonly_fields = ("lab_testing",)
     list_select_related = ("product", "party", "status")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
+
+
+class LabTestingAdminForm(forms.ModelForm):
+    """Add/edit form of a lab test. ``inward_raw_material`` exists only on add: it
+    names the lot being tested (a lot has no forward link from its test)."""
+
+    inward_raw_material = forms.ModelChoiceField(
+        label="Inward raw material",
+        queryset=InwardRawMaterial.objects.none(),
+        required=False,
+        help_text="A lot in Lab Testing that has not been tested yet.",
+    )
+
+    class Meta:
+        model = LabTesting
+        fields = (
+            "number_of_plants",
+            "female_count",
+            "ot_count",
+            "result",
+            "comment",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "inward_raw_material" in self.fields:
+            self.fields["inward_raw_material"].required = True
+            self.fields["inward_raw_material"].queryset = InwardRawMaterial.objects.filter(
+                is_deleted=False,
+                status_id=StatusIds.LAB_TESTING.value,
+                lab_testing__isnull=True,
+                return_order__isnull=True,
+            ).select_related("product", "party")
+        if self.instance.pk is None:
+            self.fields["result"].required = True
+
+
+@admin.register(LabTesting)
+class LabTestingAdmin(SoftDeleteModelAdmin):
+    """Superuser-only. A verdict moves its lot's status and the stock ledger, so
+    every save goes through ``LabTestingOperations`` (the same code as the lab
+    tester's API) rather than writing the row directly; a refused save (e.g. a
+    Pass -> Fail on packed stock) is shown as an error message, nothing is saved."""
+
+    form = LabTestingAdminForm
+    list_display = (
+        "public_id",
+        "inward_raw_material",
+        "result",
+        "number_of_plants",
+        "female_count",
+        "ot_count",
+        "tested_by",
+        "tested_at",
+    )
+    search_fields = ("public_id", "inward_raw_material__public_id", "inward_raw_material__lot_no")
+    list_filter = ("result",)
+    list_select_related = ("tested_by", "inward_raw_material")
+    ordering = ("-tested_at",)
+    # The audit columns are never typed here: the soft-delete state is the delete action's.
+    readonly_audit_fields = AUDIT_FIELDS
+
+    _lot_related = (
+        "product",
+        "party",
+        "status",
+        "created_by",
+        "return_order__order",
+        "lab_testing__tested_by",
+    )
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def get_fields(self, request, obj=None):
+        inputs = ("number_of_plants", "female_count", "ot_count", "result", "comment")
+        if obj is None:
+            return ("inward_raw_material", *inputs)
+        return ("lot", *inputs, "tested_by", "tested_at")
+
+    def get_readonly_fields(self, request, obj=None):
+        return (*super().get_readonly_fields(request, obj), "lot", "tested_by", "tested_at")
+
+    @admin.display(description="Inward raw material")
+    def lot(self, obj):
+        return obj.inward_raw_material if obj is not None else None
+
+    def save_model(self, request, obj, form, change):
+        data = form.cleaned_data
+        values = {
+            field: data[field]
+            for field in (*VALUE_FIELDS, "result")
+            if field in data and (field != "result" or data[field])
+        }
+        request._lab_testing_failed = False
+        try:
+            with transaction.atomic():
+                if change:
+                    lot = locked_lot_for_test(
+                        InwardRawMaterial.objects.select_related(*self._lot_related),
+                        obj.public_id,
+                    )
+                    update_lab_test(lot, values, request.user)
+                else:
+                    lot = locked_raw_lot(
+                        InwardRawMaterial.objects.select_related(*self._lot_related),
+                        data["inward_raw_material"].public_id,
+                    )
+                    obj.pk = submit_lab_test(lot, values, request.user).pk
+        except (DjangoValidationError, Http404) as exc:
+            request._lab_testing_failed = True
+            reason = " ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
+            self.message_user(request, reason, level=messages.ERROR)
+            return
+        obj.refresh_from_db()
+        obj._state.adding = False
+
+    def _refused(self, request) -> bool:
+        return getattr(request, "_lab_testing_failed", False)
+
+    # A refused save wrote nothing: no log entry, no "saved" message, back to the form.
+    def log_addition(self, request, obj, message):
+        if not self._refused(request):
+            return super().log_addition(request, obj, message)
+
+    def log_change(self, request, obj, message):
+        if not self._refused(request):
+            return super().log_change(request, obj, message)
+
+    def response_add(self, request, obj, post_url_continue=None):
+        if self._refused(request):
+            return HttpResponseRedirect(request.path)
+        return super().response_add(request, obj, post_url_continue)
+
+    def response_change(self, request, obj):
+        if self._refused(request):
+            return HttpResponseRedirect(request.path)
+        return super().response_change(request, obj)
 
 
 @admin.register(RawMaterialWaste)
@@ -1094,9 +1249,11 @@ class FarmerVisitAdmin(SoftDeleteParentAdmin):
         "contact_number",
         "village",
         "land_area_bigha",
+        "is_lead",
         "created_at",
     )
     search_fields = ("public_id", "farmer_name", "contact_number", "village")
+    list_filter = ("is_lead",)
     autocomplete_fields = ("field_trip",)
     list_select_related = ("field_trip",)
     ordering = ("-created_at",)

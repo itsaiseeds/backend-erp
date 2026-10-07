@@ -68,6 +68,8 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(53, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(54, 'aggregator', 'stockevent');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(55, 'aggregator', 'pushdevice');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(56, 'aggregator', 'notification');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(61, 'authentication', 'labtester');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(62, 'aggregator', 'labtesting');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(57, 'aggregator', 'nonstockinward');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
@@ -279,6 +281,14 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(199, 'Can change notification', 56, 'change_notification');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(200, 'Can delete notification', 56, 'delete_notification');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(201, 'Can view notification', 56, 'view_notification');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(206, 'Can add lab tester', 61, 'add_labtester');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(207, 'Can change lab tester', 61, 'change_labtester');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(208, 'Can delete lab tester', 61, 'delete_labtester');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(209, 'Can view lab tester', 61, 'view_labtester');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(210, 'Can add lab testing', 62, 'add_labtesting');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(211, 'Can change lab testing', 62, 'change_labtesting');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(212, 'Can delete lab testing', 62, 'delete_labtesting');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(213, 'Can view lab testing', 62, 'view_labtesting');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(202, 'Can add non-stock inward', 57, 'add_nonstockinward');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(203, 'Can change non-stock inward', 57, 'change_nonstockinward');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(204, 'Can delete non-stock inward', 57, 'delete_nonstockinward');
@@ -331,6 +341,7 @@ INSERT INTO public.authentication_user (id, "password", last_login, is_superuser
 INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(4, '!NZUkIEOkrZZK6I49TejjY9YFn1UlA3lxcTyPnVU3', NULL, false, '2026-09-07 00:34:08.192', '2026-09-07 00:34:08.195', '1111111111', 'Sales Admin User', 'test.salesadmin@gmail.com', 'TR4JC6LNBAMKUTV2YGLBVSKUFIPUF7KH', true, NULL, 0, NULL, true, false, true, '2026-09-07 00:34:08.195', 1, 1);
 INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(5, '!BLcRI0WOkSbBDCT9rPbsRoSrksTpJctSSDUA1CbC', NULL, false, '2026-09-07 00:36:06.723', '2026-09-07 00:36:06.727', '2222222222', 'Sales Admin User - Stock', 'test.salesadmin.stock@gmail.com', '6MOWDDABZGOL6LN5TCCIW5PGCMSG6SVR', true, NULL, 0, NULL, true, false, true, '2026-09-07 00:36:06.727', 1, 1);
 INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(6, '!BLcRI0WOkSbBDCT9rPbsRoSrksTpJctSSDUA1CbC', NULL, false, '2026-09-07 00:36:06.723', '2026-09-07 00:36:06.727', '3333333333', 'Godown Manager User', 'test.godownmanager@gmail.com', 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', true, NULL, 0, NULL, true, false, true, '2026-09-07 00:36:06.727', 1, 1);
+INSERT INTO public.authentication_user (id, "password", last_login, is_superuser, created_at, updated_at, phone_number, "name", email, totp_secret, totp_enabled, totp_last_counter, failed_totp_attempts, totp_lockout_until, is_verified, is_staff, is_active, date_joined, created_by_id, verified_by_id) VALUES(7, '!BLcRI0WOkSbBDCT9rPbsRoSrksTpJctSSDUA1CbC', NULL, false, '2026-09-07 00:36:06.723', '2026-09-07 00:36:06.727', '4545454545', 'Lab Tester User', 'test.labtester@gmail.com', 'KRSXG5CTMVRXEZLUKRSXG5CTMVRXEZLU', true, NULL, 0, NULL, true, false, true, '2026-09-07 00:36:06.727', 1, 1);
 
 INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count, share_contact) VALUES(1, '2026-09-07 00:34:36.434', '2026-09-07 00:36:17.156', false, NULL, NULL, 1, 4, false, false);
 INSERT INTO public.authentication_admin (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, can_update_stock_count, share_contact) VALUES(2, '2026-09-07 00:36:25.485', '2026-09-07 00:36:25.487', false, NULL, NULL, 1, 5, true, true);
@@ -347,6 +358,7 @@ INSERT INTO public.aggregator_city (id, created_at, updated_at, is_deleted, dele
 
 INSERT INTO public.authentication_salesperson (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id, city_id) VALUES(1, '2026-09-07 00:33:35.796', '2026-09-07 00:33:35.801', false, NULL, NULL, 1, 3, 2);
 INSERT INTO public.authentication_godownmanager (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id) VALUES(1, '2026-09-07 00:33:35.796', '2026-09-07 00:33:35.801', false, NULL, NULL, 1, 6);
+INSERT INTO public.authentication_labtester (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, user_id) VALUES(1, '2026-09-07 00:33:35.796', '2026-09-07 00:33:35.801', false, NULL, NULL, 1, 7);
 
 INSERT INTO public.aggregator_crop (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name") VALUES(1, '2026-09-07 00:26:28.109', '2026-09-07 00:26:28.111', false, NULL, NULL, 1, 'Castor');
 INSERT INTO public.aggregator_crop (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name") VALUES(2, '2026-09-07 00:26:42.132', '2026-09-07 00:26:42.133', false, NULL, NULL, 1, 'Bajari');
@@ -375,6 +387,7 @@ SELECT setval(pg_get_serial_sequence('public.authentication_user', 'id'),       
 SELECT setval(pg_get_serial_sequence('public.authentication_admin', 'id'),        (SELECT MAX(id) FROM public.authentication_admin));
 SELECT setval(pg_get_serial_sequence('public.authentication_salesperson', 'id'),  (SELECT MAX(id) FROM public.authentication_salesperson));
 SELECT setval(pg_get_serial_sequence('public.authentication_godownmanager', 'id'), (SELECT MAX(id) FROM public.authentication_godownmanager));
+SELECT setval(pg_get_serial_sequence('public.authentication_labtester', 'id'), (SELECT MAX(id) FROM public.authentication_labtester));
 SELECT setval(pg_get_serial_sequence('public.aggregator_country', 'id'),          (SELECT MAX(id) FROM public.aggregator_country));
 SELECT setval(pg_get_serial_sequence('public.aggregator_state', 'id'),            (SELECT MAX(id) FROM public.aggregator_state));
 SELECT setval(pg_get_serial_sequence('public.aggregator_city', 'id'),             (SELECT MAX(id) FROM public.aggregator_city));

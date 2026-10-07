@@ -135,6 +135,10 @@ DELETE FROM public.aggregator_loosestocksnapshot;
 DELETE FROM public.aggregator_inwardrawmaterial;
 DELETE FROM public.aggregator_inwardothermaterial;
 
+-- Lab tests: one per raw lot, referenced by aggregator_inwardrawmaterial.lab_testing_id,
+-- so they go right after the lots.
+DELETE FROM public.aggregator_labtesting;
+
 -- Raw material written off as waste.
 DELETE FROM public.aggregator_rawmaterialwaste;
 
@@ -248,6 +252,7 @@ DECLARE
         'aggregator_loosestocksnapshot',
         'aggregator_inwardrawmaterial',
         'aggregator_inwardothermaterial',
+        'aggregator_labtesting',
         'aggregator_rawmaterialwaste',
         'aggregator_nonstockinward',
         'aggregator_clientaddress',
@@ -341,6 +346,7 @@ SELECT 'KEPT -- users & auth' AS section, count(*) AS rows FROM public.authentic
 UNION ALL SELECT 'KEPT -- sales people',     count(*) FROM public.authentication_salesperson
 UNION ALL SELECT 'KEPT -- admins',           count(*) FROM public.authentication_admin
 UNION ALL SELECT 'KEPT -- godown managers',  count(*) FROM public.authentication_godownmanager
+UNION ALL SELECT 'KEPT -- lab testers',      count(*) FROM public.authentication_labtester
 UNION ALL SELECT 'KEPT -- api tokens',       count(*) FROM public.authtoken_token
 UNION ALL SELECT 'KEPT -- permissions',      count(*) FROM public.auth_permission
 UNION ALL SELECT 'KEPT -- content types',    count(*) FROM public.django_content_type

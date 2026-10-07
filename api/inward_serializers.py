@@ -24,6 +24,7 @@ from aggregator.models import (
     InwardOtherMaterial,
     InwardRawMaterial,
     InwardRawMaterialStatus,
+    LabTestResult,
     OtherMaterialRecipe,
     OtherMaterialType,
     Party,
@@ -73,6 +74,17 @@ class InwardCreatedByRefSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
+class InwardLabTestingRefSerializer(serializers.Serializer):
+    """Output shape for the ``lab_testing`` reference on a lot."""
+
+    public_id = serializers.CharField()
+    result = serializers.CharField(
+        allow_null=True,
+        help_text="Pass / Fail; null while the lot awaits a (re-)test.",
+    )
+    grow_out_test = serializers.CharField(help_text="100 - genetical impurity, in percent.")
+
+
 class InwardRawMaterialPayloadSerializer(serializers.Serializer):
     """Output shape for one raw-material lot."""
 
@@ -91,6 +103,10 @@ class InwardRawMaterialPayloadSerializer(serializers.Serializer):
     status = serializers.CharField()
     lab_sampling_date = serializers.DateField(allow_null=True)
     effective_date = serializers.DateField(allow_null=True)
+    lab_testing = InwardLabTestingRefSerializer(
+        allow_null=True,
+        help_text="The lot's lab test; null until a lab tester has tested it.",
+    )
     created_by = InwardCreatedByRefSerializer(allow_null=True, help_text="Who booked the lot.")
 
 
@@ -116,9 +132,9 @@ def _party_of_type(party: Party, expected: PartyType) -> Party:
 class CreateInwardRawMaterialSerializer(serializers.Serializer):
     """Request validation for booking a new raw-material lot.
 
-    ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
-    ``In Use`` or ``Rejected`` later with ``PATCH``. ``effective_date`` is
-    stamped (today) at that flip and is deliberately absent here.
+    ``status`` is not accepted: every lot starts ``Lab Testing`` and a lab
+    tester moves it to ``In Use`` (Pass) or ``Rejected`` (Fail). ``effective_date``
+    is stamped (today) at that move and is deliberately absent here.
     ``lab_sampling_date`` may be given explicitly; left out, it defaults to
     today -- a lot never starts with no sampling date, since it arrives for
     lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
@@ -690,10 +706,11 @@ RECIPE_SORT_OPTIONS = (
 class UpdateInwardRawMaterialSerializer(serializers.Serializer):
     """Request validation for updating a raw-material lot (all fields optional).
 
-    Only ``lab_sampling_date`` and ``status`` are accepted: flipping to
-    ``In Use`` stamps the effective date with today, reverting to
-    ``Lab Testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
-    are immutable. Any unknown key is ignored.
+    Only ``lab_sampling_date`` and ``status`` are accepted, and ``status`` may
+    only *revert* a lot to ``Lab Testing`` (clearing its effective date): moving
+    a lot out of ``Lab Testing`` is the lab tester's verdict alone, see
+    ``LabTestingOperations``. ``product`` / ``party`` / ``quantity_kg`` are
+    immutable. Any unknown key is ignored.
     """
 
     lab_sampling_date = serializers.DateField(required=False, allow_null=True)
@@ -750,6 +767,213 @@ class UpdateInwardRawMaterialSerializer(serializers.Serializer):
         if "status" in attrs:
             attrs["status"] = status_row_for(requested_status)
         return attrs
+
+
+class GodownUpdateInwardRawMaterialSerializer(serializers.Serializer):
+    """Request validation for the godown manager's raw-lot PATCH: nothing is writable.
+
+    A godown manager books and deletes lots but never changes their lifecycle:
+    ``status`` belongs to the lab tester (forward) and the admin (revert), and
+    ``lab_sampling_date`` is part of that lifecycle. Sending either is a 400;
+    any other key is ignored.
+    """
+
+    def to_internal_value(self, data):
+        errors = {}
+        if "status" in data:
+            errors["status"] = "Only a lab tester or an admin can change the status of a lot."
+        if "lab_sampling_date" in data:
+            errors["lab_sampling_date"] = (
+                "The lab sampling date cannot be changed from the godown app."
+            )
+        if errors:
+            raise serializers.ValidationError(errors)
+        return super().to_internal_value(data)
+
+
+def _check_counts(plants, female, ot) -> None:
+    """Female + OT may not exceed the plants: impurity stays within 100%."""
+    if plants is not None and female is not None and ot is not None and female + ot > plants:
+        raise serializers.ValidationError(
+            {"female_count": "Female count plus OT count cannot exceed the number of plants."}
+        )
+
+
+class LabTestingInputsSerializer(serializers.Serializer):
+    """The fields a lab tester types, shared by submitting and editing a test."""
+
+    number_of_plants = serializers.IntegerField(
+        min_value=1,
+        error_messages={
+            "required": "Number of plants is required.",
+            "null": "Number of plants is required.",
+            "invalid": "Number of plants must be a whole number.",
+            "min_value": "Number of plants must be greater than zero.",
+        },
+    )
+    female_count = serializers.IntegerField(
+        min_value=0,
+        error_messages={
+            "required": "Female count is required.",
+            "null": "Female count is required.",
+            "invalid": "Female count must be a whole number.",
+            "min_value": "Female count cannot be negative.",
+        },
+    )
+    ot_count = serializers.IntegerField(
+        min_value=0,
+        error_messages={
+            "required": "OT count is required.",
+            "null": "OT count is required.",
+            "invalid": "OT count must be a whole number.",
+            "min_value": "OT count cannot be negative.",
+        },
+    )
+    result = serializers.ChoiceField(
+        choices=LabTestResult.choices,
+        error_messages={
+            "required": "Result is required: choose Pass or Fail.",
+            "null": "Result is required: choose Pass or Fail.",
+            "invalid_choice": "Result must be either Pass or Fail.",
+        },
+        help_text=(
+            "The tester's own verdict, independent of the counts. Pass moves the lot to "
+            "In Use, Fail to Rejected."
+        ),
+    )
+    comment = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class CreateLabTestingSerializer(LabTestingInputsSerializer):
+    """Request validation for submitting the lab test of a lot in Lab Testing."""
+
+    inward_raw_material = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=InwardRawMaterial.objects.all(),
+        error_messages={
+            "required": "Inward raw material is required.",
+            "does_not_exist": "No inward raw material matches that id.",
+        },
+        help_text="Public id (IR-...) of the lot being tested.",
+    )
+
+    def validate(self, attrs):
+        _check_counts(attrs["number_of_plants"], attrs["female_count"], attrs["ot_count"])
+        return attrs
+
+
+class UpdateLabTestingSerializer(LabTestingInputsSerializer):
+    """Request validation for editing a lab test (send only what changed).
+
+    Inputs are always editable. Changing ``result`` flips the lot In Use <->
+    Rejected; Pass -> Fail is refused when the lot's kilograms are already
+    packed.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs["partial"] = True
+        super().__init__(*args, **kwargs)
+
+    def validate(self, attrs):
+        test = self.instance
+        _check_counts(
+            attrs.get("number_of_plants", test.number_of_plants),
+            attrs.get("female_count", test.female_count),
+            attrs.get("ot_count", test.ot_count),
+        )
+        return attrs
+
+
+class LabTestingTestedByRefSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
+class LabTestingLotRefSerializer(serializers.Serializer):
+    """The lot a lab test belongs to."""
+
+    public_id = serializers.CharField()
+    product = InwardRawMaterialProductRefSerializer()
+    party = InwardRawMaterialPartyRefSerializer()
+    lot_no = serializers.CharField()
+    quantity_kg = serializers.CharField()
+    status = serializers.CharField()
+
+
+class LabTestingPayloadSerializer(serializers.Serializer):
+    """Output shape for one lab test (``LT-...``) with its computed figures."""
+
+    public_id = serializers.CharField()
+    number_of_plants = serializers.IntegerField()
+    female_count = serializers.IntegerField()
+    ot_count = serializers.IntegerField()
+    genetical_impurity = serializers.CharField(
+        help_text="(female + OT) / plants * 100, in percent (computed)."
+    )
+    grow_out_test = serializers.CharField(
+        help_text="100 - genetical impurity, in percent (computed)."
+    )
+    result = serializers.CharField(
+        allow_null=True, help_text="Pass / Fail; null while the lot awaits a (re-)test."
+    )
+    comment = serializers.CharField(allow_blank=True)
+    tested_by = LabTestingTestedByRefSerializer(allow_null=True)
+    tested_at = serializers.DateTimeField(allow_null=True)
+    inward_raw_material = LabTestingLotRefSerializer()
+
+
+class LabTestingListPageSerializer(serializers.Serializer):
+    """Output shape for the paginated lab-testing envelope (schema only)."""
+
+    total_count = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+    next_page_number = serializers.IntegerField(allow_null=True)
+    previous_page_number = serializers.IntegerField(allow_null=True)
+    results = LabTestingPayloadSerializer(many=True)
+    available_filters = FilterCatalogueEntrySerializer(many=True)
+    available_sorts = SortCatalogueEntrySerializer(many=True)
+
+
+LAB_TESTING_QUERYSET_FILTERS = (
+    public_id_filter("LT-"),
+    QuerysetFilter(
+        "product",
+        label="Product",
+        lookup="inward_raw_material__product__public_id__in",
+        parse=parse_str,
+        description="Product public id(s) (see options).",
+        options=_products_with_raw_material_lots,
+    ),
+    QuerysetFilter(
+        "result",
+        label="Result",
+        lookup="result__in",
+        parse=parse_str,
+        description="Pass / Fail.",
+        options=[{"value": r.value, "label": r.label} for r in LabTestResult],
+    ),
+    QuerysetFilter(
+        "lot_status",
+        label="Lot Status",
+        lookup="inward_raw_material__status__name__in",
+        parse=parse_str,
+        description="Status of the tested lot (Lab Testing / In Use / Rejected).",
+        options=[{"value": s.value, "label": s.label} for s in InwardRawMaterialStatus],
+    ),
+)
+LAB_TESTING_SORT_OPTIONS = (
+    SortOption(
+        "tested_at",
+        label="Tested",
+        description="When the test was last submitted or edited (default: newest first).",
+    ),
+    SortOption(
+        "product",
+        label="Product",
+        fields=("inward_raw_material__product__name",),
+        description="Product name, A->Z.",
+    ),
+)
 
 
 class UpdateInwardOtherMaterialSerializer(serializers.Serializer):

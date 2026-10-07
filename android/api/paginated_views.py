@@ -1,10 +1,15 @@
-"""Sales-person Android app base for a paginated date-range ``GET`` list view."""
+"""Android app bases for a paginated date-range ``GET`` list view, one per role gate."""
 
 from __future__ import annotations
 
 from common.views.paginated_date_range import _PaginatedDateRangeListMixin
 
-from .base import AndroidBaseView, AndroidGodownBaseView
+from .base import (
+    AndroidBaseView,
+    AndroidGodownBaseView,
+    AndroidLabTesterBaseView,
+    AndroidSharedView,
+)
 
 
 class AndroidPaginatedDateRangeListView(_PaginatedDateRangeListMixin, AndroidBaseView):
@@ -36,4 +41,24 @@ class AndroidGodownPaginatedDateRangeListView(
     Same contract as :class:`AndroidPaginatedDateRangeListView`, but gated on
     ``godown_manager_required`` (inherited from ``AndroidGodownBaseView``): a
     sales-person token is a ``403``.
+    """
+
+
+class AndroidLabTesterPaginatedDateRangeListView(
+    _PaginatedDateRangeListMixin, AndroidLabTesterBaseView
+):
+    """Lab-tester Android app ``GET`` list view, paginated + date-range filtered.
+
+    Same contract as :class:`AndroidPaginatedDateRangeListView`, but gated on
+    ``lab_tester_required`` (inherited from ``AndroidLabTesterBaseView``): any
+    other Android token is a ``403``.
+    """
+
+
+class AndroidSharedPaginatedDateRangeListView(_PaginatedDateRangeListMixin, AndroidSharedView):
+    """Android app ``GET`` list view open to any Android role, paginated + date-range filtered.
+
+    Same contract as :class:`AndroidPaginatedDateRangeListView`, but gated on
+    ``android_role_required`` (inherited from ``AndroidSharedView``): a sales
+    person, a godown manager and a lab tester may all read their own lists.
     """

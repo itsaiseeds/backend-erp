@@ -32,7 +32,7 @@ class ExportFarmerVisitsView(AdminDateRangeExportView):
     def export(self, window: DateWindow) -> list[dict]:
         visits = (
             window.created_between(farmer_visit_queryset())
-            .select_related("field_trip__city", "field_trip__created_by")
+            .select_related("field_trip__city", "field_trip__created_by", "created_by")
             .order_by("created_at", "id")
         )
         return [farmer_visit_export_payload(visit) for visit in visits]

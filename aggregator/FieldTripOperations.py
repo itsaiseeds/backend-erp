@@ -83,7 +83,9 @@ def field_trip_queryset() -> QuerySet[FieldTrip]:
 
 def farmer_visit_queryset() -> QuerySet[FarmerVisit]:
     """Every visit with the crops and products a visit payload reads."""
-    return FarmerVisit.objects.prefetch_related("visit_crops__crop", "visit_products__product")
+    return FarmerVisit.objects.select_related("field_trip").prefetch_related(
+        "visit_crops__crop", "visit_products__product"
+    )
 
 
 def farmer_queryset() -> QuerySet[FarmerVisit]:
@@ -262,6 +264,7 @@ def create_farmer_visit(
     crops: Iterable[Crop],
     products: Iterable[Product] = (),
     village: str = "",
+    is_lead: bool = False,
 ) -> FarmerVisit:
     """Record a farmer met on ``trip``, with the crops they grow and our products they use.
 
@@ -269,21 +272,91 @@ def create_farmer_visit(
     village. No ``products`` means the farmer does not use our products.
     """
     assert_field_trip_status(trip, FARMER_VISIT_STATUS_CODES, "record a farmer on")
-    unique_crops = list(dict.fromkeys(crops))
-    unique_products = list(dict.fromkeys(products))
-    if not unique_crops:
-        raise ValidationError({"crops": "At least one crop is required."})
     if FarmerVisit.all_objects.filter(field_trip=trip, contact_number=contact_number).exists():
         raise ValidationError(
             {"contact_number": "This contact number is already recorded on this field trip."}
         )
+    return _create_visit(
+        trip,
+        actor=actor,
+        farmer_name=farmer_name,
+        contact_number=contact_number,
+        village=village.strip() or trip.village,
+        land_area_bigha=land_area_bigha,
+        crops=crops,
+        products=products,
+        is_lead=is_lead,
+    )
+
+
+@transaction.atomic
+def create_independent_farmer(
+    *,
+    actor: User,
+    farmer_name: str,
+    contact_number: str,
+    village: str,
+    land_area_bigha: Decimal,
+    crops: Iterable[Crop],
+    products: Iterable[Product] = (),
+    is_lead: bool = False,
+) -> FarmerVisit:
+    """Record a farmer the sales person entered on their own, outside any field trip.
+
+    One live farmer per contact number per sales person. There is no trip to
+    default the village from, so it is required.
+    """
+    if not village.strip():
+        raise ValidationError({"village": "Village is required."})
+    if _independent_contact_taken(actor, contact_number):
+        raise ValidationError(
+            {"contact_number": "You have already recorded a farmer with this contact number."}
+        )
+    return _create_visit(
+        None,
+        actor=actor,
+        farmer_name=farmer_name,
+        contact_number=contact_number,
+        village=village.strip(),
+        land_area_bigha=land_area_bigha,
+        crops=crops,
+        products=products,
+        is_lead=is_lead,
+    )
+
+
+def _independent_contact_taken(actor: User, contact_number: str, exclude_pk=None) -> bool:
+    taken = FarmerVisit.objects.filter(
+        field_trip__isnull=True, created_by=actor, contact_number=contact_number
+    )
+    return taken.exclude(pk=exclude_pk).exists()
+
+
+def _create_visit(
+    trip: FieldTrip | None,
+    *,
+    actor: User,
+    farmer_name: str,
+    contact_number: str,
+    village: str,
+    land_area_bigha: Decimal,
+    crops: Iterable[Crop],
+    products: Iterable[Product],
+    is_lead: bool,
+) -> FarmerVisit:
+    """Save the row and its crop / product links (``trip`` is ``None`` if independent)."""
+    unique_crops = list(dict.fromkeys(crops))
+    unique_products = list(dict.fromkeys(products))
+    if not unique_crops:
+        raise ValidationError({"crops": "At least one crop is required."})
 
     visit = FarmerVisit(
         field_trip=trip,
         farmer_name=farmer_name,
         contact_number=contact_number,
-        village=village.strip() or trip.village,
+        village=village,
         land_area_bigha=land_area_bigha,
+        is_lead=is_lead,
         created_by=actor,
     )
     visit.full_clean()
@@ -334,32 +407,50 @@ def update_farmer_visit(
     land_area_bigha: Decimal | None = None,
     crops: Iterable[Crop] | None = None,
     products: Iterable[Product] | None = None,
+    is_lead: bool | None = None,
 ) -> FarmerVisit:
     """Correct a recorded farmer; only the fields passed (not ``None``) change.
 
-    Only while the trip is in progress. The name, contact number, village and
+    Only while the trip is in progress (an independent farmer has no trip, so
+    it is always editable). The name, contact number, village and
     crop list are required on a farmer, so none may be made blank or empty;
     ``products=[]`` is fine and records that the farmer does not use our products.
     """
-    assert_field_trip_status(visit.field_trip, FARMER_VISIT_STATUS_CODES, "edit a farmer on")
+    if not visit.is_independent:
+        assert_field_trip_status(visit.field_trip, FARMER_VISIT_STATUS_CODES, "edit a farmer on")
     fields = {
         "farmer_name": farmer_name,
         "contact_number": contact_number,
         "village": village,
         "land_area_bigha": land_area_bigha,
+        "is_lead": is_lead,
     }
     changed = [name for name, value in fields.items() if value is not None]
     if changed:
-        if contact_number is not None and (
-            FarmerVisit.all_objects.filter(
-                field_trip=visit.field_trip, contact_number=contact_number
-            )
-            .exclude(pk=visit.pk)
-            .exists()
-        ):
-            raise ValidationError(
-                {"contact_number": "This contact number is already recorded on this field trip."}
-            )
+        if contact_number is not None:
+            if visit.is_independent:
+                if _independent_contact_taken(visit.created_by, contact_number, visit.pk):
+                    raise ValidationError(
+                        {
+                            "contact_number": (
+                                "You have already recorded a farmer with this contact number."
+                            )
+                        }
+                    )
+            elif (
+                FarmerVisit.all_objects.filter(
+                    field_trip=visit.field_trip, contact_number=contact_number
+                )
+                .exclude(pk=visit.pk)
+                .exists()
+            ):
+                raise ValidationError(
+                    {
+                        "contact_number": (
+                            "This contact number is already recorded on this field trip."
+                        )
+                    }
+                )
         for name in changed:
             setattr(visit, name, fields[name])
         visit.full_clean()
@@ -373,6 +464,11 @@ def update_farmer_visit(
         unique_products = list(dict.fromkeys(products))
         _sync_visit_links(visit, FarmerVisitProduct, "product", unique_products, actor)
     return visit
+
+
+def delete_independent_farmer(visit: FarmerVisit, actor: User) -> None:
+    """Soft-delete a farmer recorded outside any trip."""
+    visit.mark_deleted(actor)
 
 
 def _user_ref(user: User | None) -> dict | None:
@@ -416,6 +512,8 @@ def farmer_visit_payload(visit: FarmerVisit) -> dict:
         "contact_number": visit.contact_number,
         "village": visit.village,
         "land_area_bigha": str(visit.land_area_bigha),
+        "is_lead": visit.is_lead,
+        "field_trip_public_id": visit.field_trip.public_id if visit.field_trip_id else None,
         "crops": [{"id": link.crop_id, "name": link.crop.name} for link in visit.visit_crops.all()],
         "uses_our_products": bool(products),
         "products": [{"public_id": p.public_id, "name": p.name} for p in products],
@@ -428,12 +526,16 @@ def farmer_visit_export_payload(visit: FarmerVisit) -> dict:
     trip = visit.field_trip
     return {
         **farmer_visit_payload(visit),
-        "field_trip": {
-            "public_id": trip.public_id,
-            "village": trip.village,
-            "city": {"id": trip.city_id, "name": trip.city.name},
-        },
-        "sales_person": _user_ref(trip.created_by),
+        "field_trip": (
+            {
+                "public_id": trip.public_id,
+                "village": trip.village,
+                "city": {"id": trip.city_id, "name": trip.city.name},
+            }
+            if trip is not None
+            else None
+        ),
+        "sales_person": _user_ref(trip.created_by if trip is not None else visit.created_by),
     }
 
 
@@ -482,8 +584,13 @@ def farmer_payload(latest: FarmerVisit, visits: Sequence[FarmerVisit]) -> dict:
         "contact_number": latest.contact_number,
         "farmer_name": latest.farmer_name,
         "village": latest.village,
-        "city": {"id": latest.field_trip.city_id, "name": latest.field_trip.city.name},
+        "city": (
+            {"id": latest.field_trip.city_id, "name": latest.field_trip.city.name}
+            if latest.field_trip_id
+            else None
+        ),
         "land_area_bigha": str(latest.land_area_bigha),
+        "is_lead": latest.is_lead,
         "crops": _by_name(crops),
         "uses_our_products": bool(products),
         "products": [
@@ -496,7 +603,7 @@ def farmer_payload(latest: FarmerVisit, visits: Sequence[FarmerVisit]) -> dict:
         "visits": [
             {
                 "public_id": visit.public_id,
-                "field_trip_public_id": visit.field_trip.public_id,
+                "field_trip_public_id": visit.field_trip.public_id if visit.field_trip_id else None,
                 "created_at": _isoformat(visit.created_at),
             }
             for visit in visits

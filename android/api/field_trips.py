@@ -42,6 +42,16 @@ def own_farmer_visit_or_404(request: Request, public_id: str) -> FarmerVisit:
     )
 
 
+def own_independent_farmers(request: Request) -> QuerySet[FarmerVisit]:
+    """The caller's farmers recorded outside any trip, with their crops and products."""
+    return farmer_visit_queryset().filter(field_trip__isnull=True, created_by=request.user)
+
+
+def own_independent_farmer_or_404(request: Request, public_id: str) -> FarmerVisit:
+    """One of the caller's independent farmers, or 404 -- a trip visit or somebody else's too."""
+    return get_object_or_404(own_independent_farmers(request), public_id=public_id)
+
+
 class OwnFieldTripTransitionView(AndroidBaseView):
     """One lifecycle verb on the caller's own trip: load, apply, return the trip.
 

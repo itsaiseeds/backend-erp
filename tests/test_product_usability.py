@@ -641,6 +641,13 @@ class ProductUsabilityApiTest(WebApiTestCase):
             farmer_name="Test Farmer",
             quantity_kg=Decimal("10"), lab_sampling_date=datetime.date.today(), actor=self.admin,
         )
+        # In Use, so the admin's only status write -- the revert to Lab Testing -- is a
+        # valid transition and the freeze is what refuses it.
+        update_raw_lot(
+            lot,
+            {"status": Status.by_id(StatusIds.IN_USE), "effective_date": datetime.date.today()},
+            self.admin,
+        )
         waste = inv.record_raw_waste(
             product=self.product, quantity_kg=Decimal("2"), reason="x", actor=self.admin
         )
@@ -658,7 +665,7 @@ class ProductUsabilityApiTest(WebApiTestCase):
             "lot_no": "API-2", "farmer_name": "Test Farmer", "quantity_kg": "5",
         }, format="json"))
         refused(self.client.patch(
-            f"/api/sales-admin/inward-raw-material/{lot.public_id}", {"status": "In Use"},
+            f"/api/sales-admin/inward-raw-material/{lot.public_id}", {"status": "Lab Testing"},
             format="json",
         ))
         refused(self.client.delete(f"/api/sales-admin/inward-raw-material/{lot.public_id}"))
@@ -690,7 +697,7 @@ class ProductUsabilityApiTest(WebApiTestCase):
 
         # Nothing changed.
         self.assertEqual(InwardRawMaterial.objects.get(pk=lot.pk).status_id,
-                         StatusIds.LAB_TESTING.value)
+                         StatusIds.IN_USE.value)
         self.assertTrue(RawMaterialWaste.objects.filter(pk=waste.pk).exists())
         self.assertTrue(ProductPackaging.objects.filter(pk=packaging.pk).exists())
         self.assertTrue(OtherMaterialRecipe.objects.filter(pk=recipe.pk).exists())

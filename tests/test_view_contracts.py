@@ -42,6 +42,7 @@ from aggregator.models import City, Country, State
 from android.api.base import (
     AndroidBaseView,
     AndroidGodownBaseView,
+    AndroidLabTesterBaseView,
     AndroidSharedView,
     AndroidTokenView,
 )
@@ -52,6 +53,7 @@ from api.permissions import (
     IsAdminUser,
     IsAndroidRole,
     IsGodownManager,
+    IsLabTester,
     IsSalesPerson,
     IsSuperUser,
 )
@@ -74,6 +76,7 @@ SESSION_SUPERUSER = "session:superuser"
 TOKEN_AUTH = "token:auth"
 TOKEN_SALESPERSON = "token:salesperson"
 TOKEN_GODOWN = "token:godown"
+TOKEN_LAB = "token:lab"
 TOKEN_ANDROID = "token:android"  # either Android role
 TOKEN_ANDROID_ADMIN = "token:androidadmin"  # an Android role AND an Admin profile
 
@@ -87,6 +90,7 @@ _ROLE_FLAG_NAMES = (
     "superuser_required",
     "salesperson_required",
     "godown_manager_required",
+    "lab_tester_required",
     "android_role_required",
 )
 _ROLE_FLAGS = {
@@ -98,6 +102,7 @@ _ROLE_FLAGS = {
         "salesperson": ("salesperson_required",),
         "godown": ("godown_manager_required",),
         "android": ("android_role_required",),
+        "lab": ("lab_tester_required",),
         # An admin who also holds an Android role (the app's admin-only look-ups).
         "androidadmin": ("android_role_required", "admin_required"),
     }.items()
@@ -125,15 +130,15 @@ EXPECTED_CONTRACTS = {
     "android/api/v1/get-challan/<order_public_id>": ("GetChallanView", TOKEN_SALESPERSON),
     "android/api/v1/return-order/<order_public_id>": ("ReturnOrderView", TOKEN_SALESPERSON),
     "android/api/v1/get-return-orders": ("GetReturnOrdersView", TOKEN_SALESPERSON),
-    "android/api/v1/devices/register": ("RegisterDeviceView", TOKEN_SALESPERSON),
-    "android/api/v1/notifications": ("GetNotificationsView", TOKEN_SALESPERSON),
+    "android/api/v1/devices/register": ("RegisterDeviceView", TOKEN_ANDROID),
+    "android/api/v1/notifications": ("GetNotificationsView", TOKEN_ANDROID),
     "android/api/v1/notifications/read-all": (
         "MarkAllNotificationsReadView",
-        TOKEN_SALESPERSON,
+        TOKEN_ANDROID,
     ),
     "android/api/v1/notification/<int:id>/read": (
         "MarkNotificationReadView",
-        TOKEN_SALESPERSON,
+        TOKEN_ANDROID,
     ),
     "android/api/v1/sales-person-catalogue": (
         "SalesPersonCatalogueView",
@@ -222,6 +227,11 @@ EXPECTED_CONTRACTS = {
     ),
     "android/api/v1/create-farmer-visit": ("CreateFarmerVisitView", TOKEN_SALESPERSON),
     "android/api/v1/edit-farmer-visit/<public_id>": ("UpdateFarmerVisitView", TOKEN_SALESPERSON),
+    "android/api/v1/farmers": ("FarmersView", TOKEN_SALESPERSON),
+    "android/api/v1/farmer/<public_id>": ("FarmerDetailView", TOKEN_SALESPERSON),
+    "android/api/v1/lab/pending-lots": ("LabPendingLotsView", TOKEN_LAB),
+    "android/api/v1/lab/lab-testings": ("LabTestingsView", TOKEN_LAB),
+    "android/api/v1/lab/lab-testing/<public_id>": ("LabTestingDetailView", TOKEN_LAB),
     # -- Sales-admin website (session-only) ----------------------------------
     "api/sales-admin/admins": ("AdminsView", SESSION_SUPERUSER),
     "api/sales-admin/admins/<int:id>": ("UpdateAdminView", SESSION_SUPERUSER),
@@ -353,6 +363,11 @@ EXPECTED_CONTRACTS = {
         SESSION_ADMIN,
     ),
     "api/sales-admin/raw-material-wastes": ("RawMaterialWastesView", SESSION_ADMIN),
+    "api/sales-admin/lab-testers": ("LabTestersView", SESSION_ADMIN),
+    "api/sales-admin/lab-testers/<int:id>": ("UpdateLabTesterView", SESSION_ADMIN),
+    "api/sales-admin/lab-testers/<int:id>/rotate-qr": ("RotateLabTesterQrView", SESSION_ADMIN),
+    "api/sales-admin/lab-testings": ("LabTestingsView", SESSION_ADMIN),
+    "api/sales-admin/lab-testing/<str:public_id>": ("LabTestingDetailView", SESSION_ADMIN),
     "api/sales-admin/non-stock-inward/<str:public_id>": (
         "UpdateNonStockInwardView",
         SESSION_ADMIN,
@@ -431,6 +446,7 @@ class BaseApiViewFlagTest(SimpleTestCase):
             ({"superuser_required": True}, [IsAuthenticated, IsSuperUser]),
             ({"salesperson_required": True}, [IsAuthenticated, IsSalesPerson]),
             ({"godown_manager_required": True}, [IsAuthenticated, IsGodownManager]),
+            ({"lab_tester_required": True}, [IsAuthenticated, IsLabTester]),
             ({"android_role_required": True}, [IsAuthenticated, IsAndroidRole]),
             (
                 {"admin_required": True, "superuser_required": True},
@@ -460,9 +476,16 @@ class BaseApiViewFlagTest(SimpleTestCase):
         # The other Android bases each pin exactly one role requirement.
         self.assertTrue(AndroidGodownBaseView.godown_manager_required)
         self.assertFalse(AndroidGodownBaseView.salesperson_required)
+        self.assertTrue(AndroidLabTesterBaseView.lab_tester_required)
+        self.assertFalse(AndroidLabTesterBaseView.salesperson_required)
         self.assertTrue(AndroidSharedView.android_role_required)
         self.assertFalse(AndroidSharedView.salesperson_required)
-        for base in (AndroidBaseView, AndroidGodownBaseView, AndroidSharedView):
+        for base in (
+            AndroidBaseView,
+            AndroidGodownBaseView,
+            AndroidLabTesterBaseView,
+            AndroidSharedView,
+        ):
             self.assertEqual(base.authentication_classes, [ExpiringTokenAuthentication])
 
 

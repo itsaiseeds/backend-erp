@@ -13,9 +13,19 @@ reaches the caller as a 400 with its message instead of a 500.
 
 from __future__ import annotations
 
+import logging
+
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import DatabaseError
 from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.response import Response
 from rest_framework.views import exception_handler as _drf_default
+
+logger = logging.getLogger(__name__)
+
+_SERVER_ERROR_MESSAGE = (
+    "Something went wrong on our side. Please try again, and contact support if it continues."
+)
 
 
 def _flatten(errors) -> str:
@@ -39,6 +49,12 @@ def custom_exception_handler(exc, context):
         exc = DRFValidationError(exc.messages)
 
     response = _drf_default(exc, context)
+
+    if response is None and isinstance(exc, DatabaseError):
+        # A schema/DB failure is never the caller's to fix and its text names
+        # tables and columns: log it, answer with a plain message.
+        logger.exception("Database error in %s", context.get("view"))
+        return Response({"detail": _SERVER_ERROR_MESSAGE}, status=500)
 
     if response is not None:
         data = response.data

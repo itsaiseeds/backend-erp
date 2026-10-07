@@ -57,16 +57,26 @@ class IsGodownManager(IsAuthenticated):
         return request.user.is_godown_manager
 
 
-class IsAndroidRole(IsAuthenticated):
-    """Allow a user holding either Android role (sales person or godown manager).
+class IsLabTester(IsAuthenticated):
+    """Allow only users holding a ``LabTester`` profile."""
 
-    ``BaseApiView`` ANDs its flags, so "either" needs its own class.
+    def has_permission(self, request, view) -> bool:
+        if not super().has_permission(request, view):
+            return False
+        return request.user.is_lab_tester
+
+
+class IsAndroidRole(IsAuthenticated):
+    """Allow a user holding any Android role (sales person, godown manager or lab tester).
+
+    ``BaseApiView`` ANDs its flags, so "any of" needs its own class.
     """
 
     def has_permission(self, request, view) -> bool:
         if not super().has_permission(request, view):
             return False
-        return request.user.is_salesperson or request.user.is_godown_manager
+        user = request.user
+        return user.is_salesperson or user.is_godown_manager or user.is_lab_tester
 
 
 class HasDjangoPermission(BasePermission):
