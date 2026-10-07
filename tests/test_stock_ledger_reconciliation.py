@@ -178,15 +178,22 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
             return False
         lot = rng.choice(self.lots)
         lot.refresh_from_db()
+        # The same draw as ever, so the sequence (and how often stock leaves and returns)
+        # is unchanged: one of the three statuses, tried against the lot's real lifecycle.
+        code = rng.choice(["LAB_TESTING", "IN_USE", "RAW_MATERIAL_REJECTED"])
         if lot.is_deleted:
             return False
         current = InwardOperations.raw_status_of(lot)
         lab_testing = InwardOperations.InwardRawMaterialStatus.LAB_TESTING
         if current == lab_testing:
             # Only a lab tester's verdict leaves Lab Testing (Pass -> In Use, Fail -> Rejected).
-            lab_verdict(lot.public_id, rng.choice(["Pass", "Fail"]), actor=self.su)
+            if code == "LAB_TESTING":
+                return False
+            lab_verdict(lot.public_id, "Pass" if code == "IN_USE" else "Fail", actor=self.su)
             return
         # An In Use / Rejected lot can only be sent back to Lab Testing, by an admin.
+        if code != "LAB_TESTING":
+            return False
         InwardOperations.assert_raw_status_transition(current, lab_testing)
         InwardOperations.update_raw_lot(
             lot,

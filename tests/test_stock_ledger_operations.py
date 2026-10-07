@@ -239,7 +239,7 @@ class StockLedgerOperationsTest(LedgerWorldTestCase):
         today = datetime.date.today()
         lot = InwardOperations.create_raw_lot(
             product=self.product, party=self.party, lot_no="L-LAB",
-            quantity_kg=Decimal("40.000"), lab_sampling_date=today, actor=self.su,
+            farmer_name="Test Farmer", quantity_kg=Decimal("40.000"), lab_sampling_date=today, actor=self.su,
         )
 
         def expect(before, detail, raw_deltas):

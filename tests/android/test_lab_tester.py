@@ -16,7 +16,14 @@ from rest_framework.test import APIClient
 
 from aggregator import InventoryOperations
 from aggregator.InwardOperations import today
-from aggregator.models import InwardRawMaterial, LabTesting, Party, Product, ProductPackaging
+from aggregator.models import (
+    InwardRawMaterial,
+    LabTesting,
+    Party,
+    PartyType,
+    Product,
+    ProductPackaging,
+)
 from authentication.models import Admin, GodownManager, LabTester, SalesPerson, User
 from tests.android.common import AndroidApiTestCase
 
@@ -64,7 +71,12 @@ class LabTesterApiTest(AndroidApiTestCase):
         Admin.objects.create(user=cls.admin, can_update_stock_count=True, created_by=cls.superuser)
 
         cls.product = Product.objects.get(name="SAI-33")
-        cls.party = Party.objects.create(name="Lab API Party", city_id=1, created_by=cls.superuser)
+        cls.party = Party.objects.create(
+            name="Lab API Party",
+            city_id=1,
+            party_type=PartyType.RAW_MATERIAL,
+            created_by=cls.superuser,
+        )
 
     # -- clients & helpers ----------------------------------------------------------
 
@@ -96,6 +108,7 @@ class LabTesterApiTest(AndroidApiTestCase):
                 "product": self.product.public_id,
                 "party": self.party.id,
                 "lot_no": lot_no,
+                "farmer_name": "Test Farmer",
                 "quantity_kg": quantity_kg,
             },
             format="json",

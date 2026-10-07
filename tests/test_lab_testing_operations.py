@@ -28,6 +28,7 @@ from aggregator.models import (
     LabTesting,
     Notification,
     Party,
+    PartyType,
     Product,
     ProductPackaging,
 )
@@ -71,7 +72,12 @@ class LabTestingOperationsTest(DMLTestCase):
         cls.superuser = User.objects.get(phone_number=SUPERUSER_PHONE)
         cls.tester = make_tester(cls.superuser, "7100000001", "lab tester one")
         cls.product = Product.objects.get(name="SAI-33")
-        cls.party = Party.objects.create(name="Lab Party", city_id=1, created_by=cls.superuser)
+        cls.party = Party.objects.create(
+            name="Lab Party",
+            city_id=1,
+            party_type=PartyType.RAW_MATERIAL,
+            created_by=cls.superuser,
+        )
 
     # -- helpers --------------------------------------------------------------
 
@@ -81,6 +87,7 @@ class LabTestingOperationsTest(DMLTestCase):
             product=self.product,
             party=self.party,
             lot_no="SUP-LAB-1",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal(quantity_kg),
             lab_sampling_date=today(),
             actor=self.superuser,
@@ -428,7 +435,12 @@ class LabTestNotificationTest(DMLTestCase):
         cls.two = make_tester(cls.superuser, "7100000012", "tester two")
         cls.gone = make_tester(cls.superuser, "7100000013", "tester gone")
         cls.product = Product.objects.get(name="SAI-33")
-        cls.party = Party.objects.create(name="Lab Party", city_id=1, created_by=cls.superuser)
+        cls.party = Party.objects.create(
+            name="Lab Party",
+            city_id=1,
+            party_type=PartyType.RAW_MATERIAL,
+            created_by=cls.superuser,
+        )
 
     def setUp(self):
         super().setUp()
@@ -449,6 +461,7 @@ class LabTestNotificationTest(DMLTestCase):
             product=self.product,
             party=self.party,
             lot_no="SUP-N-1",
+            farmer_name="Test Farmer",
             quantity_kg=Decimal("40"),
             lab_sampling_date=today(),
             actor=self.superuser,
