@@ -150,6 +150,10 @@ EXPECTED_CONTRACTS = {
         "ClientAddressesView",
         TOKEN_ANDROID,
     ),
+    "android/api/v1/utilities/client-children": (
+        "ClientChildOrgsView",
+        TOKEN_ANDROID,
+    ),
     "android/api/v1/utilities/client-transport-agencies": (
         "ClientTransportAgenciesView",
         TOKEN_ANDROID,
@@ -394,6 +398,7 @@ EXPECTED_CONTRACTS = {
     "api/execute-code/": ("ExecuteCodeView", SESSION_SUPERUSER),
     "api/test-sentry/": ("TestSentryView", SESSION_SUPERUSER),
     "api/utilities/cities": ("CitiesView", SESSION_ADMIN),
+    "api/utilities/client-children": ("ClientChildOrgsView", SESSION_ADMIN),
     "api/utilities/countries": ("CountriesView", SESSION_ADMIN),
     "api/utilities/reauthenticate": ("ReauthenticateView", SESSION_AUTH),
     "api/utilities/states": ("StatesView", SESSION_ADMIN),

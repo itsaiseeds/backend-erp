@@ -71,6 +71,7 @@ INSERT INTO public.django_content_type (id, app_label, model) VALUES(56, 'aggreg
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(61, 'authentication', 'labtester');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(62, 'aggregator', 'labtesting');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(57, 'aggregator', 'nonstockinward');
+INSERT INTO public.django_content_type (id, app_label, model) VALUES(63, 'aggregator', 'clientchildorg');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(29, 'contenttypes', 'contenttype');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(30, 'sessions', 'session');
 INSERT INTO public.django_content_type (id, app_label, model) VALUES(31, 'admin', 'logentry');
@@ -293,6 +294,10 @@ INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUE
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(203, 'Can change non-stock inward', 57, 'change_nonstockinward');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(204, 'Can delete non-stock inward', 57, 'delete_nonstockinward');
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(205, 'Can view non-stock inward', 57, 'view_nonstockinward');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(214, 'Can add client child org', 63, 'add_clientchildorg');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(215, 'Can change client child org', 63, 'change_clientchildorg');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(216, 'Can delete client child org', 63, 'delete_clientchildorg');
+INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(217, 'Can view client child org', 63, 'view_clientchildorg');
 -- Custom permission (authentication.User.Meta.permissions): gates POST /api/execute-code/.
 INSERT INTO public.auth_permission (id, "name", content_type_id, codename) VALUES(165, 'Can execute Python code on the server', 1, 'execute_python_code');
 

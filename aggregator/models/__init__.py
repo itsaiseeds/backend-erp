@@ -3,6 +3,7 @@ from .BagStockSnapshot import InventorySnapshot
 from .City import City
 from .Client import Client
 from .ClientAddress import ClientAddress
+from .ClientChildOrg import ClientChildOrg
 from .ClientContact import ClientContact
 from .ClientTransportAgency import ClientTransportAgency
 from .Contact import Contact
@@ -64,6 +65,7 @@ __all__ = [
     "Crop",
     "Client",
     "ClientAddress",
+    "ClientChildOrg",
     "ClientContact",
     "ClientTransportAgency",
     "Stage",

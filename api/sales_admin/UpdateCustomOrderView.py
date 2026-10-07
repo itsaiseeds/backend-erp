@@ -31,6 +31,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from aggregator.ClientChildOrgOperations import resolve_child_org
 from aggregator.CustomOrderOperations import (
     CUSTOM_ORDER_CORE_FIELDS,
     EDITABLE_CUSTOM_ORDER_STATUS_CODES,
@@ -41,6 +42,7 @@ from aggregator.CustomOrderOperations import (
 )
 from aggregator.models import ClientAddress
 from api.admin import AdminApiView
+from api.client_serializers import BookedForSerializer
 from api.custom_order_serializers import CustomOrderDetailPayloadSerializer
 
 from .CreateCustomOrderView import (
@@ -78,6 +80,14 @@ class UpdateCustomOrderSerializer(serializers.Serializer):
         ),
     )
     items = CustomOrderItemWriteSerializer(many=True, required=False)
+    booked_for = BookedForSerializer(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Child org to set ({id} or {party_name, village_name, ...}); send "
+            "null to clear it, omit to leave it unchanged."
+        ),
+    )
 
     def validate_items(self, value: list[dict]) -> list[dict]:
         return validate_custom_order_item_list(value)
@@ -130,6 +140,13 @@ class UpdateCustomOrderView(AdminApiView):
             )
             serializer.is_valid(raise_exception=True)
             data = serializer.validated_data
+
+            if "booked_for" in data:
+                data["booked_for"] = (
+                    resolve_child_org(order.client, data["booked_for"], request.user)
+                    if data["booked_for"] is not None
+                    else None
+                )
 
             core = {
                 field: data[field] for field in CUSTOM_ORDER_CORE_FIELDS if field in data

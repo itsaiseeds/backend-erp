@@ -822,6 +822,12 @@ paths:
         description: Case-insensitive substring of the public id (C-XXXXXXXXXXXX).
           Single value; AND-ed with the other filters.
       - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
+      - in: query
         name: sort
         schema:
           type: string
@@ -2213,6 +2219,12 @@ paths:
           type: string
         description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
         required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
       tags:
       - Android · Clients
       security:
@@ -2226,6 +2238,37 @@ paths:
                 items:
                   $ref: '#/components/schemas/ClientAddressLink'
           description: ''
+  /android/api/v1/utilities/client-children:
+    get:
+      operationId: android_api_v1_utilities_client_children
+      description: List one of the caller's clients' child orgs.
+      summary: List a client's child orgs (booked-for picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
+        required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
+      tags:
+      - Android · Clients
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChildOrgPayload'
+          description: ''
   /android/api/v1/utilities/client-transport-agencies:
     get:
       operationId: android_api_v1_utilities_client_transport_agencies
@@ -2238,6 +2281,12 @@ paths:
           type: string
         description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
         required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
       tags:
       - Android · Clients
       security:
@@ -2382,6 +2431,24 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/SalesAdminContact'
+          description: ''
+  /android/api/v1/utilities/sales-persons:
+    get:
+      operationId: android_api_v1_utilities_sales_persons_list
+      description: List the sales persons an admin may act for.
+      summary: List sales persons an admin can book orders for (id and name only)
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SalesPersonOption'
           description: ''
   /android/api/v1/utilities/states:
     get:
@@ -3074,7 +3141,7 @@ paths:
         name: limit
         schema:
           type: integer
-        description: Entries to return (default 20, max 100).
+        description: Lots to return per product (default 20, max 100).
       - in: query
         name: q
         schema:
@@ -6265,6 +6332,31 @@ paths:
                 items:
                   $ref: '#/components/schemas/State'
           description: ''
+  /api/utilities/client-children:
+    get:
+      operationId: api_utilities_client_children_list
+      description: List a client's child orgs.
+      summary: List a client's child orgs (booked-for picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of the client, e.g. C-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Utilities
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChildOrgPayload'
+          description: ''
   /api/utilities/countries:
     get:
       operationId: api_utilities_countries_list
@@ -6415,6 +6507,10 @@ components:
           nullable: true
         dispatch_mode:
           $ref: '#/components/schemas/DispatchModeEnum'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgSummary'
+          nullable: true
         expected_delivery_date:
           type: string
           format: date
@@ -6429,6 +6525,7 @@ components:
           items:
             $ref: '#/components/schemas/OrderCardPackaging'
       required:
+      - booked_for
       - city
       - client
       - client_created_by
@@ -6580,7 +6677,6 @@ components:
           maxLength: 10
         gst_number:
           type: string
-          minLength: 1
           maxLength: 15
       required:
       - public_id
@@ -6668,10 +6764,13 @@ components:
           type: boolean
         is_lab_tester:
           type: boolean
+        is_sales_admin:
+          type: boolean
       required:
       - id
       - is_godown_manager
       - is_lab_tester
+      - is_sales_admin
       - is_sales_person
       - name
       - phone_number
@@ -6760,6 +6859,38 @@ components:
       required:
       - lines
       - snapshot_date
+    BookedForRequest:
+      type: object
+      description: |-
+        The optional ``booked_for`` object on the order write endpoints.
+
+        Either ``id`` (reuse a child) or ``party_name`` + ``village_name``
+        (get-or-create). An address -- ``client_address_id`` or ``address``, never
+        both -- is needed only when a new child is created. No field declares a
+        default: the resolver compares only the fields that were actually sent.
+      properties:
+        id:
+          type: integer
+        party_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        village_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id of the order's client.
+        address:
+          $ref: '#/components/schemas/ChildOrgAddressRequest'
+        transport_name:
+          type: string
+          maxLength: 255
+        contact_number:
+          type: string
+          nullable: true
+          maxLength: 10
     CatalogueItem:
       type: object
       description: Output shape for one catalogue row -- a bag (schema only).
@@ -7060,6 +7191,74 @@ components:
       required:
       - is_complete
       - stock_admins
+    ChildOrgAddressRequest:
+      type: object
+      description: 'The address of a new child org: a client address without label
+        / primary.'
+      properties:
+        line_1:
+          type: string
+          minLength: 1
+          maxLength: 255
+        line_2:
+          type: string
+          maxLength: 255
+        pincode:
+          type: string
+          minLength: 1
+          maxLength: 10
+        city:
+          type: integer
+        state:
+          type: integer
+        country:
+          type: integer
+      required:
+      - city
+      - country
+      - line_1
+      - pincode
+      - state
+    ChildOrgPayload:
+      type: object
+      description: Output shape for a child org in full (schema only).
+      properties:
+        id:
+          type: integer
+        party_name:
+          type: string
+        village_name:
+          type: string
+        transport_name:
+          type: string
+        contact_number:
+          type: string
+          nullable: true
+        address:
+          type: object
+          additionalProperties: {}
+          description: Same shape as a client address, minus link fields.
+      required:
+      - address
+      - contact_number
+      - id
+      - party_name
+      - transport_name
+      - village_name
+    ChildOrgSummary:
+      type: object
+      description: Output shape for a child org on a list row (schema only).
+      properties:
+        id:
+          type: integer
+        party_name:
+          type: string
+        village_name:
+          type: string
+      required:
+      - id
+      - party_name
+      - village_name
     City:
       type: object
       description: Output shape for one city row (schema only; responses are built
@@ -7506,13 +7705,12 @@ components:
           maxLength: 10
         gst_number:
           type: string
-          minLength: 1
+          default: ''
           maxLength: 15
       required:
       - addresses
       - company_name
       - contacts
-      - gst_number
       - transport_agencies
     CreateCropRequest:
       type: object
@@ -7547,6 +7745,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CustomOrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: 'Optional child org the order is booked for: {id} to reuse
+            one, or {party_name, village_name, ...} to get-or-create it.'
       required:
       - client_address_id
       - client_public_id
@@ -7821,10 +8025,21 @@ components:
           format: date
           nullable: true
           description: Defaults to the day after booking.
+        created_by:
+          type: integer
+          nullable: true
+          description: 'Admin only: user id of the sales person to book for (from
+            GET /android/api/v1/utilities/sales-persons). Defaults to the caller.'
         items:
           type: array
           items:
             $ref: '#/components/schemas/BagOrderItemRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: 'Optional child org the order is booked for: {id} to reuse
+            one, or {party_name, village_name, ...} to get-or-create it.'
       required:
       - client_address_id
       - client_public_id
@@ -8060,6 +8275,10 @@ components:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
           $ref: '#/components/schemas/ChallanReceiver'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         hsn_code:
           type: string
         financial_year:
@@ -8078,6 +8297,7 @@ components:
         total_packets:
           type: integer
       required:
+      - booked_for
       - dispatch
       - financial_year
       - hsn_code
@@ -8154,6 +8374,10 @@ components:
           nullable: true
         special_comments:
           type: string
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -8168,6 +8392,7 @@ components:
             $ref: '#/components/schemas/CustomOrderItemPayload'
       required:
       - actual_delivery_date
+      - booked_for
       - client
       - delivery_address
       - expected_delivery_date
@@ -8286,6 +8511,10 @@ components:
         expected_delivery_date:
           type: string
           format: date
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgSummary'
+          nullable: true
         total_amount:
           type: string
         total_packets:
@@ -8297,6 +8526,7 @@ components:
           items:
             $ref: '#/components/schemas/CustomOrderCardItem'
       required:
+      - booked_for
       - city
       - client
       - client_created_by
@@ -8355,6 +8585,10 @@ components:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
           $ref: '#/components/schemas/ChallanReceiver'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         hsn_code:
           type: string
         financial_year:
@@ -8373,6 +8607,7 @@ components:
         total_packets:
           type: integer
       required:
+      - booked_for
       - dispatch
       - financial_year
       - hsn_code
@@ -8485,12 +8720,18 @@ components:
       properties:
         lot_number:
           type: string
+        product_id:
+          type: integer
+        product_name:
+          type: string
         last_used_at:
           type: string
           format: date-time
       required:
       - last_used_at
       - lot_number
+      - product_id
+      - product_name
     DispatchLotNumbers:
       type: object
       description: Output shape for the response envelope (schema only).
@@ -8660,6 +8901,10 @@ components:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
           $ref: '#/components/schemas/ChallanReceiver'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         hsn_code:
           type: string
         financial_year:
@@ -8686,6 +8931,7 @@ components:
           nullable: true
           description: custom order -> delivery address -> city.
       required:
+      - booked_for
       - city
       - dispatch
       - financial_year
@@ -8729,6 +8975,10 @@ components:
           nullable: true
         special_comments:
           type: string
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -8743,6 +8993,7 @@ components:
             $ref: '#/components/schemas/ExportCustomOrderItem'
       required:
       - actual_delivery_date
+      - booked_for
       - city
       - client
       - created_at
@@ -8810,6 +9061,10 @@ components:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
           $ref: '#/components/schemas/ChallanReceiver'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         hsn_code:
           type: string
         financial_year:
@@ -8836,6 +9091,7 @@ components:
           nullable: true
           description: order -> delivery address -> city.
       required:
+      - booked_for
       - city
       - dispatch
       - financial_year
@@ -9200,6 +9456,10 @@ components:
           nullable: true
         dispatch_mode:
           $ref: '#/components/schemas/DispatchModeEnum'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -9214,6 +9474,7 @@ components:
             $ref: '#/components/schemas/OrderItemPayload'
       required:
       - actual_delivery_date
+      - booked_for
       - city
       - client
       - created_at
@@ -9308,8 +9569,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/IdName'
           nullable: true
-          description: City of the latest visit's field trip; null for a farmer recorded
-            without a trip.
+          description: City of the latest visit's field trip; null if recorded without
+            a trip.
         land_area_bigha:
           type: string
           description: Land held at the latest visit, in bigha.
@@ -10421,10 +10682,13 @@ components:
           type: boolean
         is_lab_tester:
           type: boolean
+        is_sales_admin:
+          type: boolean
       required:
       - id
       - is_godown_manager
       - is_lab_tester
+      - is_sales_admin
       - is_sales_person
       - name
       - phone_number
@@ -10826,6 +11090,10 @@ components:
           nullable: true
         dispatch_mode:
           $ref: '#/components/schemas/DispatchModeEnum'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -10846,6 +11114,7 @@ components:
             has none. A REJECTED return is not shown.
       required:
       - actual_delivery_date
+      - booked_for
       - client
       - delivery_address
       - dispatch_mode
@@ -10944,6 +11213,10 @@ components:
           format: date
         dispatch_mode:
           type: string
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgSummary'
+          nullable: true
         total_amount:
           type: string
         total_packets:
@@ -10966,6 +11239,7 @@ components:
           format: date-time
           nullable: true
       required:
+      - booked_for
       - city
       - client
       - created_at
@@ -11044,6 +11318,10 @@ components:
           nullable: true
         dispatch_mode:
           $ref: '#/components/schemas/DispatchModeEnum'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -11058,6 +11336,7 @@ components:
             $ref: '#/components/schemas/OrderItemPayload'
       required:
       - actual_delivery_date
+      - booked_for
       - client
       - delivery_address
       - dispatch_mode
@@ -11481,6 +11760,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CustomOrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: Child org to set ({id} or {party_name, village_name, ...});
+            send null to clear it, omit to leave it unchanged.
     PatchedUpdateGodownManagerRequest:
       type: object
       description: |-
@@ -11654,6 +11939,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: Child org to set ({id} or {party_name, village_name, ...});
+            send null to clear it, omit to leave it unchanged.
     PatchedUpdateOtherMaterialTypeRequest:
       type: object
       description: Request validation for updating an ``OtherMaterialType`` (all fields
@@ -12636,6 +12927,17 @@ components:
       required:
       - name
       - phone_number
+    SalesPersonOption:
+      type: object
+      description: Output shape for one bookable sales person (schema only).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     SalesPersonPayload:
       type: object
       description: Swagger schema for one sales person row (city only).
