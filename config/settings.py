@@ -363,7 +363,9 @@ CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 # Override with DEV_SPA_PORT if you need a different one. DEBUG-only; production
 # supplies its real origins through the CSRF_TRUSTED_ORIGINS env var.
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:55524"
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
 ]
 
 # The preprod deployment runs with DEBUG=True and serves its SPA from
