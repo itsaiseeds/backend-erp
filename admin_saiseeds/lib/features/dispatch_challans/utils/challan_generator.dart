@@ -351,12 +351,16 @@ class ChallanGenerator {
     );
   }
 
-  static pw.Widget _inlinePair(String label, String value) {
+  static pw.Widget _inlinePair(
+    String label,
+    String value, {
+    double labelWidth = 52,
+  }) {
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.SizedBox(
-          width: 52,
+          width: labelWidth,
           child: pw.Text(
             label,
             style: pw.TextStyle(
@@ -622,6 +626,8 @@ class ChallanGenerator {
   // ══════════════ DECLARATION ══════════════
 
   static pw.Widget _declaration(DispatchChallanModel challan) {
+    final String licenceNumber = challan.ourDetails?.seedsLicenceNumber ?? '';
+
     return pw.Container(
       width: double.infinity,
       decoration: pw.BoxDecoration(
@@ -653,6 +659,14 @@ class ChallanGenerator {
               lineSpacing: 1.4,
             ),
           ),
+          if (licenceNumber.isNotEmpty) ...[
+            pw.SizedBox(height: 4),
+            _inlinePair(
+              'Seeds Licence No',
+              licenceNumber,
+              labelWidth: 86,
+            ),
+          ],
         ],
       ),
     );

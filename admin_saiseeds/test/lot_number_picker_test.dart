@@ -6,18 +6,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const String _productName = 'SAI-33';
+
 const List<DispatchLotNumberModel> _lots = [
   DispatchLotNumberModel(
     lotNumber: 'LOT-001',
+    productName: _productName,
     lastUsedAt: '2026-10-01T00:00:00Z',
   ),
   DispatchLotNumberModel(
     lotNumber: 'LOT-002',
+    productName: _productName,
     lastUsedAt: '2026-10-03T00:00:00Z',
   ),
   DispatchLotNumberModel(
     lotNumber: 'LOT-003',
+    productName: _productName,
     lastUsedAt: '2026-10-02T00:00:00Z',
+  ),
+  // A different product's lot -- present in the same API response, but must
+  // never show up in a picker scoped to _productName.
+  DispatchLotNumberModel(
+    lotNumber: 'OTHER-LOT',
+    productName: 'SAI-3353',
+    lastUsedAt: '2026-10-04T00:00:00Z',
   ),
 ];
 
@@ -31,6 +43,7 @@ class _Harness {
 Future<_Harness> _pumpPicker(
   WidgetTester tester, {
   List<DispatchLotNumberModel> lots = _lots,
+  String productName = _productName,
 }) async {
   tester.view.devicePixelRatio = 1.0;
   tester.view.physicalSize = const Size(1200, 900);
@@ -48,6 +61,8 @@ Future<_Harness> _pumpPicker(
             builder: (context, setState) => LotNumberPickerField(
               value: value,
               lotNumbers: lots,
+              productName: productName,
+              productPackagingName: productName,
               onSelected: (lot) {
                 harness.picked.add(lot);
                 setState(() => value = lot);
@@ -95,6 +110,15 @@ void main() {
     expect(find.text('LOT-001'), findsOneWidget);
     expect(find.text('LOT-002'), findsOneWidget);
     expect(find.text('LOT-003'), findsOneWidget);
+  });
+
+  testWidgets('a lot recorded for a different product is not offered', (
+    tester,
+  ) async {
+    await _pumpPicker(tester);
+    await _focusField(tester);
+
+    expect(find.text('OTHER-LOT'), findsNothing);
   });
 
   testWidgets('typing narrows the recent lot numbers', (tester) async {
@@ -207,6 +231,8 @@ void main() {
           body: LotNumberPickerField(
             value: const DispatchLotNumberModel(lotNumber: 'LOT-042'),
             lotNumbers: _lots,
+            productName: _productName,
+            productPackagingName: _productName,
             onSelected: (_) {},
             onFreeEntry: (_) {},
           ),

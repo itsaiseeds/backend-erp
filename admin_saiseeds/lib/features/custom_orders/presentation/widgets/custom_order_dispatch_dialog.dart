@@ -327,6 +327,7 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
         for (final CustomOrderItemModel item in _lines) ...[
           LotNumberPickerField(
             productPackagingName: item.productName + "("+item.packets.toString()+" x "+item.packetWeight+" Kg)",
+            productName: item.productName,
             value: _lotValues[_keyOf(item)],
             lotNumbers: _lotNumbers,
             enabled: !_isSubmitting,

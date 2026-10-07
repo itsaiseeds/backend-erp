@@ -5,7 +5,11 @@ import 'searchable_field.dart';
 
 class LotNumberPickerField extends StatelessWidget {
   final DispatchLotNumberModel? value;
-  final String  productPackagingName ;
+  final String productPackagingName;
+
+  /// The product this line is for -- the API returns recent lots across
+  /// every product, so this picker only offers the ones that match.
+  final String productName;
   final List<DispatchLotNumberModel> lotNumbers;
   final ValueChanged<DispatchLotNumberModel> onSelected;
   final ValueChanged<String> onFreeEntry;
@@ -17,6 +21,7 @@ class LotNumberPickerField extends StatelessWidget {
     super.key,
     required this.value,
     required this.productPackagingName,
+    required this.productName,
     required this.lotNumbers,
     required this.onSelected,
     required this.onFreeEntry,
@@ -29,13 +34,21 @@ class LotNumberPickerField extends StatelessWidget {
 
   static String searchText(DispatchLotNumberModel lot) => lot.lotNumber;
 
+  List<DispatchLotNumberModel> get _productLots {
+    final String needle = productName.trim().toLowerCase();
+    if (needle.isEmpty) return lotNumbers;
+    return lotNumbers
+        .where((lot) => lot.productName.trim().toLowerCase() == needle)
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SearchableField<DispatchLotNumberModel>(
       label: "${AppStrings.FIELD_LOT_NUMBER} : $productPackagingName",
       hintText: AppStrings.FIELD_LOT_NUMBER_RECENT_HINT,
       value: value,
-      items: lotNumbers,
+      items: _productLots,
       itemToString: label,
       searchText: searchText,
       isSame: (a, b) => a.lotNumber == b.lotNumber,

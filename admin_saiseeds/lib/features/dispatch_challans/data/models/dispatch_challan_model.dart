@@ -57,6 +57,7 @@ class ChallanCompanyModel {
   final String contactNumber;
   final String email;
   final String web;
+  final String seedsLicenceNumber;
 
   const ChallanCompanyModel({
     this.companyName = '',
@@ -66,6 +67,7 @@ class ChallanCompanyModel {
     this.contactNumber = '',
     this.email = '',
     this.web = '',
+    this.seedsLicenceNumber = '',
   });
 
   factory ChallanCompanyModel.fromJson(Map<String, dynamic> json) {
@@ -77,6 +79,7 @@ class ChallanCompanyModel {
       contactNumber: '${json['contact_number'] ?? ''}',
       email: json['email'] as String? ?? '',
       web: json['web'] as String? ?? '',
+      seedsLicenceNumber: '${json['seeds_licence_number'] ?? ''}',
     );
   }
 }

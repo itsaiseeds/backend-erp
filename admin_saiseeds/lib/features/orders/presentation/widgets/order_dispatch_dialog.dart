@@ -323,6 +323,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
           LotNumberPickerField(
             value: _lotValues[line.publicId],
             lotNumbers: _lotNumbers,
+            productName: line.productName,
             enabled: !_isSubmitting,
             isUnavailable: _lotsUnavailable,
             onSelected: (lot) => _setLot(line.publicId, lot),
