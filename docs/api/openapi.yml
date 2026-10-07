@@ -38,9 +38,8 @@ paths:
   /android/api/v1/auth/login:
     post:
       operationId: android_api_v1_auth_login_create
-      description: |-
-        Validate a TOTP code, then issue a bearer token for that sales person,
-        godown manager or lab tester.
+      description: Validate a TOTP code, then issue a bearer token for that sales
+        person or godown manager.
       tags:
       - Android · Auth
       requestBody:
@@ -405,183 +404,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/FieldTripPayload'
           description: ''
-  /android/api/v1/farmer/{public_id}:
-    get:
-      operationId: android_api_v1_farmer_retrieve
-      description: Read, edit or delete one of the caller's independent farmers.
-      summary: Get one farmer I recorded outside a field trip
-      parameters:
-      - in: path
-        name: public_id
-        schema:
-          type: string
-        description: The farmer's public id (FV-…).
-        required: true
-      tags:
-      - Android · Field trips
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FarmerVisitPayload'
-          description: ''
-    patch:
-      operationId: android_api_v1_farmer_update
-      description: Read, edit or delete one of the caller's independent farmers.
-      summary: Edit a farmer I recorded outside a field trip
-      parameters:
-      - in: path
-        name: public_id
-        schema:
-          type: string
-        description: The farmer's public id (FV-…).
-        required: true
-      tags:
-      - Android · Field trips
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FarmerVisitPayload'
-          description: ''
-    delete:
-      operationId: android_api_v1_farmer_delete
-      description: Read, edit or delete one of the caller's independent farmers.
-      summary: Delete a farmer I recorded outside a field trip
-      parameters:
-      - in: path
-        name: public_id
-        schema:
-          type: string
-        description: The farmer's public id (FV-…).
-        required: true
-      tags:
-      - Android · Field trips
-      security:
-      - bearerAuth: []
-      responses:
-        '204':
-          description: No response body
-  /android/api/v1/farmers:
-    get:
-      operationId: android_api_v1_farmers_list
-      description: List (GET) or record (POST) the caller's independent farmers.
-      summary: List the farmers I recorded outside a field trip
-      parameters:
-      - in: query
-        name: all
-        schema:
-          type: boolean
-          default: false
-        description: When true, ignore page / page_size and return every row matching
-          the filters as a single page (total_pages 1, page numbers null).
-      - in: query
-        name: contact_number
-        schema:
-          type: string
-        description: Case-insensitive substring of the farmer's contact number. Single
-          value; AND-ed with the other filters.
-      - in: query
-        name: farmer_name
-        schema:
-          type: string
-        description: Case-insensitive substring of the farmer's name. Single value;
-          AND-ed with the other filters.
-      - in: query
-        name: is_lead
-        schema:
-          type: string
-        description: 'true: leads only; false: everyone else. Single value; AND-ed
-          with the other filters.'
-      - in: query
-        name: page
-        schema:
-          type: integer
-        description: 1-based page number.
-      - in: query
-        name: page_size
-        schema:
-          type: integer
-        description: Rows per page (default 10, max 100).
-      - in: query
-        name: public_id
-        schema:
-          type: string
-        description: Case-insensitive substring of the public id (FV-XXXXXXXXXXXX).
-          Single value; AND-ed with the other filters.
-      - in: query
-        name: sort
-        schema:
-          type: string
-        description: Comma-separated sort keys (created_at, land_area, farmer_name);
-          prefix a key with '-' for descending. Defaults to the view's natural order.
-      - in: query
-        name: uses_our_products
-        schema:
-          type: string
-        description: 'true: farmers using at least one of our products; false: none.
-          Single value; AND-ed with the other filters.'
-      - in: query
-        name: village
-        schema:
-          type: string
-        description: Case-insensitive substring of the village. Single value; AND-ed
-          with the other filters.
-      tags:
-      - Android · Field trips
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FarmerVisitPage'
-          description: ''
-    post:
-      operationId: android_api_v1_farmers_create
-      description: List (GET) or record (POST) the caller's independent farmers.
-      summary: Record a farmer outside a field trip
-      tags:
-      - Android · Field trips
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateFarmerRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CreateFarmerRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CreateFarmerRequest'
-        required: true
-      security:
-      - bearerAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FarmerVisitPayload'
-          description: ''
   /android/api/v1/field-trip-farmer-visits/{public_id}:
     get:
       operationId: android_api_v1_get_field_trip_farmer_visits_list
@@ -821,6 +643,12 @@ paths:
           type: string
         description: Case-insensitive substring of the public id (C-XXXXXXXXXXXX).
           Single value; AND-ed with the other filters.
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
       - in: query
         name: sort
         schema:
@@ -1274,8 +1102,9 @@ paths:
   /android/api/v1/godown/inward-raw-material/{public_id}:
     patch:
       operationId: android_api_v1_godown_inward_raw_material_partial_update
-      description: Confirm a lot unchanged or soft-delete it (godown manager only).
-      summary: Update an inward raw-material lot (no writable fields)
+      description: Update the lifecycle or soft-delete a raw-material lot (godown
+        manager only).
+      summary: Update an inward raw-material lot
       parameters:
       - in: path
         name: public_id
@@ -1284,6 +1113,17 @@ paths:
         required: true
       tags:
       - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
       security:
       - bearerAuth: []
       responses:
@@ -1295,7 +1135,8 @@ paths:
           description: ''
     delete:
       operationId: android_api_v1_godown_inward_raw_material_destroy
-      description: Confirm a lot unchanged or soft-delete it (godown manager only).
+      description: Update the lifecycle or soft-delete a raw-material lot (godown
+        manager only).
       summary: Delete an inward raw-material lot
       parameters:
       - in: path
@@ -1703,209 +1544,6 @@ paths:
                 items:
                   $ref: '#/components/schemas/LooseStockPayload'
           description: ''
-  /android/api/v1/lab/lab-testing/{public_id}:
-    get:
-      operationId: android_api_v1_lab_testing_retrieve
-      description: Read or correct one lab test (lab tester only).
-      summary: Get one lab test in detail
-      parameters:
-      - in: path
-        name: public_id
-        schema:
-          type: string
-        required: true
-      tags:
-      - Android · Lab
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTestingPayload'
-          description: ''
-    patch:
-      operationId: android_api_v1_lab_testing_update
-      description: Read or correct one lab test (lab tester only).
-      summary: Edit a lab test (a changed result moves the lot In Use <-> Rejected)
-      parameters:
-      - in: path
-        name: public_id
-        schema:
-          type: string
-        required: true
-      tags:
-      - Android · Lab
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTestingPayload'
-          description: ''
-  /android/api/v1/lab/lab-testings:
-    get:
-      operationId: android_api_v1_lab_testings_list
-      description: List (GET) or submit (POST) lab tests (lab tester only).
-      summary: List lab tests (filter by product / result / lot status, sortable)
-      parameters:
-      - in: query
-        name: all
-        schema:
-          type: boolean
-          default: false
-        description: When true, ignore page / page_size and return every row matching
-          the filters as a single page (total_pages 1, page numbers null).
-      - in: query
-        name: lot_status
-        schema:
-          type: string
-        description: Status of the tested lot (Lab Testing / In Use / Rejected). Comma-separated
-          (any match); AND-ed with the other filters.
-      - in: query
-        name: page
-        schema:
-          type: integer
-        description: 1-based page number.
-      - in: query
-        name: page_size
-        schema:
-          type: integer
-        description: Rows per page (default 10, max 100).
-      - in: query
-        name: product
-        schema:
-          type: string
-        description: Product public id(s) (see options). Comma-separated (any match);
-          AND-ed with the other filters.
-      - in: query
-        name: public_id
-        schema:
-          type: string
-        description: Case-insensitive substring of the public id (LT-XXXXXXXXXXXX).
-          Single value; AND-ed with the other filters.
-      - in: query
-        name: result
-        schema:
-          type: string
-        description: Pass / Fail. Comma-separated (any match); AND-ed with the other
-          filters.
-      - in: query
-        name: sort
-        schema:
-          type: string
-        description: Comma-separated sort keys (tested_at, product); prefix a key
-          with '-' for descending. Defaults to the view's natural order.
-      tags:
-      - Android · Lab
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTestingListPage'
-          description: ''
-    post:
-      operationId: android_api_v1_lab_testings_create
-      description: List (GET) or submit (POST) lab tests (lab tester only).
-      summary: Submit a lot's lab test (Pass -> In Use, Fail -> Rejected)
-      tags:
-      - Android · Lab
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateLabTestingRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CreateLabTestingRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CreateLabTestingRequest'
-        required: true
-      security:
-      - bearerAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTestingPayload'
-          description: ''
-  /android/api/v1/lab/pending-lots:
-    get:
-      operationId: android_api_v1_lab_pending_lots_list
-      description: List the lots waiting for a lab test (lab tester only).
-      summary: List raw-material lots waiting for a lab test (oldest first)
-      parameters:
-      - in: query
-        name: all
-        schema:
-          type: boolean
-          default: false
-        description: When true, ignore page / page_size and return every row matching
-          the filters as a single page (total_pages 1, page numbers null).
-      - in: query
-        name: page
-        schema:
-          type: integer
-        description: 1-based page number.
-      - in: query
-        name: page_size
-        schema:
-          type: integer
-        description: Rows per page (default 10, max 100).
-      - in: query
-        name: party
-        schema:
-          type: string
-        description: Party id(s). Comma-separated (any match); AND-ed with the other
-          filters.
-      - in: query
-        name: product
-        schema:
-          type: string
-        description: Product public id(s) (see options). Comma-separated (any match);
-          AND-ed with the other filters.
-      - in: query
-        name: public_id
-        schema:
-          type: string
-        description: Case-insensitive substring of the public id (IR-XXXXXXXXXXXX).
-          Single value; AND-ed with the other filters.
-      - in: query
-        name: sort
-        schema:
-          type: string
-        description: Comma-separated sort keys (created_at, product, effective_date);
-          prefix a key with '-' for descending. Defaults to the view's natural order.
-      tags:
-      - Android · Lab
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InwardRawMaterialListPage'
-          description: ''
   /android/api/v1/notification/{id}/read:
     post:
       operationId: android_api_v1_notification_read_create
@@ -2213,6 +1851,12 @@ paths:
           type: string
         description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
         required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
       tags:
       - Android · Clients
       security:
@@ -2238,6 +1882,12 @@ paths:
           type: string
         description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
         required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
       tags:
       - Android · Clients
       security:
@@ -2382,6 +2032,24 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/SalesAdminContact'
+          description: ''
+  /android/api/v1/utilities/sales-persons:
+    get:
+      operationId: android_api_v1_utilities_sales_persons_list
+      description: List the sales persons an admin may act for.
+      summary: List sales persons an admin can book orders for (id and name only)
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SalesPersonOption'
           description: ''
   /android/api/v1/utilities/states:
     get:
@@ -3074,7 +2742,7 @@ paths:
         name: limit
         schema:
           type: integer
-        description: Entries to return (default 20, max 100).
+        description: Lots to return per product (default 20, max 100).
       - in: query
         name: q
         schema:
@@ -3521,12 +3189,6 @@ paths:
           type: string
         description: Case-insensitive substring of the farmer's name. Single value;
           AND-ed with the other filters.
-      - in: query
-        name: is_lead
-        schema:
-          type: string
-        description: 'true: farmers whose latest record is flagged as a lead; false:
-          the rest. Single value; AND-ed with the other filters.'
       - in: query
         name: land_area_gte
         schema:
@@ -4319,209 +3981,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InwardRawMaterialPayload'
-          description: ''
-  /api/sales-admin/lab-testers:
-    get:
-      operationId: api_sales_admin_lab_testers_list
-      description: List (GET) or create (POST) lab testers (app admin only).
-      summary: List lab testers
-      tags:
-      - Admin · Users
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LabTesterPayload'
-          description: ''
-    post:
-      operationId: api_sales_admin_lab_testers_create
-      description: List (GET) or create (POST) lab testers (app admin only).
-      summary: Create a lab tester
-      tags:
-      - Admin · Users
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateLabTesterRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CreateLabTesterRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CreateLabTesterRequest'
-        required: true
-      security:
-      - sessionAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTesterPayload'
-          description: ''
-  /api/sales-admin/lab-testers/{id}:
-    patch:
-      operationId: api_sales_admin_lab_testers_partial_update
-      description: Update or delete a lab tester (app admin only).
-      summary: Update a lab tester
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - Admin · Users
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateLabTesterRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateLabTesterRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateLabTesterRequest'
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTesterPayload'
-          description: ''
-    delete:
-      operationId: api_sales_admin_lab_testers_destroy
-      description: Update or delete a lab tester (app admin only).
-      summary: Delete a lab tester
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - Admin · Users
-      security:
-      - sessionAuth: []
-      responses:
-        '204':
-          description: No response body
-  /api/sales-admin/lab-testers/{id}/rotate-qr:
-    post:
-      operationId: api_sales_admin_lab_testers_rotate_qr_create
-      description: Rotate a lab tester's authenticator QR (app admin only).
-      summary: Rotate a lab tester's authenticator QR
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - Admin · Users
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTesterPayload'
-          description: ''
-  /api/sales-admin/lab-testing/{public_id}:
-    get:
-      operationId: api_sales_admin_lab_testing_retrieve
-      description: Read one lab test (app admin only).
-      summary: Get one lab test in detail
-      parameters:
-      - in: path
-        name: public_id
-        schema:
-          type: string
-        required: true
-      tags:
-      - Admin · Inward
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTestingPayload'
-          description: ''
-  /api/sales-admin/lab-testings:
-    get:
-      operationId: sales_admin_lab_testings_list
-      description: List lab tests (app admin only).
-      summary: List lab tests (filter by product / result / lot status, sortable)
-      parameters:
-      - in: query
-        name: all
-        schema:
-          type: boolean
-          default: false
-        description: When true, ignore page / page_size and return every row matching
-          the filters as a single page (total_pages 1, page numbers null).
-      - in: query
-        name: lot_status
-        schema:
-          type: string
-        description: Status of the tested lot (Lab Testing / In Use / Rejected). Comma-separated
-          (any match); AND-ed with the other filters.
-      - in: query
-        name: page
-        schema:
-          type: integer
-        description: 1-based page number.
-      - in: query
-        name: page_size
-        schema:
-          type: integer
-        description: Rows per page (default 10, max 100).
-      - in: query
-        name: product
-        schema:
-          type: string
-        description: Product public id(s) (see options). Comma-separated (any match);
-          AND-ed with the other filters.
-      - in: query
-        name: public_id
-        schema:
-          type: string
-        description: Case-insensitive substring of the public id (LT-XXXXXXXXXXXX).
-          Single value; AND-ed with the other filters.
-      - in: query
-        name: result
-        schema:
-          type: string
-        description: Pass / Fail. Comma-separated (any match); AND-ed with the other
-          filters.
-      - in: query
-        name: sort
-        schema:
-          type: string
-        description: Comma-separated sort keys (tested_at, product); prefix a key
-          with '-' for descending. Defaults to the view's natural order.
-      tags:
-      - Admin · Inward
-      security:
-      - sessionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LabTestingListPage'
           description: ''
   /api/sales-admin/non-stock-inward/{public_id}:
     patch:
@@ -6580,7 +6039,6 @@ components:
           maxLength: 10
         gst_number:
           type: string
-          minLength: 1
           maxLength: 15
       required:
       - public_id
@@ -6666,12 +6124,12 @@ components:
           type: boolean
         is_godown_manager:
           type: boolean
-        is_lab_tester:
+        is_sales_admin:
           type: boolean
       required:
       - id
       - is_godown_manager
-      - is_lab_tester
+      - is_sales_admin
       - is_sales_person
       - name
       - phone_number
@@ -7506,13 +6964,12 @@ components:
           maxLength: 10
         gst_number:
           type: string
-          minLength: 1
+          default: ''
           maxLength: 15
       required:
       - addresses
       - company_name
       - contacts
-      - gst_number
       - transport_agencies
     CreateCropRequest:
       type: object
@@ -7551,50 +7008,6 @@ components:
       - client_address_id
       - client_public_id
       - items
-    CreateFarmerRequest:
-      type: object
-      description: |-
-        A farmer a sales person records on their own, outside any field trip.
-
-        Same fields as :class:`CreateFarmerVisitSerializer` minus the trip; with no
-        trip to default from, ``village`` is required.
-      properties:
-        farmer_name:
-          type: string
-          minLength: 1
-          maxLength: 255
-        contact_number:
-          type: string
-          minLength: 1
-        village:
-          type: string
-          minLength: 1
-          maxLength: 255
-        land_area_bigha:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
-          description: Land held, in bigha.
-        is_lead:
-          type: boolean
-          default: false
-        crop_ids:
-          type: array
-          items:
-            type: integer
-          description: At least one crop the farmer grows.
-        product_public_ids:
-          type: array
-          items:
-            type: string
-            minLength: 1
-          description: Our products the farmer uses; empty if none.
-      required:
-      - contact_number
-      - crop_ids
-      - farmer_name
-      - land_area_bigha
-      - village
     CreateFarmerVisitRequest:
       type: object
       description: |-
@@ -7604,9 +7017,6 @@ components:
         ``utilities/products``. An empty (or omitted) product list records that the
         farmer does not use our products.
       properties:
-        is_lead:
-          type: boolean
-          default: false
         field_trip_public_id:
           type: string
           minLength: 1
@@ -7695,9 +7105,9 @@ components:
       description: |-
         Request validation for booking a new raw-material lot.
 
-        ``status`` is not accepted: every lot starts ``Lab Testing`` and a lab
-        tester moves it to ``In Use`` (Pass) or ``Rejected`` (Fail). ``effective_date``
-        is stamped (today) at that move and is deliberately absent here.
+        ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
+        ``In Use`` or ``Rejected`` later with ``PATCH``. ``effective_date`` is
+        stamped (today) at that flip and is deliberately absent here.
         ``lab_sampling_date`` may be given explicitly; left out, it defaults to
         today -- a lot never starts with no sampling date, since it arrives for
         lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
@@ -7734,63 +7144,6 @@ components:
       - party
       - product
       - quantity_kg
-    CreateLabTesterRequest:
-      type: object
-      description: Request validation for creating a new ``LabTester``.
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 255
-        email:
-          nullable: true
-          oneOf:
-          - type: string
-            format: email
-          - type: string
-            maxLength: 0
-        phone_number:
-          type: string
-          minLength: 1
-          maxLength: 10
-      required:
-      - name
-      - phone_number
-    CreateLabTestingRequest:
-      type: object
-      description: Request validation for submitting the lab test of a lot in Lab
-        Testing.
-      properties:
-        number_of_plants:
-          type: integer
-          minimum: 1
-        female_count:
-          type: integer
-          minimum: 0
-        ot_count:
-          type: integer
-          minimum: 0
-        result:
-          allOf:
-          - $ref: '#/components/schemas/ResultEnum'
-          description: |-
-            The tester's own verdict, independent of the counts. Pass moves the lot to In Use, Fail to Rejected.
-
-            * `Pass` - Pass
-            * `Fail` - Fail
-        comment:
-          type: string
-          default: ''
-        inward_raw_material:
-          type: string
-          minLength: 1
-          description: Public id (IR-...) of the lot being tested.
-      required:
-      - female_count
-      - inward_raw_material
-      - number_of_plants
-      - ot_count
-      - result
     CreateMultiSelectBagOrderRequest:
       type: object
       description: |-
@@ -7821,6 +7174,11 @@ components:
           format: date
           nullable: true
           description: Defaults to the day after booking.
+        created_by:
+          type: integer
+          nullable: true
+          description: 'Admin only: user id of the sales person to book for (from
+            GET /android/api/v1/utilities/sales-persons). Defaults to the caller.'
         items:
           type: array
           items:
@@ -8485,12 +7843,18 @@ components:
       properties:
         lot_number:
           type: string
+        product_id:
+          type: integer
+        product_name:
+          type: string
         last_used_at:
           type: string
           format: date-time
       required:
       - last_used_at
       - lot_number
+      - product_id
+      - product_name
     DispatchLotNumbers:
       type: object
       description: Output shape for the response envelope (schema only).
@@ -8890,12 +8254,6 @@ components:
           type: string
         land_area_bigha:
           type: string
-        is_lead:
-          type: boolean
-        field_trip_public_id:
-          type: string
-          nullable: true
-          description: Null for a farmer recorded outside any trip.
         crops:
           type: array
           items:
@@ -8910,10 +8268,7 @@ components:
           type: string
           format: date-time
         field_trip:
-          allOf:
-          - $ref: '#/components/schemas/ExportFarmerVisitFieldTrip'
-          nullable: true
-          description: Null for a farmer recorded outside any trip.
+          $ref: '#/components/schemas/ExportFarmerVisitFieldTrip'
         sales_person:
           $ref: '#/components/schemas/UserContactRef'
       required:
@@ -8922,8 +8277,6 @@ components:
       - crops
       - farmer_name
       - field_trip
-      - field_trip_public_id
-      - is_lead
       - land_area_bigha
       - products
       - public_id
@@ -9107,11 +8460,6 @@ components:
           type: string
           format: date
           nullable: true
-        lab_testing:
-          allOf:
-          - $ref: '#/components/schemas/InwardLabTestingRef'
-          nullable: true
-          description: The lot's lab test; null until a lab tester has tested it.
         created_at:
           type: string
           format: date-time
@@ -9120,7 +8468,6 @@ components:
       - effective_date
       - farmer_name
       - lab_sampling_date
-      - lab_testing
       - lot_no
       - party
       - product
@@ -9307,15 +8654,10 @@ components:
         city:
           allOf:
           - $ref: '#/components/schemas/IdName'
-          nullable: true
-          description: City of the latest visit's field trip; null for a farmer recorded
-            without a trip.
+          description: City of the latest visit's field trip.
         land_area_bigha:
           type: string
           description: Land held at the latest visit, in bigha.
-        is_lead:
-          type: boolean
-          description: Lead flag of the latest record.
         crops:
           type: array
           items:
@@ -9352,7 +8694,6 @@ components:
       - contact_number
       - crops
       - farmer_name
-      - is_lead
       - land_area_bigha
       - last_visited_at
       - products
@@ -9409,12 +8750,6 @@ components:
           type: string
         land_area_bigha:
           type: string
-        is_lead:
-          type: boolean
-        field_trip_public_id:
-          type: string
-          nullable: true
-          description: Null for a farmer recorded outside any trip.
         crops:
           type: array
           items:
@@ -9433,8 +8768,6 @@ components:
       - created_at
       - crops
       - farmer_name
-      - field_trip_public_id
-      - is_lead
       - land_area_bigha
       - products
       - public_id
@@ -9717,23 +9050,6 @@ components:
       required:
       - id
       - name
-    InwardLabTestingRef:
-      type: object
-      description: Output shape for the ``lab_testing`` reference on a lot.
-      properties:
-        public_id:
-          type: string
-        result:
-          type: string
-          nullable: true
-          description: Pass / Fail; null while the lot awaits a (re-)test.
-        grow_out_test:
-          type: string
-          description: 100 - genetical impurity, in percent.
-      required:
-      - grow_out_test
-      - public_id
-      - result
     InwardOtherMaterialListPage:
       type: object
       description: Output shape for the paginated envelope (schema only).
@@ -9947,11 +9263,6 @@ components:
           type: string
           format: date
           nullable: true
-        lab_testing:
-          allOf:
-          - $ref: '#/components/schemas/InwardLabTestingRef'
-          nullable: true
-          description: The lot's lab test; null until a lab tester has tested it.
         created_by:
           allOf:
           - $ref: '#/components/schemas/InwardCreatedByRef'
@@ -9962,7 +9273,6 @@ components:
       - effective_date
       - farmer_name
       - lab_sampling_date
-      - lab_testing
       - lot_no
       - party
       - product
@@ -9992,152 +9302,6 @@ components:
       required:
       - order_public_id
       - public_id
-    LabTesterPayload:
-      type: object
-      description: Swagger schema for one lab tester row (no location, no audit keys).
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        email:
-          type: string
-          nullable: true
-        phone_number:
-          type: string
-        role:
-          type: string
-        created_by:
-          allOf:
-          - $ref: '#/components/schemas/UserRef'
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        is_admin:
-          type: boolean
-        totp:
-          $ref: '#/components/schemas/Totp'
-      required:
-      - created_at
-      - id
-      - is_admin
-      - name
-      - phone_number
-      - role
-    LabTestingListPage:
-      type: object
-      description: Output shape for the paginated lab-testing envelope (schema only).
-      properties:
-        total_count:
-          type: integer
-        total_pages:
-          type: integer
-        next_page_number:
-          type: integer
-          nullable: true
-        previous_page_number:
-          type: integer
-          nullable: true
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/LabTestingPayload'
-        available_filters:
-          type: array
-          items:
-            $ref: '#/components/schemas/FilterCatalogueEntry'
-        available_sorts:
-          type: array
-          items:
-            $ref: '#/components/schemas/SortCatalogueEntry'
-      required:
-      - available_filters
-      - available_sorts
-      - next_page_number
-      - previous_page_number
-      - results
-      - total_count
-      - total_pages
-    LabTestingLotRef:
-      type: object
-      description: The lot a lab test belongs to.
-      properties:
-        public_id:
-          type: string
-        product:
-          $ref: '#/components/schemas/InwardRawMaterialProductRef'
-        party:
-          $ref: '#/components/schemas/InwardRawMaterialPartyRef'
-        lot_no:
-          type: string
-        quantity_kg:
-          type: string
-        status:
-          type: string
-      required:
-      - lot_no
-      - party
-      - product
-      - public_id
-      - quantity_kg
-      - status
-    LabTestingPayload:
-      type: object
-      description: Output shape for one lab test (``LT-...``) with its computed figures.
-      properties:
-        public_id:
-          type: string
-        number_of_plants:
-          type: integer
-        female_count:
-          type: integer
-        ot_count:
-          type: integer
-        genetical_impurity:
-          type: string
-          description: (female + OT) / plants * 100, in percent (computed).
-        grow_out_test:
-          type: string
-          description: 100 - genetical impurity, in percent (computed).
-        result:
-          type: string
-          nullable: true
-          description: Pass / Fail; null while the lot awaits a (re-)test.
-        comment:
-          type: string
-        tested_by:
-          allOf:
-          - $ref: '#/components/schemas/LabTestingTestedByRef'
-          nullable: true
-        tested_at:
-          type: string
-          format: date-time
-          nullable: true
-        inward_raw_material:
-          $ref: '#/components/schemas/LabTestingLotRef'
-      required:
-      - comment
-      - female_count
-      - genetical_impurity
-      - grow_out_test
-      - inward_raw_material
-      - number_of_plants
-      - ot_count
-      - public_id
-      - result
-      - tested_at
-      - tested_by
-    LabTestingTestedByRef:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-      required:
-      - id
-      - name
     LedgerActor:
       type: object
       properties:
@@ -10419,12 +9583,12 @@ components:
           type: boolean
         is_godown_manager:
           type: boolean
-        is_lab_tester:
+        is_sales_admin:
           type: boolean
       required:
       - id
       - is_godown_manager
-      - is_lab_tester
+      - is_sales_admin
       - is_sales_person
       - name
       - phone_number
@@ -11351,8 +10515,6 @@ components:
         crop. ``product_public_ids`` may be empty -- the farmer does not use our
         products. Anything else sent is ignored.
       properties:
-        is_lead:
-          type: boolean
         farmer_name:
           type: string
           minLength: 1
@@ -11509,11 +10671,10 @@ components:
       description: |-
         Request validation for updating a raw-material lot (all fields optional).
 
-        Only ``lab_sampling_date`` and ``status`` are accepted, and ``status`` may
-        only *revert* a lot to ``Lab Testing`` (clearing its effective date): moving
-        a lot out of ``Lab Testing`` is the lab tester's verdict alone, see
-        ``LabTestingOperations``. ``product`` / ``party`` / ``quantity_kg`` are
-        immutable. Any unknown key is ignored.
+        Only ``lab_sampling_date`` and ``status`` are accepted: flipping to
+        ``In Use`` stamps the effective date with today, reverting to
+        ``Lab Testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
+        are immutable. Any unknown key is ignored.
       properties:
         lab_sampling_date:
           type: string
@@ -11521,58 +10682,6 @@ components:
           nullable: true
         status:
           $ref: '#/components/schemas/UpdateInwardRawMaterialStatusEnum'
-    PatchedUpdateLabTesterRequest:
-      type: object
-      description: |-
-        Request validation for updating a ``LabTester`` (name/email/phone).
-
-        Callers pass the ``LabTester`` being edited as ``instance=`` so the phone
-        uniqueness check excludes that user's own row.
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 255
-        email:
-          nullable: true
-          oneOf:
-          - type: string
-            format: email
-          - type: string
-            maxLength: 0
-        phone_number:
-          type: string
-          minLength: 1
-          maxLength: 10
-    PatchedUpdateLabTestingRequest:
-      type: object
-      description: |-
-        Request validation for editing a lab test (send only what changed).
-
-        Inputs are always editable. Changing ``result`` flips the lot In Use <->
-        Rejected; Pass -> Fail is refused when the lot's kilograms are already
-        packed.
-      properties:
-        number_of_plants:
-          type: integer
-          minimum: 1
-        female_count:
-          type: integer
-          minimum: 0
-        ot_count:
-          type: integer
-          minimum: 0
-        result:
-          allOf:
-          - $ref: '#/components/schemas/ResultEnum'
-          description: |-
-            The tester's own verdict, independent of the counts. Pass moves the lot to In Use, Fail to Rejected.
-
-            * `Pass` - Pass
-            * `Fail` - Fail
-        comment:
-          type: string
-          default: ''
     PatchedUpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'
@@ -12088,12 +11197,9 @@ components:
           type: boolean
         can_create_godown_manager:
           type: boolean
-        can_create_lab_tester:
-          type: boolean
       required:
       - can_create_admin
       - can_create_godown_manager
-      - can_create_lab_tester
       - can_create_sales_person
       - user
     ReauthenticateUser:
@@ -12206,14 +11312,6 @@ components:
           maxLength: 32
       required:
       - fcm_token
-    ResultEnum:
-      enum:
-      - Pass
-      - Fail
-      type: string
-      description: |-
-        * `Pass` - Pass
-        * `Fail` - Fail
     ReturnClientRef:
       type: object
       description: Output shape for the client on a return.
@@ -12636,6 +11734,17 @@ components:
       required:
       - name
       - phone_number
+    SalesPersonOption:
+      type: object
+      description: Output shape for one bookable sales person (schema only).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     SalesPersonPayload:
       type: object
       description: Swagger schema for one sales person row (city only).
@@ -13070,12 +12179,9 @@ components:
           type: boolean
         can_create_godown_manager:
           type: boolean
-        can_create_lab_tester:
-          type: boolean
       required:
       - can_create_admin
       - can_create_godown_manager
-      - can_create_lab_tester
       - can_create_sales_person
       - user
     VerifyOTPUser:
@@ -13110,7 +12216,7 @@ tags:
 - name: Admin · Auth
   description: Sales-admin website sign-in and session.
 - name: Admin · Users
-  description: Admin, sales-person, godown-manager and lab-tester accounts.
+  description: Admin, sales-person and godown-manager accounts.
 - name: Admin · Clients
   description: Client records and verification.
 - name: Admin · Orders
@@ -13146,9 +12252,6 @@ tags:
   description: Planning, running and ending field trips, and recording farmers met.
 - name: Android · Godown
   description: 'Godown manager: inward lots, stock positions and recipes.'
-- name: Android · Lab
-  description: 'Lab tester: lots waiting for a test, and submitting / editing lab
-    tests.'
 - name: Android · Utilities
   description: 'Look-ups for the app (either role): geography, crops, products, parties,
     material types and sales-admin contacts.'
