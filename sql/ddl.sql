@@ -651,14 +651,18 @@ CREATE TABLE IF NOT EXISTS public.aggregator_client (
 	public_id varchar(20) NOT NULL,
 	company_name varchar(255) NOT NULL,
 	company_phone varchar(10) NOT NULL,
-	gst_number varchar(15) NOT NULL,
+	gst_number varchar(15) NOT NULL DEFAULT '',
 	status_id int8 NOT NULL,
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
 	CONSTRAINT aggregator_client_pkey PRIMARY KEY (id),
-	CONSTRAINT aggregator_client_public_id_key UNIQUE (public_id),
-	CONSTRAINT aggregator_client_gst_number_key UNIQUE (gst_number)
+	CONSTRAINT aggregator_client_public_id_key UNIQUE (public_id)
 );
+-- GST is optional (stored as ''); a real GSTIN stays unique.
+-- Idempotent upgrade for databases created with the old UNIQUE (gst_number).
+ALTER TABLE public.aggregator_client ALTER COLUMN gst_number SET DEFAULT '';
+ALTER TABLE public.aggregator_client DROP CONSTRAINT IF EXISTS aggregator_client_gst_number_key;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_client_gst_number_nonblank ON public.aggregator_client USING btree (gst_number) WHERE gst_number <> '';
 CREATE INDEX IF NOT EXISTS aggregator_client_public_id_like ON public.aggregator_client USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_client_gst_number_like ON public.aggregator_client USING btree (gst_number varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_client_status_id_idx ON public.aggregator_client USING btree (status_id);

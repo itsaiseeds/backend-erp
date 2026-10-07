@@ -23,7 +23,11 @@ from rest_framework.response import Response
 
 from android.api.base import AndroidSharedView
 
-from .ClientAddressesView import CLIENT_PUBLIC_ID_PARAM, client_of_caller
+from .ClientAddressesView import (
+    CLIENT_PUBLIC_ID_PARAM,
+    SALES_PERSON_ID_PARAM,
+    client_of_caller,
+)
 
 
 class ClientTransportAgencyLinkSerializer(serializers.Serializer):
@@ -54,7 +58,7 @@ class ClientTransportAgenciesView(AndroidSharedView):
     @extend_schema(
         operation_id="android_api_v1_utilities_client_transport_agencies",
         summary="List a client's transport agency links (carrier picker)",
-        parameters=[CLIENT_PUBLIC_ID_PARAM],
+        parameters=[CLIENT_PUBLIC_ID_PARAM, SALES_PERSON_ID_PARAM],
         responses={200: ClientTransportAgencyLinkSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
