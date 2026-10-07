@@ -27,6 +27,7 @@ from aggregator.models import (
 )
 from authentication.models import Admin, GodownManager, SalesPerson, User
 from tests.android.common import AndroidApiTestCase
+from tests.common import lab_verdict
 
 BASE = "/android/api/v1/"
 LOGIN_URL = BASE + "auth/login"
@@ -169,11 +170,14 @@ class GodownManagerApiTest(AndroidApiTestCase):
             return line["incoming_kg"] if line else "0"
 
         self.assertEqual(incoming(), "0")
-        flipped = self.client.patch(
+        # A godown manager cannot decide the lot: only the lab tester's Pass moves it.
+        refused = self.client.patch(
             self._lot_url(booked.data["public_id"]), {"status": "In Use"}, format="json"
         )
-        self.assertEqual(flipped.status_code, 200, flipped.content)
-        self.assertEqual(flipped.data["effective_date"], date.today().isoformat())
+        self.assertEqual(refused.status_code, 400, refused.content)
+        self.assertEqual(incoming(), "0")
+        passed = lab_verdict(booked.data["public_id"], "Pass", actor=self.superuser)
+        self.assertEqual(passed.inward_raw_material.effective_date, date.today())
         self.assertEqual(incoming(), "40.000")
 
     def test_godown_stock_shows_admin_recorded_waste(self):
@@ -184,9 +188,7 @@ class GodownManagerApiTest(AndroidApiTestCase):
         """
         self.login_as(self.manager.user)
         booked = self._book_raw()
-        self.client.patch(
-            self._lot_url(booked.data["public_id"]), {"status": "In Use"}, format="json"
-        )
+        lab_verdict(booked.data["public_id"], "Pass", actor=self.superuser)
         RawMaterialWaste.objects.create(
             product=self.product,
             quantity_kg=Decimal("5"),
@@ -206,15 +208,16 @@ class GodownManagerApiTest(AndroidApiTestCase):
             self.client.get("/api/sales-admin/raw-material-wastes").status_code, (401, 403)
         )
 
-    def test_reverting_or_deleting_an_in_use_lot_with_packed_stock_is_400(self):
-        """The shared refusals (``assert_raw_lot_removable``) bite from Android.
+    def test_a_godown_manager_cannot_move_a_lot_and_cannot_delete_packed_stock(self):
+        """A godown PATCH has no writable fields (status is a 400, a revert included),
+        and the shared delete refusal (``assert_raw_lot_removable``) still bites.
 
-        tests/android/test_godown.py::GodownManagerApiTest::test_reverting_or_deleting_an_in_use_lot_with_packed_stock_is_400
+        tests/android/test_godown.py::GodownManagerApiTest::test_a_godown_manager_cannot_move_a_lot_and_cannot_delete_packed_stock
         """
         self.login_as(self.manager.user)
         booked = self._book_raw()
         url = self._lot_url(booked.data["public_id"])
-        self.client.patch(url, {"status": "In Use"}, format="json")
+        lab_verdict(booked.data["public_id"], "Pass", actor=self.superuser)
         InventoryOperations.record_stock_count(
             product_packaging=ProductPackaging.objects.get(product=self.product),
             bags=1,
@@ -228,16 +231,14 @@ class GodownManagerApiTest(AndroidApiTestCase):
         self.assertTrue(InwardRawMaterial.objects.filter(public_id=booked.data["public_id"]).exists())
 
     def test_an_unpacked_lot_can_be_rejected_and_deleted(self):
-        """Rejected is reachable (the dashboard's enum omits it) and DELETE corrects a booking.
+        """A lot the lab tester failed (Rejected) was never packable, and DELETE corrects a booking.
 
         tests/android/test_godown.py::GodownManagerApiTest::test_an_unpacked_lot_can_be_rejected_and_deleted
         """
         self.login_as(self.manager.user)
         booked = self._book_raw()
         url = self._lot_url(booked.data["public_id"])
-        rejected = self.client.patch(url, {"status": "Rejected"}, format="json")
-        self.assertEqual(rejected.status_code, 200, rejected.content)
-        self.assertEqual(rejected.data["status"], "Rejected")
+        lab_verdict(booked.data["public_id"], "Fail", actor=self.superuser)
         self.assertEqual(self.client.delete(url).status_code, 204)
         self.assertEqual(self.client.delete(url).status_code, 404)
 

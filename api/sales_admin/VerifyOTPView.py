@@ -66,6 +66,7 @@ class VerifyOTPResponseSerializer(serializers.Serializer):
     can_create_admin = serializers.BooleanField()
     can_create_sales_person = serializers.BooleanField()
     can_create_godown_manager = serializers.BooleanField()
+    can_create_lab_tester = serializers.BooleanField()
 
 
 class VerifyOTPThrottle(AnonRateThrottle):
@@ -154,5 +155,6 @@ class VerifyOTPView(APIView):
                 "can_create_admin": user.is_superuser,
                 "can_create_sales_person": user.is_superuser or user.is_admin_user,
                 "can_create_godown_manager": user.is_superuser or user.is_admin_user,
+                "can_create_lab_tester": user.is_superuser or user.is_admin_user,
             }
         )

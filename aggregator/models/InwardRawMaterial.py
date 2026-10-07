@@ -104,6 +104,18 @@ class InwardRawMaterial(
         default=StatusIds.LAB_TESTING.value,
         related_name="inward_raw_materials",
     )
+    lab_testing = models.OneToOneField(
+        "aggregator.LabTesting",
+        verbose_name="lab testing",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="inward_raw_material",
+        help_text=(
+            "The lot's one grow-out test; a re-test after an admin sends the lot "
+            "back to the lab updates this same row."
+        ),
+    )
 
     class Meta:
         verbose_name = "inward raw material"

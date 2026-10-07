@@ -51,6 +51,7 @@ graph TD
         U --> ADMINP["Admin (1:1)"]
         U --> SPP["SalesPerson (1:1)"]
         U --> GMP["GodownManager (1:1)"]
+        U --> LTP["LabTester (1:1)"]
     end
 
     subgraph AGG["Domain (aggregator/)"]
@@ -193,7 +194,7 @@ role-flag parent both client bases build on.
 | Auth classes | `api/authentication.py` | `SessionAuthentication` (DRF session but with a real `WWW-Authenticate` challenge so anonymous = **401**, not 403; used only by the web) + `ExpiringTokenAuthentication` (24h TTL via `TOKEN_TTL_HOURS`; an expired token is deleted on first use; used only by Android) | used by → `AdminApiView`, `AndroidBaseView` |
 | `AdminApiView` | `api/admin.py` | Sales-admin website base: **session cookie only** | → `BaseApiView` |
 | `AdminPaginatedDateRangeListView` | `api/paginated_views.py` | Sales-admin `GET` list base (default `admin_required = True`): paginated + optional/required `start_date_time`..`end_date_time` window + a declarative filter/sort catalogue. Subclass sets `get_queryset` / `serialize_page` and optionally `date_field`, `enforce_date_range_filters`, `queryset_filters`, `sort_options`, `default_sort` | → `AdminApiView`, `common.views.paginated_date_range._PaginatedDateRangeListMixin` |
-| Permissions | `api/permissions.py` | `IsRolePermission` meta-class + `IsAdminUser`, `IsSuperUser`, `IsSalesPerson`, `IsGodownManager`, `IsAndroidRole` (either Android role) | keyed off → `User.is_admin_user/is_superuser/is_salesperson` |
+| Permissions | `api/permissions.py` | `IsRolePermission` meta-class + `IsAdminUser`, `IsSuperUser`, `IsSalesPerson`, `IsGodownManager`, `IsLabTester`, `IsAndroidRole` (any Android role) | keyed off → `User.is_admin_user/is_superuser/is_salesperson` |
 | Top API router | `api/urls.py` | `/api/sales-admin/`, `/api/utilities/` (web, session-only) | → namespace URLconfs |
 | `VerifyOTPView` | `api/sales_admin/VerifyOTPView.py` | `POST /api/sales-admin/auth/otp/verify` — pre-auth, `AllowAny`; verifies the user's **TOTP** code, opens a session, returns the user payload + `can_create_admin`/`can_create_sales_person`/`can_create_godown_manager` flags (no token) | reads → `User`; calls → `login()` + `get_token()` (issues `sessionid` + `csrftoken` cookies) |
 | `AdminDateRangeExportView` | `api/export_views.py` | Base for the date-range exports: validates `start_date`/`end_date` (inclusive IST days, ≤ 31 days), hands a `DateWindow` to `export()`, returns `{start_date, end_date, count, results}`. Business fields only — no audit columns. `admin_required` | ← the five `Export*View`s |
@@ -233,8 +234,10 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `User` | `authentication/models/User.py` | Custom user (`AbstractBaseUser` + `PermissionsMixin`); `phone_number` is `USERNAME_FIELD` (10 digits, no country code); password only for staff; everyone else logs in via **TOTP authenticator app**; `created_by`/`verified_by` self-FK invariants (superusers self-reference); TOTP helpers (`generate_totp_secret`, `enable_totp`, `verify_totp`, provisioning URI); role helpers `role`, `is_salesperson`, `is_admin_user`, `is_verified_user`, `can_login_with_password` | extends → `TimeStampedModel`; related ← `Admin`, `SalesPerson` |
 | `Admin` | `authentication/models/Admin.py` | Application admin profile (1:1). Only a superuser may create one; `can_update_stock_count` gates writing an `InventorySnapshot` (the day's stock count) and nothing else — it does **not** gate order verification; `share_contact` (default false) opts the admin into `utilities/sales-admins` (name + phone only) | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
 | `SalesPerson` | `authentication/models/SalesPerson.py` | Salesperson profile (1:1). Only an Admin (or superuser) may create one; `city` FK | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User`; FK → `aggregator.City` |
+| `LabTester` | `authentication/models/LabTester.py` | Lab tester profile (1:1), no location field; the only role that may decide a raw lot (`LabTestingOperations`). Only an Admin (or superuser) may create one; losing it revokes the user's credentials | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
+| `LabTesting` | `aggregator/models/LabTesting.py` | One lot's grow-out test (`LT-…`): plants, female, OT, comment, tester's own Pass/Fail `result` (null while awaiting re-test); `genetical_impurity` / `grow_out_test` computed on read; referenced one-to-one by `InwardRawMaterial.lab_testing` | extends → `PrefixedPublicIdModel`, `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel` |
 | `GodownManager` | `authentication/models/GodownManager.py` | Godown (warehouse) manager profile (1:1), no location field. Only an Admin (or superuser) may create one; losing it revokes the user's credentials | extends → `TimeStampedModel`, `SoftDeletedModel`, `CreatedByModel`; 1:1 → `User` |
-| Admin site | `authentication/admin.py` | Registers `User`, `Admin`, `SalesPerson`, `GodownManager`; enforces who may grant `Admin`/`SalesPerson` roles; unregisters stock `Group` admin | configures → Django `admin` |
+| Admin site | `authentication/admin.py` | Registers `User`, `Admin`, `SalesPerson`, `GodownManager`, `LabTester`; enforces who may grant `Admin`/`SalesPerson` roles; unregisters stock `Group` admin | configures → Django `admin` |
 | Validator | `authentication/validators.py` | `^\d{10}$` 10-digit phone validator | used by → `User.phone_number` |
 
 ### Domain — aggregator (geo master data)
@@ -278,7 +281,7 @@ inheritance: a view introduced at `vX` is served under every later `vY`
 | `CustomOrder` | `aggregator/models/CustomOrder.py` | Loose-packet order (`CORD-…`), the **admin-only** counterpart of `Order`. Mirrors `Order`'s fields but is **standalone — no FK to `Order`**. **No verification step**: `create_custom_order` auto-confirms it (born `CONFIRMED`, `verified_by`/`verified_at` set), and creation is **blocked unless enough loose packets are in stock**. `created_by` must be an admin. `total_packets` sums line packets directly | FK → `Client`, `Address`, `Status`, `DispatchDetails`; 1:N → `CustomOrderItem` |
 | `CustomOrderItem` | `aggregator/models/CustomOrderItem.py` | One custom-order line: a `Product` at a `packet_weight`, a `packets` count and a **per-packet** `negotiated_selling_price` (defaults to `product.price_for_weight(packet_weight)`, so a 500g line prefills at half a 1kg line). Deliberately has **no `ProductPackaging`** — it names the same (`product`, `packet_weight`) pair `LooseStockSnapshot` is keyed by. Unique per (`custom_order`, `product`, `packet_weight`), so one order may carry a 1kg line and a 500g line of the same product; `line_total = negotiated_selling_price * packets` | FK → `CustomOrder`, `Product` |
 | `FieldTrip` | `aggregator/models/FieldTrip.py` | A sales person's trip to one village (`FT-…`): `city` + free-text `village`, a planned `expected_start_at`/`expected_end_at` window and the server-stamped `started_at`/`ended_at`. Lifecycle PLANNED → APPROVED → IN_PROGRESS → COMPLETED (`StatusIds.field_trip_statuses()`); `approved_by`/`approved_at` record the sales admin (required from APPROVED on). `created_by` is the sales person. Only PLANNED/APPROVED trips can be deleted — `delete()` and `mark_deleted()` both refuse otherwise. A partial unique index keeps one IN_PROGRESS trip per sales person. Transitions live in `aggregator/FieldTripOperations.py` | FK → `City`, `Status`, `User` (`created_by`, `approved_by`); 1:N → `FarmerVisit` |
-| `FarmerVisit` | `aggregator/models/FarmerVisit.py` | One farmer met on a `FieldTrip` (`FV-…`): name, 10-digit `contact_number` (unique per trip), `village` (defaults to the trip's), `land_area_bigha`. A visit, not a farmer master record. Recorded only while the trip is IN_PROGRESS. `uses_our_products` is derived from its `FarmerVisitProduct` rows, never stored | FK → `FieldTrip`; 1:N → `FarmerVisitCrop`, `FarmerVisitProduct` |
+| `FarmerVisit` | `aggregator/models/FarmerVisit.py` | One farmer met on a `FieldTrip` (`FV-…`): name, 10-digit `contact_number` (unique per trip), `village` (defaults to the trip's), `land_area_bigha`, `is_lead` (default false). A visit, not a farmer master record. Recorded only while the trip is IN_PROGRESS — or with no trip at all (`field_trip` null) as an *independent farmer* owned by `created_by`, unique per sales person + contact (`docs/prd/independent-farmers.md`). `uses_our_products` is derived from its `FarmerVisitProduct` rows, never stored | FK → `FieldTrip` (nullable); 1:N → `FarmerVisitCrop`, `FarmerVisitProduct` |
 | `FarmerVisitCrop` / `FarmerVisitProduct` | `aggregator/models/FarmerVisitCrop.py`, `FarmerVisitProduct.py` | Link rows: the crops a visited farmer grows (at least one) and our products they use (none = does not use ours) | FK → `FarmerVisit`, `Crop` / `Product` |
 | `Client` | `aggregator/models/Client.py` | Customer company (`C-…`); verification statuses limited to `StatusIds.client_statuses()`. Created by a sales person as `VERIFICATION_PENDING`, approved by an admin through `/api/sales-admin/verify-client/`. Always carries at least one address, contact and transport agency, each list with exactly one primary | FK → `Status`, `User` (`verified_by`); 1:N → `ClientAddress`, `ClientContact`, `ClientTransportAgency` |
 
@@ -327,6 +330,8 @@ erDiagram
     USER ||--o| ADMIN : "admin_profile (1:1)"
     USER ||--o| SALESPERSON : "salesperson_profile (1:1)"
     USER ||--o| GODOWNMANAGER : "godown_manager_profile (1:1)"
+    USER ||--o| LABTESTER : "lab_tester_profile (1:1)"
+    INWARDRAWMATERIAL o|--o| LABTESTING : "lab_testing (1:1) -- the lot's one grow-out test"
     USER o|--o| USER : "created_by / verified_by (self-FK)"
     SALESPERSON o|--o| CITY : "city FK"
     COUNTRY ||--o{ STATE : "states"
@@ -414,6 +419,10 @@ erDiagram
 │   ├── sales-people/<int:id> PATCH/DELETE  UpdateSalesPersonView (IsAdminUser)
 │   ├── godown-managers      GET/POST  GodownManagersView (IsAdminUser)
 │   ├── godown-managers/<int:id> PATCH/DELETE  UpdateGodownManagerView (IsAdminUser)
+│   ├── lab-testers          GET/POST  LabTestersView     (IsAdminUser)
+│   ├── lab-testers/<int:id> PATCH/DELETE  UpdateLabTesterView (IsAdminUser); POST …/rotate-qr RotateLabTesterQrView
+│   ├── lab-testings         GET  LabTestingsView         (IsAdminUser → paginated lab tests; ?product, ?result, ?lot_status)
+│   ├── lab-testing/<public_id> GET LabTestingDetailView  (IsAdminUser → one test in detail)
 │   ├── verify-client/       POST  VerifyClientView       (IsAdminUser → marks VERIFIED + verified_by/at)
 │   ├── update-client/       POST  UpdateClientView       (IsAdminUser → core fields + any list)
 │   ├── get-clients/         GET   GetClientsView         (IsAdminUser → every client; paginated; ?created_by / ?verified_by / ?city_id / ?status / ?company_name / ?address / ?created_gte / ?created_lte filters + ?sort; catalogues in available_filters/available_sorts)
@@ -480,6 +489,8 @@ erDiagram
         ├── end-field-trip/<public_id>    POST  EndFieldTripView    (IsSalesPerson → IN_PROGRESS → COMPLETED)
         ├── delete-field-trip/<public_id> DELETE DeleteFieldTripView (IsSalesPerson → own PLANNED/APPROVED trip)
         ├── field-trip-farmer-visits/<public_id> GET GetFieldTripFarmerVisitsView (IsSalesPerson → farmers on own trip)
+        ├── farmers GET/POST FarmersView (IsSalesPerson → own independent farmers, no trip)
+        ├── farmer/<public_id> GET/PATCH/DELETE FarmerDetailView (IsSalesPerson → one independent farmer)
         ├── create-farmer-visit POST CreateFarmerVisitView (IsSalesPerson → own IN_PROGRESS trip only)
         ├── utilities/parties  GET   PartiesView           (IsAndroidRole → flat party list)
         ├── utilities/other-material-types GET OtherMaterialTypesView (IsAndroidRole → flat list)
@@ -490,7 +501,10 @@ erDiagram
         ├── godown/inward-raw-material/<public_id> PATCH/DELETE UpdateGodownInwardRawMaterialView (IsGodownManager → InwardOperations lifecycle + removability)
         ├── godown/inward-other-materials GET/POST GodownInwardOtherMaterialsView (IsGodownManager)
         ├── godown/inward-other-material/<public_id> PATCH/DELETE UpdateGodownInwardOtherMaterialView (IsGodownManager)
-        └── godown/other-material-recipes GET GodownOtherMaterialRecipesView (IsGodownManager, view-only)
+        ├── godown/other-material-recipes GET GodownOtherMaterialRecipesView (IsGodownManager, view-only)
+        ├── lab/pending-lots    GET  LabPendingLotsView   (IsLabTester → lots in Lab Testing, oldest first)
+        ├── lab/lab-testings    GET/POST LabTestingsView  (IsLabTester → list tests / submit a verdict: Pass → In Use, Fail → Rejected)
+        └── lab/lab-testing/<public_id> GET/PATCH LabTestingDetailView (IsLabTester → detail / edit; a changed result moves the lot)
 /sales-admin[/...]   -> Flutter build  (config/views.py catch-all)
 ```
 
@@ -553,7 +567,7 @@ master merged → Render auto-deploy (Docker build)
 - `admin_saiseeds/build/web/` (Flutter) is **committed**; rebuild with `bash scripts/run.sh flutter` before pushing Flutter changes.
 - Tests never boot gunicorn: they run in short-lived one-off `web` containers against the `db` service.
 - **Auth/TOTP:** non-staff users log in with an **authenticator app (TOTP)**, not SMS/OTP. Web login is `POST /api/sales-admin/auth/otp/verify` (admins/superusers, opens a session); Android login is `POST /android/api/v1/auth/login` (sales persons, mints a token). Neither has an `otp/request` step.
-- **Role creation:** only superusers can create Admins; superusers *and* Admins can create SalesPeople. Admins (and superusers) also create `GodownManager`s. `VerifyOTPView` exposes this to the SPA via `can_create_admin` / `can_create_sales_person` / `can_create_godown_manager`.
+- **Role creation:** only superusers can create Admins; superusers *and* Admins can create SalesPeople. Admins (and superusers) also create `GodownManager`s and `LabTester`s. `VerifyOTPView` exposes this to the SPA via `can_create_admin` / `can_create_sales_person` / `can_create_godown_manager` / `can_create_lab_tester`.
 - **Strict client separation:** the web (`api/`) is session-only and never touches `authtoken_token`; the Android app (`android/`) is token-only and never touches sessions/`django_session`. `AdminApiView` and `AndroidBaseView` are the two client base views that enforce this — no view should extend `BaseApiView` directly.
 - **Token TTL:** bearer tokens die `TOKEN_TTL_HOURS` (24) after their last "login"; `ExpiringTokenAuthentication` deletes an expired token on first use so the next request forces a fresh login. Session cookies share the same 24h through `SESSION_COOKIE_AGE`.
 - **401 vs 403:** the custom `SessionAuthentication`/`ExpiringTokenAuthentication` return a `WWW-Authenticate` challenge header, which is what keeps anonymous calls a **401** instead of DRF's default 403.

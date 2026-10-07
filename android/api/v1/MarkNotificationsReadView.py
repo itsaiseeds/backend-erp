@@ -15,10 +15,10 @@ from rest_framework.response import Response
 
 from aggregator.models import Notification
 from aggregator.NotificationOperations import mark_read
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 
 
-class MarkNotificationReadView(AndroidBaseView):
+class MarkNotificationReadView(AndroidSharedView):
     """Mark one of the caller's notifications read."""
 
     @extend_schema(
@@ -32,7 +32,7 @@ class MarkNotificationReadView(AndroidBaseView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class MarkAllNotificationsReadView(AndroidBaseView):
+class MarkAllNotificationsReadView(AndroidSharedView):
     """Mark every notification of the caller's read."""
 
     @extend_schema(

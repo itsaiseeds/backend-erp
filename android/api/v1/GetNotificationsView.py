@@ -2,7 +2,7 @@
 
 Lists the calling sales person's notifications, newest first -- the in-app copy
 of every push, so one that was missed (phone off, permission denied) is still
-here. Scoped to the caller. Paginated through ``AndroidPaginatedDateRangeListView``:
+here. Scoped to the caller. Paginated through ``AndroidSharedPaginatedDateRangeListView``:
 
 * ``?is_read=<true|false>`` -- only read, or only unread (``false`` plus
   ``total_count`` is the badge number).
@@ -19,7 +19,7 @@ from rest_framework.request import Request
 
 from aggregator.models import Notification
 from aggregator.NotificationOperations import notification_payload
-from android.api.paginated_views import AndroidPaginatedDateRangeListView
+from android.api.paginated_views import AndroidSharedPaginatedDateRangeListView
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
     QuerysetFilter,
@@ -80,7 +80,7 @@ class NotificationListPageSerializer(serializers.Serializer):
     available_sorts = SortCatalogueEntrySerializer(many=True)
 
 
-class GetNotificationsView(AndroidPaginatedDateRangeListView):
+class GetNotificationsView(AndroidSharedPaginatedDateRangeListView):
     """List the caller's own notifications, newest first."""
 
     enforce_date_range_filters = False

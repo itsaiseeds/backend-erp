@@ -15,7 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from aggregator.NotificationOperations import register_device
-from android.api.base import AndroidBaseView
+from android.api.base import AndroidSharedView
 
 
 class RegisterDeviceSerializer(serializers.Serializer):
@@ -23,7 +23,7 @@ class RegisterDeviceSerializer(serializers.Serializer):
     app_version = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
 
 
-class RegisterDeviceView(AndroidBaseView):
+class RegisterDeviceView(AndroidSharedView):
     """Register (or refresh) the caller's FCM token."""
 
     serializer_class = RegisterDeviceSerializer

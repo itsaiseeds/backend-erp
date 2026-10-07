@@ -50,6 +50,11 @@ class ChallanAddressModel {
 }
 
 class ChallanCompanyModel {
+  /// Not sent by the server -- kept as a client-side constant on request,
+  /// since the backend's own copy of this was reverted. Update here if the
+  /// real licence is renewed or changes.
+  static const String SEEDS_LICENCE_NUMBER = '305 dt.02-07-2010';
+
   final String companyName;
   final String companyAddress;
   final String gstNumber;
@@ -67,7 +72,7 @@ class ChallanCompanyModel {
     this.contactNumber = '',
     this.email = '',
     this.web = '',
-    this.seedsLicenceNumber = '',
+    this.seedsLicenceNumber = SEEDS_LICENCE_NUMBER,
   });
 
   factory ChallanCompanyModel.fromJson(Map<String, dynamic> json) {
@@ -79,7 +84,11 @@ class ChallanCompanyModel {
       contactNumber: '${json['contact_number'] ?? ''}',
       email: json['email'] as String? ?? '',
       web: json['web'] as String? ?? '',
-      seedsLicenceNumber: '${json['seeds_licence_number'] ?? ''}',
+      // The server no longer sends this (see SEEDS_LICENCE_NUMBER); fall
+      // back to the hardcoded value whenever the key is absent or blank.
+      seedsLicenceNumber: ('${json['seeds_licence_number'] ?? ''}').trim().isEmpty
+          ? SEEDS_LICENCE_NUMBER
+          : '${json['seeds_licence_number']}',
     );
   }
 }

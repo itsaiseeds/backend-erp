@@ -187,5 +187,7 @@ class ExportFarmerVisitFieldTripSerializer(serializers.Serializer):
 class ExportFarmerVisitSerializer(FarmerVisitPayloadSerializer):
     """``FieldTripOperations.farmer_visit_export_payload``: a visit, its trip and sales person."""
 
-    field_trip = ExportFarmerVisitFieldTripSerializer()
+    field_trip = ExportFarmerVisitFieldTripSerializer(
+        allow_null=True, help_text="Null for a farmer recorded outside any trip."
+    )
     sales_person = UserContactRefSerializer()

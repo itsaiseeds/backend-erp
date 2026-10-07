@@ -47,7 +47,10 @@ The Android app is served under `/android/api/<version>/…`. **`v1` is the curr
 | `GET`  | `/android/api/v1/godown/raw-material-stock` | Godown manager: incoming raw-material position per product |
 | `GET`  | `/android/api/v1/godown/other-material-stock` | Godown manager: on-hand position per material type |
 | `GET/POST` | `/android/api/v1/godown/inward-raw-materials` | Godown manager: list / book raw-material lots |
-| `PATCH/DELETE` | `/android/api/v1/godown/inward-raw-material/<public_id>` | Godown manager: move a lot through its status lifecycle / delete it |
+| `PATCH/DELETE` | `/android/api/v1/godown/inward-raw-material/<public_id>` | Godown manager: confirm a lot unchanged (`status` / `lab_sampling_date` are a 400) / delete it |
+| `GET` | `/android/api/v1/lab/pending-lots` | Lab tester: lots waiting in Lab Testing, oldest first (a lot sent back carries its earlier `lab_testing`) |
+| `GET/POST` | `/android/api/v1/lab/lab-testings` | Lab tester: list lab tests / submit a verdict (`Pass` → lot In Use, `Fail` → Rejected) |
+| `GET/PATCH` | `/android/api/v1/lab/lab-testing/<public_id>` | Lab tester: one test in detail / edit it (changing `result` moves the lot; `Pass → Fail` is a 400 once bags are packed from the lot) |
 | `GET/POST` | `/android/api/v1/godown/inward-other-materials` | Godown manager: list / book other-material lots |
 | `PATCH/DELETE` | `/android/api/v1/godown/inward-other-material/<public_id>` | Godown manager: confirm / delete a lot |
 | `GET`  | `/android/api/v1/godown/other-material-recipes` | Godown manager: recipes (view-only; `?all=true` for the picker) |
@@ -76,16 +79,17 @@ Content-Type: application/json
     "phone_number": "7777777777",
     "role": "salesperson",
     "is_sales_person": true,
-    "is_godown_manager": false
+    "is_godown_manager": false,
+    "is_lab_tester": false
   }
 }
 ```
 
-**Two Android roles.** The same login serves a **sales person** and a **godown manager**. `user.is_sales_person` and `user.is_godown_manager` are independent flags — a user may hold both — so pick your navigation from the flags, not from `role` (which is only the single highest role). `GET /auth/reauthenticate` returns the same two flags. Sales-person routes answer `403` to a godown-manager-only token and the `godown/…` routes answer `403` to a sales-person-only token; everything under `utilities/…` and `auth/…` is open to both.
+**Three Android roles.** The same login serves a **sales person**, a **godown manager** and a **lab tester**. `user.is_sales_person`, `user.is_godown_manager` and `user.is_lab_tester` are independent flags — a user may hold both — so pick your navigation from the flags, not from `role` (which is only the single highest role). `GET /auth/reauthenticate` returns the same three flags. Sales-person routes answer `403` to a godown-manager-only or lab-tester-only token, the `godown/…` routes answer `403` to anyone without a godown manager profile, and the `lab/…` routes answer `403` to anyone without a lab tester profile; everything under `utilities/…`, `auth/…`, `devices/…` and `notifications…` is open to all three.
 
 **Store `token` securely** — Android Keystore, `EncryptedSharedPreferences`, or your platform's secure-storage equivalent. Do **not** put it in plain `SharedPreferences`, in a file, or in a log line.
 
-**Failure (400):** `{"detail": "Invalid phone number or TOTP code."}` — same generic body whether the phone is unknown, the account holds neither Android role, the code is wrong, or the account is locked. Do not try to distinguish them from the client.
+**Failure (400):** `{"detail": "Invalid phone number or TOTP code."}` — same generic body whether the phone is unknown, the account holds no Android role, the code is wrong, or the account is locked. Do not try to distinguish them from the client.
 
 **Rate limit (429):** the endpoint is throttled per source IP. Surface a "Too many attempts, try again later" message.
 

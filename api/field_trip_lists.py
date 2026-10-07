@@ -227,6 +227,53 @@ FARMER_VISIT_FILTERS: tuple[ListFilter, ...] = (
     ),
 )
 
+# The caller's independent farmers (no trip): every filter works on the rows themselves.
+INDEPENDENT_FARMER_FILTERS: tuple[ListFilter, ...] = (
+    public_id_filter("FV-"),
+    QuerysetFilter(
+        "contact_number",
+        label="Contact Number",
+        lookup="contact_number__icontains",
+        parse=parse_str,
+        multi=False,
+        description="Case-insensitive substring of the farmer's contact number.",
+    ),
+    QuerysetFilter(
+        "farmer_name",
+        label="Farmer Name",
+        lookup="farmer_name__icontains",
+        parse=parse_str,
+        multi=False,
+        description="Case-insensitive substring of the farmer's name.",
+    ),
+    QuerysetFilter(
+        "village",
+        label="Village",
+        lookup="village__icontains",
+        parse=parse_str,
+        multi=False,
+        description="Case-insensitive substring of the village.",
+    ),
+    QuerysetFilter(
+        "is_lead",
+        label="Is Lead",
+        lookup="is_lead",
+        parse=_parse_yes_no,
+        multi=False,
+        description="true: leads only; false: everyone else.",
+        options=[{"value": "true", "label": "Yes"}, {"value": "false", "label": "No"}],
+    ),
+    QuerysetFilter(
+        "uses_our_products",
+        label="Uses Our Products",
+        parse=_parse_yes_no,
+        multi=False,
+        apply=_by_product_use,
+        description="true: farmers using at least one of our products; false: none.",
+        options=[{"value": "true", "label": "Yes"}, {"value": "false", "label": "No"}],
+    ),
+)
+
 FARMER_VISIT_SORTS = (
     SortOption(
         "created_at",
@@ -350,6 +397,15 @@ ALL_FARMER_FILTERS: tuple[ListFilter, ...] = (
         parse=parse_str,
         multi=False,
         description="Case-insensitive substring of the farmer's name.",
+    ),
+    QuerysetFilter(
+        "is_lead",
+        label="Is Lead",
+        lookup="is_lead",
+        parse=_parse_yes_no,
+        multi=False,
+        description="true: farmers whose latest record is flagged as a lead; false: the rest.",
+        options=[{"value": "true", "label": "Yes"}, {"value": "false", "label": "No"}],
     ),
     QuerysetFilter(
         "village",

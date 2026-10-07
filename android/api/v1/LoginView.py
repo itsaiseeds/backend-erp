@@ -1,7 +1,7 @@
-"""TOTP login endpoint used by the sales-person Android app.
+"""TOTP login endpoint used by the Android app (sales person, godown manager, lab tester).
 
 Verifies a 6-digit authenticator-app code against the user's enrolled TOTP
-secret and issues a bearer token for a sales person or godown manager -- the token
+secret and issues a bearer token for a sales person, godown manager or lab tester -- the token
 counterpart of ``api.sales_admin.VerifyOTPView`` (which issues a session
 cookie for the web). This view never touches sessions: no ``login()``, no
 ``request.session``.
@@ -45,6 +45,7 @@ class LoginUserSerializer(serializers.Serializer):
     role = serializers.CharField()
     is_sales_person = serializers.BooleanField()
     is_godown_manager = serializers.BooleanField()
+    is_lab_tester = serializers.BooleanField()
     is_sales_admin = serializers.BooleanField()
 
 
@@ -73,7 +74,8 @@ _GENERIC_FAILURE = {"detail": "Invalid phone number or TOTP code."}
 
 
 class LoginView(APIView):
-    """Validate a TOTP code, then issue a bearer token for that sales person or godown manager."""
+    """Validate a TOTP code, then issue a bearer token for that sales person,
+    godown manager or lab tester."""
 
     serializer_class = LoginSerializer
 
@@ -104,7 +106,7 @@ class LoginView(APIView):
                 User.objects.select_for_update().filter(phone_number=data["phone_number"]).first()
             )
             if user is None or not user.is_active or not (
-                user.is_salesperson or user.is_godown_manager
+                user.is_salesperson or user.is_godown_manager or user.is_lab_tester
             ):
                 return Response(_GENERIC_FAILURE, status=400)
 
@@ -132,6 +134,7 @@ class LoginView(APIView):
                     "role": user.role,
                     "is_sales_person": user.is_salesperson,
                     "is_godown_manager": user.is_godown_manager,
+                    "is_lab_tester": user.is_lab_tester,
                     "is_sales_admin": user.is_admin_user,
                 },
             }

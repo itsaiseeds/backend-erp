@@ -1,8 +1,9 @@
-"""Base views for the Android app (sales person and godown manager).
+"""Base views for the Android app (sales person, godown manager and lab tester).
 
 Android views authenticate via an expiring DRF bearer token
 (``ExpiringTokenAuthentication`` -- 24h TTL), which the client persists across
-requests, and require an Android role profile (``SalesPerson``, ``GodownManager``, or either).
+requests, and require an Android role profile (``SalesPerson``, ``GodownManager``,
+``LabTester``, or any of them).
 
 Android never touches sessions: no view in this app may import ``login``/
 ``logout``, read ``request.session``, or use ``SessionAuthentication`` -- that
@@ -43,7 +44,13 @@ class AndroidGodownBaseView(AndroidTokenView):
     godown_manager_required = True
 
 
+class AndroidLabTesterBaseView(AndroidTokenView):
+    """Base for the lab-tester-only Android endpoints (``lab/...``)."""
+
+    lab_tester_required = True
+
+
 class AndroidSharedView(AndroidTokenView):
-    """Base for Android endpoints open to either role (look-ups, reauthenticate)."""
+    """Base for Android endpoints open to any role (look-ups, reauthenticate, notifications)."""
 
     android_role_required = True

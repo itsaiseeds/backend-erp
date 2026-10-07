@@ -242,3 +242,40 @@ def book_raw_material_for_every_product(*, actor, quantity_kg=None, booked_on=No
         book_raw_material(product, quantity_kg, actor=actor, booked_on=booked_on)
         for product in Product.objects.all()
     ]
+
+
+def lab_verdict(lot_public_id, result, *, actor, **inputs):
+    """Give the lot in Lab Testing a lab tester's verdict, through the real lab flow.
+
+    ``result`` is ``"Pass"`` (lot -> In Use) or ``"Fail"`` (lot -> Rejected); either
+    stamps today as the effective date and records the stock-ledger event, exactly
+    as ``POST lab/lab-testings`` does. A lot an admin sent back is re-tested on its
+    existing record. ``inputs`` override the default (clean, 100-plant) figures.
+    Returns the ``LabTesting``.
+
+    Only a lab tester moves a lot out of Lab Testing -- neither the admin nor the
+    godown PATCH can -- so every test that needs an In Use or Rejected lot made
+    through the API-level lifecycle goes through here.
+    """
+    from django.db import transaction
+
+    from aggregator.InwardOperations import locked_raw_lot
+    from aggregator.LabTestingOperations import submit_lab_test
+    from aggregator.models import InwardRawMaterial
+
+    values = {
+        "number_of_plants": 100,
+        "female_count": 0,
+        "ot_count": 0,
+        "comment": "",
+        "result": result,
+        **inputs,
+    }
+    with transaction.atomic():
+        lot = locked_raw_lot(
+            InwardRawMaterial.objects.select_related(
+                "product", "party", "status", "created_by", "return_order__order", "lab_testing"
+            ),
+            lot_public_id,
+        )
+        return submit_lab_test(lot, values, actor)
