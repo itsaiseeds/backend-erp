@@ -20,6 +20,9 @@ Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
 * ``?sort=<-?name,...>`` over ``created_at`` / ``company_name``; default newest
   first.
 
+* ``?sales_person_id=<user id>`` -- admin only: list that sales person's clients
+  (and city options) instead of the caller's own. A non-admin gets 403.
+
 A bare request returns the first page of all the caller's clients.
 """
 
@@ -34,6 +37,8 @@ from aggregator.ClientOperations import client_list_payload
 from aggregator.models import Client, ClientAddress, ClientContact
 from aggregator.models.Status import StatusIds
 from android.api.paginated_views import AndroidPaginatedDateRangeListView
+from android.api.sales_person_scope import sales_person_from_query
+from android.api.v1.ClientAddressesView import SALES_PERSON_ID_PARAM
 from api.client_serializers import (
     ClientAddressPayloadSerializer,
     ClientContactPayloadSerializer,
@@ -98,7 +103,9 @@ def _cities_of_my_clients(request: Request) -> list[dict]:
     ever needs to show a city the sales person actually has a client in.
     """
     rows = (
-        ClientAddress.objects.filter(is_primary=True, client__created_by=request.user)
+        ClientAddress.objects.filter(
+            is_primary=True, client__created_by=sales_person_from_query(request)
+        )
         .values_list("address__city_id", "address__city__name")
         .distinct()
         .order_by("address__city__name")
@@ -200,11 +207,14 @@ class GetClientsView(AndroidPaginatedDateRangeListView):
     @extend_schema(
         operation_id="android_api_v1_get_clients_list",
         summary="List my clients (filter by city / status / name / address / created, sortable)",
-        parameters=list_query_parameters(
-            queryset_filters=_QUERYSET_FILTERS,
-            sort_options=_SORT_OPTIONS,
-            date_window="none",
-        ),
+        parameters=[
+            *list_query_parameters(
+                queryset_filters=_QUERYSET_FILTERS,
+                sort_options=_SORT_OPTIONS,
+                date_window="none",
+            ),
+            SALES_PERSON_ID_PARAM,
+        ],
         responses={200: ClientListPageSerializer},
     )
     def get(self, request: Request, *args, **kwargs):
@@ -219,7 +229,7 @@ class GetClientsView(AndroidPaginatedDateRangeListView):
             "address__country",
         )
         return (
-            Client.objects.filter(created_by=request.user)
+            Client.objects.filter(created_by=sales_person_from_query(request))
             .select_related("status")
             .prefetch_related(
                 Prefetch("client_addresses", queryset=primary_addresses),

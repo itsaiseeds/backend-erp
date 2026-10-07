@@ -29,6 +29,11 @@ handed out verbatim by ``GET /android/api/v1/utilities/client-addresses`` and
 ``.../utilities/client-transport-agencies``. Naming the link rather than the
 underlying row is what makes "does this belong to the client?" the lookup
 itself rather than a second check.
+
+An admin with app access may book for a sales person by sending ``created_by``
+(a user id). The client, address and agency are then looked up among *that*
+sales person's clients and the order is created as them; a non-admin sending it
+gets 403, an id that is not an active sales person gets 400.
 """
 
 from __future__ import annotations
@@ -46,6 +51,7 @@ from aggregator.models import (
 from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import create_order, order_payload
 from android.api.base import AndroidBaseView
+from android.api.sales_person_scope import resolve_sales_person
 from api.order_serializers import (
     OrderItemPayloadSerializer,
     TransportAgencyRefSerializer,
@@ -130,6 +136,15 @@ class CreateMultiSelectBagOrderSerializer(serializers.Serializer):
         default=None,
         help_text="Defaults to the day after booking.",
     )
+    created_by = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text=(
+            "Admin only: user id of the sales person to book for (from "
+            "GET /android/api/v1/utilities/sales-persons). Defaults to the caller."
+        ),
+    )
     items = BagOrderItemSerializer(many=True)
 
     def validate_items(self, value):
@@ -150,9 +165,14 @@ class CreateMultiSelectBagOrderSerializer(serializers.Serializer):
     def validate(self, attrs):
         # Scoped to ``created_by`` like every other client endpoint: another
         # sales person's client reads as unknown rather than as forbidden.
+        # (``created_by`` re-points that scope at the sales person an admin is
+        # booking for; without it the caller is the sales person.)
+        sales_person = resolve_sales_person(
+            self.context["request"], attrs.get("created_by")
+        )
         client = Client.objects.filter(
             public_id=attrs["client_public_id"],
-            created_by=self.context["request"].user,
+            created_by=sales_person,
         ).first()
         if client is None:
             raise serializers.ValidationError(
@@ -225,6 +245,7 @@ class CreateMultiSelectBagOrderSerializer(serializers.Serializer):
                 {"items": f"Unknown product packaging(s): {', '.join(missing)}."}
             )
 
+        attrs["sales_person"] = sales_person
         attrs["client"] = client
         attrs["delivery_address"] = address_link.address
         attrs["transport_agency"] = agency
@@ -259,7 +280,7 @@ class CreateMultiSelectBagOrderView(AndroidBaseView):
         order = create_order(
             client=data["client"],
             delivery_address=data["delivery_address"],
-            actor=request.user,
+            actor=data["sales_person"],
             items=data["resolved_items"],
             special_comments=data["special_comments"],
             expected_delivery_date=data["expected_delivery_date"],
