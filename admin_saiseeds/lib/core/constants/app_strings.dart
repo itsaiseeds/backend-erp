@@ -47,6 +47,7 @@ class AppStrings {
   static const String ADMINS = 'Admins';
   static const String SALES_PEOPLE = 'Sales People';
   static const String GODOWN_MANAGERS = 'Godown Managers';
+  static const String LAB_TESTERS = 'Lab Testers';
 
   static const String SIDEBAR_COLLAPSE = 'Collapse sidebar';
   static const String SIDEBAR_EXPAND = 'Expand sidebar';
@@ -281,6 +282,7 @@ class AppStrings {
   static const String SALES_PEOPLE_TABLE_SEARCH_HINT = 'Search sales people...';
   static const String GODOWN_MANAGERS_TABLE_SEARCH_HINT =
       'Search godown managers...';
+  static const String LAB_TESTERS_TABLE_SEARCH_HINT = 'Search lab testers...';
   static const String COLUMN_NAME = 'Name';
   static const String COLUMN_PHONE_NUMBER = 'Phone Number';
   static const String COLUMN_ROLE = 'Role';
@@ -311,6 +313,8 @@ class AppStrings {
   static const String EDIT_SALES_PERSON = 'Edit Sales Person';
   static const String ADD_GODOWN_MANAGER = 'Add Godown Manager';
   static const String EDIT_GODOWN_MANAGER = 'Edit Godown Manager';
+  static const String ADD_LAB_TESTER = 'Add Lab Tester';
+  static const String EDIT_LAB_TESTER = 'Edit Lab Tester';
   static const String ADD_ADMIN_SUBTITLE =
       'Create an administrator account with platform access.';
   static const String EDIT_ADMIN_SUBTITLE =
@@ -323,6 +327,10 @@ class AppStrings {
       'Register a godown manager account on the platform.';
   static const String EDIT_GODOWN_MANAGER_SUBTITLE =
       'Update the godown manager account details.';
+  static const String ADD_LAB_TESTER_SUBTITLE =
+      'Register a lab tester account on the platform.';
+  static const String EDIT_LAB_TESTER_SUBTITLE =
+      'Update the lab tester account details.';
 
   static const String FIELD_NAME = 'Name';
   static const String FIELD_NAME_HINT = 'Full name';
@@ -356,6 +364,9 @@ class AppStrings {
   static const String GODOWN_MANAGER_CREATED_TITLE = 'Godown manager created';
   static const String GODOWN_MANAGER_UPDATED_TITLE = 'Godown manager updated';
   static const String GODOWN_MANAGER_DELETED_TITLE = 'Godown manager deleted';
+  static const String LAB_TESTER_CREATED_TITLE = 'Lab tester created';
+  static const String LAB_TESTER_UPDATED_TITLE = 'Lab tester updated';
+  static const String LAB_TESTER_DELETED_TITLE = 'Lab tester deleted';
 
   static const String DELETE_ADMIN_TITLE = 'Delete administrator';
   static const String DELETE_ADMIN_BODY =
@@ -369,10 +380,15 @@ class AppStrings {
   static const String DELETE_GODOWN_MANAGER_BODY =
       'This permanently removes the godown manager account. This cannot be '
       'undone.';
+  static const String DELETE_LAB_TESTER_TITLE = 'Delete lab tester';
+  static const String DELETE_LAB_TESTER_BODY =
+      'This permanently removes the lab tester account. This cannot be '
+      'undone.';
 
   static const String ADMIN_DETAIL_TITLE = 'Administrator details';
   static const String SALES_PERSON_DETAIL_TITLE = 'Sales person details';
   static const String GODOWN_MANAGER_DETAIL_TITLE = 'Godown manager details';
+  static const String LAB_TESTER_DETAIL_TITLE = 'Lab tester details';
   static const String DETAIL_SECTION_ACCOUNT = 'Account';
   static const String DETAIL_SECTION_ACCOUNT_HINT =
       'Identity and contact details on record.';
@@ -385,6 +401,8 @@ class AppStrings {
       'Update the sales person account details.';
   static const String GODOWN_MANAGER_EDIT_HINT =
       'Update the godown manager account details.';
+  static const String LAB_TESTER_EDIT_HINT =
+      'Update the lab tester account details.';
   static const String VIEW_MODE_TOAST_TITLE = 'View mode';
   static const String VIEW_MODE_TOAST_BODY =
       'Select the edit action in the header to change these details.';
@@ -438,6 +456,11 @@ class AppStrings {
       'No godown managers yet';
   static const String GODOWN_MANAGERS_EMPTY_STATE_BODY =
       'Add a godown manager to register a warehouse account.';
+  static const String LAB_TESTERS_LOAD_FAILED_TITLE =
+      'Could not load lab testers';
+  static const String LAB_TESTERS_EMPTY_STATE_TITLE = 'No lab testers yet';
+  static const String LAB_TESTERS_EMPTY_STATE_BODY =
+      'Add a lab tester to register a lab account.';
   static const String CITIES_UNAVAILABLE =
       'City list is unavailable. Refresh the page and try again.';
   static const String SORT_BY_EMAIL = 'email';

@@ -5,6 +5,7 @@ class TabIds {
   static const String ADMINS = 'admins';
   static const String SALES_PEOPLE = 'sales-people';
   static const String GODOWN_MANAGERS = 'godown-managers';
+  static const String LAB_TESTERS = 'lab-testers';
   static const String CLIENTS = 'clients';
   static const String ORDERS = 'orders';
   static const String RETURN_ORDERS = 'return-orders';

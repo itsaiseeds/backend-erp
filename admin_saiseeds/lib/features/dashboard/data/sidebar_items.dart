@@ -30,6 +30,11 @@ class SidebarItems {
       icon: Icons.warehouse_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.LAB_TESTERS,
+      label: AppStrings.LAB_TESTERS,
+      icon: Icons.biotech_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.CLIENTS,
       label: AppStrings.CLIENTS,
       icon: Icons.storefront_outlined,
@@ -213,7 +218,12 @@ class SidebarItems {
       SidebarGroupModel(
         id: 'setup-users',
         label: AppStrings.GROUP_USER_MANAGEMENT,
-        itemIds: [TabIds.SALES_PEOPLE, TabIds.GODOWN_MANAGERS, TabIds.ADMINS],
+        itemIds: [
+          TabIds.SALES_PEOPLE,
+          TabIds.GODOWN_MANAGERS,
+          TabIds.LAB_TESTERS,
+          TabIds.ADMINS,
+        ],
       ),
     ],
   );

@@ -23,6 +23,7 @@ import '../../../product_stock/presentation/views/product_stock_view.dart';
 import '../../../raw_material_stock/presentation/views/raw_material_stock_view.dart';
 import '../../../other_material_stock/presentation/views/other_material_stock_view.dart';
 import '../../../godown_managers/presentation/views/godown_managers_view.dart';
+import '../../../lab_testers/presentation/views/lab_testers_view.dart';
 import '../../../sales_people/presentation/views/sales_people_view.dart';
 import '../../../field_trips/presentation/views/field_trips_view.dart';
 import '../../../field_trips/presentation/views/farmers_view.dart';
@@ -52,6 +53,8 @@ class DashboardContentSwitcher {
         return const SalesPeopleView();
       case TabIds.GODOWN_MANAGERS:
         return const GodownManagersView();
+      case TabIds.LAB_TESTERS:
+        return const LabTestersView();
       case TabIds.PRODUCTS:
         return const ProductsView();
       case TabIds.PRODUCT_PACKAGINGS:
