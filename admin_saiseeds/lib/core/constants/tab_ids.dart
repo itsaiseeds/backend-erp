@@ -19,6 +19,7 @@ class TabIds {
   static const String INWARD_RAW_MATERIALS = 'inward-raw-materials';
   static const String OTHER_RAW_MATERIALS = 'other-raw-materials';
   static const String OTHER_MATERIAL_INWARD = 'other-material-inward';
+  static const String PURCHASE_TRACKING = 'purchase-tracking';
   static const String WASTE_MANAGEMENT = 'waste-management';
   static const String PRODUCT_STOCK = 'product-stock';
   static const String RAW_MATERIAL_STOCK = 'raw-material-stock';

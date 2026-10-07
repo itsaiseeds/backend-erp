@@ -213,8 +213,12 @@ class _InwardRecordDialogState extends State<InwardRecordDialog> {
     if (!_isEditing) return const SizedBox.shrink();
 
     // Only the moves the workflow actually permits are offered: a settled
-    // lot goes back to Lab Testing, never straight to the other state.
+    // lot goes back to Lab Testing, never straight to the other state. A
+    // Lab Testing lot has no admin-permitted move at all right now, so there
+    // is nothing to offer -- the field disappears rather than showing an
+    // empty picker.
     final List<String> options = _lot.allowedNextStatuses;
+    if (options.isEmpty) return const SizedBox.shrink();
 
     return SearchableField<String>(
       label: AppStrings.INWARD_STATUS_CHANGE_LABEL,

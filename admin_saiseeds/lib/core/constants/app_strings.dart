@@ -253,7 +253,7 @@ class AppStrings {
   static const String CLIENT_CREATED_BY_LABEL = 'Added by';
   static const String CLIENT_COMPANY_NAME_HINT = 'Registered business name';
   static const String CLIENT_GST_HINT = '15-character GSTIN';
-  static const String VALIDATION_GST_REQUIRED = 'GST number is required.';
+  static const String CLIENT_GST_FIELD_LABEL = 'GST Number (optional)';
   static const String VALIDATION_GST_INVALID =
       'Enter a valid 15-character GST number.';
   static const String TABLE_SELECT_ALL_ON_PAGE = 'Select all on this page';
@@ -1075,7 +1075,7 @@ class AppStrings {
   static const String GROUP_CATALOGUE = 'Product Configuration';
   static const String GROUP_ONBOARDING = 'Client & Party';
   static const String GROUP_USER_MANAGEMENT = 'User Management';
-  static const String GROUP_FARMER_TRIPS = 'Farmer & Trips';
+  static const String GROUP_FARMER_TRIPS = 'Farmer & Meetings';
 
   static const String ORDER_DISPATCH = 'Dispatch';
   static const String ORDER_DISPATCH_TITLE = 'Dispatch order';
@@ -1142,6 +1142,7 @@ class AppStrings {
   static const String COLUMN_STOCK_TYPE = 'Type';
   static const String COLUMN_INCOMING_KG = 'Incoming (kg)';
   static const String COLUMN_PACKED_KG = 'Packed (kg)';
+  static const String COLUMN_WASTED_KG = 'Wasted (kg)';
   static const String COLUMN_AVAILABLE_KG = 'Available (kg)';
   static const String COLUMN_REJECTED_KG = 'Rejected (kg)';
 
@@ -1329,10 +1330,10 @@ class AppStrings {
       'Could not load packet stock';
   static const String PACKET_STOCK_UPDATED_TITLE = 'Packet stock updated';
 
-  static const String FIELD_TRIPS = 'Field Trips';
+  static const String FIELD_TRIPS = 'Farmer Meetings';
   static const String FARMERS = 'Farmers';
 
-  static const String COLUMN_TRIP_ID = 'Trip ID';
+  static const String COLUMN_TRIP_ID = 'Meeting ID';
   static const String COLUMN_VILLAGE = 'Village';
   static const String COLUMN_SALES_PERSON = 'Sales Person';
   static const String COLUMN_EXPECTED_START = 'Expected Start';
@@ -1355,39 +1356,39 @@ class AppStrings {
   static const String FIELD_TRIP_STATUS_COMPLETED = 'Completed';
 
   static const String FIELD_TRIPS_TABLE_SEARCH_HINT = 'Search by village...';
-  static const String FIELD_TRIPS_EMPTY_STATE_TITLE = 'No field trips yet';
+  static const String FIELD_TRIPS_EMPTY_STATE_TITLE = 'No farmer meetings yet';
   static const String FIELD_TRIPS_EMPTY_STATE_BODY =
-      'A field trip appears here once a salesperson plans one.';
+      'A farmer meeting appears here once a salesperson plans one.';
   static const String FIELD_TRIPS_LOAD_FAILED_TITLE =
-      'Could not load field trips';
+      'Could not load farmer meetings';
 
-  static const String FIELD_TRIP_DETAIL_TITLE = 'Field trip';
-  static const String FIELD_TRIP_SECTION_PLAN = 'Trip plan';
+  static const String FIELD_TRIP_DETAIL_TITLE = 'Farmer meeting';
+  static const String FIELD_TRIP_SECTION_PLAN = 'Meeting plan';
   static const String FIELD_TRIP_SECTION_PEOPLE = 'People';
   static const String FIELD_TRIP_SECTION_PROGRESS = 'Progress';
   static const String FIELD_TRIP_SECTION_APPROVAL = 'Approval';
   static const String FIELD_TRIP_SECTION_FARMERS = 'Farmers visited';
   static const String FIELD_TRIP_STEP_PLAN_CAPTION = 'Where and when';
   static const String FIELD_TRIP_STEP_PROGRESS_CAPTION =
-      'How far the trip has got';
+      'How far the meeting has got';
   static const String FIELD_TRIP_STEP_FARMERS_CAPTION =
-      'Farmers recorded on this trip';
+      'Farmers recorded on this meeting';
   static const String FIELD_TRIP_TIMELINE_PLANNED = 'Planned';
   static const String FIELD_TRIP_TIMELINE_APPROVED = 'Approved';
   static const String FIELD_TRIP_TIMELINE_STARTED = 'Started';
   static const String FIELD_TRIP_TIMELINE_ENDED = 'Ended';
   static const String FIELD_TRIP_TIMELINE_PENDING = 'Not yet';
   static const String FIELD_TRIP_FARMERS_EMPTY =
-      'No farmers recorded on this trip yet.';
+      'No farmers recorded on this meeting yet.';
   static const String FIELD_TRIP_FARMERS_FAILED =
-      'Could not load the farmers on this trip.';
+      'Could not load the farmers on this meeting.';
 
-  static const String EDIT_FIELD_TRIP = 'Edit trip';
+  static const String EDIT_FIELD_TRIP = 'Edit meeting';
   static const String EDIT_FIELD_TRIP_SUBTITLE =
-      'Change the plan while the trip is still unapproved.';
-  static const String FIELD_TRIP_UPDATED_TITLE = 'Trip updated';
+      'Change the plan while the meeting is still unapproved.';
+  static const String FIELD_TRIP_UPDATED_TITLE = 'Meeting updated';
   static const String FIELD_VILLAGE = 'Village';
-  static const String FIELD_VILLAGE_HINT = 'Village the trip covers';
+  static const String FIELD_VILLAGE_HINT = 'Village the meeting covers';
   static const String FIELD_EXPECTED_START = 'Expected start';
   static const String FIELD_EXPECTED_END = 'Expected end';
   static const String VALIDATION_VILLAGE_REQUIRED = 'Village is required.';
@@ -1399,24 +1400,24 @@ class AppStrings {
       'Expected end must fall on or after the start.';
 
   static const String FIELD_TRIP_APPROVE = 'Approve';
-  static const String FIELD_TRIP_APPROVE_TITLE = 'Approve this trip?';
+  static const String FIELD_TRIP_APPROVE_TITLE = 'Approve this meeting?';
   static const String FIELD_TRIP_APPROVE_BODY =
-      'The salesperson can start the trip once it is approved.';
-  static const String FIELD_TRIP_APPROVED_DONE = 'Trip approved';
+      'The salesperson can start the meeting once it is approved.';
+  static const String FIELD_TRIP_APPROVED_DONE = 'Meeting approved';
   static const String FIELD_TRIP_UNAPPROVE = 'Unapprove';
   static const String FIELD_TRIP_UNAPPROVE_TITLE = 'Withdraw approval?';
   static const String FIELD_TRIP_UNAPPROVE_BODY =
-      'The trip returns to Planned and cannot be started until it is '
+      'The meeting returns to Planned and cannot be started until it is '
       'approved again.';
   static const String FIELD_TRIP_UNAPPROVED_DONE = 'Approval withdrawn';
-  static const String DELETE_FIELD_TRIP_TITLE = 'Delete trip';
+  static const String DELETE_FIELD_TRIP_TITLE = 'Delete meeting';
   static const String DELETE_FIELD_TRIP_BODY =
-      'This permanently removes the field trip. This cannot be undone.';
-  static const String FIELD_TRIP_DELETED_TITLE = 'Trip deleted';
+      'This permanently removes the farmer meeting. This cannot be undone.';
+  static const String FIELD_TRIP_DELETED_TITLE = 'Meeting deleted';
 
   static const String FARMERS_EMPTY_STATE_TITLE = 'No farmers yet';
   static const String FARMERS_EMPTY_STATE_BODY =
-      'Every farmer recorded on a field trip will be listed here.';
+      'Every farmer recorded on a farmer meeting will be listed here.';
   static const String FARMERS_LOAD_FAILED_TITLE = 'Could not load farmers';
   static const String FARMERS_TABLE_SEARCH_HINT = 'Search by farmer name...';
 
@@ -1468,6 +1469,48 @@ class AppStrings {
 
   static const String WASTE_EDIT = 'Edit entry';
   static const String WASTE_REASON_MISSING = 'No reason given';
+
+  static const String PURCHASE_TRACKING = 'Purchase Tracking';
+  static const String PURCHASE_TRACKING_DETAIL_TITLE = 'Purchase entry';
+  static const String PURCHASE_TRACKING_DETAIL_SUBTITLE =
+      'What was bought, from whom, and how much.';
+  static const String ADD_PURCHASE_TRACKING_ENTRY = 'Record purchase';
+  static const String ADD_PURCHASE_TRACKING_SUBTITLE =
+      'Record an incoming consumable that is not seed stock.';
+  static const String EDIT_PURCHASE_TRACKING_SUBTITLE =
+      'Correct any detail of this purchase entry.';
+  static const String PURCHASE_TRACKING_CREATED_TITLE = 'Purchase recorded';
+  static const String PURCHASE_TRACKING_UPDATED_TITLE = 'Purchase updated';
+  static const String PURCHASE_TRACKING_DELETED_TITLE =
+      'Purchase entry deleted';
+  static const String DELETE_PURCHASE_TRACKING_TITLE =
+      'Delete purchase entry';
+  static const String DELETE_PURCHASE_TRACKING_BODY =
+      'This cannot be undone.';
+  static const String PURCHASE_TRACKING_TABLE_SEARCH_HINT =
+      'Search purchase entries...';
+  static const String PURCHASE_TRACKING_EMPTY_STATE_TITLE =
+      'No purchases recorded yet';
+  static const String PURCHASE_TRACKING_EMPTY_STATE_BODY =
+      'Record a purchase when a non-stock consumable arrives.';
+  static const String PURCHASE_TRACKING_LOAD_FAILED_TITLE =
+      'Could not load purchase entries';
+  static const String PURCHASE_TRACKING_EDIT = 'Edit entry';
+  static const String PURCHASE_TRACKING_DESCRIPTION_MISSING =
+      'No description given';
+  static const String PURCHASE_TRACKING_COMPANY_MISSING = 'No company given';
+  static const String PURCHASE_TRACKING_PRICE_MISSING = 'Not given';
+
+  static const String FIELD_DESCRIPTION = 'Description';
+  static const String FIELD_DESCRIPTION_HINT = 'What this is, if useful';
+  static const String FIELD_COMPANY_NAME_HINT = 'Supplier or manufacturer';
+  static const String FIELD_PRICE = 'Price';
+  static const String FIELD_PRICE_HINT = 'Leave blank if unknown';
+  static const String FIELD_UNIT = 'Unit';
+  static const String FIELD_UNIT_HINT = 'Select unit';
+
+  static const String COLUMN_PRICE = 'Price';
+  static const String COLUMN_UNIT = 'Unit';
 
   static const String COLUMN_REASON = 'Reason';
   static const String COLUMN_REFERENCE = 'Reference';
