@@ -230,7 +230,10 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     (_route(_ADMIN, "export/dispatch-receipts"), (ADMIN_DISPATCH, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/inward-entries"), (ADMIN_INWARD, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/inventory-snapshots"), (ADMIN_STOCK_COUNT, ADMIN_EXPORTS)),
-    (_route(_ADMIN_UTILITIES, "cities", "countries", "states"), (ADMIN_UTILITIES,)),
+    (
+        _route(_ADMIN_UTILITIES, "cities", "client-children", "countries", "states"),
+        (ADMIN_UTILITIES,),
+    ),
     # -- android app ------------------------------------------------------------
     (_route(_ANDROID, "auth"), (ANDROID_AUTH,)),
     (
@@ -241,6 +244,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
             "get-clients",
             "update-client",
             "utilities/client-addresses",
+            "utilities/client-children",
             "utilities/client-transport-agencies",
         ),
         (ANDROID_CLIENTS,),

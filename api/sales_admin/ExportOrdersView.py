@@ -33,7 +33,17 @@ class ExportOrdersView(AdminDateRangeExportView):
     def export(self, window: DateWindow) -> list[dict]:
         orders = (
             window.created_between(Order.objects.all())
-            .select_related("client", "status", "delivery_address__city", "transport_agency")
+            .select_related(
+                "client",
+                "status",
+                "delivery_address__city",
+                "transport_agency",
+                "booked_for__address__pincode",
+                "booked_for__address__city",
+                "booked_for__address__state",
+                "booked_for__address__country",
+                "booked_for",
+            )
             .prefetch_related(
                 Prefetch(
                     "items",

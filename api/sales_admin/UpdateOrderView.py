@@ -56,6 +56,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from aggregator.ClientChildOrgOperations import resolve_child_org
 from aggregator.models import (
     ClientAddress,
     ClientTransportAgency,
@@ -71,6 +72,7 @@ from aggregator.OrderOperations import (
     update_order_core,
 )
 from api.admin import AdminApiView
+from api.client_serializers import BookedForSerializer
 from api.order_serializers import OrderDetailPayloadSerializer
 
 from .GetOrderView import ORDER_PUBLIC_ID_PARAMETER, get_locked_order
@@ -139,6 +141,14 @@ class UpdateOrderSerializer(serializers.Serializer):
         ),
     )
     items = OrderItemWriteSerializer(many=True, required=False)
+    booked_for = BookedForSerializer(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Child org to set ({id} or {party_name, village_name, ...}); send "
+            "null to clear it, omit to leave it unchanged."
+        ),
+    )
 
     def validate_items(self, value):
         if not value:
@@ -253,6 +263,13 @@ class UpdateOrderView(AdminApiView):
             )
             serializer.is_valid(raise_exception=True)
             data = serializer.validated_data
+
+            if "booked_for" in data:
+                data["booked_for"] = (
+                    resolve_child_org(order.client, data["booked_for"], request.user)
+                    if data["booked_for"] is not None
+                    else None
+                )
 
             core = {field: data[field] for field in ORDER_CORE_FIELDS if field in data}
             if core:

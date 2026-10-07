@@ -52,6 +52,7 @@ from rest_framework.request import Request
 from aggregator.models import Order, OrderItem
 from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import order_list_payload
+from api.client_serializers import ChildOrgSummarySerializer
 from api.order_serializers import (
     OrderCardPackagingSerializer,
     TransportAgencyRefSerializer,
@@ -125,6 +126,7 @@ class AdminOrderListItemSerializer(serializers.Serializer):
     city = AdminOrderListCitySerializer(allow_null=True)
     transport_agency = TransportAgencyRefSerializer(allow_null=True)
     dispatch_mode = serializers.ChoiceField(choices=["AGENCY", "PRIVATE"])
+    booked_for = ChildOrgSummarySerializer(allow_null=True)
     expected_delivery_date = serializers.DateField()
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()
@@ -319,6 +321,7 @@ class GetOrdersView(AdminPaginatedDateRangeListView):
                 "client__created_by",
                 "transport_agency",
                 "delivery_address__city",
+                "booked_for",
             )
             .prefetch_related(
                 Prefetch(

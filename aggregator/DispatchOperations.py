@@ -22,6 +22,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from .AddressOperations import address_payload
+from .ClientChildOrgOperations import child_org_payload
 from .CompanyDetails import COMPANY_DETAILS, DEFAULT_HSN_CODE, current_financial_year
 from .models import CustomOrder, DispatchEntry, DispatchEntryItem, Order
 from .ProductOperations import packaging_payload
@@ -424,6 +425,7 @@ def _challan_header(order: Order | CustomOrder, entry: DispatchEntry) -> dict:
             "contact_person_name": entry.contact_name,
             "contact_person_number": entry.contact_number,
         },
+        "booked_for": child_org_payload(order.booked_for),
         "hsn_code": DEFAULT_HSN_CODE,
         "financial_year": current_financial_year(entry.dispatch_date),
     }

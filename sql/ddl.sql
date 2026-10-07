@@ -694,6 +694,32 @@ CREATE INDEX IF NOT EXISTS aggregator_clientaddress_created_by_id_idx ON public.
 CREATE INDEX IF NOT EXISTS aggregator_clientaddress_deleted_by_id_idx ON public.aggregator_clientaddress USING btree (deleted_by_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_clientaddress_one_primary ON public.aggregator_clientaddress USING btree (client_id) WHERE (is_primary AND NOT is_deleted);
 
+-- aggregator_clientchildorg ---------------------------------------------------
+-- A downstream party a client books orders for ("booked for"); created through
+-- order booking (ClientChildOrgOperations.resolve_child_org).
+CREATE TABLE IF NOT EXISTS public.aggregator_clientchildorg (
+	id bigserial NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	is_deleted bool NOT NULL DEFAULT false,
+	deleted_at timestamptz NULL,
+	deleted_by_id int8 NULL,
+	created_by_id int8 NULL,
+	client_id int8 NOT NULL,
+	party_name varchar(255) NOT NULL,
+	village_name varchar(255) NOT NULL,
+	address_id int8 NOT NULL,
+	transport_name varchar(255) NOT NULL DEFAULT '',
+	contact_number varchar(10) NULL,
+	CONSTRAINT aggregator_clientchildorg_pkey PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS aggregator_clientchildorg_client_id_idx ON public.aggregator_clientchildorg USING btree (client_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientchildorg_address_id_idx ON public.aggregator_clientchildorg USING btree (address_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientchildorg_is_deleted_idx ON public.aggregator_clientchildorg USING btree (is_deleted);
+CREATE INDEX IF NOT EXISTS aggregator_clientchildorg_created_by_id_idx ON public.aggregator_clientchildorg USING btree (created_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_clientchildorg_deleted_by_id_idx ON public.aggregator_clientchildorg USING btree (deleted_by_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_clientchildorg_client_party_village ON public.aggregator_clientchildorg USING btree (client_id, lower((party_name)::text), lower((village_name)::text)) WHERE (NOT is_deleted);
+
 -- aggregator_clientcontact ----------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.aggregator_clientcontact (
 	id bigserial NOT NULL,
@@ -917,6 +943,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_order (
 	dispatch_details_id int8 NULL,
 	private_dispatch_details_id int8 NULL,
 	transport_agency_id int8 NULL,
+	booked_for_id int8 NULL,
 	special_comments text NOT NULL,
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
@@ -932,6 +959,7 @@ CREATE INDEX IF NOT EXISTS aggregator_order_status_id_idx ON public.aggregator_o
 CREATE INDEX IF NOT EXISTS aggregator_order_dispatch_details_id_idx ON public.aggregator_order USING btree (dispatch_details_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_private_dispatch_details_id_idx ON public.aggregator_order USING btree (private_dispatch_details_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_transport_agency_id_idx ON public.aggregator_order USING btree (transport_agency_id);
+CREATE INDEX IF NOT EXISTS aggregator_order_booked_for_id_idx ON public.aggregator_order USING btree (booked_for_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_is_deleted_idx ON public.aggregator_order USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_order_created_by_id_idx ON public.aggregator_order USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_order_deleted_by_id_idx ON public.aggregator_order USING btree (deleted_by_id);
@@ -1154,6 +1182,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_customorder (
 	actual_delivery_date date NULL,
 	dispatch_details_id int8 NULL,
 	private_dispatch_details_id int8 NULL,
+	booked_for_id int8 NULL,
 	special_comments text NOT NULL,
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
@@ -1168,6 +1197,7 @@ CREATE INDEX IF NOT EXISTS aggregator_customorder_delivery_address_id_idx ON pub
 CREATE INDEX IF NOT EXISTS aggregator_customorder_status_id_idx ON public.aggregator_customorder USING btree (status_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorder_dispatch_details_id_idx ON public.aggregator_customorder USING btree (dispatch_details_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorder_private_dispatch_details_id_idx ON public.aggregator_customorder USING btree (private_dispatch_details_id);
+CREATE INDEX IF NOT EXISTS aggregator_customorder_booked_for_id_idx ON public.aggregator_customorder USING btree (booked_for_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorder_is_deleted_idx ON public.aggregator_customorder USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_customorder_created_by_id_idx ON public.aggregator_customorder USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorder_deleted_by_id_idx ON public.aggregator_customorder USING btree (deleted_by_id);
@@ -1669,6 +1699,10 @@ ALTER TABLE public.aggregator_client ADD CONSTRAINT aggregator_client_verified_b
 ALTER TABLE public.aggregator_client ADD CONSTRAINT aggregator_client_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_client ADD CONSTRAINT aggregator_client_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
+ALTER TABLE public.aggregator_clientchildorg ADD CONSTRAINT aggregator_clientchildorg_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientchildorg ADD CONSTRAINT aggregator_clientchildorg_address_id_fk FOREIGN KEY (address_id) REFERENCES public.aggregator_address(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientchildorg ADD CONSTRAINT aggregator_clientchildorg_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_clientchildorg ADD CONSTRAINT aggregator_clientchildorg_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_clientaddress ADD CONSTRAINT aggregator_clientaddress_client_id_fk FOREIGN KEY (client_id) REFERENCES public.aggregator_client(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_clientaddress ADD CONSTRAINT aggregator_clientaddress_address_id_fk FOREIGN KEY (address_id) REFERENCES public.aggregator_address(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_clientaddress ADD CONSTRAINT aggregator_clientaddress_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
@@ -1718,6 +1752,7 @@ ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_status_id_fk
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_dispatch_details_id_fk FOREIGN KEY (dispatch_details_id) REFERENCES public.aggregator_dispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_private_dispatch_details_id_fk FOREIGN KEY (private_dispatch_details_id) REFERENCES public.aggregator_privatedispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_transport_agency_id_fk FOREIGN KEY (transport_agency_id) REFERENCES public.aggregator_transportagency(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_booked_for_id_fk FOREIGN KEY (booked_for_id) REFERENCES public.aggregator_clientchildorg(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_verified_by_id_fk FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_order ADD CONSTRAINT aggregator_order_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
@@ -1740,6 +1775,7 @@ ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_
 ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_dispatch_details_id_fk FOREIGN KEY (dispatch_details_id) REFERENCES public.aggregator_dispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_private_dispatch_details_id_fk FOREIGN KEY (private_dispatch_details_id) REFERENCES public.aggregator_privatedispatchdetails(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_verified_by_id_fk FOREIGN KEY (verified_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_booked_for_id_fk FOREIGN KEY (booked_for_id) REFERENCES public.aggregator_clientchildorg(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 

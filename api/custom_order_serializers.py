@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from api.client_serializers import ClientPayloadSerializer
+from api.client_serializers import (
+    ChildOrgPayloadSerializer,
+    ChildOrgSummarySerializer,
+    ClientPayloadSerializer,
+)
 from api.order_serializers import OrderCardProductSerializer, ProductRefSerializer
 from common.views.paginated_date_range import (
     FilterCatalogueEntrySerializer,
@@ -41,6 +45,7 @@ class CustomOrderDetailPayloadSerializer(serializers.Serializer):
     expected_delivery_date = serializers.DateField()
     actual_delivery_date = serializers.DateField(allow_null=True)
     special_comments = serializers.CharField(allow_blank=True)
+    booked_for = ChildOrgPayloadSerializer(allow_null=True)
     verified_at = serializers.DateTimeField(allow_null=True)
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()
@@ -90,6 +95,7 @@ class CustomOrderListItemSerializer(serializers.Serializer):
     delivery_address = serializers.CharField()
     city = CustomOrderListCitySerializer(allow_null=True)
     expected_delivery_date = serializers.DateField()
+    booked_for = ChildOrgSummarySerializer(allow_null=True)
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()
     item_count = serializers.IntegerField()

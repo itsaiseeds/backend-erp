@@ -38,10 +38,12 @@ gets 403, an id that is not an active sales person gets 400.
 
 from __future__ import annotations
 
+from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 
+from aggregator.ClientChildOrgOperations import resolve_child_org
 from aggregator.models import (
     Client,
     ClientAddress,
@@ -52,6 +54,7 @@ from aggregator.models.Status import StatusIds
 from aggregator.OrderOperations import create_order, order_payload
 from android.api.base import AndroidBaseView
 from android.api.sales_person_scope import resolve_sales_person
+from api.client_serializers import BookedForSerializer, ChildOrgPayloadSerializer
 from api.order_serializers import (
     OrderItemPayloadSerializer,
     TransportAgencyRefSerializer,
@@ -92,6 +95,7 @@ class OrderPayloadSerializer(serializers.Serializer):
     special_comments = serializers.CharField(allow_blank=True)
     transport_agency = TransportAgencyRefSerializer(allow_null=True)
     dispatch_mode = serializers.ChoiceField(choices=["AGENCY", "PRIVATE"])
+    booked_for = ChildOrgPayloadSerializer(allow_null=True)
     verified_at = serializers.DateTimeField(allow_null=True)
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()
@@ -146,6 +150,14 @@ class CreateMultiSelectBagOrderSerializer(serializers.Serializer):
         ),
     )
     items = BagOrderItemSerializer(many=True)
+    booked_for = BookedForSerializer(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Optional child org the order is booked for: {id} to reuse one, or "
+            "{party_name, village_name, ...} to get-or-create it."
+        ),
+    )
 
     def validate_items(self, value):
         if not value:
@@ -277,13 +289,22 @@ class CreateMultiSelectBagOrderView(AndroidBaseView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        order = create_order(
-            client=data["client"],
-            delivery_address=data["delivery_address"],
-            actor=data["sales_person"],
-            items=data["resolved_items"],
-            special_comments=data["special_comments"],
-            expected_delivery_date=data["expected_delivery_date"],
-            transport_agency=data["transport_agency"],
-        )
+        # One transaction around both, so a child org resolved for an order
+        # that then fails validation is rolled back with it.
+        with transaction.atomic():
+            booked_for = (
+                resolve_child_org(data["client"], data["booked_for"], data["sales_person"])
+                if data.get("booked_for")
+                else None
+            )
+            order = create_order(
+                client=data["client"],
+                delivery_address=data["delivery_address"],
+                actor=data["sales_person"],
+                items=data["resolved_items"],
+                special_comments=data["special_comments"],
+                expected_delivery_date=data["expected_delivery_date"],
+                transport_agency=data["transport_agency"],
+                booked_for=booked_for,
+            )
         return Response(order_payload(order), status=status.HTTP_201_CREATED)
