@@ -344,7 +344,7 @@ def _create_visit(
     products: Iterable[Product],
     is_lead: bool,
 ) -> FarmerVisit:
-    """Save the row and its crop / product links (``trip`` is ``None`` for an independent farmer)."""
+    """Save the row and its crop / product links (``trip`` is ``None`` if independent)."""
     unique_crops = list(dict.fromkeys(crops))
     unique_products = list(dict.fromkeys(products))
     if not unique_crops:

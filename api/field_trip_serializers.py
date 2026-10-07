@@ -269,7 +269,7 @@ class FarmerPayloadSerializer(serializers.Serializer):
     village = serializers.CharField(help_text="Village of the latest visit.")
     city = IdNameSerializer(
         allow_null=True,
-        help_text="City of the latest visit's field trip; null for a farmer recorded without a trip.",
+        help_text="City of the latest visit's field trip; null if recorded without a trip.",
     )
     land_area_bigha = serializers.CharField(help_text="Land held at the latest visit, in bigha.")
     is_lead = serializers.BooleanField(help_text="Lead flag of the latest record.")

@@ -14,9 +14,10 @@ class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
 
     A visit, not a farmer master record: the same farmer met on two trips is
     two rows. A farmer a sales person enters outside any trip has
-    ``field_trip`` empty (:attr:`is_independent`) and belongs to ``created_by``. The crops they grow are ``FarmerVisitCrop`` rows; the products of
-    ours they use are ``FarmerVisitProduct`` rows, and having none is what
-    "doesn't use our products" means (:attr:`uses_our_products`).
+    ``field_trip`` empty (:attr:`is_independent`) and belongs to ``created_by``.
+    The crops they grow are ``FarmerVisitCrop`` rows; the products of ours they
+    use are ``FarmerVisitProduct`` rows, and having none is what "doesn't use
+    our products" means (:attr:`uses_our_products`).
 
     ``village`` is stored resolved -- ``FieldTripOperations.create_farmer_visit``
     copies the trip's village when none is given.
