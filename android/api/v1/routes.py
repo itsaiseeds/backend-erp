@@ -43,6 +43,7 @@ from .GodownRawMaterialStockView import GodownRawMaterialStockView
 from .GodownSamplePacketStockView import GodownSamplePacketStockView
 from .GodownUpdateBagStockView import GodownUpdateBagStockView
 from .GodownUpdateSamplePacketStockView import GodownUpdateSamplePacketStockView
+from .LabExportLabTestingsView import LabExportLabTestingsView
 from .LabPendingLotsView import LabPendingLotsView
 from .LabTestingDetailView import LabTestingDetailView
 from .LabTestingsView import LabTestingsView
@@ -128,5 +129,6 @@ ROUTES: dict[str, type] = {
     "godown/product-packagings": GodownProductPackagingsView,
     "lab/pending-lots": LabPendingLotsView,
     "lab/lab-testings": LabTestingsView,
+    "lab/export/lab-testings": LabExportLabTestingsView,
     "lab/lab-testing/<public_id>": LabTestingDetailView,
 }

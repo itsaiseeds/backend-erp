@@ -149,15 +149,13 @@ class DateWindow:
         )
 
 
-class AdminDateRangeExportView(AdminApiView):
-    """Admin website ``GET`` export over a validated date window.
+class DateRangeExportMixin:
+    """The ``GET`` of a date-window export, independent of who may call it.
 
-    A subclass implements :meth:`export` and wraps :meth:`get` in its own
-    ``extend_schema`` (with :data:`EXPORT_QUERY_PARAMETERS`), the same way the
-    paginated list views do.
+    Mixed in ahead of a role base (:class:`AdminDateRangeExportView` here, an
+    Android role base in ``android.api``), so the window contract, its cap and
+    the response envelope are the same for every export.
     """
-
-    admin_required = True
 
     def export(self, window: DateWindow) -> list[dict]:
         raise NotImplementedError(f"{type(self).__name__} must implement export(self, window).")
@@ -178,3 +176,14 @@ class AdminDateRangeExportView(AdminApiView):
                 "results": results,
             }
         )
+
+
+class AdminDateRangeExportView(DateRangeExportMixin, AdminApiView):
+    """Admin website ``GET`` export over a validated date window.
+
+    A subclass implements :meth:`export` and wraps :meth:`get` in its own
+    ``extend_schema`` (with :data:`EXPORT_QUERY_PARAMETERS`), the same way the
+    paginated list views do.
+    """
+
+    admin_required = True
