@@ -360,7 +360,7 @@ class InwardOtherMaterialApiTest(WebApiTestCase):
         response = self.client.delete(self._url(created.data))
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.content)
-        self.assertIn("'packet_outer_cover' short by 12.000", response.data["detail"])
+        self.assertIn("'packet_outer_cover' for 'SAI-33' 2.500kg short by 12.000", response.data["detail"])
         lot = InwardOtherMaterial.all_objects.get(public_id=created.data["public_id"])
         self.assertFalse(lot.is_deleted)
 

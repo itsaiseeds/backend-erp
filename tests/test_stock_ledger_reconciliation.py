@@ -431,8 +431,7 @@ class StockLedgerReconciliationTest(LedgerWorldTestCase):
                 for material in row["other_materials"]:
                     self.assertEqual(
                         Decimal(material["incoming"])
-                        - Decimal(material["packed"])
-                        - Decimal(material["used_by_other_products"]),
+                        - Decimal(material["packed"]),
                         Decimal(material["available"]),
                     )
             # The window's closing balance is the next window's opening balance.

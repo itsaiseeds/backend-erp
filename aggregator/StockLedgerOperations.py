@@ -19,10 +19,9 @@ Figures per pool (see ``docs/prd/product-stock-ledger.md`` section 3.2):
 * ``BAG`` (per ``ProductPackaging``) and ``LOOSE`` (per packet weight):
   ``on_hand``, ``reserved``, ``consumed``;
 * ``RAW`` (one per product): ``incoming``, ``packed``, ``rejected``, ``wasted``;
-* ``OTHER`` (per packing-material type): ``incoming`` (pool-wide) and ``packed``
-  (this product's usage). The pool-wide ``incoming`` delta is written once per
-  write, on the first product's event that carries it, so summing a material
-  type's lines across products never double counts it.
+* ``OTHER`` (per packing-material configuration, ``(packet weight, material
+  type)`` of the product): ``incoming`` (lots booked against that configuration)
+  and ``packed`` (the product's usage of it).
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from django.db import models, transaction
 
@@ -49,7 +48,6 @@ from .models import (
     LooseStockSnapshot,
     Order,
     OrderItem,
-    OtherMaterialRecipe,
     Product,
     ProductPackaging,
     RawMaterialWaste,
@@ -83,8 +81,8 @@ LINE_FIELDS: dict[int, tuple[str, ...]] = {
 }
 
 # A pool is addressed by (kind, ref): the packaging pk for BAG, the packet
-# weight for LOOSE, 0 for RAW and the material-type id for OTHER.
-PoolKey = tuple[int, int | Decimal]
+# weight for LOOSE, 0 for RAW and ``(packet weight, material-type id)`` for OTHER.
+PoolKey = tuple[int, int | Decimal | tuple[Decimal, int]]
 Figures = dict[str, Decimal]
 Position = dict[PoolKey, Figures]
 
@@ -106,17 +104,6 @@ _SOURCE_FIELDS: dict[type[models.Model], str] = {
 
 def _weight(value: Decimal) -> Decimal:
     return Decimal(value).quantize(WEIGHT_QUANT)
-
-
-def product_material_type_ids(product: Product) -> list[int]:
-    """Packing-material types ``product``'s recipes use (live or deleted)."""
-    return sorted(
-        set(
-            OtherMaterialRecipe.all_objects.filter(product=product).values_list(
-                "material_type_id", flat=True
-            )
-        )
-    )
 
 
 def _row_date(row: InventorySnapshot | LooseStockSnapshot | None) -> Decimal:
@@ -206,23 +193,16 @@ def read_position(
         "wasted": InventoryOperations.raw_wasted_kg(product),
     }
 
-    material_type_ids = product_material_type_ids(product)
-    if material_type_ids:
-        incoming = InventoryOperations.other_material_inward(material_type_ids)
-        used = other_material_used_by_product(product, material_type_ids)
-        for material_type_id in material_type_ids:
-            position[(OTHER, material_type_id)] = {
-                "incoming": incoming.get(material_type_id, ZERO),
-                "packed": used.get(material_type_id, ZERO),
-            }
+    keys = InventoryOperations.material_keys([product.pk])
+    incoming = InventoryOperations.other_material_inward(keys)
+    used = InventoryOperations.other_material_used(keys)
+    for key in keys:
+        _, key_weight, material_type_id = key
+        position[(OTHER, (_weight(key_weight), material_type_id))] = {
+            "incoming": incoming.get(key, ZERO),
+            "packed": used.get(key, ZERO),
+        }
     return position
-
-
-def other_material_used_by_product(
-    product: Product, material_type_ids: Iterable[int]
-) -> dict[int, Decimal]:
-    """Units of each material type spent by ``product``'s own packed packets."""
-    return InventoryOperations.other_material_used(material_type_ids, product=product)
 
 
 def read_positions(product_ids: Iterable[int]) -> dict[int, Position]:
@@ -381,13 +361,13 @@ def _pool_row(
         if latest is None:
             return None
         return InventorySnapshot.objects.filter(
-            product_packaging_id=int(ref), snapshot_date=latest
+            product_packaging_id=cast(int, ref), snapshot_date=latest
         ).first()
     latest = InventoryOperations.latest_loose_snapshot_date()
     if latest is None:
         return None
     return LooseStockSnapshot.objects.filter(
-        product_id=product_id, packet_weight=Decimal(ref), snapshot_date=latest
+        product_id=product_id, packet_weight=cast(Decimal, ref), snapshot_date=latest
     ).first()
 
 
@@ -515,19 +495,8 @@ def _write_events(
     after: dict[int, Position],
 ) -> None:
     occurred_at = indian_now()
-    incoming_written: set[int] = set()
     for product_id in sorted(tracked):
         changes = diff_positions(before.get(product_id, {}), after.get(product_id, {}))
-        # A material type's ``incoming`` is pool-wide: record it once per write.
-        for key, delta in list(changes.items()):
-            if key[0] != OTHER or not delta.get("incoming"):
-                continue
-            if key[1] in incoming_written:
-                delta["incoming"] = ZERO
-                if not any(delta[name] for name in LINE_FIELDS[OTHER]):
-                    del changes[key]
-            else:
-                incoming_written.add(int(key[1]))
         if not changes:
             continue
         groups = _group_changes(
@@ -558,11 +527,13 @@ def _line(event: StockEvent, key: PoolKey, delta: Figures) -> StockEventLine:
     kind, ref = key
     line = StockEventLine(event=event, pool_kind=kind)
     if kind == BAG:
-        line.product_packaging_id = int(ref)
+        line.product_packaging_id = cast(int, ref)
     elif kind == LOOSE:
-        line.packet_weight = Decimal(ref)
+        line.packet_weight = cast(Decimal, ref)
     elif kind == OTHER:
-        line.material_type_id = int(ref)
+        weight, material_type_id = cast(tuple[Decimal, int], ref)
+        line.packet_weight = weight
+        line.material_type_id = material_type_id
     for name in LINE_FIELDS[kind]:
         value = delta.get(name, ZERO)
         setattr(line, f"d_{name}", value if value else None)
@@ -638,19 +609,9 @@ def seed_ledger() -> int:
     InventoryOperations.seed_recipe_layers()
     occurred_at = indian_now()
     positions = read_positions(Product.all_objects.values_list("pk", flat=True))
-    incoming_written: set[int] = set()
     count = 0
     for product_id in sorted(positions):
         changes = diff_positions({}, positions[product_id])
-        for key, delta in list(changes.items()):
-            if key[0] != OTHER or not delta.get("incoming"):
-                continue
-            if key[1] in incoming_written:
-                delta["incoming"] = ZERO
-                if not any(delta[name] for name in LINE_FIELDS[OTHER]):
-                    del changes[key]
-            else:
-                incoming_written.add(int(key[1]))
         event = _zero_delta_event(product_id, occurred_at)
         StockEventLine.objects.bulk_create(
             _line(event, key, changes[key]) for key in sorted(changes, key=str)
@@ -660,11 +621,7 @@ def seed_ledger() -> int:
 
 
 def ledger_positions(product_ids: Iterable[int]) -> dict[int, Position]:
-    """Each product's figures as the ledger says they are: the sum of its deltas.
-
-    A packing-material type's ``incoming`` is pool-wide, so it is summed over
-    every product's lines of that type.
-    """
+    """Each product's figures as the ledger says they are: the sum of its deltas."""
     product_ids = list(product_ids)
     sums = {name: models.Sum(f"d_{name}") for name in (
         "on_hand", "reserved", "consumed", "incoming", "packed", "rejected", "wasted"
@@ -683,35 +640,19 @@ def ledger_positions(product_ids: Iterable[int]) -> dict[int, Position]:
     positions: dict[int, Position] = {pid: {} for pid in product_ids}
     for row in rows:
         kind = row["pool_kind"]
-        ref: int | Decimal
+        ref: int | Decimal | tuple[Decimal, int]
         if kind == BAG:
             ref = row["product_packaging_id"]
         elif kind == LOOSE:
             ref = _weight(row["packet_weight"] or ZERO)
         elif kind == OTHER:
-            ref = row["material_type_id"]
+            ref = (_weight(row["packet_weight"] or ZERO), row["material_type_id"])
         else:
             ref = 0
         positions[row["event__product_id"]][(kind, ref)] = {
             name: row[name] or ZERO  # type: ignore[literal-required]
             for name in LINE_FIELDS[kind]
         }
-    pool_incoming = {
-        row["material_type_id"]: row["total"] or ZERO
-        for row in StockEventLine.objects.filter(pool_kind=OTHER)
-        .values("material_type_id")
-        .annotate(total=models.Sum("d_incoming"))
-    }
-    for product_id, position in positions.items():
-        # A product that shares a material type but never moved it still sees
-        # the pool-wide incoming other products recorded.
-        for material_type_id in product_material_type_ids(Product(pk=product_id)):
-            position.setdefault(
-                (OTHER, material_type_id), {"incoming": ZERO, "packed": ZERO}
-            )
-        for key, figures in position.items():
-            if key[0] == OTHER:
-                figures["incoming"] = pool_incoming.get(int(key[1]), ZERO)
     return positions
 
 
@@ -740,3 +681,44 @@ def check_ledger(product_ids: Iterable[int] | None = None) -> list[str]:
                         f"{name}: live {expected}, ledger {recorded}"
                     )
     return problems
+
+
+@transaction.atomic
+def rebuild_other_material_ledger() -> int:
+    """Re-key legacy OTHER ledger lines per configuration. Returns lines written.
+
+    Lines written before packing material was stocked per configuration carry no
+    packet weight and cannot be split after the fact. They are deleted, and each
+    product's ``LEDGER_START`` event gets one OTHER line per configuration equal
+    to the live position less whatever own OTHER lines remain, so the history
+    before the rebuild collapses into the opening balance. Idempotent, and a
+    no-op on an unseeded ledger.
+    """
+    starts = dict(
+        StockEvent.objects.filter(event_type=StockEventType.LEDGER_START).values_list(
+            "product_id", "pk"
+        )
+    )
+    if not starts:
+        return 0
+    StockEventLine.objects.filter(pool_kind=OTHER, packet_weight__isnull=True).delete()
+    product_ids = sorted(starts)
+    live = read_positions(product_ids)
+    recorded = ledger_positions(product_ids)
+    written = 0
+    for product_id in product_ids:
+        lines = []
+        for key, figures in live.get(product_id, {}).items():
+            if key[0] != OTHER:
+                continue
+            delta = {
+                name: figures[name] - recorded[product_id].get(key, {}).get(name, ZERO)
+                for name in LINE_FIELDS[OTHER]
+            }
+            if any(delta.values()):
+                lines.append(
+                    _line(StockEvent(pk=starts[product_id]), key, delta)
+                )
+        StockEventLine.objects.bulk_create(lines)
+        written += len(lines)
+    return written

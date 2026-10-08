@@ -145,7 +145,8 @@ class ReturnWorldTestCase(LedgerWorldTestCase):
         )
 
     def pouch_inward(self):
-        return inv.other_material_inward([self.pouch.id]).get(self.pouch.id, Decimal("0"))
+        inward = inv.other_material_inward(material_type_ids=[self.pouch.id])
+        return sum(inward.values(), Decimal("0"))
 
     def replace_recipe_p(self, quantity="3.000"):
         """Soft-delete ``recipe_p`` and create its live replacement."""

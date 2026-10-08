@@ -164,8 +164,8 @@ class StockLedgerApiTest(LedgerWorldTestCase, WebApiTestCase):
             [row["event"] for row in flat].count("OPENING_BALANCE"), 1, "only on page one"
         )
 
-    def test_rows_reconcile_and_a_shared_material_shows_the_other_products_use(self):
-        """Two products share a material: incoming - packed - used_by_others = available.
+    def test_rows_reconcile_per_configuration_and_other_products_lots_are_not_listed(self):
+        """Each configuration reconciles alone: incoming - packed = available.
 
         tests/test_stock_ledger_api.py::StockLedgerApiTest::test_rows_reconcile_and_a_shared_material_shows_the_other_products_use
         """
@@ -175,31 +175,27 @@ class StockLedgerApiTest(LedgerWorldTestCase, WebApiTestCase):
         self.count_bags({self.qq1: 8})
 
         rows = self._get().data["results"]
-        events = [row["event"] for row in rows]
-        self.assertIn("INWARD_OPERATIONS", events)
         inward_rows = [
             row for row in rows if row["source"] and row["source"]["kind"] == "inward_other_material"
         ]
-        self.assertEqual(
-            len(inward_rows), 2, "both pouch lots appear, though one is Q's"
-        )
-        self.assertIn("Ledger Q", inward_rows[1]["source"]["label"])
+        self.assertEqual(len(inward_rows), 1, "Q's lots are not listed in P's report")
+        self.assertNotIn("Ledger Q", inward_rows[0]["source"]["label"])
 
         for row in rows:
             for material in row["other_materials"]:
                 with self.subTest(event=row["event"], at=row["occurred_at"]):
+                    self.assertEqual(material["packet_weight"], "1.000")
                     self.assertEqual(
-                        Decimal(material["incoming"])
-                        - Decimal(material["packed"])
-                        - Decimal(material["used_by_other_products"]),
+                        Decimal(material["incoming"]) - Decimal(material["packed"]),
                         Decimal(material["available"]),
                     )
         closing = rows[-1]["other_materials"][0]
-        # P packed 12 bags x 20 = 240 at 1; Q packed 8 x 10 = 80 at 2 = 160.
+        # P packed 12 bags x 20 = 240 at 1 a packet; Q's 160 is not in P's pool.
         self.assertEqual(closing["packed"], "240.000")
-        self.assertEqual(closing["used_by_other_products"], "160.000")
-        self.assertEqual(closing["incoming"], "1500.000")
-        self.assertEqual(closing["available"], str(Decimal("1500") - 240 - 160) + ".000")
+        self.assertNotIn("used_by_other_products", closing)
+        self.assertEqual(
+            closing["available"], str(Decimal(closing["incoming"]) - 240)
+        )
 
     def test_only_this_endpoint_is_gzipped_and_only_when_asked(self):
         """tests/test_stock_ledger_api.py::StockLedgerApiTest::test_only_this_endpoint_is_gzipped_and_only_when_asked"""
