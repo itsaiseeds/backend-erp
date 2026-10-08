@@ -228,7 +228,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     (_route(_ADMIN, "export/orders", "export/custom-orders"), (ADMIN_ORDERS, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/farmer-visits"), (ADMIN_FIELD_TRIPS, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/dispatch-receipts"), (ADMIN_DISPATCH, ADMIN_EXPORTS)),
-    (_route(_ADMIN, "export/inward-entries"), (ADMIN_INWARD, ADMIN_EXPORTS)),
+    (_route(_ADMIN, "export/inward-entries", "export/lab-testings"), (ADMIN_INWARD, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/inventory-snapshots"), (ADMIN_STOCK_COUNT, ADMIN_EXPORTS)),
     (
         _route(_ADMIN_UTILITIES, "cities", "client-children", "countries", "states"),
