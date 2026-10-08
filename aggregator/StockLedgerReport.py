@@ -6,16 +6,10 @@ event changed, so ``row k`` plus ``change(k+1)`` equals ``row k+1``.
 ``OPENING_BALANCE`` and ``CLOSING_BALANCE`` are synthetic rows built here and
 never stored.
 
-Which events a product's report lists (PRD section 3.6):
-
-* every event stored against the product;
-* ``INWARD_OPERATIONS`` events of **other** products that touch one of this
-  product's packing-material types (a lot booked against another product's
-  recipe still changes the shared pool).
-
-Other products' packing of a shared material is not a row, but it moves the
-running ``used_by_other_products``, so every row still reconciles:
-``incoming - packed - used_by_other_products = available``.
+A product's report lists only the events stored against the product. Packing
+material is stocked per configuration ``(packet weight, material type)`` of the
+product, so every row reconciles on its own: ``incoming - packed = available``
+(``docs/prd/other-material-per-configuration-stock.md``).
 """
 
 from __future__ import annotations
@@ -37,12 +31,7 @@ from .models import (
     StockEventType,
     StockPoolKind,
 )
-from .StockLedgerOperations import (
-    LINE_FIELDS,
-    ZERO,
-    _weight,
-    product_material_type_ids,
-)
+from .StockLedgerOperations import LINE_FIELDS, ZERO, _weight
 
 BAG = StockPoolKind.BAG
 LOOSE = StockPoolKind.LOOSE
@@ -58,6 +47,10 @@ class LedgerNotStarted(Exception):
 
 class LedgerRangeError(Exception):
     """The requested window starts before the ledger does."""
+
+
+# A packing-material pool: ``(packet weight, material type id)``.
+OtherKey = tuple[Decimal, int]
 
 
 def ledger_start() -> datetime | None:
@@ -88,21 +81,18 @@ class _State:
     raw: dict[str, Decimal] = field(
         default_factory=lambda: dict.fromkeys(LINE_FIELDS[RAW], ZERO)
     )
-    other: dict[int, dict[str, Decimal]] = field(default_factory=dict)
+    other: dict[OtherKey, dict[str, Decimal]] = field(default_factory=dict)
 
-    def apply(self, line: StockEventLine, *, own: bool) -> None:
-        """Add one line. ``own`` is False for another product's event, of which
-        only the packing-material pool (shared) is relevant."""
+    def apply(self, line: StockEventLine) -> None:
+        """Add one line of the product's own event."""
         kind = line.pool_kind
         if kind == OTHER:
             figures = self.other.setdefault(
-                line.material_type_id or 0,
-                {"incoming": ZERO, "packed": ZERO, "used_by_others": ZERO},
+                (_weight(line.packet_weight or ZERO), line.material_type_id or 0),
+                dict.fromkeys(LINE_FIELDS[OTHER], ZERO),
             )
-            figures["incoming"] += line.d_incoming or ZERO
-            figures["packed" if own else "used_by_others"] += line.d_packed or ZERO
-            return
-        if not own:
+            for name in LINE_FIELDS[OTHER]:
+                figures[name] += getattr(line, f"d_{name}") or ZERO
             return
         if kind == BAG:
             figures = self.bags.setdefault(
@@ -123,7 +113,7 @@ def _available(figures: dict[str, Decimal], kind: int) -> Decimal:
         return figures["on_hand"] - figures["reserved"] - figures["consumed"]
     if kind == RAW:
         return figures["incoming"] - figures["packed"] - figures["wasted"]
-    return figures["incoming"] - figures["packed"] - figures["used_by_others"]
+    return figures["incoming"] - figures["packed"]
 
 
 def _count_block(now: dict[str, Decimal], delta: dict[str, Decimal]) -> dict[str, object]:
@@ -147,10 +137,10 @@ def _pool_payloads(
     change: _State,
     packagings: list[ProductPackaging],
     weights: list[Decimal],
-    materials: list[OtherMaterialType],
+    materials: list[tuple[Decimal, OtherMaterialType]],
 ) -> dict[str, object]:
     zero_count = dict.fromkeys(LINE_FIELDS[BAG], ZERO)
-    zero_other = {"incoming": ZERO, "packed": ZERO, "used_by_others": ZERO}
+    zero_other = dict.fromkeys(LINE_FIELDS[OTHER], ZERO)
 
     bag_pools = [
         {
@@ -184,11 +174,12 @@ def _pool_payloads(
         },
     }
     other_materials = []
-    for material in materials:
-        now = state.other.get(material.pk, zero_other)
-        delta = change.other.get(material.pk, zero_other)
+    for weight, material in materials:
+        now = state.other.get((weight, material.pk), zero_other)
+        delta = change.other.get((weight, material.pk), zero_other)
         other_materials.append(
             {
+                "packet_weight": _fmt(weight),
                 "material_type": {
                     "id": material.pk,
                     "name": material.name,
@@ -196,12 +187,10 @@ def _pool_payloads(
                 },
                 "incoming": _fmt(now["incoming"]),
                 "packed": _fmt(now["packed"]),
-                "used_by_other_products": _fmt(now["used_by_others"]),
                 "available": _fmt(_available(now, OTHER)),
                 "change": {
                     "incoming": _fmt(delta["incoming"]),
                     "packed": _fmt(delta["packed"]),
-                    "used_by_other_products": _fmt(delta["used_by_others"]),
                     "available": _fmt(_available(delta, OTHER)),
                 },
             }
@@ -272,20 +261,10 @@ def _actor_payload(event: StockEvent) -> dict[str, object] | None:
     return {"id": event.actor_id, "name": event.actor.display_name}
 
 
-def _window_events(
-    product: Product, material_ids: list[int], window_end: datetime
-) -> list[StockEvent]:
-    """The product's events plus other products' events on its materials."""
-    own = StockEvent.objects.filter(product=product, occurred_at__lt=window_end)
-    others = (
-        StockEvent.objects.exclude(product=product)
-        .filter(occurred_at__lt=window_end, lines__material_type_id__in=material_ids)
-        .distinct()
-    )
+def _window_events(product: Product, window_end: datetime) -> list[StockEvent]:
+    """The product's own events before ``window_end``, oldest first."""
     return list(
-        StockEvent.objects.filter(
-            pk__in=[*own.values_list("pk", flat=True), *others.values_list("pk", flat=True)]
-        )
+        StockEvent.objects.filter(product=product, occurred_at__lt=window_end)
         .select_related(
             "product",
             "actor",
@@ -321,8 +300,7 @@ def product_ledger_rows(
     window_start = day_start(start_date)
     window_end = day_start(end_date + timedelta(days=1))
 
-    material_ids = product_material_type_ids(product)
-    events = _window_events(product, material_ids, window_end)
+    events = _window_events(product, window_end)
 
     packagings = list(
         ProductPackaging.all_objects.filter(product=product).order_by("packet_weight", "pk")
@@ -331,16 +309,28 @@ def product_ledger_rows(
         _weight(weight) for weight in InventoryOperations.product_loose_weights(product)
     }
     for event in events:
-        if event.product_id != product.pk:
-            continue
         weights.update(
             _weight(line.packet_weight)
             for line in event.lines.all()
             if line.pool_kind == LOOSE and line.packet_weight is not None
         )
     ordered_weights = sorted(weights)
-    materials = list(
-        OtherMaterialType.all_objects.filter(pk__in=material_ids).order_by("name", "pk")
+    pools: set[OtherKey] = {
+        (_weight(weight), material_type_id)
+        for _, weight, material_type_id in InventoryOperations.material_keys([product.pk])
+    }
+    for event in events:
+        pools.update(
+            (_weight(line.packet_weight or ZERO), line.material_type_id or 0)
+            for line in event.lines.all()
+            if line.pool_kind == OTHER
+        )
+    types = OtherMaterialType.all_objects.in_bulk(
+        {material_type_id for _, material_type_id in pools}
+    )
+    materials = sorted(
+        ((weight, types[material_type_id]) for weight, material_type_id in pools),
+        key=lambda pair: (pair[1].name, pair[1].pk, pair[0]),
     )
 
     state = _State()
@@ -367,17 +357,12 @@ def product_ledger_rows(
         in_window = event.occurred_at >= window_start
         if in_window and opening is None:
             opening = row("OPENING_BALANCE", None, window_start, _State())
-        is_own = event.product_id == product.pk
         change = _State()
         for line in event.lines.all():
-            if not is_own and line.material_type_id not in material_ids:
-                continue
-            state.apply(line, own=is_own)
-            change.apply(line, own=is_own)
+            state.apply(line)
+            change.apply(line)
         if not in_window:
             continue
-        if not is_own and event.event_type != StockEventType.INWARD_OPERATIONS:
-            continue  # another product's packing only moves used_by_other_products
         detail = StockEventDetail(event.detail)
         rows.append(
             row(

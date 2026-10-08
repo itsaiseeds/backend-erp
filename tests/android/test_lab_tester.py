@@ -9,8 +9,10 @@ guard (``DMLTestCase``) runs after every test.
 
 from __future__ import annotations
 
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
@@ -24,8 +26,10 @@ from aggregator.models import (
     Product,
     ProductPackaging,
 )
+from api.sales_admin.ExportLabTestingsView import ExportLabTestingsResponseSerializer
 from authentication.models import Admin, GodownManager, LabTester, SalesPerson, User
 from tests.android.common import AndroidApiTestCase
+from tests.test_stock_ledger_api import documented_keys_mismatches
 
 BASE = "/android/api/v1/"
 WEB = "/api/sales-admin/"
@@ -573,6 +577,119 @@ class LabTesterApiTest(AndroidApiTestCase):
             with self.subTest(url=url):
                 self.assertEqual(self._web(self.sales).get(url).status_code, 403)
                 self.assertEqual(APIClient().get(url).status_code, 401)
+
+    # -- exports ------------------------------------------------------------------------------------
+
+    def _tested_on(self, test_id: str, day: date) -> None:
+        """Backdate a test to noon IST on ``day``."""
+        LabTesting.objects.filter(public_id=test_id).update(
+            tested_at=timezone.make_aware(datetime.combine(day, time(12, 0)))
+        )
+
+    def _export_window(self, client, url, start: date, end: date):
+        return client.get(url, {"start_date": start.isoformat(), "end_date": end.isoformat()})
+
+    def test_both_exports_list_the_tests_of_a_window_newest_first(self):
+        """The admin and the lab tester get the same rows: only tests tested inside the
+        window, newest first, as the lab-testing payloads (no audit keys).
+
+        tests/android/test_lab_tester.py::LabTesterApiTest::test_both_exports_list_the_tests_of_a_window_newest_first
+        """
+        day = today()
+        old = self._submit(self._book(lot_no="SUP-OLD")).data["public_id"]
+        first = self._submit(self._book(lot_no="SUP-1ST"), result="Fail").data["public_id"]
+        last = self._submit(self._book(lot_no="SUP-LST")).data["public_id"]
+        self._tested_on(old, day - timedelta(days=30))
+        self._tested_on(first, day - timedelta(days=2))
+        self._tested_on(last, day)
+
+        for who, client, url in (
+            ("admin", self.as_admin, WEB + "export/lab-testings"),
+            ("lab tester", self.as_tester, BASE + "lab/export/lab-testings"),
+        ):
+            with self.subTest(who=who):
+                response = self._export_window(client, url, day - timedelta(days=2), day)
+
+                self.assertEqual(response.status_code, 200, response.content)
+                self.assertEqual(response.data["count"], 2)
+                self.assertEqual(response.data["start_date"], (day - timedelta(days=2)).isoformat())
+                self.assertEqual(response.data["end_date"], day.isoformat())
+                self.assertEqual([r["public_id"] for r in response.data["results"]], [last, first])
+                row = response.data["results"][0]
+                self.assertEqual(row["result"], "Pass")
+                self.assertEqual(row["inward_raw_material"]["lot_no"], "SUP-LST")
+                self.assertEqual(row["genetical_impurity"], "2.00")
+                self.assertFalse(
+                    {"created_by", "is_deleted", "deleted_at", "updated_at"} & set(row),
+                    row,
+                )
+                self.assertEqual(
+                    documented_keys_mismatches(
+                        ExportLabTestingsResponseSerializer(), response.data
+                    ),
+                    [],
+                )
+
+    def test_the_exports_leave_out_tests_of_deleted_lots_and_tests_awaiting_a_retest(self):
+        """A deleted lot's test is not exported, and a test sent back to the lab has no
+        ``tested_at`` of the window until it is tested again.
+
+        tests/android/test_lab_tester.py::LabTesterApiTest::test_the_exports_leave_out_tests_of_deleted_lots_and_tests_awaiting_a_retest
+        """
+        day = today()
+        kept = self._submit(self._book(lot_no="SUP-KEEP")).data["public_id"]
+        deleted_lot = self._book(lot_no="SUP-GONE")
+        gone = self._submit(deleted_lot, result="Fail").data["public_id"]
+        untested = self._submit(self._book(lot_no="SUP-NEW")).data["public_id"]
+        LabTesting.objects.filter(public_id=untested).update(tested_at=None)
+        self.assertEqual(
+            self.as_godown.delete(BASE + f"godown/inward-raw-material/{deleted_lot}").status_code,
+            204,
+        )
+
+        for who, client, url in (
+            ("admin", self.as_admin, WEB + "export/lab-testings"),
+            ("lab tester", self.as_tester, BASE + "lab/export/lab-testings"),
+        ):
+            with self.subTest(who=who):
+                response = self._export_window(client, url, day - timedelta(days=1), day)
+
+                self.assertEqual(response.status_code, 200, response.content)
+                self.assertEqual([r["public_id"] for r in response.data["results"]], [kept])
+                self.assertNotIn(gone, [r["public_id"] for r in response.data["results"]])
+
+    def test_the_exports_need_a_valid_window_and_the_right_role(self):
+        """A missing, reversed or over-long window is a 400; only the admin and the lab
+        tester respectively may call each export.
+
+        tests/android/test_lab_tester.py::LabTesterApiTest::test_the_exports_need_a_valid_window_and_the_right_role
+        """
+        day = today()
+        admin_url = WEB + "export/lab-testings"
+        tester_url = BASE + "lab/export/lab-testings"
+
+        for client, url in ((self.as_admin, admin_url), (self.as_tester, tester_url)):
+            with self.subTest(url=url, case="missing window"):
+                self.assertEqual(client.get(url).status_code, 400)
+            with self.subTest(url=url, case="reversed"):
+                self.assertEqual(
+                    self._export_window(client, url, day, day - timedelta(days=1)).status_code, 400
+                )
+            with self.subTest(url=url, case="too long"):
+                self.assertEqual(
+                    self._export_window(client, url, day - timedelta(days=62), day).status_code,
+                    400,
+                )
+        for who, client, url in (
+            ("sales person (web)", self._web(self.sales), admin_url),
+            ("godown manager", self.as_godown, tester_url),
+            ("sales person (android)", self.as_sales, tester_url),
+        ):
+            with self.subTest(who=who):
+                self.assertEqual(self._export_window(client, url, day, day).status_code, 403)
+        for url in (admin_url, tester_url):
+            with self.subTest(who="anonymous", url=url):
+                self.assertEqual(self._export_window(APIClient(), url, day, day).status_code, 401)
 
     # -- admin: managing lab testers ------------------------------------------------------------------
 

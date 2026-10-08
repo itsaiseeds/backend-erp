@@ -11,6 +11,7 @@ Soft-deleted admins are never found (404).
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -22,6 +23,7 @@ from authentication.UserOperations import (
     AdminPayloadSerializer,
     UpdateAdminSerializer,
     admin_payload,
+    deactivate_if_roleless,
 )
 
 
@@ -69,5 +71,7 @@ class UpdateAdminView(AdminApiView):
         admin = get_object_or_404(
             Admin.objects.select_related("user", "created_by"), id=id
         )
-        admin.delete(deleted_by=request.user)
+        with transaction.atomic():
+            admin.delete(deleted_by=request.user)
+            deactivate_if_roleless(admin.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

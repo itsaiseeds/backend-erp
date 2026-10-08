@@ -28,9 +28,8 @@ COMPANY_DETAILS = {
     "web": "saiseeds.in"
 }
 
-# Stand-in until HSN is classified per product. 1209 91 00 is "vegetable seeds
-# for sowing", which is the right family for a seed business.
-DEFAULT_HSN_CODE = "12099100"
+# Stand-in until HSN is classified per product: 1209 10 00, seeds for sowing.
+DEFAULT_HSN_CODE = "12091000"
 
 # The Indian financial year runs April -> March.
 FINANCIAL_YEAR_START_MONTH = 4

@@ -145,7 +145,8 @@ class ReturnWorldTestCase(LedgerWorldTestCase):
         )
 
     def pouch_inward(self):
-        return inv.other_material_inward([self.pouch.id]).get(self.pouch.id, Decimal("0"))
+        inward = inv.other_material_inward(material_type_ids=[self.pouch.id])
+        return sum(inward.values(), Decimal("0"))
 
     def replace_recipe_p(self, quantity="3.000"):
         """Soft-delete ``recipe_p`` and create its live replacement."""
@@ -200,22 +201,103 @@ class ReturnOrderOperationsTest(ReturnWorldTestCase):
         ret = self.new_return(delivered)
         self.assertEqual(ret.order_id, delivered.pk)
 
-    def test_one_live_return_per_order_and_a_rejected_one_does_not_count(self):
-        """tests/test_return_orders.py::ReturnOrderOperationsTest::test_one_live_return_per_order_and_a_rejected_one_does_not_count"""
-        order = self.dispatched_order()
+    def test_many_live_returns_share_the_challan_limit(self):
+        """tests/test_return_orders.py::ReturnOrderOperationsTest::test_many_live_returns_share_the_challan_limit"""
+        order = self.dispatched_order()  # 40 packets of P
         first = self.new_return(order, 10)
+        second = self.new_return(order, 25)  # 35 of 40 across two live returns
+        self.assertEqual({first.order_id, second.order_id}, {order.pk})
+
+        with self.subTest(case="a third return that would overshoot the sum"):
+            with self.assertRaises(ValidationError):
+                self.new_return(order, 6)  # 10 + 25 + 6 > 40
+            self.assertEqual(ReturnOrder.objects.filter(order=order).count(), 2)
+        self.new_return(order, 5)  # exactly fills the challan
+
+        with self.subTest(case="v1 refuses any second live return"):
+            with self.assertRaises(ValidationError):
+                create_return_order(
+                    order,
+                    return_date=None,
+                    items=[self.item(self.product, 1)],
+                    actor=self.sp_user,
+                    single_live=True,
+                )
+
+        with self.subTest(case="editing within the shared limit"):
+            with self.assertRaises(ValidationError):
+                update_return_order(
+                    first, return_date=None, items=[self.item(self.product, 11)], actor=self.sp_user
+                )
+            update_return_order(
+                first, return_date=None, items=[self.item(self.product, 10)], actor=self.sp_user
+            )
+
+    def test_the_sum_per_product_across_returns_never_exceeds_the_order(self):
+        """A sold 20 and B sold 15 packets: every return counts against its own product.
+
+        tests/test_return_orders.py::ReturnOrderOperationsTest::test_the_sum_per_product_across_returns_never_exceeds_the_order
+        """
+        order = self.dispatched_order({self.pp1: 1, self.qq1: 2})  # 20 packets of P and of Q
+        sold_p = sold_q = 20
+
+        def returned(product):
+            return sum(
+                item.packets
+                for item in ReturnOrderItem.objects.filter(
+                    return_order__order=order,
+                    product=product,
+                    return_order__status_id__in=[
+                        StatusIds.RETURN_PENDING,
+                        StatusIds.RETURN_ACCEPTED,
+                    ],
+                )
+            )
+
+        def raise_(p, q):
+            items = [self.item(prod, n) for prod, n in ((self.product, p), (self.other_product, q)) if n]
+            return create_return_order(order, return_date=None, items=items, actor=self.sp_user)
+
+        first = raise_(8, 5)
+        second = raise_(10, 0)  # P now 18 of 20
         with self.assertRaises(ValidationError):
-            self.new_return(order, 5)
+            raise_(3, 0)  # P would be 21
+        with self.assertRaises(ValidationError):
+            raise_(2, 16)  # Q would be 21; nothing of this attempt is kept
+        third = raise_(2, 15)  # P 20, Q 20: exactly the order
+        self.assertLessEqual(returned(self.product), sold_p)
+        self.assertLessEqual(returned(self.other_product), sold_q)
+        self.assertEqual((returned(self.product), returned(self.other_product)), (20, 20))
 
-        # Rejected: out of the way, and its packets are free again.
-        reject_return_order(first, admin=self.admin_user)
-        second = self.new_return(order, 40)
+        with self.subTest(case="accept and revert keep the total"):
+            self.accept(second)
+            self.assertEqual(returned(self.product), 20)
+            with self.assertRaises(ValidationError):
+                raise_(1, 0)
 
-        with self.subTest(case="unreject while another return is live"):
+        with self.subTest(case="reject frees packets for others"):
+            reject_return_order(first, admin=self.admin_user)
+            self.assertEqual((returned(self.product), returned(self.other_product)), (12, 15))
+            fourth = raise_(8, 5)
+            self.assertEqual((returned(self.product), returned(self.other_product)), (20, 20))
+
+        with self.subTest(case="unreject re-checks the shared limit"):
             with self.assertRaises(ValidationError):
                 unreject_return_order(first, admin=self.admin_user)
-            first.refresh_from_db()
-            self.assertEqual(first.status_id, StatusIds.RETURN_REJECTED)
+            reject_return_order(fourth, admin=self.admin_user)
+            unreject_return_order(first, admin=self.admin_user)
+            self.assertEqual(returned(self.product), 20)
+
+        with self.subTest(case="accepting the others stays within the limit"):
+            self.accept(third)
+            self.assertLessEqual(returned(self.product), sold_p)
+
+    def test_a_rejected_return_does_not_count(self):
+        """tests/test_return_orders.py::ReturnOrderOperationsTest::test_a_rejected_return_does_not_count"""
+        order = self.dispatched_order()
+        first = self.new_return(order, 10)
+        reject_return_order(first, admin=self.admin_user)
+        second = self.new_return(order, 40)
 
         reject_return_order(second, admin=self.admin_user)
         unreject_return_order(first, admin=self.admin_user)
@@ -805,7 +887,7 @@ class ReturnOrderApiTest(ReturnWorldTestCase):
         self.assertEqual(
             self.droid.post(url, self.body(5), format="json").status_code,
             status.HTTP_400_BAD_REQUEST,
-            "only one live return per order",
+            "v1 keeps one live return per order",
         )
 
     def test_android_sales_people_only_reach_their_own_orders_and_dispatched_ones(self):

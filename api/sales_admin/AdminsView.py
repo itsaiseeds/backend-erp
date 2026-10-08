@@ -17,11 +17,12 @@ from rest_framework.response import Response
 
 from aggregator.models import City
 from api.admin import AdminApiView
-from authentication.models import Admin, SalesPerson, User
+from authentication.models import Admin, SalesPerson
 from authentication.UserOperations import (
     AdminPayloadSerializer,
     admin_payload,
-    create_verified_user,
+    grant_role,
+    obtain_role_user,
 )
 from authentication.validators import validate_phone_number
 
@@ -54,11 +55,6 @@ class CreateAdminSerializer(serializers.Serializer):
         help_text="City for the fallback salesperson profile created with this admin.",
     )
 
-    def validate_phone_number(self, value):
-        if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError("A user with this contact number already exists.")
-        return value
-
 
 class AdminsView(AdminApiView):
     """List (GET) or create (POST) application admins (superuser only)."""
@@ -87,15 +83,18 @@ class AdminsView(AdminApiView):
         data = serializer.validated_data
 
         with transaction.atomic():
-            user = create_verified_user(data, actor=request.user)
-            admin = Admin.objects.create(
-                user=user,
+            user = obtain_role_user(data, actor=request.user)
+            admin = grant_role(
+                Admin,
+                user,
+                request.user,
                 can_update_stock_count=data["can_update_stock_count"],
                 share_contact=data["share_contact"],
-                created_by=request.user,
             )
             # Fallback salesperson so the account can always use the sales app.
-            SalesPerson.objects.create(user=user, city=data["city"], created_by=request.user)
+            grant_role(
+                SalesPerson, user, request.user, keep_live=True, city=data["city"]
+            )
 
         return Response(
             admin_payload(admin, include_totp=True),

@@ -111,13 +111,14 @@ OPENAPI_TAGS: list[dict[str, str]] = [
 
 _ADMIN = "/api/sales-admin/"
 _ADMIN_UTILITIES = "/api/utilities/"
-_ANDROID = "/android/api/v1/"
+_ANDROID = "/android/api/v"  # + a version number; see ``_route``
 
 
 def _route(base: str, *segments: str) -> re.Pattern[str]:
     """Match ``base`` followed by any of ``segments`` as a whole path segment."""
     names = "|".join(re.escape(segment) for segment in segments)
-    return re.compile(rf"^{re.escape(base)}(?:{names})(?:/|$)")
+    version = r"\d+/" if base == _ANDROID else ""
+    return re.compile(rf"^{re.escape(base)}{version}(?:{names})(?:/|$)")
 
 
 # (path pattern, tags) -- checked in order, first match wins.
@@ -228,7 +229,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     (_route(_ADMIN, "export/orders", "export/custom-orders"), (ADMIN_ORDERS, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/farmer-visits"), (ADMIN_FIELD_TRIPS, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/dispatch-receipts"), (ADMIN_DISPATCH, ADMIN_EXPORTS)),
-    (_route(_ADMIN, "export/inward-entries"), (ADMIN_INWARD, ADMIN_EXPORTS)),
+    (_route(_ADMIN, "export/inward-entries", "export/lab-testings"), (ADMIN_INWARD, ADMIN_EXPORTS)),
     (_route(_ADMIN, "export/inventory-snapshots"), (ADMIN_STOCK_COUNT, ADMIN_EXPORTS)),
     (
         _route(_ADMIN_UTILITIES, "cities", "client-children", "countries", "states"),

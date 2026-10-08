@@ -84,5 +84,6 @@ class ReturnOrderView(AndroidBaseView):
             return_date=data.get("return_date"),
             items=data["resolved_items"],
             actor=request.user,
+            single_live=True,
         )
         return Response(return_order_payload(ret), status=status.HTTP_201_CREATED)

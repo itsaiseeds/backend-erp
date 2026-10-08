@@ -21,7 +21,9 @@ picks them up unchanged; the stock ledger records the accept as one
 **The returnable limit** per ``(product, packet_weight)`` is the packets on the
 order's challan -- ``DispatchEntryItem.quantity`` x ``packaging.packets`` -- less
 what any other live return already claims. A return is *live* while PENDING or
-ACCEPTED, and an order may carry only one.
+ACCEPTED, and an order may carry any number of them: the sum of their items per
+``(product, packet_weight)`` never exceeds the challan's packets
+(``docs/prd/multiple-return-orders.md``).
 
 Every refusal is a ``ValidationError``, which the API renders as a 400.
 """
@@ -94,8 +96,8 @@ def lock_order(order: Order) -> Order:
 
     Creating, editing, accepting and un-rejecting a return all take this lock
     first, so two of them for the same order run one after the other and the
-    one-live-return rule and the limit are checked against what the last one
-    left. It is the lock ``GetOrderView.get_locked_order`` takes for every order
+    limit (and, for a v1 create, the one-live-return rule) is checked against
+    what the last one left. It is the lock ``GetOrderView.get_locked_order`` takes for every order
     lifecycle verb, so a ``revert-dispatch`` is serialised against them too.
 
     The lock is taken on the bare row and the joined load runs afterwards, the
@@ -158,11 +160,15 @@ def returnable_packets(order: Order, exclude: ReturnOrder | None = None) -> dict
     return remaining
 
 
-def assert_order_returnable(order: Order, exclude: ReturnOrder | None = None) -> None:
+def assert_order_returnable(
+    order: Order, exclude: ReturnOrder | None = None, *, single_live: bool = False
+) -> None:
     """Raise unless ``order`` may take a (new or restored) return.
 
-    Its status must be DISPATCHED or DELIVERED, and it must have no live return
-    besides ``exclude`` -- the one being edited, accepted or un-rejected.
+    Its status must be DISPATCHED or DELIVERED. With ``single_live`` (the v1
+    Android create) it must also have no live return besides ``exclude``. Without
+    it any number of live returns may coexist; ``assert_items_within_limit``
+    keeps their sum within the challan.
     """
     if order.status_id not in RETURNABLE_ORDER_STATUS_IDS:
         raise ValidationError(
@@ -173,6 +179,8 @@ def assert_order_returnable(order: Order, exclude: ReturnOrder | None = None) ->
                 )
             }
         )
+    if not single_live:
+        return
     other = live_returns(order, exclude).first()
     if other is not None:
         raise ValidationError(
@@ -244,16 +252,22 @@ def _assert_admin(admin: User | None) -> None:
 
 @transaction.atomic
 def create_return_order(
-    order: Order, *, return_date: date | None, items: list[dict], actor: User
+    order: Order,
+    *,
+    return_date: date | None,
+    items: list[dict],
+    actor: User,
+    single_live: bool = False,
 ) -> ReturnOrder:
     """Raise a PENDING return against ``order``.
 
     ``items`` is ``[{"product", "packet_weight", "packets", "price_per_packet"}]``.
     The order row is locked first, so two creates for the same order cannot both
-    see it free of a live return.
+    claim the same packets. ``single_live`` (Android v1) also refuses when the
+    order already has a live return.
     """
     order = lock_order(order)
-    assert_order_returnable(order)
+    assert_order_returnable(order, single_live=single_live)
     assert_items_within_limit(order, items)
 
     ret = ReturnOrder(
@@ -281,7 +295,7 @@ def update_return_order(
     order = lock_order(ret.order)
     ret.refresh_from_db()
     assert_return_status(ret, PENDING_ONLY, "edit")
-    assert_order_returnable(order, exclude=ret)
+    assert_order_returnable(order)
     assert_items_within_limit(order, items, exclude=ret)
 
     if return_date is not None:
@@ -494,7 +508,7 @@ def accept_return_order(
     order = lock_order(ret.order)
     ret.refresh_from_db()
     assert_return_status(ret, PENDING_ONLY, "accept")
-    assert_order_returnable(order, exclude=ret)
+    assert_order_returnable(order)
 
     items = list(ret.items.select_related("product"))
     assert_items_within_limit(
@@ -607,7 +621,12 @@ def revert_accept_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
     product_ids = set(raw_lots.values_list("product_id", flat=True)) | set(
         other_lots.values_list("recipe__product_id", flat=True)
     )
-    material_type_ids = set(other_lots.values_list("recipe__material_type_id", flat=True))
+    material_keys = {
+        (product_id, Decimal(weight), material_type_id)
+        for product_id, weight, material_type_id in other_lots.values_list(
+            "recipe__product_id", "recipe__packet_weight", "recipe__material_type_id"
+        )
+    }
 
     with recording(
         StockEventType.RETURN_OPERATIONS,
@@ -638,7 +657,7 @@ def revert_accept_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
             other_lots.update(**removal)
 
         InventoryOperations.guard_stock_deletion(
-            perform, product_ids=product_ids, material_type_ids=material_type_ids
+            perform, product_ids=product_ids, extra_material_keys=material_keys
         )
 
         ret.status = Status.by_id(StatusIds.RETURN_PENDING)
@@ -692,7 +711,7 @@ def unreject_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
     order = lock_order(ret.order)
     ret.refresh_from_db()
     assert_return_status(ret, REJECTED_ONLY, "unreject")
-    assert_order_returnable(order, exclude=ret)
+    assert_order_returnable(order)
     assert_items_within_limit(
         order,
         [
@@ -788,17 +807,17 @@ def return_order_payload(ret: ReturnOrder) -> dict:
     }
 
 
-def live_return_order(order: Order) -> ReturnOrder | None:
-    """``order``'s live return, if any.
+def live_return_orders(order: Order) -> list[ReturnOrder]:
+    """``order``'s live returns, newest first.
 
     Reads ``order.live_return_orders`` when ``order_detail_queryset`` prefetched
-    it (``Prefetch(..., to_attr="live_return_orders")``), and queries otherwise.
-    A REJECTED return is never live, so it never appears here.
+    it (``Prefetch(..., to_attr="live_return_orders")``, ordered newest first),
+    and queries otherwise. A REJECTED return is never live, so never appears.
     """
     prefetched = getattr(order, "live_return_orders", None)
     if prefetched is not None:
-        return prefetched[0] if prefetched else None
-    return (
+        return list(prefetched)
+    return list(
         live_returns(order)
         .select_related(
             "status",
@@ -809,8 +828,14 @@ def live_return_order(order: Order) -> ReturnOrder | None:
             "rejected_by",
         )
         .prefetch_related("items__product")
-        .first()
+        .order_by("-created_at", "-id")
     )
+
+
+def live_return_order(order: Order) -> ReturnOrder | None:
+    """The newest live return of ``order``, if any (v1 / compatibility callers)."""
+    live = live_return_orders(order)
+    return live[0] if live else None
 
 
 def order_return_payload(order: Order) -> dict | None:
@@ -822,8 +847,12 @@ def order_return_payload(order: Order) -> dict | None:
 # -- Android prefill ----------------------------------------------------------
 
 
-def return_order_prefill_payload(order: Order) -> dict:
-    """What the return screen needs for ``order``: its summary, the live return, the lines.
+def return_order_prefill_payload(order: Order, *, many: bool = False) -> dict:
+    """What the return screen needs for ``order``: its summary, live return(s), the lines.
+
+    v1 (default) emits ``return_order`` -- the newest live return or null; with
+    ``many=True`` (v2) it emits ``return_orders`` -- every live return, newest
+    first.
 
     ``lines`` has one entry per ``(product, packet_weight)`` on the challan:
     the packets dispatched, the packets still returnable, and a suggested
@@ -868,7 +897,12 @@ def return_order_prefill_payload(order: Order) -> dict:
         }
         for key in sorted(dispatched, key=lambda k: (products[k[0]].name, k[1]))
     ]
-    live = live_return_order(order)
+    live = live_return_orders(order)
+    returns_block = (
+        {"return_orders": [return_order_payload(r) for r in live]}
+        if many
+        else {"return_order": return_order_payload(live[0]) if live else None}
+    )
     return {
         "order": {
             "public_id": order.public_id,
@@ -878,7 +912,7 @@ def return_order_prefill_payload(order: Order) -> dict:
                 "company_name": order.client.company_name,
             },
         },
-        "return_order": return_order_payload(live) if live is not None else None,
+        **returns_block,
         "lines": lines,
     }
 

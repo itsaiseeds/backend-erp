@@ -38,7 +38,8 @@ class PackedRecipeLayersTest(LedgerWorldTestCase):
         ]
 
     def _used(self):
-        return inv.other_material_used([self.pouch.pk]).get(self.pouch.pk, Decimal("0"))
+        used = inv.other_material_used(material_type_ids=[self.pouch.pk])
+        return sum(used.values(), Decimal("0"))
 
     def _replace_recipe(self, quantity):
         self.recipe_p.mark_deleted(self.su)
@@ -121,6 +122,6 @@ class PackedRecipeLayersTest(LedgerWorldTestCase):
         # P spends 1 a packet, Q 2 a packet: 100 + 60.
         self.assertEqual(self._used(), Decimal("160"))
         self.assertEqual(
-            inv.other_material_used([self.pouch.pk], product=self.other_product),
-            {self.pouch.pk: Decimal("60")},
+            inv.other_material_used(product=self.other_product),
+            {(self.other_product.pk, W1, self.pouch.pk): Decimal("60")},
         )

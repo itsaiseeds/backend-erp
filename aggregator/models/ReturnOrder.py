@@ -14,8 +14,9 @@ from .Status import StatusIds
 
 RETURN_STATUS_CODES = {s.name for s in StatusIds.return_statuses()}
 # A return is *live* while PENDING or ACCEPTED: it counts toward the order's
-# returnable limit, and an order may have only one. A REJECTED return is kept
-# for the record but is out of the way.
+# returnable limit. An order may carry any number of live returns (their sum
+# stays within the challan; docs/prd/multiple-return-orders.md). A REJECTED
+# return is kept for the record but is out of the way.
 LIVE_RETURN_STATUS_IDS = (StatusIds.RETURN_PENDING, StatusIds.RETURN_ACCEPTED)
 
 
@@ -89,16 +90,6 @@ class ReturnOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         verbose_name = "return order"
         verbose_name_plural = "return orders"
         ordering = ["-created_at"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["order"],
-                condition=models.Q(
-                    is_deleted=False,
-                    status_id__in=[int(s) for s in LIVE_RETURN_STATUS_IDS],
-                ),
-                name="uniq_returnorder_one_live_per_order",
-            ),
-        ]
 
     def __str__(self):
         return self.public_id or "Return order"

@@ -235,6 +235,7 @@ EXPECTED_CONTRACTS = {
     "android/api/v1/farmer/<public_id>": ("FarmerDetailView", TOKEN_SALESPERSON),
     "android/api/v1/lab/pending-lots": ("LabPendingLotsView", TOKEN_LAB),
     "android/api/v1/lab/lab-testings": ("LabTestingsView", TOKEN_LAB),
+    "android/api/v1/lab/export/lab-testings": ("LabExportLabTestingsView", TOKEN_LAB),
     "android/api/v1/lab/lab-testing/<public_id>": ("LabTestingDetailView", TOKEN_LAB),
     # -- Sales-admin website (session-only) ----------------------------------
     "api/sales-admin/admins": ("AdminsView", SESSION_SUPERUSER),
@@ -276,6 +277,7 @@ EXPECTED_CONTRACTS = {
         SESSION_ADMIN,
     ),
     "api/sales-admin/export/inward-entries": ("ExportInwardEntriesView", SESSION_ADMIN),
+    "api/sales-admin/export/lab-testings": ("ExportLabTestingsView", SESSION_ADMIN),
     "api/sales-admin/export/orders": ("ExportOrdersView", SESSION_ADMIN),
     "api/sales-admin/hold-order/<str:public_id>": ("HoldOrderView", SESSION_ADMIN),
     "api/sales-admin/order/<str:public_id>": ("GetOrderView", SESSION_ADMIN),
@@ -404,6 +406,18 @@ EXPECTED_CONTRACTS = {
     "api/utilities/states": ("StatesView", SESSION_ADMIN),
 }
 
+# Every Android view is also served under each later version (android.api.routing),
+# with the same view class and permission -- unless a version overrides the class,
+# in which case it keeps its name (v2 ReturnOrderView). Derive those entries
+# instead of listing them twice.
+EXPECTED_CONTRACTS.update(
+    {
+        path.replace("android/api/v1/", "android/api/v2/", 1): contract
+        for path, contract in list(EXPECTED_CONTRACTS.items())
+        if path.startswith("android/api/v1/")
+    }
+)
+
 # Views that additionally demand a Django permission (``required_permission``),
 # on top of their role flags. Every other routed view must declare none.
 REQUIRED_PERMISSIONS = {
@@ -414,6 +428,7 @@ REQUIRED_PERMISSIONS = {
 # them. Anything else bypassing BaseApiView is a security regression.
 PRE_AUTH_VIEWS = {
     "android/api/v1/auth/login": "android.api.v1.LoginView.LoginView",
+    "android/api/v2/auth/login": "android.api.v1.LoginView.LoginView",
     "api/sales-admin/auth/otp/verify": "api.sales_admin.VerifyOTPView.VerifyOTPView",
 }
 

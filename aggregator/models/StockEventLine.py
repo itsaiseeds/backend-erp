@@ -19,7 +19,8 @@ class StockEventLine(models.Model):
 
     Exactly the pool reference matching ``pool_kind`` is set: ``BAG`` names a
     ``product_packaging``, ``LOOSE`` a ``packet_weight``, ``OTHER`` a
-    ``material_type``, and ``RAW`` none (it is one pool per product). Delta
+    ``packet_weight`` and a ``material_type`` (one pool per configuration), and
+    ``RAW`` none (it is one pool per product). Delta
     columns a pool does not use stay NULL. Only deltas are stored -- ``available``
     and every other derived figure is recomputed when the report is built.
     """
@@ -94,7 +95,7 @@ class StockEventLine(models.Model):
                     | models.Q(
                         pool_kind=StockPoolKind.OTHER,
                         product_packaging__isnull=True,
-                        packet_weight__isnull=True,
+                        packet_weight__isnull=False,
                         material_type__isnull=False,
                     )
                 ),

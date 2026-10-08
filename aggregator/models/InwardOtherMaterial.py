@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 from common.models import (
@@ -72,7 +74,13 @@ class InwardOtherMaterial(
         InventoryOperations.guard_stock_deletion(
             perform,
             product_ids=[self.recipe.product_id],
-            material_type_ids=[self.recipe.material_type_id],
+            extra_material_keys=[
+                (
+                    self.recipe.product_id,
+                    Decimal(self.recipe.packet_weight),
+                    self.recipe.material_type_id,
+                )
+            ],
             ledger=(
                 StockEventType.INWARD_OPERATIONS,
                 StockEventDetail.OTHER_MATERIAL_DELETED,

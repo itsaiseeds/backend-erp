@@ -11,6 +11,7 @@ Soft-deleted godown managers are never found (404).
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -22,6 +23,7 @@ from authentication.models import GodownManager, User
 from authentication.UserOperations import (
     GodownManagerPayloadSerializer,
     UpdateGodownManagerSerializer,
+    deactivate_if_roleless,
     godown_manager_payload,
 )
 
@@ -82,5 +84,7 @@ class UpdateGodownManagerView(AdminApiView):
         # ``mark_deleted`` (not ``delete(deleted_by=...)``) for the same reason
         # as sales people; ``GodownManager.guard_soft_delete`` still revokes the
         # user's sessions and tokens.
-        manager.mark_deleted(request.user)
+        with transaction.atomic():
+            manager.mark_deleted(request.user)
+            deactivate_if_roleless(manager.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

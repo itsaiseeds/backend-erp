@@ -15,12 +15,13 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from api.admin import AdminApiView
-from authentication.models import GodownManager, User
+from authentication.models import GodownManager
 from authentication.UserOperations import (
     GodownManagerPayloadSerializer,
     can_see_totp,
-    create_verified_user,
     godown_manager_payload,
+    grant_role,
+    obtain_role_user,
 )
 from authentication.validators import validate_phone_number
 
@@ -41,11 +42,6 @@ class CreateGodownManagerSerializer(serializers.Serializer):
             "required": "Phone number is required.",
         },
     )
-
-    def validate_phone_number(self, value):
-        if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError("A user with this contact number already exists.")
-        return value
 
 
 class GodownManagersView(AdminApiView):
@@ -80,8 +76,8 @@ class GodownManagersView(AdminApiView):
         data = serializer.validated_data
 
         with transaction.atomic():
-            user = create_verified_user(data, actor=request.user)
-            manager = GodownManager.objects.create(user=user, created_by=request.user)
+            user = obtain_role_user(data, actor=request.user)
+            manager = grant_role(GodownManager, user, request.user)
 
         return Response(
             godown_manager_payload(manager, include_totp=True),

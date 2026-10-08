@@ -215,7 +215,7 @@ class ReturnPrefillLineSerializer(serializers.Serializer):
     packet_weight = serializers.CharField()
     dispatched_packets = serializers.IntegerField(help_text="Packets on the challan.")
     returnable_packets = serializers.IntegerField(
-        help_text="Dispatched, less what a live return already claims."
+        help_text="Dispatched, less what live returns already claim."
     )
     suggested_price_per_packet = serializers.CharField(
         help_text="The order line's bag price divided by the packets in the bag."
@@ -228,6 +228,16 @@ class ReturnOrderPrefillSerializer(serializers.Serializer):
     order = ReturnPrefillOrderSerializer()
     return_order = ReturnOrderPayloadSerializer(
         allow_null=True, help_text="The order's live return, if there is one."
+    )
+    lines = ReturnPrefillLineSerializer(many=True)
+
+
+class ReturnOrderPrefillV2Serializer(serializers.Serializer):
+    """Output shape for ``GET /android/api/v2/return-order/<order_public_id>``."""
+
+    order = ReturnPrefillOrderSerializer()
+    return_orders = ReturnOrderPayloadSerializer(
+        many=True, help_text="Every live return of the order, newest first."
     )
     lines = ReturnPrefillLineSerializer(many=True)
 

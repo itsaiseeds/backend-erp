@@ -114,7 +114,14 @@ class OrderDetailPayloadSerializer(serializers.Serializer):
     return_order = ReturnOrderPayloadSerializer(
         allow_null=True,
         help_text=(
-            "The order's live return (PENDING or ACCEPTED); null when it has none. "
-            "A REJECTED return is not shown."
+            "Deprecated, use ``return_orders``. The order's newest live return "
+            "(PENDING or ACCEPTED); null when it has none."
+        ),
+    )
+    return_orders = ReturnOrderPayloadSerializer(
+        many=True,
+        help_text=(
+            "Every live return of the order (PENDING or ACCEPTED), newest first. "
+            "REJECTED returns are not shown."
         ),
     )

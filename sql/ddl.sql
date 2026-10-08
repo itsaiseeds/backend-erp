@@ -1527,7 +1527,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_returnorder (
 	CONSTRAINT aggregator_returnorder_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_returnorder_public_id_key UNIQUE (public_id)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_returnorder_one_live_per_order ON public.aggregator_returnorder USING btree (order_id) WHERE is_deleted = false AND status_id IN (17, 18);
+DROP INDEX IF EXISTS public.uniq_returnorder_one_live_per_order;
 CREATE INDEX IF NOT EXISTS aggregator_returnorder_public_id_like ON public.aggregator_returnorder USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_returnorder_order_id_idx ON public.aggregator_returnorder USING btree (order_id);
 CREATE INDEX IF NOT EXISTS aggregator_returnorder_status_id_idx ON public.aggregator_returnorder USING btree (status_id);
@@ -1958,7 +1958,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_stockeventline (
 		(pool_kind = 1 AND product_packaging_id IS NOT NULL AND packet_weight IS NULL AND material_type_id IS NULL)
 		OR (pool_kind = 2 AND product_packaging_id IS NULL AND packet_weight IS NOT NULL AND material_type_id IS NULL)
 		OR (pool_kind = 3 AND product_packaging_id IS NULL AND packet_weight IS NULL AND material_type_id IS NULL)
-		OR (pool_kind = 4 AND product_packaging_id IS NULL AND packet_weight IS NULL AND material_type_id IS NOT NULL)
+		OR (pool_kind = 4 AND product_packaging_id IS NULL AND packet_weight IS NOT NULL AND material_type_id IS NOT NULL)
 	)
 );
 CREATE INDEX IF NOT EXISTS ix_stock_event_line_event ON public.aggregator_stockeventline USING btree (event_id);

@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 
-from authentication.models import Admin, GodownManager
+from authentication.models import Admin, GodownManager, LabTester
 from tests.common import WebApiTestCase
 
 User = get_user_model()
@@ -74,7 +74,7 @@ class GodownManagerApiTest(WebApiTestCase):
         self.assertEqual(self._create().status_code, status.HTTP_201_CREATED)
         duplicate = self._create()
         self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("contact number already exists", str(duplicate.data))
+        self.assertIn("already a godown manager", str(duplicate.data))
 
     def test_an_admins_own_godown_profile_is_superuser_only(self):
         """tests/test_godown_manager_api.py::GodownManagerApiTest::test_an_admins_own_godown_profile_is_superuser_only"""
@@ -95,3 +95,72 @@ class GodownManagerApiTest(WebApiTestCase):
             status.HTTP_403_FORBIDDEN,
         )
         self.assertEqual(self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_deleting_the_only_role_deactivates_the_user_and_recreating_revives_it(self):
+        """tests/test_godown_manager_api.py::GodownManagerApiTest::test_deleting_the_only_role_deactivates_the_user_and_recreating_revives_it"""
+        self.login_as(self.seed_admin)
+        first = self._create()
+        user = User.objects.get(phone_number="9000000011")
+        old_secret = user.totp_secret
+
+        self.client.delete(ITEM_URL.format(id=first.data["id"]))
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+
+        again = self._create(name="Renamed")
+        self.assertEqual(again.status_code, status.HTTP_201_CREATED, again.content)
+        self.assertEqual(again.data["id"], first.data["id"])
+        self.assertEqual(User.objects.filter(phone_number="9000000011").count(), 1)
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+        self.assertNotEqual(user.totp_secret, old_secret)
+        self.assertEqual(GodownManager.objects.get(user=user).created_by, self.seed_admin)
+
+    def test_deleting_one_of_several_roles_keeps_the_user_active(self):
+        """tests/test_godown_manager_api.py::GodownManagerApiTest::test_deleting_one_of_several_roles_keeps_the_user_active"""
+        self.login_as(self.seed_admin)
+        created = self._create()
+        user = User.objects.get(phone_number="9000000011")
+        LabTester.objects.create(user=user, created_by=self.seed_admin)
+
+        self.client.delete(ITEM_URL.format(id=created.data["id"]))
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+        self.assertTrue(user.is_lab_tester)
+        self.assertFalse(user.is_godown_manager)
+
+    def test_adding_a_role_to_an_existing_user_reuses_the_account(self):
+        """tests/test_godown_manager_api.py::GodownManagerApiTest::test_adding_a_role_to_an_existing_user_reuses_the_account"""
+        self.login_as(self.seed_admin)
+        tester = self.client.post(
+            "/api/sales-admin/lab-testers",
+            {"name": "Asha", "phone_number": "9000000012"},
+            format="json",
+        )
+        self.assertEqual(tester.status_code, status.HTTP_201_CREATED, tester.content)
+
+        manager = self._create(phone="9000000012")
+        self.assertEqual(manager.status_code, status.HTTP_201_CREATED, manager.content)
+        user = User.objects.get(phone_number="9000000012")
+        self.assertTrue(user.is_lab_tester and user.is_godown_manager)
+
+    def test_only_a_superuser_may_add_a_role_to_an_admin(self):
+        """tests/test_godown_manager_api.py::GodownManagerApiTest::test_only_a_superuser_may_add_a_role_to_an_admin"""
+        other = User.objects.create_user(
+            phone_number="7777777776",
+            name="other admin",
+            is_verified=True,
+            created_by=self.superuser,
+            verified_by=self.superuser,
+        )
+        Admin.objects.create(user=other, created_by=self.superuser)
+
+        self.login_as(self.seed_admin)
+        self.assertEqual(
+            self._create(phone="7777777776").status_code, status.HTTP_403_FORBIDDEN
+        )
+        Admin.objects.create(user=self.superuser, created_by=self.superuser)
+        self.login_as(self.superuser)
+        self.assertEqual(
+            self._create(phone="7777777776").status_code, status.HTTP_201_CREATED
+        )

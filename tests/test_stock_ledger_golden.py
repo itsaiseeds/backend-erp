@@ -242,7 +242,8 @@ class StockLedgerGoldenTest(DMLTestCase):
         self.assertEqual(self._figures(d2[-1]), expected[-1][1:])
 
         # Final recipe layers: A 220 packets on the bag row, A 30 on the loose row.
-        self.assertEqual(inv.other_material_used([self.pouch.pk])[self.pouch.pk], Decimal("250.000"))
+        used = inv.other_material_used(material_type_ids=[self.pouch.pk])
+        self.assertEqual(sum(used.values(), Decimal("0")), Decimal("250.000"))
 
     @staticmethod
     def _figures(row):

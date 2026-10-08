@@ -13,7 +13,7 @@ from django.urls import include, path
 
 from .routing import build_urlpatterns
 
-VERSIONS = ["v1"]
+VERSIONS = ["v1", "v2"]
 
 urlpatterns = [
     path(f"{version}/", include(build_urlpatterns(VERSIONS[: index + 1])))
