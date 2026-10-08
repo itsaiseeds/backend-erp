@@ -9,9 +9,10 @@ never stored.
 Which events a product's report lists (PRD section 3.6):
 
 * every event stored against the product;
-* ``INWARD_OPERATIONS`` events of **other** products that touch one of this
-  product's packing-material types (a lot booked against another product's
-  recipe still changes the shared pool).
+* ``INWARD_OPERATIONS`` and ``RETURN_OPERATIONS`` events of **other** products
+  that touch one of this product's packing-material types (a lot booked against
+  another product's recipe -- on a delivery or on an accepted return -- still
+  changes the shared pool).
 
 Other products' packing of a shared material is not a row, but it moves the
 running ``used_by_other_products``, so every row still reconciles:
@@ -58,6 +59,10 @@ class LedgerNotStarted(Exception):
 
 class LedgerRangeError(Exception):
     """The requested window starts before the ledger does."""
+
+
+# Other products' events that add or remove stock in a shared packing-material pool.
+SHARED_POOL_EVENT_TYPES = (StockEventType.INWARD_OPERATIONS, StockEventType.RETURN_OPERATIONS)
 
 
 def ledger_start() -> datetime | None:
@@ -376,7 +381,7 @@ def product_ledger_rows(
             change.apply(line, own=is_own)
         if not in_window:
             continue
-        if not is_own and event.event_type != StockEventType.INWARD_OPERATIONS:
+        if not is_own and event.event_type not in SHARED_POOL_EVENT_TYPES:
             continue  # another product's packing only moves used_by_other_products
         detail = StockEventDetail(event.detail)
         rows.append(

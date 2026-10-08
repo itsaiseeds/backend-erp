@@ -87,3 +87,21 @@ def test_a_v2_only_route_is_unreachable_under_v1():
         pass
     else:
         raise AssertionError("a v2-only route must not resolve under v1")
+
+
+def test_the_real_v2_inherits_v1_routes_and_overrides_return_order():
+    """tests/android/test_routing.py::test_the_real_v2_inherits_v1_routes_and_overrides_return_order"""
+    from android.api.v2 import routes as v2_routes
+    from android.api.v2.ReturnOrderView import ReturnOrderView as ReturnOrderViewV2
+
+    route = "return-order/<order_public_id>"
+    merged = routing.merged_routes(["v1", "v2"])
+    assert merged[route] is ReturnOrderViewV2
+    assert v2_routes.ROUTES == {route: ReturnOrderViewV2}
+    for key, view_class in v1_routes.ROUTES.items():
+        if key != route:
+            assert merged[key] is view_class, key
+
+    assert resolve("/android/api/v2/utilities/cities").func.view_class is CitiesView
+    assert resolve("/android/api/v2/return-order/ORD-X").func.view_class is ReturnOrderViewV2
+    assert resolve("/android/api/v1/return-order/ORD-X").func.view_class is v1_routes.ROUTES[route]

@@ -86,7 +86,8 @@ def order_detail_queryset() -> QuerySet:
                 Prefetch(
                     "items", queryset=ReturnOrderItem.objects.select_related("product")
                 )
-            ),
+            )
+            .order_by("-created_at", "-id"),
             to_attr="live_return_orders",
         ),
         Prefetch(

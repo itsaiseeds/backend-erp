@@ -16,7 +16,7 @@ All code lives in `backend-erp/`. The schema is raw SQL in `sql/ddl.sql` and `sq
 ## Decisions (from Q&A)
 - **How returns become stock.** Accepting a return writes real `InwardRawMaterial` and `InwardOtherMaterial` rows that point back to the return. Every stock screen, export and ledger figure then picks them up with no reader changes.
 - **Sold limit.** Only DISPATCHED or DELIVERED orders can have a return. The limit for each `(product, packet_weight)` is the packets on the order's challan: `DispatchEntryItem.quantity × packaging.packets`.
-- **One live return per order.** A return is live while PENDING or ACCEPTED, and an order can have only one. A REJECTED return keeps its order FK, but it is hidden from the order's details and does not count toward the limit.
+- **Live returns.** A return is live while PENDING or ACCEPTED. ~~An order can have only one~~ -- superseded by [multiple-return-orders.md](multiple-return-orders.md): an order may carry many live returns whose sum per `(product, packet_weight)` stays within the challan. **Android v1 keeps the single-live create rule** (400 if a live return exists). A REJECTED return keeps its order FK, but it is hidden from the order's details and does not count toward the limit.
 - **Statuses.**
   - PENDING → ACCEPTED or REJECTED.
   - ACCEPTED → PENDING (revert-accept).
@@ -47,7 +47,7 @@ All code lives in `backend-erp/`. The schema is raw SQL in `sql/ddl.sql` and `sq
 - **`aggregator_returnorder`**:
   - Standard columns: id, timestamps, soft-delete, `created_by`, `public_id` (`RET-`).
   - Fields: `order_id`, `status_id`, `return_date`, `include_in_other_raw_materials` (nullable bool, set on accept), `verified_by_id`, `verified_at`, `rejected_by_id`, `rejected_at`.
-  - Partial unique index on `(order_id)` WHERE `is_deleted = false AND status_id IN (17, 18)`. This backs up the one-live rule.
+  - ~~Partial unique index `uniq_returnorder_one_live_per_order`~~ -- dropped; see [multiple-return-orders.md](multiple-return-orders.md). `lock_order()` is the concurrency backstop for the shared limit.
 - **`aggregator_returnorderitem`**:
   - Standard columns.
   - Fields: `return_order_id`, `product_id`, `packet_weight numeric(8,3)`, `packets int8 > 0`, `price_per_packet numeric(12,2) >= 0`.

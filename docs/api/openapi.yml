@@ -38,8 +38,9 @@ paths:
   /android/api/v1/auth/login:
     post:
       operationId: android_api_v1_auth_login_create
-      description: Validate a TOTP code, then issue a bearer token for that sales
-        person or godown manager.
+      description: |-
+        Validate a TOTP code, then issue a bearer token for that sales person,
+        godown manager or lab tester.
       tags:
       - Android · Auth
       requestBody:
@@ -403,6 +404,183 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FieldTripPayload'
+          description: ''
+  /android/api/v1/farmer/{public_id}:
+    get:
+      operationId: android_api_v1_farmer_retrieve
+      description: Read, edit or delete one of the caller's independent farmers.
+      summary: Get one farmer I recorded outside a field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
+    patch:
+      operationId: android_api_v1_farmer_update
+      description: Read, edit or delete one of the caller's independent farmers.
+      summary: Edit a farmer I recorded outside a field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
+    delete:
+      operationId: android_api_v1_farmer_delete
+      description: Read, edit or delete one of the caller's independent farmers.
+      summary: Delete a farmer I recorded outside a field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /android/api/v1/farmers:
+    get:
+      operationId: android_api_v1_farmers_list
+      description: List (GET) or record (POST) the caller's independent farmers.
+      summary: List the farmers I recorded outside a field trip
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: contact_number
+        schema:
+          type: string
+        description: Case-insensitive substring of the farmer's contact number. Single
+          value; AND-ed with the other filters.
+      - in: query
+        name: farmer_name
+        schema:
+          type: string
+        description: Case-insensitive substring of the farmer's name. Single value;
+          AND-ed with the other filters.
+      - in: query
+        name: is_lead
+        schema:
+          type: string
+        description: 'true: leads only; false: everyone else. Single value; AND-ed
+          with the other filters.'
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (FV-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, land_area, farmer_name);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: uses_our_products
+        schema:
+          type: string
+        description: 'true: farmers using at least one of our products; false: none.
+          Single value; AND-ed with the other filters.'
+      - in: query
+        name: village
+        schema:
+          type: string
+        description: Case-insensitive substring of the village. Single value; AND-ed
+          with the other filters.
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPage'
+          description: ''
+    post:
+      operationId: android_api_v1_farmers_create
+      description: List (GET) or record (POST) the caller's independent farmers.
+      summary: Record a farmer outside a field trip
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
           description: ''
   /android/api/v1/field-trip-farmer-visits/{public_id}:
     get:
@@ -1102,9 +1280,8 @@ paths:
   /android/api/v1/godown/inward-raw-material/{public_id}:
     patch:
       operationId: android_api_v1_godown_inward_raw_material_partial_update
-      description: Update the lifecycle or soft-delete a raw-material lot (godown
-        manager only).
-      summary: Update an inward raw-material lot
+      description: Confirm a lot unchanged or soft-delete it (godown manager only).
+      summary: Update an inward raw-material lot (no writable fields)
       parameters:
       - in: path
         name: public_id
@@ -1113,17 +1290,6 @@ paths:
         required: true
       tags:
       - Android · Godown
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedUpdateInwardRawMaterialRequest'
       security:
       - bearerAuth: []
       responses:
@@ -1135,8 +1301,7 @@ paths:
           description: ''
     delete:
       operationId: android_api_v1_godown_inward_raw_material_destroy
-      description: Update the lifecycle or soft-delete a raw-material lot (godown
-        manager only).
+      description: Confirm a lot unchanged or soft-delete it (godown manager only).
       summary: Delete an inward raw-material lot
       parameters:
       - in: path
@@ -1544,6 +1709,209 @@ paths:
                 items:
                   $ref: '#/components/schemas/LooseStockPayload'
           description: ''
+  /android/api/v1/lab/lab-testing/{public_id}:
+    get:
+      operationId: android_api_v1_lab_testing_retrieve
+      description: Read or correct one lab test (lab tester only).
+      summary: Get one lab test in detail
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Lab
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingPayload'
+          description: ''
+    patch:
+      operationId: android_api_v1_lab_testing_update
+      description: Read or correct one lab test (lab tester only).
+      summary: Edit a lab test (a changed result moves the lot In Use <-> Rejected)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Lab
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingPayload'
+          description: ''
+  /android/api/v1/lab/lab-testings:
+    get:
+      operationId: android_api_v1_lab_testings_list
+      description: List (GET) or submit (POST) lab tests (lab tester only).
+      summary: List lab tests (filter by product / result / lot status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: lot_status
+        schema:
+          type: string
+        description: Status of the tested lot (Lab Testing / In Use / Rejected). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (LT-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: result
+        schema:
+          type: string
+        description: Pass / Fail. Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (tested_at, product); prefix a key
+          with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Android · Lab
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingListPage'
+          description: ''
+    post:
+      operationId: android_api_v1_lab_testings_create
+      description: List (GET) or submit (POST) lab tests (lab tester only).
+      summary: Submit a lot's lab test (Pass -> In Use, Fail -> Rejected)
+      tags:
+      - Android · Lab
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLabTestingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateLabTestingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateLabTestingRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingPayload'
+          description: ''
+  /android/api/v1/lab/pending-lots:
+    get:
+      operationId: android_api_v1_lab_pending_lots_list
+      description: List the lots waiting for a lab test (lab tester only).
+      summary: List raw-material lots waiting for a lab test (oldest first)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (IR-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, product, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Android · Lab
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialListPage'
+          description: ''
   /android/api/v1/notification/{id}/read:
     post:
       operationId: android_api_v1_notification_read_create
@@ -1870,6 +2238,37 @@ paths:
                 items:
                   $ref: '#/components/schemas/ClientAddressLink'
           description: ''
+  /android/api/v1/utilities/client-children:
+    get:
+      operationId: android_api_v1_utilities_client_children
+      description: List one of the caller's clients' child orgs.
+      summary: List a client's child orgs (booked-for picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
+        required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
+      tags:
+      - Android · Clients
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChildOrgPayload'
+          description: ''
   /android/api/v1/utilities/client-transport-agencies:
     get:
       operationId: android_api_v1_utilities_client_transport_agencies
@@ -2054,6 +2453,2476 @@ paths:
   /android/api/v1/utilities/states:
     get:
       operationId: android_api_v1_utilities_states_list
+      description: List the states available for a client address, optionally by country.
+      summary: List states (optionally scoped to a country)
+      parameters:
+      - in: query
+        name: country_id
+        schema:
+          type: integer
+        description: Only return states in this country.
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AndroidStateRef'
+          description: ''
+  /android/api/v2/analytics:
+    get:
+      operationId: android_api_v2_analytics_retrieve
+      description: Order / client counts and per-product kilograms for the caller
+        in a window.
+      summary: Order / client counts by status, and kg booked per product, in a window
+      parameters:
+      - in: query
+        name: end_date_time
+        schema:
+          type: string
+        description: ISO 8601.
+        required: true
+      - in: query
+        name: start_date_time
+        schema:
+          type: string
+        description: ISO 8601.
+        required: true
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsResponse'
+          description: ''
+  /android/api/v2/auth/login:
+    post:
+      operationId: android_api_v2_auth_login_create
+      description: |-
+        Validate a TOTP code, then issue a bearer token for that sales person,
+        godown manager or lab tester.
+      tags:
+      - Android · Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                description: Invalid phone number or TOTP code.
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                description: Too many requests from this IP; retry later.
+          description: ''
+  /android/api/v2/auth/logout:
+    post:
+      operationId: android_api_v2_auth_logout_create
+      description: |-
+        Revoke the caller's bearer token and forget their push devices.
+
+        The token is one per user, so logging out signs the user out everywhere;
+        their FCM tokens go with it, or a logged-out phone would keep receiving
+        their notifications.
+
+        Logout must succeed for anyone the token authentication accepts, so this
+        view relaxes the ``salesperson_required`` gate inherited from
+        ``AndroidBaseView``. Otherwise a user whose ``SalesPerson`` profile has
+        been soft-deleted (or has already been logged out server-side) would be
+        unable to revoke their still-valid token, leaving it live for the rest of
+        ``TOKEN_TTL_HOURS``.
+      summary: Revoke the caller's bearer token
+      tags:
+      - Android · Auth
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: Token revoked.
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                description: Missing or invalid token.
+          description: ''
+  /android/api/v2/auth/reauthenticate:
+    get:
+      operationId: android_api_v2_auth_reauthenticate_retrieve
+      description: Confirm the caller's bearer token is still valid.
+      summary: Check whether the caller's bearer token is still valid
+      tags:
+      - Android · Auth
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AndroidReauthenticateResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                description: Missing, expired, or revoked token.
+          description: ''
+  /android/api/v2/client/{public_id}:
+    get:
+      operationId: android_api_v2_client_retrieve
+      description: Full detail of one of the caller's clients, by ``public_id``.
+      summary: Get one of my clients in full (core + all addresses/contacts/agencies)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The client's public id, e.g. C-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Clients
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPayload'
+          description: ''
+  /android/api/v2/create-client:
+    post:
+      operationId: android_api_v2_create_client_create
+      description: Create a client owned by the calling sales person.
+      summary: Create a client
+      tags:
+      - Android · Clients
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPayload'
+          description: ''
+  /android/api/v2/create-farmer-visit:
+    post:
+      operationId: android_api_v2_create_farmer_visit_create
+      description: Record a farmer met on the caller's in-progress field trip.
+      summary: Record a farmer met on my in-progress field trip
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerVisitRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerVisitRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerVisitRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
+  /android/api/v2/create-field-trip:
+    post:
+      operationId: android_api_v2_create_field_trip_create
+      description: Plan a field trip (born PLANNED).
+      summary: Plan a field trip
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FieldTripWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FieldTripWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FieldTripWriteRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldTripPayload'
+          description: ''
+  /android/api/v2/create-multi-select-bag-order:
+    post:
+      operationId: android_api_v2_create_multi_select_bag_order
+      description: Book an order of sealed bags for one of the caller's clients.
+      summary: Book an order from multi-selected catalogue bags
+      tags:
+      - Android · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMultiSelectBagOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateMultiSelectBagOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateMultiSelectBagOrderRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPayload'
+          description: ''
+  /android/api/v2/delete-field-trip/{public_id}:
+    delete:
+      operationId: android_api_v2_delete_field_trip_destroy
+      description: Delete the caller's field trip that has not started.
+      summary: Delete my field trip (PLANNED or APPROVED only)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The public id of one of your field trips, e.g. FT-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /android/api/v2/devices/register:
+    post:
+      operationId: android_api_v2_devices_register_create
+      description: Register (or refresh) the caller's FCM token.
+      summary: Register this device for push notifications
+      tags:
+      - Android · Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: Device registered.
+          description: ''
+  /android/api/v2/edit-farmer-visit/{public_id}:
+    patch:
+      operationId: android_api_v2_edit_farmer_visit_partial_update
+      description: Edit a farmer recorded on the caller's in-progress field trip.
+      summary: Edit a farmer on my in-progress field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer visit's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
+  /android/api/v2/edit-field-trip/{public_id}:
+    patch:
+      operationId: android_api_v2_edit_field_trip_partial_update
+      description: Edit the plan of the caller's PLANNED or APPROVED field trip.
+      summary: Edit my field trip's plan (an approved trip returns to PLANNED)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The public id of one of your field trips, e.g. FT-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFieldTripWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFieldTripWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFieldTripWriteRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldTripPayload'
+          description: ''
+  /android/api/v2/end-field-trip/{public_id}:
+    post:
+      operationId: android_api_v2_end_field_trip_create
+      description: End the caller's in-progress field trip (IN_PROGRESS -> COMPLETED).
+      summary: End my field trip (IN_PROGRESS -> COMPLETED)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The public id of one of your field trips, e.g. FT-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldTripPayload'
+          description: ''
+  /android/api/v2/farmer/{public_id}:
+    get:
+      operationId: android_api_v2_farmer_retrieve
+      description: Read, edit or delete one of the caller's independent farmers.
+      summary: Get one farmer I recorded outside a field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
+    patch:
+      operationId: android_api_v2_farmer_update
+      description: Read, edit or delete one of the caller's independent farmers.
+      summary: Edit a farmer I recorded outside a field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEditFarmerVisitRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
+    delete:
+      operationId: android_api_v2_farmer_delete
+      description: Read, edit or delete one of the caller's independent farmers.
+      summary: Delete a farmer I recorded outside a field trip
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The farmer's public id (FV-…).
+        required: true
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /android/api/v2/farmers:
+    get:
+      operationId: android_api_v2_farmers_list
+      description: List (GET) or record (POST) the caller's independent farmers.
+      summary: List the farmers I recorded outside a field trip
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: contact_number
+        schema:
+          type: string
+        description: Case-insensitive substring of the farmer's contact number. Single
+          value; AND-ed with the other filters.
+      - in: query
+        name: farmer_name
+        schema:
+          type: string
+        description: Case-insensitive substring of the farmer's name. Single value;
+          AND-ed with the other filters.
+      - in: query
+        name: is_lead
+        schema:
+          type: string
+        description: 'true: leads only; false: everyone else. Single value; AND-ed
+          with the other filters.'
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (FV-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, land_area, farmer_name);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: uses_our_products
+        schema:
+          type: string
+        description: 'true: farmers using at least one of our products; false: none.
+          Single value; AND-ed with the other filters.'
+      - in: query
+        name: village
+        schema:
+          type: string
+        description: Case-insensitive substring of the village. Single value; AND-ed
+          with the other filters.
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPage'
+          description: ''
+    post:
+      operationId: android_api_v2_farmers_create
+      description: List (GET) or record (POST) the caller's independent farmers.
+      summary: Record a farmer outside a field trip
+      tags:
+      - Android · Field trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateFarmerRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPayload'
+          description: ''
+  /android/api/v2/field-trip-farmer-visits/{public_id}:
+    get:
+      operationId: android_api_v2_get_field_trip_farmer_visits_list
+      description: List the farmers recorded on one of the caller's field trips.
+      summary: List the farmers recorded on my field trip
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: crop
+        schema:
+          type: string
+        description: Crop id(s) the farmer grows (see options). Comma-separated (any
+          match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) the farmer uses (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The public id of one of your field trips, e.g. FT-E79QA0E2OIHF.
+        required: true
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (FV-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, land_area, farmer_name);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: uses_our_products
+        schema:
+          type: string
+        description: 'true: farmers using at least one of our products; false: none.
+          Single value; AND-ed with the other filters.'
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmerVisitPage'
+          description: ''
+  /android/api/v2/get-challan/{order_public_id}:
+    get:
+      operationId: android_api_v2_get_challan_retrieve
+      description: The challan of one of the caller's dispatched or delivered orders.
+      summary: Get the dispatch challan of one of my orders
+      parameters:
+      - in: path
+        name: order_public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispatchChallanItem'
+          description: ''
+  /android/api/v2/get-challans:
+    get:
+      operationId: android_api_v2_get_challans_list
+      description: List the challans of the caller's dispatched or delivered orders.
+      summary: List my dispatch challans (filter by client / city / status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: challan_number
+        schema:
+          type: string
+        description: Case-insensitive substring of the challan number (YYYYMMDD-XXXX).
+          The date window still applies -- the number carries its own date. Single
+          value; AND-ed with the other filters.
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the goods were sent to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client public id(s) the goods were consigned to (see options).
+          Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: end_date_time
+        schema:
+          type: string
+          format: date-time
+        description: ISO 8601. End date time of the window.
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (DE-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (dispatch_date, created_at); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: start_date_time
+        schema:
+          type: string
+          format: date-time
+        description: ISO 8601. Start date time of the window.
+        required: true
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Whether the order is still DISPATCHED or already DELIVERED. Comma-separated
+          (any match); AND-ed with the other filters.
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallanPage'
+          description: ''
+  /android/api/v2/get-clients:
+    get:
+      operationId: android_api_v2_get_clients_list
+      description: 'List the caller''s clients: filter by city / status / created
+        window, sort.'
+      summary: List my clients (filter by city / status / name / address / created,
+        sortable)
+      parameters:
+      - in: query
+        name: address
+        schema:
+          type: string
+        description: Case-insensitive substring of the primary address (line 1/2,
+          pincode or city). Single value; AND-ed with the other filters.
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) of the client's primary address (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: company_name
+        schema:
+          type: string
+        description: Case-insensitive substring of the company name. Single value;
+          AND-ed with the other filters.
+      - in: query
+        name: created_gte
+        schema:
+          type: string
+          format: date-time
+        description: When the client was added (ISO 8601). Inclusive lower bound.
+      - in: query
+        name: created_lte
+        schema:
+          type: string
+          format: date-time
+        description: When the client was added (ISO 8601). Inclusive upper bound.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (C-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, company_name); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Client verification status. Comma-separated (any match); AND-ed
+          with the other filters.
+      tags:
+      - Android · Clients
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientListPage'
+          description: ''
+  /android/api/v2/get-field-trips:
+    get:
+      operationId: android_api_v2_get_field_trips_list
+      description: 'List the caller''s field trips: filter by status / city / village
+        / dates.'
+      summary: List my field trips (filter by status / city / village / dates)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the trip goes to (see options). Comma-separated (any
+          match); AND-ed with the other filters.
+      - in: query
+        name: expected_start_gte
+        schema:
+          type: string
+          format: date-time
+        description: When the trip is planned to start (inclusive bounds). Inclusive
+          lower bound.
+      - in: query
+        name: expected_start_lte
+        schema:
+          type: string
+          format: date-time
+        description: When the trip is planned to start (inclusive bounds). Inclusive
+          upper bound.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (FT-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (expected_start_at, created_at); prefix
+          a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Field-trip lifecycle status. Comma-separated (any match); AND-ed
+          with the other filters.
+      - in: query
+        name: village
+        schema:
+          type: string
+        description: Case-insensitive substring of the village name. Single value;
+          AND-ed with the other filters.
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldTripPage'
+          description: ''
+  /android/api/v2/get-orders:
+    get:
+      operationId: android_api_v2_get_orders_list
+      description: 'List the caller''s orders: filter by client / product / city /
+        status, sort.'
+      summary: List my orders (filter by client / product / city / status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the order is delivered to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client public id(s) the order was booked for (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) the order contains (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (ORD-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, price); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Order lifecycle status. Comma-separated (any match); AND-ed with
+          the other filters.
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListPage'
+          description: ''
+  /android/api/v2/get-return-orders:
+    get:
+      operationId: android_api_v2_get_return_orders_list
+      description: 'List the caller''s own returns: filter by order / status, sort.'
+      summary: List my returns (filter by order / status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: order
+        schema:
+          type: string
+        description: Public id(s) of the order the return is against. Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (RET-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at); prefix a key with '-'
+          for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Return lifecycle status. Comma-separated (any match); AND-ed
+          with the other filters.
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderListPage'
+          description: ''
+  /android/api/v2/godown/bag-stock:
+    get:
+      operationId: android_api_v2_godown_bag_stock
+      description: The live on-hand/reserved/consumed/available figures for every
+        counted sealed-bag packaging -- the same position ``godown/update-bag-stock``
+        would report back, but readable before (or without) submitting a count. ``snapshot_date``
+        is the date the bag count was last taken, null when none has ever been recorded.
+      summary: Read the bag-stock position
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BagStockPosition'
+          description: ''
+  /android/api/v2/godown/check-todays-inventory:
+    get:
+      operationId: android_api_v2_godown_check_todays_inventory
+      description: '``is_complete`` covers sealed bags only -- the loose count is
+        optional and never blocks order verification. ``stock_admins`` lists the admins
+        who may upload the count; a godown manager counts from the app without an
+        admin profile and is therefore not listed.'
+      summary: Check whether today's stock count is complete
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckTodaysInventoryPayload'
+          description: ''
+  /android/api/v2/godown/export/inventory-snapshots:
+    get:
+      operationId: android_api_v2_godown_export_inventory_snapshots
+      description: Export bag and loose stock counts, interleaved and paginated.
+      summary: Export bag and loose stock counts, interleaved and paginated
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). Optional -- give together
+          with start_date, or omit both for the full history.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST). Optional -- give together
+          with end_date, or omit both for the full history.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportInventorySnapshotsPage'
+          description: ''
+  /android/api/v2/godown/inward-other-material/{public_id}:
+    patch:
+      operationId: android_api_v2_godown_inward_other_material_partial_update
+      description: Confirm a lot unchanged or soft-delete it (godown manager only).
+      summary: Update an inward other-material lot (no writable fields)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialPayload'
+          description: ''
+    delete:
+      operationId: android_api_v2_godown_inward_other_material_destroy
+      description: Confirm a lot unchanged or soft-delete it (godown manager only).
+      summary: Delete an inward other-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /android/api/v2/godown/inward-other-materials:
+    get:
+      operationId: android_api_v2_godown_inward_other_materials_list
+      description: List (GET) or book (POST) inward other-material lots (godown manager
+        only).
+      summary: List inward other-material lots (filter by party / material type /
+        product, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: material_type
+        schema:
+          type: string
+        description: Material type id(s) (see the recipe; see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see the recipe; see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (IO-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, party, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialListPage'
+          description: ''
+    post:
+      operationId: android_api_v2_godown_inward_other_materials_create
+      description: List (GET) or book (POST) inward other-material lots (godown manager
+        only).
+      summary: Book an inward other-material lot
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateInwardOtherMaterialRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardOtherMaterialPayload'
+          description: ''
+  /android/api/v2/godown/inward-raw-material/{public_id}:
+    patch:
+      operationId: android_api_v2_godown_inward_raw_material_partial_update
+      description: Confirm a lot unchanged or soft-delete it (godown manager only).
+      summary: Update an inward raw-material lot (no writable fields)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: ''
+    delete:
+      operationId: android_api_v2_godown_inward_raw_material_destroy
+      description: Confirm a lot unchanged or soft-delete it (godown manager only).
+      summary: Delete an inward raw-material lot
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /android/api/v2/godown/inward-raw-materials:
+    get:
+      operationId: android_api_v2_godown_inward_raw_materials_list
+      description: List (GET) or book (POST) inward raw-material lots (godown manager
+        only).
+      summary: List inward raw-material lots (filter by product / party / status,
+        sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (IR-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, product, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Lot status (Lab Testing / In Use / Rejected). Comma-separated
+          (any match); AND-ed with the other filters.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialListPage'
+          description: ''
+    post:
+      operationId: android_api_v2_godown_inward_raw_materials_create
+      description: List (GET) or book (POST) inward raw-material lots (godown manager
+        only).
+      summary: Book an inward raw-material lot
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateInwardRawMaterialRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: ''
+  /android/api/v2/godown/other-material-recipes:
+    get:
+      operationId: android_api_v2_godown_other_material_recipes_list
+      description: List other-material recipes (godown manager only).
+      summary: List other material recipes (filter by product / material type, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: material_type
+        schema:
+          type: string
+        description: Material type id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (OMR-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (product, packet_weight, created_at);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeListPage'
+          description: ''
+  /android/api/v2/godown/other-material-stock:
+    get:
+      operationId: android_api_v2_godown_other_material_stock_retrieve
+      description: Read the other-material on-hand position (godown manager only).
+      summary: Other-material on-hand stock, per material type
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtherMaterialStock'
+          description: ''
+  /android/api/v2/godown/product-packagings:
+    get:
+      operationId: android_api_v2_godown_product_packagings_list
+      description: Packagings of usable products only by default, so this list is
+        the set of packagings ``update-bag-stock`` will accept. ``?is_usable=all``
+        (or ``false``) also returns the packagings of frozen products, which cannot
+        be counted. Each row carries its product's ``image_url`` so the app needs
+        no second lookup.
+      summary: List product packagings (filter by product usability)
+      parameters:
+      - in: query
+        name: is_usable
+        schema:
+          type: string
+          enum:
+          - all
+          - 'false'
+          - 'true'
+        description: 'Usability of the packaging''s product: ``true`` (default) usable
+          only, ``false`` frozen only, ``all`` both.'
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GodownProductPackagingPayload'
+          description: ''
+  /android/api/v2/godown/raw-material-stock:
+    get:
+      operationId: android_api_v2_godown_raw_material_stock_retrieve
+      description: Read the incoming raw-material position (godown manager only).
+      summary: Raw-material incoming stock, per product
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialStock'
+          description: ''
+  /android/api/v2/godown/sample-packet-stock:
+    get:
+      operationId: android_api_v2_godown_sample_packet_stock
+      description: The live on-hand/reserved/consumed/available figures for every
+        counted ``(product, packet_weight)`` pool -- the same position ``godown/update-sample-packet-stock``
+        would report back, but readable before (or without) submitting a count. ``snapshot_date``
+        is the date the loose count was last taken, null when none has ever been recorded.
+      summary: Read the sample-packet (loose) stock position
+      tags:
+      - Android · Godown
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LooseStockPosition'
+          description: ''
+  /android/api/v2/godown/update-bag-stock:
+    post:
+      operationId: android_api_v2_godown_update_bag_stock
+      description: 'Sealed-bag counts only: every active packaging of a usable product
+        receives a snapshot row for today, and packagings absent from ``counts`` are
+        recorded as zero bags. Packagings of an unusable product cannot be counted
+        (naming one is a 400); their last figure is carried forward. Loose packets
+        are not accepted here -- record them at ``/android/api/v1/godown/update-sample-packet-stock``.'
+      summary: Replace today's entire sealed-bag stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+            examples:
+              Whole-dayBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                    PP-A1B2C3D4E0F2: 0
+                summary: Whole-day bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateTodaysInventoryRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
+          description: ''
+    patch:
+      operationId: android_api_v2_godown_update_bag_stock_partial
+      description: 'Sealed-bag counts only: only the packagings named in ``counts``
+        are written; the rest of today''s rows are left as they are. Loose packets
+        are not accepted here -- record them at ``/android/api/v1/godown/update-sample-packet-stock``.'
+      summary: Partially update today's sealed-bag stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+            examples:
+              PartialBagCount:
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 12
+                summary: Partial bag count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SnapshotPayload'
+          description: ''
+  /android/api/v2/godown/update-sample-packet-stock:
+    post:
+      operationId: android_api_v2_godown_update_sample_packet_stock
+      description: Every (product, packet_weight) pair the business packs receives
+        a loose row for today. Pairs absent from ``counts`` are recorded as zero packets.
+        Does not touch the sealed-bag snapshot.
+      summary: Replace the whole loose-packet stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+            examples:
+              Whole-dayLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '0.500'
+                    packets: 0
+                summary: Whole-day loose count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateLooseStockRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LooseStockPayload'
+          description: ''
+    patch:
+      operationId: android_api_v2_godown_update_sample_packet_stock_partial
+      description: Only the pairs named in ``counts`` are written; every other loose
+        row is left as it is.
+      summary: Partially update the loose-packet stock count
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+            examples:
+              PartialLooseCount:
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 12
+                summary: Partial loose count
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LooseStockPayload'
+          description: ''
+  /android/api/v2/lab/lab-testing/{public_id}:
+    get:
+      operationId: android_api_v2_lab_testing_retrieve
+      description: Read or correct one lab test (lab tester only).
+      summary: Get one lab test in detail
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Lab
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingPayload'
+          description: ''
+    patch:
+      operationId: android_api_v2_lab_testing_update
+      description: Read or correct one lab test (lab tester only).
+      summary: Edit a lab test (a changed result moves the lot In Use <-> Rejected)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Lab
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTestingRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingPayload'
+          description: ''
+  /android/api/v2/lab/lab-testings:
+    get:
+      operationId: android_api_v2_lab_testings_list
+      description: List (GET) or submit (POST) lab tests (lab tester only).
+      summary: List lab tests (filter by product / result / lot status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: lot_status
+        schema:
+          type: string
+        description: Status of the tested lot (Lab Testing / In Use / Rejected). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (LT-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: result
+        schema:
+          type: string
+        description: Pass / Fail. Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (tested_at, product); prefix a key
+          with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Android · Lab
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingListPage'
+          description: ''
+    post:
+      operationId: android_api_v2_lab_testings_create
+      description: List (GET) or submit (POST) lab tests (lab tester only).
+      summary: Submit a lot's lab test (Pass -> In Use, Fail -> Rejected)
+      tags:
+      - Android · Lab
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLabTestingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateLabTestingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateLabTestingRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingPayload'
+          description: ''
+  /android/api/v2/lab/pending-lots:
+    get:
+      operationId: android_api_v2_lab_pending_lots_list
+      description: List the lots waiting for a lab test (lab tester only).
+      summary: List raw-material lots waiting for a lab test (oldest first)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: party
+        schema:
+          type: string
+        description: Party id(s). Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (IR-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, product, effective_date);
+          prefix a key with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Android · Lab
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InwardRawMaterialListPage'
+          description: ''
+  /android/api/v2/notification/{id}/read:
+    post:
+      operationId: android_api_v2_notification_read_create
+      description: Mark one of the caller's notifications read.
+      summary: Mark one notification read
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Android · Notifications
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: Marked read.
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                description: Unknown id.
+          description: ''
+  /android/api/v2/notifications:
+    get:
+      operationId: android_api_v2_get_notifications_list
+      description: List the caller's own notifications, newest first.
+      summary: List my notifications (filter by read state)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: is_read
+        schema:
+          type: string
+        description: Whether the notification has been marked read. Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      tags:
+      - Android · Notifications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListPage'
+          description: ''
+  /android/api/v2/notifications/read-all:
+    post:
+      operationId: android_api_v2_notifications_read_all_create
+      description: Mark every notification of the caller's read.
+      summary: Mark all my notifications read
+      tags:
+      - Android · Notifications
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: All marked read.
+          description: ''
+  /android/api/v2/return-order/{order_public_id}:
+    get:
+      operationId: android_api_v2_return_order_prefill
+      description: Prefill (GET) or raise (POST) one of possibly many returns against
+        an order.
+      summary: 'Prefill a return: challan lines, what is returnable and every live
+        return'
+      parameters:
+      - in: path
+        name: order_public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Orders
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPrefillV2'
+          description: ''
+    post:
+      operationId: android_api_v2_return_order_create
+      description: Prefill (GET) or raise (POST) one of possibly many returns against
+        an order.
+      summary: Raise a return against a dispatched order (several allowed)
+      parameters:
+      - in: path
+        name: order_public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReturnOrderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReturnOrderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReturnOrderWriteRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnOrderPayload'
+          description: ''
+  /android/api/v2/sales-person-catalogue:
+    get:
+      operationId: android_api_v2_sales_person_catalogue_list
+      description: |-
+        The bags a sales person can book: filter by crop / product / stage / name
+        / price, sort by price / stage / name.
+      summary: Browse the product catalogue (filter by crop / product / stage / name
+        / price, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: crop
+        schema:
+          type: string
+        description: Crop id(s) of the product (see options). Comma-separated (any
+          match); AND-ed with the other filters.
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: Case-insensitive substring of the product name. Single value;
+          AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: price_gte
+        schema:
+          type: number
+        description: Price of the whole bag (inclusive bounds). Inclusive lower bound.
+      - in: query
+        name: price_lte
+        schema:
+          type: number
+        description: Price of the whole bag (inclusive bounds). Inclusive upper bound.
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s), e.g. P-E79QA0E2OIHF (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (PP-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (price, stage, name); prefix a key
+          with '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: stage
+        schema:
+          type: string
+        description: Seed stage of the product. Comma-separated (any match); AND-ed
+          with the other filters.
+      tags:
+      - Android · Catalogue
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CataloguePage'
+          description: ''
+  /android/api/v2/start-field-trip/{public_id}:
+    post:
+      operationId: android_api_v2_start_field_trip_create
+      description: Start the caller's approved field trip (APPROVED -> IN_PROGRESS).
+      summary: Start my field trip (APPROVED -> IN_PROGRESS)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The public id of one of your field trips, e.g. FT-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Field trips
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldTripPayload'
+          description: ''
+  /android/api/v2/update-client:
+    post:
+      operationId: android_api_v2_update_client_create
+      description: Replace the three lists of a client the calling sales person created.
+      summary: Update a client's addresses, contacts and transport agencies
+      tags:
+      - Android · Clients
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPayload'
+          description: ''
+  /android/api/v2/utilities/cities:
+    get:
+      operationId: android_api_v2_utilities_cities_list
+      description: List Indian states, each with its cities, grouped by state.
+      summary: List Indian states grouped with their cities
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AndroidState'
+          description: ''
+  /android/api/v2/utilities/client-addresses:
+    get:
+      operationId: android_api_v2_utilities_client_addresses
+      description: List one of the caller's clients' address links.
+      summary: List a client's address links (delivery address picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
+        required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
+      tags:
+      - Android · Clients
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientAddressLink'
+          description: ''
+  /android/api/v2/utilities/client-children:
+    get:
+      operationId: android_api_v2_utilities_client_children
+      description: List one of the caller's clients' child orgs.
+      summary: List a client's child orgs (booked-for picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
+        required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
+      tags:
+      - Android · Clients
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChildOrgPayload'
+          description: ''
+  /android/api/v2/utilities/client-transport-agencies:
+    get:
+      operationId: android_api_v2_utilities_client_transport_agencies
+      description: List one of the caller's clients' transport-agency links.
+      summary: List a client's transport agency links (carrier picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of one of your clients, e.g. C-E79QA0E2OIHF.
+        required: true
+      - in: query
+        name: sales_person_id
+        schema:
+          type: integer
+        description: 'Admin only: read this sales person''s client instead of your
+          own.'
+      tags:
+      - Android · Clients
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientTransportAgencyLink'
+          description: ''
+  /android/api/v2/utilities/countries:
+    get:
+      operationId: android_api_v2_utilities_countries_list
+      description: List the countries available for a client address.
+      summary: List countries
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AndroidCountry'
+          description: ''
+  /android/api/v2/utilities/crops:
+    get:
+      operationId: android_api_v2_utilities_crops_list
+      description: List every crop, optionally including soft-deleted ones.
+      summary: List every crop (not paginated)
+      parameters:
+      - in: query
+        name: show_deleted
+        schema:
+          type: boolean
+        description: Also return soft-deleted rows (default false; a bare ?show_deleted
+          means true). Each row's is_deleted marks them.
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UtilityCrop'
+          description: ''
+  /android/api/v2/utilities/other-material-types:
+    get:
+      operationId: android_api_v2_utilities_other_material_types_list
+      description: List every other-material type.
+      summary: List every other-material type (not paginated)
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UtilityOtherMaterialType'
+          description: ''
+  /android/api/v2/utilities/parties:
+    get:
+      operationId: android_api_v2_utilities_parties_list
+      description: List every party, optionally of one type.
+      summary: List every party (not paginated; filter by type)
+      parameters:
+      - in: query
+        name: type
+        schema:
+          type: string
+          enum:
+          - OTHER_MATERIAL
+          - RAW_MATERIAL
+        description: Only parties of this type.
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UtilityParty'
+          description: ''
+  /android/api/v2/utilities/products:
+    get:
+      operationId: android_api_v2_utilities_products_list
+      description: List every product with its crop, optionally including soft-deleted
+        ones.
+      summary: List every product with its crop (not paginated)
+      parameters:
+      - in: query
+        name: show_deleted
+        schema:
+          type: boolean
+        description: Also return soft-deleted rows (default false; a bare ?show_deleted
+          means true). Each row's is_deleted marks them.
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UtilityProduct'
+          description: ''
+  /android/api/v2/utilities/sales-admins:
+    get:
+      operationId: android_api_v2_utilities_sales_admins_list
+      description: List the sales admins who share their contact.
+      summary: List sales admins who share their contact (name and phone only)
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SalesAdminContact'
+          description: ''
+  /android/api/v2/utilities/sales-persons:
+    get:
+      operationId: android_api_v2_utilities_sales_persons_list
+      description: List the sales persons an admin may act for.
+      summary: List sales persons an admin can book orders for (id and name only)
+      tags:
+      - Android · Utilities
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SalesPersonOption'
+          description: ''
+  /android/api/v2/utilities/states:
+    get:
+      operationId: android_api_v2_utilities_states_list
       description: List the states available for a client address, optionally by country.
       summary: List states (optionally scoped to a country)
       parameters:
@@ -3190,6 +6059,12 @@ paths:
         description: Case-insensitive substring of the farmer's name. Single value;
           AND-ed with the other filters.
       - in: query
+        name: is_lead
+        schema:
+          type: string
+        description: 'true: farmers whose latest record is flagged as a lead; false:
+          the rest. Single value; AND-ed with the other filters.'
+      - in: query
         name: land_area_gte
         schema:
           type: number
@@ -3981,6 +6856,209 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: ''
+  /api/sales-admin/lab-testers:
+    get:
+      operationId: api_sales_admin_lab_testers_list
+      description: List (GET) or create (POST) lab testers (app admin only).
+      summary: List lab testers
+      tags:
+      - Admin · Users
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LabTesterPayload'
+          description: ''
+    post:
+      operationId: api_sales_admin_lab_testers_create
+      description: List (GET) or create (POST) lab testers (app admin only).
+      summary: Create a lab tester
+      tags:
+      - Admin · Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLabTesterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateLabTesterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateLabTesterRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTesterPayload'
+          description: ''
+  /api/sales-admin/lab-testers/{id}:
+    patch:
+      operationId: api_sales_admin_lab_testers_partial_update
+      description: Update or delete a lab tester (app admin only).
+      summary: Update a lab tester
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin · Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTesterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTesterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateLabTesterRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTesterPayload'
+          description: ''
+    delete:
+      operationId: api_sales_admin_lab_testers_destroy
+      description: Update or delete a lab tester (app admin only).
+      summary: Delete a lab tester
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin · Users
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/lab-testers/{id}/rotate-qr:
+    post:
+      operationId: api_sales_admin_lab_testers_rotate_qr_create
+      description: Rotate a lab tester's authenticator QR (app admin only).
+      summary: Rotate a lab tester's authenticator QR
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin · Users
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTesterPayload'
+          description: ''
+  /api/sales-admin/lab-testing/{public_id}:
+    get:
+      operationId: api_sales_admin_lab_testing_retrieve
+      description: Read one lab test (app admin only).
+      summary: Get one lab test in detail
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin · Inward
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingPayload'
+          description: ''
+  /api/sales-admin/lab-testings:
+    get:
+      operationId: sales_admin_lab_testings_list
+      description: List lab tests (app admin only).
+      summary: List lab tests (filter by product / result / lot status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: lot_status
+        schema:
+          type: string
+        description: Status of the tested lot (Lab Testing / In Use / Rejected). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product public id(s) (see options). Comma-separated (any match);
+          AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (LT-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: result
+        schema:
+          type: string
+        description: Pass / Fail. Comma-separated (any match); AND-ed with the other
+          filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (tested_at, product); prefix a key
+          with '-' for descending. Defaults to the view's natural order.
+      tags:
+      - Admin · Inward
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabTestingListPage'
           description: ''
   /api/sales-admin/non-stock-inward/{public_id}:
     patch:
@@ -5724,6 +8802,31 @@ paths:
                 items:
                   $ref: '#/components/schemas/State'
           description: ''
+  /api/utilities/client-children:
+    get:
+      operationId: api_utilities_client_children_list
+      description: List a client's child orgs.
+      summary: List a client's child orgs (booked-for picker)
+      parameters:
+      - in: query
+        name: client_public_id
+        schema:
+          type: string
+        description: Public id of the client, e.g. C-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Utilities
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChildOrgPayload'
+          description: ''
   /api/utilities/countries:
     get:
       operationId: api_utilities_countries_list
@@ -5874,6 +8977,10 @@ components:
           nullable: true
         dispatch_mode:
           $ref: '#/components/schemas/DispatchModeEnum'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgSummary'
+          nullable: true
         expected_delivery_date:
           type: string
           format: date
@@ -5888,6 +8995,7 @@ components:
           items:
             $ref: '#/components/schemas/OrderCardPackaging'
       required:
+      - booked_for
       - city
       - client
       - client_created_by
@@ -6124,11 +9232,14 @@ components:
           type: boolean
         is_godown_manager:
           type: boolean
+        is_lab_tester:
+          type: boolean
         is_sales_admin:
           type: boolean
       required:
       - id
       - is_godown_manager
+      - is_lab_tester
       - is_sales_admin
       - is_sales_person
       - name
@@ -6218,6 +9329,38 @@ components:
       required:
       - lines
       - snapshot_date
+    BookedForRequest:
+      type: object
+      description: |-
+        The optional ``booked_for`` object on the order write endpoints.
+
+        Either ``id`` (reuse a child) or ``party_name`` + ``village_name``
+        (get-or-create). An address -- ``client_address_id`` or ``address``, never
+        both -- is needed only when a new child is created. No field declares a
+        default: the resolver compares only the fields that were actually sent.
+      properties:
+        id:
+          type: integer
+        party_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        village_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id of the order's client.
+        address:
+          $ref: '#/components/schemas/ChildOrgAddressRequest'
+        transport_name:
+          type: string
+          maxLength: 255
+        contact_number:
+          type: string
+          nullable: true
+          maxLength: 10
     CatalogueItem:
       type: object
       description: Output shape for one catalogue row -- a bag (schema only).
@@ -6518,6 +9661,74 @@ components:
       required:
       - is_complete
       - stock_admins
+    ChildOrgAddressRequest:
+      type: object
+      description: 'The address of a new child org: a client address without label
+        / primary.'
+      properties:
+        line_1:
+          type: string
+          minLength: 1
+          maxLength: 255
+        line_2:
+          type: string
+          maxLength: 255
+        pincode:
+          type: string
+          minLength: 1
+          maxLength: 10
+        city:
+          type: integer
+        state:
+          type: integer
+        country:
+          type: integer
+      required:
+      - city
+      - country
+      - line_1
+      - pincode
+      - state
+    ChildOrgPayload:
+      type: object
+      description: Output shape for a child org in full (schema only).
+      properties:
+        id:
+          type: integer
+        party_name:
+          type: string
+        village_name:
+          type: string
+        transport_name:
+          type: string
+        contact_number:
+          type: string
+          nullable: true
+        address:
+          type: object
+          additionalProperties: {}
+          description: Same shape as a client address, minus link fields.
+      required:
+      - address
+      - contact_number
+      - id
+      - party_name
+      - transport_name
+      - village_name
+    ChildOrgSummary:
+      type: object
+      description: Output shape for a child org on a list row (schema only).
+      properties:
+        id:
+          type: integer
+        party_name:
+          type: string
+        village_name:
+          type: string
+      required:
+      - id
+      - party_name
+      - village_name
     City:
       type: object
       description: Output shape for one city row (schema only; responses are built
@@ -7004,10 +10215,60 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CustomOrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: 'Optional child org the order is booked for: {id} to reuse
+            one, or {party_name, village_name, ...} to get-or-create it.'
       required:
       - client_address_id
       - client_public_id
       - items
+    CreateFarmerRequest:
+      type: object
+      description: |-
+        A farmer a sales person records on their own, outside any field trip.
+
+        Same fields as :class:`CreateFarmerVisitSerializer` minus the trip; with no
+        trip to default from, ``village`` is required.
+      properties:
+        farmer_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contact_number:
+          type: string
+          minLength: 1
+        village:
+          type: string
+          minLength: 1
+          maxLength: 255
+        land_area_bigha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          description: Land held, in bigha.
+        is_lead:
+          type: boolean
+          default: false
+        crop_ids:
+          type: array
+          items:
+            type: integer
+          description: At least one crop the farmer grows.
+        product_public_ids:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: Our products the farmer uses; empty if none.
+      required:
+      - contact_number
+      - crop_ids
+      - farmer_name
+      - land_area_bigha
+      - village
     CreateFarmerVisitRequest:
       type: object
       description: |-
@@ -7017,6 +10278,9 @@ components:
         ``utilities/products``. An empty (or omitted) product list records that the
         farmer does not use our products.
       properties:
+        is_lead:
+          type: boolean
+          default: false
         field_trip_public_id:
           type: string
           minLength: 1
@@ -7105,9 +10369,9 @@ components:
       description: |-
         Request validation for booking a new raw-material lot.
 
-        ``status`` is not accepted: every lot starts ``Lab Testing`` and is moved to
-        ``In Use`` or ``Rejected`` later with ``PATCH``. ``effective_date`` is
-        stamped (today) at that flip and is deliberately absent here.
+        ``status`` is not accepted: every lot starts ``Lab Testing`` and a lab
+        tester moves it to ``In Use`` (Pass) or ``Rejected`` (Fail). ``effective_date``
+        is stamped (today) at that move and is deliberately absent here.
         ``lab_sampling_date`` may be given explicitly; left out, it defaults to
         today -- a lot never starts with no sampling date, since it arrives for
         lab testing the day it's booked. ``lot_no`` -- the supplier's own batch
@@ -7144,6 +10408,63 @@ components:
       - party
       - product
       - quantity_kg
+    CreateLabTesterRequest:
+      type: object
+      description: Request validation for creating a new ``LabTester``.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+      required:
+      - name
+      - phone_number
+    CreateLabTestingRequest:
+      type: object
+      description: Request validation for submitting the lab test of a lot in Lab
+        Testing.
+      properties:
+        number_of_plants:
+          type: integer
+          minimum: 1
+        female_count:
+          type: integer
+          minimum: 0
+        ot_count:
+          type: integer
+          minimum: 0
+        result:
+          allOf:
+          - $ref: '#/components/schemas/ResultEnum'
+          description: |-
+            The tester's own verdict, independent of the counts. Pass moves the lot to In Use, Fail to Rejected.
+
+            * `Pass` - Pass
+            * `Fail` - Fail
+        comment:
+          type: string
+          default: ''
+        inward_raw_material:
+          type: string
+          minLength: 1
+          description: Public id (IR-...) of the lot being tested.
+      required:
+      - female_count
+      - inward_raw_material
+      - number_of_plants
+      - ot_count
+      - result
     CreateMultiSelectBagOrderRequest:
       type: object
       description: |-
@@ -7183,6 +10504,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BagOrderItemRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: 'Optional child org the order is booked for: {id} to reuse
+            one, or {party_name, village_name, ...} to get-or-create it.'
       required:
       - client_address_id
       - client_public_id
@@ -7418,6 +10745,10 @@ components:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
           $ref: '#/components/schemas/ChallanReceiver'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         hsn_code:
           type: string
         financial_year:
@@ -7436,6 +10767,7 @@ components:
         total_packets:
           type: integer
       required:
+      - booked_for
       - dispatch
       - financial_year
       - hsn_code
@@ -7512,6 +10844,10 @@ components:
           nullable: true
         special_comments:
           type: string
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -7526,6 +10862,7 @@ components:
             $ref: '#/components/schemas/CustomOrderItemPayload'
       required:
       - actual_delivery_date
+      - booked_for
       - client
       - delivery_address
       - expected_delivery_date
@@ -7644,6 +10981,10 @@ components:
         expected_delivery_date:
           type: string
           format: date
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgSummary'
+          nullable: true
         total_amount:
           type: string
         total_packets:
@@ -7655,6 +10996,7 @@ components:
           items:
             $ref: '#/components/schemas/CustomOrderCardItem'
       required:
+      - booked_for
       - city
       - client
       - client_created_by
@@ -7713,6 +11055,10 @@ components:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
           $ref: '#/components/schemas/ChallanReceiver'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         hsn_code:
           type: string
         financial_year:
@@ -7731,6 +11077,7 @@ components:
         total_packets:
           type: integer
       required:
+      - booked_for
       - dispatch
       - financial_year
       - hsn_code
@@ -8024,6 +11371,10 @@ components:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
           $ref: '#/components/schemas/ChallanReceiver'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         hsn_code:
           type: string
         financial_year:
@@ -8050,6 +11401,7 @@ components:
           nullable: true
           description: custom order -> delivery address -> city.
       required:
+      - booked_for
       - city
       - dispatch
       - financial_year
@@ -8093,6 +11445,10 @@ components:
           nullable: true
         special_comments:
           type: string
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -8107,6 +11463,7 @@ components:
             $ref: '#/components/schemas/ExportCustomOrderItem'
       required:
       - actual_delivery_date
+      - booked_for
       - city
       - client
       - created_at
@@ -8174,6 +11531,10 @@ components:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
           $ref: '#/components/schemas/ChallanReceiver'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         hsn_code:
           type: string
         financial_year:
@@ -8200,6 +11561,7 @@ components:
           nullable: true
           description: order -> delivery address -> city.
       required:
+      - booked_for
       - city
       - dispatch
       - financial_year
@@ -8254,6 +11616,12 @@ components:
           type: string
         land_area_bigha:
           type: string
+        is_lead:
+          type: boolean
+        field_trip_public_id:
+          type: string
+          nullable: true
+          description: Null for a farmer recorded outside any trip.
         crops:
           type: array
           items:
@@ -8268,7 +11636,10 @@ components:
           type: string
           format: date-time
         field_trip:
-          $ref: '#/components/schemas/ExportFarmerVisitFieldTrip'
+          allOf:
+          - $ref: '#/components/schemas/ExportFarmerVisitFieldTrip'
+          nullable: true
+          description: Null for a farmer recorded outside any trip.
         sales_person:
           $ref: '#/components/schemas/UserContactRef'
       required:
@@ -8277,6 +11648,8 @@ components:
       - crops
       - farmer_name
       - field_trip
+      - field_trip_public_id
+      - is_lead
       - land_area_bigha
       - products
       - public_id
@@ -8460,6 +11833,11 @@ components:
           type: string
           format: date
           nullable: true
+        lab_testing:
+          allOf:
+          - $ref: '#/components/schemas/InwardLabTestingRef'
+          nullable: true
+          description: The lot's lab test; null until a lab tester has tested it.
         created_at:
           type: string
           format: date-time
@@ -8468,6 +11846,7 @@ components:
       - effective_date
       - farmer_name
       - lab_sampling_date
+      - lab_testing
       - lot_no
       - party
       - product
@@ -8547,6 +11926,10 @@ components:
           nullable: true
         dispatch_mode:
           $ref: '#/components/schemas/DispatchModeEnum'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -8561,6 +11944,7 @@ components:
             $ref: '#/components/schemas/OrderItemPayload'
       required:
       - actual_delivery_date
+      - booked_for
       - city
       - client
       - created_at
@@ -8654,10 +12038,15 @@ components:
         city:
           allOf:
           - $ref: '#/components/schemas/IdName'
-          description: City of the latest visit's field trip.
+          nullable: true
+          description: City of the latest visit's field trip; null if recorded without
+            a trip.
         land_area_bigha:
           type: string
           description: Land held at the latest visit, in bigha.
+        is_lead:
+          type: boolean
+          description: Lead flag of the latest record.
         crops:
           type: array
           items:
@@ -8694,6 +12083,7 @@ components:
       - contact_number
       - crops
       - farmer_name
+      - is_lead
       - land_area_bigha
       - last_visited_at
       - products
@@ -8750,6 +12140,12 @@ components:
           type: string
         land_area_bigha:
           type: string
+        is_lead:
+          type: boolean
+        field_trip_public_id:
+          type: string
+          nullable: true
+          description: Null for a farmer recorded outside any trip.
         crops:
           type: array
           items:
@@ -8768,6 +12164,8 @@ components:
       - created_at
       - crops
       - farmer_name
+      - field_trip_public_id
+      - is_lead
       - land_area_bigha
       - products
       - public_id
@@ -9050,6 +12448,23 @@ components:
       required:
       - id
       - name
+    InwardLabTestingRef:
+      type: object
+      description: Output shape for the ``lab_testing`` reference on a lot.
+      properties:
+        public_id:
+          type: string
+        result:
+          type: string
+          nullable: true
+          description: Pass / Fail; null while the lot awaits a (re-)test.
+        grow_out_test:
+          type: string
+          description: 100 - genetical impurity, in percent.
+      required:
+      - grow_out_test
+      - public_id
+      - result
     InwardOtherMaterialListPage:
       type: object
       description: Output shape for the paginated envelope (schema only).
@@ -9263,6 +12678,11 @@ components:
           type: string
           format: date
           nullable: true
+        lab_testing:
+          allOf:
+          - $ref: '#/components/schemas/InwardLabTestingRef'
+          nullable: true
+          description: The lot's lab test; null until a lab tester has tested it.
         created_by:
           allOf:
           - $ref: '#/components/schemas/InwardCreatedByRef'
@@ -9273,6 +12693,7 @@ components:
       - effective_date
       - farmer_name
       - lab_sampling_date
+      - lab_testing
       - lot_no
       - party
       - product
@@ -9302,6 +12723,152 @@ components:
       required:
       - order_public_id
       - public_id
+    LabTesterPayload:
+      type: object
+      description: Swagger schema for one lab tester row (no location, no audit keys).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phone_number:
+          type: string
+        role:
+          type: string
+        created_by:
+          allOf:
+          - $ref: '#/components/schemas/UserRef'
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        is_admin:
+          type: boolean
+        totp:
+          $ref: '#/components/schemas/Totp'
+      required:
+      - created_at
+      - id
+      - is_admin
+      - name
+      - phone_number
+      - role
+    LabTestingListPage:
+      type: object
+      description: Output shape for the paginated lab-testing envelope (schema only).
+      properties:
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        next_page_number:
+          type: integer
+          nullable: true
+        previous_page_number:
+          type: integer
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabTestingPayload'
+        available_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCatalogueEntry'
+        available_sorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SortCatalogueEntry'
+      required:
+      - available_filters
+      - available_sorts
+      - next_page_number
+      - previous_page_number
+      - results
+      - total_count
+      - total_pages
+    LabTestingLotRef:
+      type: object
+      description: The lot a lab test belongs to.
+      properties:
+        public_id:
+          type: string
+        product:
+          $ref: '#/components/schemas/InwardRawMaterialProductRef'
+        party:
+          $ref: '#/components/schemas/InwardRawMaterialPartyRef'
+        lot_no:
+          type: string
+        quantity_kg:
+          type: string
+        status:
+          type: string
+      required:
+      - lot_no
+      - party
+      - product
+      - public_id
+      - quantity_kg
+      - status
+    LabTestingPayload:
+      type: object
+      description: Output shape for one lab test (``LT-...``) with its computed figures.
+      properties:
+        public_id:
+          type: string
+        number_of_plants:
+          type: integer
+        female_count:
+          type: integer
+        ot_count:
+          type: integer
+        genetical_impurity:
+          type: string
+          description: (female + OT) / plants * 100, in percent (computed).
+        grow_out_test:
+          type: string
+          description: 100 - genetical impurity, in percent (computed).
+        result:
+          type: string
+          nullable: true
+          description: Pass / Fail; null while the lot awaits a (re-)test.
+        comment:
+          type: string
+        tested_by:
+          allOf:
+          - $ref: '#/components/schemas/LabTestingTestedByRef'
+          nullable: true
+        tested_at:
+          type: string
+          format: date-time
+          nullable: true
+        inward_raw_material:
+          $ref: '#/components/schemas/LabTestingLotRef'
+      required:
+      - comment
+      - female_count
+      - genetical_impurity
+      - grow_out_test
+      - inward_raw_material
+      - number_of_plants
+      - ot_count
+      - public_id
+      - result
+      - tested_at
+      - tested_by
+    LabTestingTestedByRef:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     LedgerActor:
       type: object
       properties:
@@ -9583,11 +13150,14 @@ components:
           type: boolean
         is_godown_manager:
           type: boolean
+        is_lab_tester:
+          type: boolean
         is_sales_admin:
           type: boolean
       required:
       - id
       - is_godown_manager
+      - is_lab_tester
       - is_sales_admin
       - is_sales_person
       - name
@@ -9990,6 +13560,10 @@ components:
           nullable: true
         dispatch_mode:
           $ref: '#/components/schemas/DispatchModeEnum'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -10006,10 +13580,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReturnOrderPayload'
           nullable: true
-          description: The order's live return (PENDING or ACCEPTED); null when it
-            has none. A REJECTED return is not shown.
+          description: Deprecated, use ``return_orders``. The order's newest live
+            return (PENDING or ACCEPTED); null when it has none.
+        return_orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnOrderPayload'
+          description: Every live return of the order (PENDING or ACCEPTED), newest
+            first. REJECTED returns are not shown.
       required:
       - actual_delivery_date
+      - booked_for
       - client
       - delivery_address
       - dispatch_mode
@@ -10017,6 +13598,7 @@ components:
       - items
       - public_id
       - return_order
+      - return_orders
       - special_comments
       - status
       - total_amount
@@ -10108,6 +13690,10 @@ components:
           format: date
         dispatch_mode:
           type: string
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgSummary'
+          nullable: true
         total_amount:
           type: string
         total_packets:
@@ -10130,6 +13716,7 @@ components:
           format: date-time
           nullable: true
       required:
+      - booked_for
       - city
       - client
       - created_at
@@ -10208,6 +13795,10 @@ components:
           nullable: true
         dispatch_mode:
           $ref: '#/components/schemas/DispatchModeEnum'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/ChildOrgPayload'
+          nullable: true
         verified_at:
           type: string
           format: date-time
@@ -10222,6 +13813,7 @@ components:
             $ref: '#/components/schemas/OrderItemPayload'
       required:
       - actual_delivery_date
+      - booked_for
       - client
       - delivery_address
       - dispatch_mode
@@ -10515,6 +14107,8 @@ components:
         crop. ``product_public_ids`` may be empty -- the farmer does not use our
         products. Anything else sent is ignored.
       properties:
+        is_lead:
+          type: boolean
         farmer_name:
           type: string
           minLength: 1
@@ -10643,6 +14237,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CustomOrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: Child org to set ({id} or {party_name, village_name, ...});
+            send null to clear it, omit to leave it unchanged.
     PatchedUpdateGodownManagerRequest:
       type: object
       description: |-
@@ -10671,10 +14271,11 @@ components:
       description: |-
         Request validation for updating a raw-material lot (all fields optional).
 
-        Only ``lab_sampling_date`` and ``status`` are accepted: flipping to
-        ``In Use`` stamps the effective date with today, reverting to
-        ``Lab Testing`` clears it, and ``product`` / ``party`` / ``quantity_kg``
-        are immutable. Any unknown key is ignored.
+        Only ``lab_sampling_date`` and ``status`` are accepted, and ``status`` may
+        only *revert* a lot to ``Lab Testing`` (clearing its effective date): moving
+        a lot out of ``Lab Testing`` is the lab tester's verdict alone, see
+        ``LabTestingOperations``. ``product`` / ``party`` / ``quantity_kg`` are
+        immutable. Any unknown key is ignored.
       properties:
         lab_sampling_date:
           type: string
@@ -10682,6 +14283,58 @@ components:
           nullable: true
         status:
           $ref: '#/components/schemas/UpdateInwardRawMaterialStatusEnum'
+    PatchedUpdateLabTesterRequest:
+      type: object
+      description: |-
+        Request validation for updating a ``LabTester`` (name/email/phone).
+
+        Callers pass the ``LabTester`` being edited as ``instance=`` so the phone
+        uniqueness check excludes that user's own row.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+    PatchedUpdateLabTestingRequest:
+      type: object
+      description: |-
+        Request validation for editing a lab test (send only what changed).
+
+        Inputs are always editable. Changing ``result`` flips the lot In Use <->
+        Rejected; Pass -> Fail is refused when the lot's kilograms are already
+        packed.
+      properties:
+        number_of_plants:
+          type: integer
+          minimum: 1
+        female_count:
+          type: integer
+          minimum: 0
+        ot_count:
+          type: integer
+          minimum: 0
+        result:
+          allOf:
+          - $ref: '#/components/schemas/ResultEnum'
+          description: |-
+            The tester's own verdict, independent of the counts. Pass moves the lot to In Use, Fail to Rejected.
+
+            * `Pass` - Pass
+            * `Fail` - Fail
+        comment:
+          type: string
+          default: ''
     PatchedUpdateLooseStockRequest:
       type: object
       description: 'Request validation: a list of loose lines.'
@@ -10763,6 +14416,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: Child org to set ({id} or {party_name, village_name, ...});
+            send null to clear it, omit to leave it unchanged.
     PatchedUpdateOtherMaterialTypeRequest:
       type: object
       description: Request validation for updating an ``OtherMaterialType`` (all fields
@@ -11197,9 +14856,12 @@ components:
           type: boolean
         can_create_godown_manager:
           type: boolean
+        can_create_lab_tester:
+          type: boolean
       required:
       - can_create_admin
       - can_create_godown_manager
+      - can_create_lab_tester
       - can_create_sales_person
       - user
     ReauthenticateUser:
@@ -11312,6 +14974,14 @@ components:
           maxLength: 32
       required:
       - fcm_token
+    ResultEnum:
+      enum:
+      - Pass
+      - Fail
+      type: string
+      description: |-
+        * `Pass` - Pass
+        * `Fail` - Fail
     ReturnClientRef:
       type: object
       description: Output shape for the client on a return.
@@ -11564,6 +15234,25 @@ components:
       - lines
       - order
       - return_order
+    ReturnOrderPrefillV2:
+      type: object
+      description: Output shape for ``GET /android/api/v2/return-order/<order_public_id>``.
+      properties:
+        order:
+          $ref: '#/components/schemas/ReturnPrefillOrder'
+        return_orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnOrderPayload'
+          description: Every live return of the order, newest first.
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnPrefillLine'
+      required:
+      - lines
+      - order
+      - return_orders
     ReturnOrderRecipes:
       type: object
       description: Output shape for ``GET return-order-recipes/<public_id>``.
@@ -11616,7 +15305,7 @@ components:
           description: Packets on the challan.
         returnable_packets:
           type: integer
-          description: Dispatched, less what a live return already claims.
+          description: Dispatched, less what live returns already claim.
         suggested_price_per_packet:
           type: string
           description: The order line's bag price divided by the packets in the bag.
@@ -12179,9 +15868,12 @@ components:
           type: boolean
         can_create_godown_manager:
           type: boolean
+        can_create_lab_tester:
+          type: boolean
       required:
       - can_create_admin
       - can_create_godown_manager
+      - can_create_lab_tester
       - can_create_sales_person
       - user
     VerifyOTPUser:
@@ -12216,7 +15908,7 @@ tags:
 - name: Admin · Auth
   description: Sales-admin website sign-in and session.
 - name: Admin · Users
-  description: Admin, sales-person and godown-manager accounts.
+  description: Admin, sales-person, godown-manager and lab-tester accounts.
 - name: Admin · Clients
   description: Client records and verification.
 - name: Admin · Orders
@@ -12252,6 +15944,9 @@ tags:
   description: Planning, running and ending field trips, and recording farmers met.
 - name: Android · Godown
   description: 'Godown manager: inward lots, stock positions and recipes.'
+- name: Android · Lab
+  description: 'Lab tester: lots waiting for a test, and submitting / editing lab
+    tests.'
 - name: Android · Utilities
   description: 'Look-ups for the app (either role): geography, crops, products, parties,
     material types and sales-admin contacts.'
