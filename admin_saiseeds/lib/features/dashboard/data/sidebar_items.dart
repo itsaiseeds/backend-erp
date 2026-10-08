@@ -80,6 +80,11 @@ class SidebarItems {
       icon: Icons.handshake_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.CHILD_CLIENTS,
+      label: AppStrings.CHILD_CLIENTS,
+      icon: Icons.account_tree_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.BAG_STOCK,
       label: AppStrings.BAG_STOCK,
       icon: Icons.warehouse_outlined,
@@ -108,6 +113,11 @@ class SidebarItems {
       id: TabIds.PURCHASE_TRACKING,
       label: AppStrings.PURCHASE_TRACKING,
       icon: Icons.shopping_bag_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.LAB_TESTING_REPORT,
+      label: AppStrings.LAB_TESTING_REPORT,
+      icon: Icons.biotech_outlined,
     ),
     SidebarItemModel(
       id: TabIds.WASTE_MANAGEMENT,
@@ -179,6 +189,7 @@ class SidebarItems {
           TabIds.INWARD_RAW_MATERIALS,
           TabIds.OTHER_MATERIAL_INWARD,
           TabIds.PURCHASE_TRACKING,
+          TabIds.LAB_TESTING_REPORT,
         ],
       ),
       SidebarGroupModel(
@@ -208,7 +219,7 @@ class SidebarItems {
       SidebarGroupModel(
         id: 'setup-onboarding',
         label: AppStrings.GROUP_ONBOARDING,
-        itemIds: [TabIds.CLIENTS, TabIds.PARTIES],
+        itemIds: [TabIds.CLIENTS, TabIds.PARTIES, TabIds.CHILD_CLIENTS],
       ),
       SidebarGroupModel(
         id: 'setup-farmer-trips',

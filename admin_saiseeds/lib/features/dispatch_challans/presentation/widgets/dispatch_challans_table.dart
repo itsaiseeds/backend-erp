@@ -326,15 +326,19 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
       case DispatchChallansTable.COLUMN_FROM_CITY:
         return _textCell(dispatch?.fromCity ?? '');
       case DispatchChallansTable.COLUMN_TO_CITY:
-        return _textCell(dispatch?.toCity ?? '');
+        return _textCell(
+          challan.bookedFor != null
+              ? challan.deliveryToPlace
+              : (dispatch?.toCity ?? ''),
+        );
       case DispatchChallansTable.COLUMN_RECEIVER:
-        return _textCell(challan.receiverName, isStrong: true);
+        return _textCell(challan.deliveryToTableName, isStrong: true);
       case DispatchChallansTable.COLUMN_GST:
-        return _textCell(challan.receiverGst);
+        return _textCell(challan.deliveryToGst);
       case DispatchChallansTable.COLUMN_ADDRESS:
-        return _textCell(challan.receiverAddress);
+        return _textCell(challan.deliveryToAddress);
       case DispatchChallansTable.COLUMN_CONTACT:
-        return _textCell(challan.contactSummary);
+        return _textCell(challan.deliveryToContact);
       case DispatchChallansTable.COLUMN_HSN:
         return _textCell(challan.hsnCode);
       case DispatchChallansTable.COLUMN_FY:

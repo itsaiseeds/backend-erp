@@ -18,6 +18,7 @@ import '../../../../core/widgets/feedback/section_title.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
 import '../../../../core/widgets/inputs/single_date_field.dart';
 import '../../../../core/widgets/layout/app_hairline.dart';
+import '../../../orders/presentation/widgets/delivery_to_field.dart';
 import '../../../orders/presentation/widgets/order_status_badge.dart';
 import '../../data/models/custom_order_model.dart';
 import '../../../product_packagings/data/models/product_packaging_model.dart';
@@ -86,6 +87,7 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
   late RecordDialogMode _mode;
   late List<CustomOrderLine> _lines;
   DateTime? _expectedDelivery;
+  DeliveryToValue _deliveryTo = const DeliveryToValue.untouchedValue();
   bool _isSubmitting = false;
   String? _linesError;
 
@@ -120,6 +122,7 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
   void _resetDraft() {
     _commentsController.text = _order.specialComments;
     _expectedDelivery = _order.expectedDeliveryDateTime;
+    _deliveryTo = const DeliveryToValue.untouchedValue();
     _lines = [
       for (final CustomOrderItemModel item in _order.items)
         CustomOrderLine(
@@ -266,6 +269,8 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
             _expectedDelivery!,
           ),
         'items': [for (final CustomOrderLine line in _lines) line.toJson()],
+        if (!_deliveryTo.untouched)
+          'booked_for': _deliveryTo.toRequestValue(),
       },
     );
 
@@ -423,6 +428,11 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
             label: AppStrings.FIELD_DELIVERY_ADDRESS_PICK,
             value: _order.deliveryAddress,
           ),
+          if (_order.bookedFor != null)
+            DetailField(
+              label: AppStrings.DELIVERY_TO_LABEL,
+              value: _order.bookedFor!.displayLabel,
+            ),
           DetailField(
             label: AppStrings.COLUMN_CUSTOM_ORDER_CITY,
             value: _order.cityName,
@@ -455,6 +465,18 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
           label: AppStrings.FIELD_SPECIAL_COMMENTS,
           hint: AppStrings.FIELD_SPECIAL_COMMENTS_HINT,
           enabled: _canEdit,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DeliveryToField(
+          apiClient: context.read<ApiClient>(),
+          clientPublicId: _order.clientPublicId,
+          initial: _deliveryTo.untouched
+              ? (_order.bookedFor != null
+                    ? DeliveryToValue.existingChild(_order.bookedFor!)
+                    : const DeliveryToValue.none())
+              : _deliveryTo,
+          enabled: _canEdit,
+          onChanged: (value) => setState(() => _deliveryTo = value),
         ),
       ],
     );

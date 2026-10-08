@@ -23,6 +23,7 @@ import '../../../clients/data/models/client_model.dart';
 import '../../../clients/data/models/client_status.dart';
 import '../../../product_packagings/data/models/product_packaging_model.dart';
 import '../../../product_packagings/data/product_packagings_repository.dart';
+import '../../../orders/presentation/widgets/delivery_to_field.dart';
 import '../../../orders/presentation/widgets/order_product_picker_dialog.dart';
 import '../bloc/custom_orders_cubit.dart';
 import 'custom_order_line_row.dart';
@@ -80,6 +81,7 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
   ClientAddressModel? _address;
   bool _isLoadingAddresses = false;
   DateTime? _expectedDelivery;
+  DeliveryToValue _deliveryTo = const DeliveryToValue.none();
 
   int _stepIndex = 0;
   bool _isLoadingClients = true;
@@ -311,6 +313,7 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
           _expectedDelivery!,
         ),
       'items': [for (final CustomOrderLine line in _lines) line.toJson()],
+      if (_deliveryTo.isSet) 'booked_for': _deliveryTo.toRequestValue(),
     });
 
     if (!mounted) return;
@@ -418,6 +421,14 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
             _address = address;
             _addressError = null;
           }),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DeliveryToField(
+          apiClient: context.read<ApiClient>(),
+          clientPublicId: _client?.publicId ?? '',
+          initial: _deliveryTo,
+          enabled: _canEdit,
+          onChanged: (value) => setState(() => _deliveryTo = value),
         ),
       ],
     );

@@ -1,4 +1,5 @@
 import '../../../../core/services/products_service.dart';
+import '../../../orders/data/models/child_org_model.dart';
 import '../../../orders/data/models/order_status.dart';
 
 class CustomOrderClientRef {
@@ -135,6 +136,7 @@ class CustomOrderModel {
   final String createdBy;
   final String verifiedBy;
   final String deliveryAddress;
+  final ChildOrgModel? bookedFor;
   final CustomOrderCityRef? city;
   final String expectedDeliveryDate;
   final String actualDeliveryDate;
@@ -153,6 +155,7 @@ class CustomOrderModel {
     this.createdBy = '',
     this.verifiedBy = '',
     this.deliveryAddress = '',
+    this.bookedFor,
     this.city,
     this.expectedDeliveryDate = '',
     this.actualDeliveryDate = '',
@@ -167,6 +170,7 @@ class CustomOrderModel {
     final dynamic client = json['client'];
     final dynamic city = json['city'];
     final dynamic items = json['items'];
+    final dynamic bookedFor = json['booked_for'];
 
     // The list and detail payloads carry these differently: the list sends
     // created_by / created_at / city at the top level, the detail nests the
@@ -204,6 +208,9 @@ class CustomOrderModel {
           clientMap['verified_by'] as String? ??
           '',
       deliveryAddress: json['delivery_address'] as String? ?? '',
+      bookedFor: bookedFor is Map
+          ? ChildOrgModel.fromJson(Map<String, dynamic>.from(bookedFor))
+          : null,
       city: city is Map
           ? CustomOrderCityRef.fromJson(Map<String, dynamic>.from(city))
           : null,
@@ -231,6 +238,10 @@ class CustomOrderModel {
     if (named.isNotEmpty) return named;
     return _cityFromAddress;
   }
+
+  /// Same "don't repeat the column" rule as [OrderModel.deliveryToLabel].
+  String get deliveryToLabel =>
+      bookedFor != null ? bookedFor!.displayLabel : deliveryAddress;
 
   String get _cityFromAddress {
     final List<String> parts = deliveryAddress

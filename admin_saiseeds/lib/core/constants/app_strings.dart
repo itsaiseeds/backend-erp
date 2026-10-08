@@ -628,7 +628,7 @@ class AppStrings {
   static const String COLUMN_ORDER_STATUS = 'Status';
   static const String COLUMN_ORDER_AMOUNT = 'Amount';
   static const String COLUMN_ORDER_ID = 'Order ID';
-  static const String COLUMN_ORDER_ADDRESS = 'Delivery Address';
+  static const String COLUMN_ORDER_ADDRESS = 'Delivery To';
   static const String COLUMN_ORDER_DISPATCH = 'Dispatch';
   static const String COLUMN_ORDER_VERIFIED_BY = 'Verified By';
   static const String COLUMN_ORDER_CLIENT_ONBOARDED_BY = 'Client Added By';
@@ -833,6 +833,26 @@ class AppStrings {
   static const String PARTY_DETAIL_TITLE = 'Party details';
   static const String PARTY_DETAIL_SUBTITLE =
       'Name and city on record for this party.';
+
+  static const String CHILD_CLIENTS = 'Child Client Management';
+  static const String CHILD_CLIENTS_SUBTITLE =
+      'Pick a client to see the delivery places it books orders through.';
+  static const String CHILD_CLIENTS_PICK_PARENT = 'Parent client';
+  static const String CHILD_CLIENTS_PICK_PARENT_HINT = 'Search clients';
+  static const String FILTER_BY_PARENT_CLIENT = 'parent_client';
+  static const String CHILD_CLIENTS_EMPTY_NO_PARENT =
+      'Pick a client to see its child clients';
+  static const String CHILD_CLIENTS_EMPTY_NO_PARENT_BODY =
+      'A child client is created automatically the first time an order is booked through it.';
+  static const String CHILD_CLIENTS_EMPTY_TITLE = 'No child clients yet';
+  static const String CHILD_CLIENTS_EMPTY_BODY =
+      'This client has not had any order routed through a separate delivery place.';
+  static const String CHILD_CLIENTS_LOAD_FAILED = 'Could not load child clients';
+  static const String COLUMN_CHILD_PARTY_NAME = 'Party Name';
+  static const String COLUMN_CHILD_VILLAGE = 'Village';
+  static const String COLUMN_CHILD_ADDRESS = 'Address';
+  static const String COLUMN_CHILD_TRANSPORT = 'Transport';
+  static const String COLUMN_CHILD_CONTACT = 'Contact';
   static const String ADD_PARTY = 'Add party';
   static const String ADD_PARTY_SUBTITLE = 'Register a party in the directory.';
   static const String EDIT_PARTY_SUBTITLE = 'Update the party details.';
@@ -907,6 +927,24 @@ class AppStrings {
   static const String ORDER_PLACED_ON_LABEL = 'Booked on';
   static const String ORDER_DISPATCH_AGENCY = 'Transport agency';
   static const String ORDER_DISPATCH_PRIVATE = 'Private dispatch';
+
+  // "Delivery To" (backend: booked_for) -- a separate place the client books
+  // an order on behalf of. Never say "booked for" in UI copy.
+  static const String DELIVERY_TO_SECTION = 'Delivery To';
+  static const String DELIVERY_TO_TOGGLE = 'Deliver to a different place';
+  static const String DELIVERY_TO_TOGGLE_HINT =
+      'Leave off to deliver to the client\'s own address';
+  static const String DELIVERY_TO_PICK = 'Select delivery place';
+  static const String DELIVERY_TO_PICK_HINT = 'Search existing places';
+  static const String DELIVERY_TO_ADD_NEW = 'Add a new delivery place';
+  static const String DELIVERY_TO_USE_EXISTING = 'Use an existing place';
+  static const String DELIVERY_TO_PARTY_NAME = 'Party name';
+  static const String DELIVERY_TO_VILLAGE_NAME = 'Village name';
+  static const String DELIVERY_TO_TRANSPORT_NAME = 'Transport name';
+  static const String DELIVERY_TO_CONTACT_NUMBER = 'Contact number';
+  static const String DELIVERY_TO_LABEL = 'Delivery to';
+  static const String VALIDATION_VILLAGE_NAME_REQUIRED =
+      'Village name is required.';
   static const String ORDER_QUANTITY_PREFIX = 'Qty';
   static const String ORDER_PER_BAG = 'per bag';
   static const String ORDER_LIST_PRICE_LABEL = 'List price';
@@ -1372,6 +1410,7 @@ class AppStrings {
   static const String COLUMN_CROPS = 'Crops';
   static const String COLUMN_USES_OUR_PRODUCTS = 'Our Products';
   static const String COLUMN_PRODUCTS_USED = 'Products';
+  static const String COLUMN_IS_LEAD = 'Lead';
 
   static const String FIELD_TRIP_STATUS_PLANNED = 'Planned';
   static const String FIELD_TRIP_STATUS_APPROVED = 'Approved';
@@ -1534,6 +1573,32 @@ class AppStrings {
 
   static const String COLUMN_PRICE = 'Price';
   static const String COLUMN_UNIT = 'Unit';
+
+  static const String LAB_TESTING_REPORT = 'Lab Testing Report';
+  static const String LAB_TESTING_REPORT_DETAIL_TITLE = 'Lab test';
+  static const String LAB_TESTING_REPORT_DETAIL_SUBTITLE =
+      'What was tested, by whom, and the result.';
+  static const String LAB_TESTING_REPORT_TABLE_SEARCH_HINT =
+      'Search lab tests...';
+  static const String LAB_TESTING_REPORT_EMPTY_STATE_TITLE =
+      'No lab tests yet';
+  static const String LAB_TESTING_REPORT_EMPTY_STATE_BODY =
+      'Tests submitted by a lab tester will show up here.';
+  static const String LAB_TESTING_REPORT_LOAD_FAILED_TITLE =
+      'Could not load lab tests';
+  static const String LAB_TESTING_REPORT_COLUMN_LOT_NO = 'Lot No.';
+  static const String LAB_TESTING_REPORT_COLUMN_RESULT = 'Result';
+  static const String LAB_TESTING_REPORT_COLUMN_GENETICAL_IMPURITY =
+      'Genetical Impurity';
+  static const String LAB_TESTING_REPORT_COLUMN_GROW_OUT_TEST =
+      'Grow Out Test';
+  static const String LAB_TESTING_REPORT_COLUMN_TESTED_BY = 'Tested By';
+  static const String LAB_TESTING_REPORT_COLUMN_TESTED_AT = 'Tested At';
+  static const String LAB_TESTING_REPORT_LOT_STATUS = 'Lot Status';
+  static const String LAB_TESTING_REPORT_FIELD_PLANTS = 'No. of Plants';
+  static const String LAB_TESTING_REPORT_FIELD_FEMALE_COUNT = 'Female Count';
+  static const String LAB_TESTING_REPORT_FIELD_OT_COUNT = 'OT Count';
+  static const String LAB_TESTING_REPORT_FIELD_COMMENT = 'Comment';
 
   static const String COLUMN_REASON = 'Reason';
   static const String COLUMN_REFERENCE = 'Reference';
