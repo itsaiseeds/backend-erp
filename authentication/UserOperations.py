@@ -12,6 +12,7 @@ or ``address`` and a sales person carries only its ``city``.
 from __future__ import annotations
 
 import pyotp
+from django.core.exceptions import PermissionDenied
 from rest_framework import serializers
 
 from aggregator.models import City
@@ -246,6 +247,83 @@ def create_verified_user(data: dict, actor: User) -> User:
         totp_secret=pyotp.random_base32(),
         totp_enabled=True,
     )
+
+
+def obtain_role_user(data: dict, actor: User) -> User:
+    """The user a new role is granted to: the existing one for this phone, else a new one.
+
+    A phone number that already has an account (a deleted godown manager being
+    re-hired, an admin who also becomes a lab tester) gets the role added to
+    that same account; ``name``/``email`` in ``data`` are then ignored. Only a
+    superuser may add a role to a superuser or an admin, the same rule the
+    update/delete endpoints apply. A deactivated account is reactivated and
+    its TOTP secret rotated, so the authenticator entry it had before it was
+    removed stays dead and a fresh QR is shown.
+    """
+    user = User.objects.filter(phone_number=data["phone_number"]).first()
+    if user is None:
+        return create_verified_user(data, actor)
+
+    if (user.is_superuser or user.is_admin_user) and not actor.is_superuser:
+        raise PermissionDenied("Only a superuser may add a role to an admin.")
+
+    if not user.is_active:
+        user.is_active = True
+        if not user.is_verified or user.verified_by_id is None:
+            user.is_verified = True
+            user.verified_by = actor
+        user.save(
+            skip_full_clean=True,
+            update_fields=["is_active", "is_verified", "verified_by", "updated_at"],
+        )
+        rotate_totp_secret(user)
+    return user
+
+
+def grant_role(profile_model, user: User, actor: User, *, keep_live: bool = False, **fields):
+    """Give ``user`` the ``profile_model`` role, reviving a deleted profile row.
+
+    The profile is one-to-one with the user, so a role that was removed earlier
+    is restored (with ``fields`` applied) rather than inserted again. A live
+    profile is a 400, unless ``keep_live`` (the fallback sales person created
+    with an admin), which leaves it exactly as it is.
+    """
+    profile = profile_model.all_objects.filter(user=user).first()
+    if profile is None:
+        return profile_model.objects.create(user=user, created_by=actor, **fields)
+    if not profile.is_deleted:
+        if keep_live:
+            return profile
+        raise serializers.ValidationError(
+            {"phone_number": [f"This user is already a {profile_model._meta.verbose_name}."]}
+        )
+    for name, value in fields.items():
+        setattr(profile, name, value)
+    profile.created_by = actor
+    profile.restore()
+    profile.save()
+    return profile
+
+
+def deactivate_if_roleless(user: User) -> None:
+    """Deactivate ``user`` once none of its four roles is live (superusers never are).
+
+    Re-reads the user: the reverse profile accessors cache, and the profile
+    that was just soft-deleted must not still count. ``User.save`` revokes
+    credentials on the ``is_active`` change.
+    """
+    user = User.objects.get(pk=user.pk)
+    if user.is_superuser or not user.is_active:
+        return
+    if (
+        user.is_admin_user
+        or user.is_salesperson
+        or user.is_godown_manager
+        or user.is_lab_tester
+    ):
+        return
+    user.is_active = False
+    user.save(skip_full_clean=True, update_fields=["is_active", "updated_at"])
 
 
 def rotate_totp_secret(user: User) -> None:

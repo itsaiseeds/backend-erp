@@ -15,12 +15,13 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from api.admin import AdminApiView
-from authentication.models import LabTester, User
+from authentication.models import LabTester
 from authentication.UserOperations import (
     LabTesterPayloadSerializer,
     can_see_totp,
-    create_verified_user,
+    grant_role,
     lab_tester_payload,
+    obtain_role_user,
 )
 from authentication.validators import validate_phone_number
 
@@ -41,11 +42,6 @@ class CreateLabTesterSerializer(serializers.Serializer):
             "required": "Phone number is required.",
         },
     )
-
-    def validate_phone_number(self, value):
-        if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError("A user with this contact number already exists.")
-        return value
 
 
 class LabTestersView(AdminApiView):
@@ -80,8 +76,8 @@ class LabTestersView(AdminApiView):
         data = serializer.validated_data
 
         with transaction.atomic():
-            user = create_verified_user(data, actor=request.user)
-            tester = LabTester.objects.create(user=user, created_by=request.user)
+            user = obtain_role_user(data, actor=request.user)
+            tester = grant_role(LabTester, user, request.user)
 
         return Response(
             lab_tester_payload(tester, include_totp=True),
