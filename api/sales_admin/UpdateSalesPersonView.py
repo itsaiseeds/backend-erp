@@ -19,6 +19,7 @@ Soft-deleted sales people are never found (404).
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -30,6 +31,7 @@ from authentication.models import SalesPerson, User
 from authentication.UserOperations import (
     SalesPersonPayloadSerializer,
     UpdateSalesPersonSerializer,
+    deactivate_if_roleless,
     salesperson_payload,
 )
 
@@ -95,5 +97,7 @@ class UpdateSalesPersonView(AdminApiView):
         # ``admin_required`` gate above is the intended access control. Both
         # run ``SalesPerson.guard_soft_delete``, which revokes the user's
         # sessions and tokens.
-        salesperson.mark_deleted(request.user)
+        with transaction.atomic():
+            salesperson.mark_deleted(request.user)
+            deactivate_if_roleless(salesperson.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

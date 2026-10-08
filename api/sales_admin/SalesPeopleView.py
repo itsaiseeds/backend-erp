@@ -16,11 +16,12 @@ from rest_framework.response import Response
 
 from aggregator.models import City
 from api.admin import AdminApiView
-from authentication.models import SalesPerson, User
+from authentication.models import SalesPerson
 from authentication.UserOperations import (
     SalesPersonPayloadSerializer,
     can_see_totp,
-    create_verified_user,
+    grant_role,
+    obtain_role_user,
     salesperson_payload,
 )
 from authentication.validators import validate_phone_number
@@ -46,11 +47,6 @@ class CreateSalesPersonSerializer(serializers.Serializer):
         queryset=City.objects.all(),
         error_messages={"required": "City is required."},
     )
-
-    def validate_phone_number(self, value):
-        if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError("A user with this contact number already exists.")
-        return value
 
 
 class SalesPeopleView(AdminApiView):
@@ -87,10 +83,8 @@ class SalesPeopleView(AdminApiView):
         data = serializer.validated_data
 
         with transaction.atomic():
-            user = create_verified_user(data, actor=request.user)
-            salesperson = SalesPerson.objects.create(
-                user=user, city=data["city"], created_by=request.user
-            )
+            user = obtain_role_user(data, actor=request.user)
+            salesperson = grant_role(SalesPerson, user, request.user, city=data["city"])
 
         return Response(
             salesperson_payload(salesperson, include_totp=True),
