@@ -268,7 +268,7 @@ class CustomOrdersTableState extends State<CustomOrdersTable> {
       case CustomOrdersTable.COLUMN_PACKETS:
         return _textCell('${order.totalPackets}');
       case CustomOrdersTable.COLUMN_ADDRESS:
-        return _textCell(order.deliveryAddress);
+        return _textCell(order.deliveryToLabel);
       case CustomOrdersTable.COLUMN_CITY:
         return _textCell(order.cityName);
       case CustomOrdersTable.COLUMN_EXPECTED:

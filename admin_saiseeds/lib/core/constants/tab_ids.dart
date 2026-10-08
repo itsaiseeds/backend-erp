@@ -15,12 +15,14 @@ class TabIds {
   static const String PRODUCTS = 'products';
   static const String PRODUCT_PACKAGINGS = 'product-packagings';
   static const String PARTIES = 'parties';
+  static const String CHILD_CLIENTS = 'child-clients';
   static const String BAG_STOCK = 'bag-stock';
   static const String PACKET_STOCK = 'packet-stock';
   static const String INWARD_RAW_MATERIALS = 'inward-raw-materials';
   static const String OTHER_RAW_MATERIALS = 'other-raw-materials';
   static const String OTHER_MATERIAL_INWARD = 'other-material-inward';
   static const String PURCHASE_TRACKING = 'purchase-tracking';
+  static const String LAB_TESTING_REPORT = 'lab-testing-report';
   static const String WASTE_MANAGEMENT = 'waste-management';
   static const String PRODUCT_STOCK = 'product-stock';
   static const String RAW_MATERIAL_STOCK = 'raw-material-stock';

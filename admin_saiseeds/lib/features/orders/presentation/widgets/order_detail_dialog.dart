@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/font_sizes.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -27,6 +28,7 @@ import '../../data/models/order_status.dart';
 import '../../../return_orders/data/models/return_order_model.dart';
 import '../../../return_orders/data/models/return_order_status.dart';
 import '../../../return_orders/presentation/widgets/return_order_status_badge.dart';
+import 'delivery_to_field.dart';
 import 'order_status_badge.dart';
 
 class OrderDetailDialog extends StatefulWidget {
@@ -99,6 +101,7 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
   late List<OrderPackagingModel> _lines;
   late List<TextEditingController> _quantityControllers;
   late List<TextEditingController> _priceControllers;
+  DeliveryToValue _deliveryTo = const DeliveryToValue.untouchedValue();
   bool _isSubmitting = false;
 
   OrderModel get _order => widget.order;
@@ -116,6 +119,7 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
 
   void _resetDraft() {
     _expectedDeliveryDate = _order.expectedDeliveryDate;
+    _deliveryTo = const DeliveryToValue.untouchedValue();
     _lines = List<OrderPackagingModel>.from(_order.packagings);
     _quantityControllers = _lines
         .map((line) => TextEditingController(text: '${line.quantity}'))
@@ -280,6 +284,7 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
       if (_expectedDeliveryDate != null)
         'expected_delivery_date': _dateOnly(_expectedDeliveryDate!),
       'items': [for (final line in edited) line.toEditJson()],
+      if (!_deliveryTo.untouched) 'booked_for': _deliveryTo.toRequestValue(),
     };
   }
 
@@ -492,6 +497,18 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
           value: _expectedDeliveryDate,
           enabled: _canEdit,
           onChanged: (picked) => setState(() => _expectedDeliveryDate = picked),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DeliveryToField(
+          apiClient: context.read<ApiClient>(),
+          clientPublicId: order.client.publicId,
+          initial: _deliveryTo.untouched
+              ? (order.bookedFor != null
+                    ? DeliveryToValue.existingChild(order.bookedFor!)
+                    : const DeliveryToValue.none())
+              : _deliveryTo,
+          enabled: _canEdit,
+          onChanged: (value) => setState(() => _deliveryTo = value),
         ),
       ],
     );
@@ -1062,6 +1079,11 @@ class _DeliveryStep extends StatelessWidget {
           label: AppStrings.ORDER_DELIVERY_ADDRESS_LABEL,
           value: order.deliveryAddress,
         ),
+        if (order.bookedFor != null)
+          DetailField(
+            label: AppStrings.DELIVERY_TO_LABEL,
+            value: order.bookedFor!.displayLabel,
+          ),
         DetailField(label: AppStrings.ORDER_CITY_LABEL, value: order.cityName),
         DetailField(
           label: AppStrings.ORDER_DISPATCH_MODE_LABEL,

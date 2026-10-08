@@ -64,6 +64,7 @@ class FarmerModel {
   final String village;
   final FieldTripCityRef? city;
   final String landAreaBigha;
+  final bool isLead;
   final List<CropModel> crops;
   final bool usesOurProducts;
   final List<FarmerVisitProductRef> products;
@@ -78,6 +79,7 @@ class FarmerModel {
     this.village = '',
     this.city,
     this.landAreaBigha = '',
+    this.isLead = false,
     this.crops = const [],
     this.usesOurProducts = false,
     this.products = const [],
@@ -98,6 +100,7 @@ class FarmerModel {
           ? FieldTripCityRef.fromJson(Map<String, dynamic>.from(city))
           : null,
       landAreaBigha: decimalOf(json['land_area_bigha']),
+      isLead: json['is_lead'] == true,
       crops: listOf(json['crops'], CropModel.fromJson),
       usesOurProducts: json['uses_our_products'] == true,
       products: listOf(json['products'], FarmerVisitProductRef.fromJson),

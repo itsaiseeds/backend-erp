@@ -1,3 +1,4 @@
+import 'child_org_model.dart';
 import 'order_status.dart';
 import '../../../return_orders/data/models/return_order_model.dart';
 import '../../../return_orders/data/models/return_order_status.dart';
@@ -144,6 +145,7 @@ class OrderModel {
   final String createdBy;
   final String verifiedBy;
   final String deliveryAddress;
+  final ChildOrgModel? bookedFor;
   final OrderCityModel? city;
   final OrderAgencyModel? transportAgency;
   final String dispatchMode;
@@ -167,6 +169,7 @@ class OrderModel {
     this.createdBy = '',
     this.verifiedBy = '',
     this.deliveryAddress = '',
+    this.bookedFor,
     this.city,
     this.transportAgency,
     this.dispatchMode = '',
@@ -183,6 +186,7 @@ class OrderModel {
     final dynamic city = json['city'];
     final dynamic agency = json['transport_agency'];
     final dynamic client = json['client'];
+    final dynamic bookedFor = json['booked_for'];
 
     return OrderModel(
       publicId: json['public_id'] as String? ?? '',
@@ -195,6 +199,9 @@ class OrderModel {
       createdBy: json['created_by'] as String? ?? '',
       verifiedBy: json['verified_by'] as String? ?? '',
       deliveryAddress: json['delivery_address'] as String? ?? '',
+      bookedFor: bookedFor is Map
+          ? ChildOrgModel.fromJson(Map<String, dynamic>.from(bookedFor))
+          : null,
       city: city is Map
           ? OrderCityModel.fromJson(Map<String, dynamic>.from(city))
           : null,
@@ -265,6 +272,7 @@ class OrderModel {
       deliveryAddress: detail.deliveryAddress.isNotEmpty
           ? detail.deliveryAddress
           : base.deliveryAddress,
+      bookedFor: detail.bookedFor ?? base.bookedFor,
       city: detail.city ?? base.city,
       transportAgency: detail.transportAgency ?? base.transportAgency,
       dispatchMode: detail.dispatchMode.isNotEmpty
@@ -290,6 +298,12 @@ class OrderModel {
   bool get isAgencyDispatch => dispatchMode.toUpperCase() == DISPATCH_AGENCY;
 
   String get cityName => city?.name ?? '';
+
+  /// The order table's "Delivery To" cell: the separate delivery place when
+  /// one is set, else the plain delivery address -- never both, so the table
+  /// never grows a second column for the same idea.
+  String get deliveryToLabel =>
+      bookedFor != null ? bookedFor!.displayLabel : deliveryAddress;
 
   String get agencyName => transportAgency?.name ?? '';
 

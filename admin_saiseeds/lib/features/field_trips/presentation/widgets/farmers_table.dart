@@ -21,6 +21,7 @@ class FarmersTable extends StatefulWidget {
   static const String COLUMN_CITY = 'city';
   static const String COLUMN_LAND = 'land_area_bigha';
   static const String COLUMN_CROPS = 'crops';
+  static const String COLUMN_IS_LEAD = 'is_lead';
   static const String COLUMN_USES_PRODUCTS = 'uses_our_products';
   static const String COLUMN_VISIT_COUNT = 'visit_count';
   static const String COLUMN_LAST_VISITED = 'last_visited_at';
@@ -100,6 +101,12 @@ class FarmersTableState extends State<FarmersTable> {
       id: FarmersTable.COLUMN_CROPS,
       label: AppStrings.COLUMN_CROPS,
       width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: FarmersTable.COLUMN_IS_LEAD,
+      label: AppStrings.COLUMN_IS_LEAD,
+      width: AppSizes.tableColumnWidthNarrow,
+      isCenter: true,
     ),
     AppDataColumn(
       id: FarmersTable.COLUMN_USES_PRODUCTS,
@@ -243,6 +250,17 @@ class FarmersTableState extends State<FarmersTable> {
         return _textCell(farmer.landAreaBigha);
       case FarmersTable.COLUMN_CROPS:
         return _listCell(farmer.cropNames);
+      case FarmersTable.COLUMN_IS_LEAD:
+        return Align(
+          alignment: Alignment.center,
+          child: Icon(
+            farmer.isLead
+                ? Icons.check_circle_outline_rounded
+                : Icons.remove_circle_outline_rounded,
+            size: AppSizes.iconMd,
+            color: farmer.isLead ? AppColors.SUCCESS : AppColors.TEXT_DISABLED,
+          ),
+        );
       case FarmersTable.COLUMN_USES_PRODUCTS:
         return Align(
           alignment: Alignment.center,

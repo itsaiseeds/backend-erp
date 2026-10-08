@@ -5,4 +5,5 @@ class UtilitiesEndpoints {
 
   static const String reauthenticate = '$_base/reauthenticate';
   static const String cities = '$_base/cities';
+  static const String clientChildren = '$_base/client-children';
 }

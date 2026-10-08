@@ -265,7 +265,7 @@ class OrdersTableState extends State<OrdersTable> {
       case OrdersTable.COLUMN_AMOUNT:
         return _textCell(CurrencyFormatter.rupees(order.totalAmount));
       case OrdersTable.COLUMN_ADDRESS:
-        return _textCell(order.deliveryAddress);
+        return _textCell(order.deliveryToLabel);
       case OrdersTable.COLUMN_PLACED:
         return _textCell(DateFormatter.instantLabel(order.createdAt));
       case OrdersTable.COLUMN_SALES_PERSON:

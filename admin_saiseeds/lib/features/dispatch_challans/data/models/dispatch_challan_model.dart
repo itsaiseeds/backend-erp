@@ -132,6 +132,51 @@ class ChallanReceiverModel {
   }
 }
 
+/// The "delivery to" party, when the order was booked for someone other than
+/// the client themselves (e.g. the client's own sub-dealer). Null means the
+/// goods go to the client's own address -- the consignee details already
+/// carry everything a challan needs in that case.
+class ChallanBookedForModel {
+  final int id;
+  final String partyName;
+  final String villageName;
+  final ChallanAddressModel? address;
+  final String transportName;
+  final String contactNumber;
+
+  const ChallanBookedForModel({
+    this.id = 0,
+    this.partyName = '',
+    this.villageName = '',
+    this.address,
+    this.transportName = '',
+    this.contactNumber = '',
+  });
+
+  factory ChallanBookedForModel.fromJson(Map<String, dynamic> json) {
+    final dynamic address = json['address'];
+
+    return ChallanBookedForModel(
+      id: _asInt(json['id']),
+      partyName: json['party_name'] as String? ?? '',
+      villageName: json['village_name'] as String? ?? '',
+      address: address is Map
+          ? ChallanAddressModel.fromJson(Map<String, dynamic>.from(address))
+          : null,
+      transportName: json['transport_name'] as String? ?? '',
+      contactNumber: '${json['contact_number'] ?? ''}',
+    );
+  }
+
+  String get addressLine => address?.singleLine ?? '';
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse('$value') ?? 0;
+  }
+}
+
 class ChallanAgencyRef {
   final int id;
   final String name;
@@ -300,6 +345,7 @@ class DispatchChallanModel {
   final String orderPublicId;
   final ChallanCompanyModel? ourDetails;
   final ChallanReceiverModel? receiver;
+  final ChallanBookedForModel? bookedFor;
   final String hsnCode;
   final String financialYear;
   final ChallanDispatchModel? dispatch;
@@ -312,6 +358,7 @@ class DispatchChallanModel {
     this.orderPublicId = '',
     this.ourDetails,
     this.receiver,
+    this.bookedFor,
     this.hsnCode = '',
     this.financialYear = '',
     this.dispatch,
@@ -324,6 +371,7 @@ class DispatchChallanModel {
   factory DispatchChallanModel.fromJson(Map<String, dynamic> json) {
     final dynamic ourDetails = json['our_details'];
     final dynamic receiver = json['receiver_details'];
+    final dynamic bookedFor = json['booked_for'];
     final dynamic dispatch = json['dispatch'];
     final dynamic items = json['items'];
 
@@ -334,6 +382,9 @@ class DispatchChallanModel {
           : null,
       receiver: receiver is Map
           ? ChallanReceiverModel.fromJson(Map<String, dynamic>.from(receiver))
+          : null,
+      bookedFor: bookedFor is Map
+          ? ChallanBookedForModel.fromJson(Map<String, dynamic>.from(bookedFor))
           : null,
       hsnCode: '${json['hsn_code'] ?? ''}',
       financialYear: '${json['financial_year'] ?? ''}',
@@ -376,6 +427,46 @@ class DispatchChallanModel {
   String get contactSummary => receiver?.contactSummary ?? '';
 
   String get driverSummary => dispatch?.driverSummary ?? '';
+
+  /// The "Delivery To" name shown on the challan: the booked-for party when
+  /// the order was placed for someone else, else the consignee itself --
+  /// never both, so this is always one name, never a second block.
+  String get deliveryToName =>
+      bookedFor != null ? bookedFor!.partyName : receiverName;
+
+  String get deliveryToAddress =>
+      bookedFor != null ? bookedFor!.addressLine : receiverAddress;
+
+  String get deliveryToGst => bookedFor != null ? '' : receiverGst;
+
+  /// "Name - Number" for whichever contact applies to the delivery-to party.
+  String get deliveryToContact {
+    if (bookedFor == null) return contactSummary;
+    final String transport = bookedFor!.transportName.trim();
+    final String number = bookedFor!.contactNumber.trim();
+    if (transport.isEmpty) return number;
+    if (number.isEmpty) return transport;
+    return '$transport - $number';
+  }
+
+  /// The village the goods travel to -- the booked-for party's village when
+  /// set, else the dispatch's own destination city as before.
+  String get deliveryToPlace =>
+      bookedFor != null ? bookedFor!.villageName : (dispatch?.toCity ?? '');
+
+  /// "Parent (Child)" for a table row -- the client the order actually
+  /// belongs to stays visible even once a delivery-to party replaces every
+  /// other detail in the row, so the two are never confused for each other.
+  /// The challan document itself keeps its own plain [deliveryToName]; this
+  /// is for the list only.
+  String get deliveryToTableName {
+    if (bookedFor == null) return receiverName;
+    final String parent = receiverName.trim();
+    final String child = bookedFor!.partyName.trim();
+    if (parent.isEmpty) return child;
+    if (child.isEmpty) return parent;
+    return '$parent ($child)';
+  }
 
   static String _decimalOf(dynamic value) {
     if (value == null) return '';
