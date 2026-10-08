@@ -22,6 +22,7 @@ from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
 from .ExportFarmerVisitsView import ExportFarmerVisitsView
 from .ExportInventorySnapshotsView import ExportInventorySnapshotsView
 from .ExportInwardEntriesView import ExportInwardEntriesView
+from .ExportLabTestingsView import ExportLabTestingsView
 from .ExportOrdersView import ExportOrdersView
 from .FieldTripView import FieldTripView
 from .GetClientsView import GetClientsView
@@ -422,5 +423,10 @@ urlpatterns = [
         "export/inventory-snapshots",
         ExportInventorySnapshotsView.as_view(),
         name="export-inventory-snapshots",
+    ),
+    path(
+        "export/lab-testings",
+        ExportLabTestingsView.as_view(),
+        name="export-lab-testings",
     ),
 ]
