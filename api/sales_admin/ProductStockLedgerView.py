@@ -58,7 +58,7 @@ from api.export_views import EXPORT_QUERY_PARAMETERS, ExportDateRangeQuerySerial
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
 DAILY_BUILDS_PER_PRODUCT = 2
-CACHE_VERSION = 2  # bump to drop every cached window after a change to the row shape
+CACHE_VERSION = 3  # bump to drop every cached window after a change to the row shape
 
 
 def _cache_seconds(end_date: datetime.date) -> int:

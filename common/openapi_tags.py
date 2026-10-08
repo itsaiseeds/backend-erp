@@ -111,13 +111,14 @@ OPENAPI_TAGS: list[dict[str, str]] = [
 
 _ADMIN = "/api/sales-admin/"
 _ADMIN_UTILITIES = "/api/utilities/"
-_ANDROID = "/android/api/v1/"
+_ANDROID = "/android/api/v"  # + a version number; see ``_route``
 
 
 def _route(base: str, *segments: str) -> re.Pattern[str]:
     """Match ``base`` followed by any of ``segments`` as a whole path segment."""
     names = "|".join(re.escape(segment) for segment in segments)
-    return re.compile(rf"^{re.escape(base)}(?:{names})(?:/|$)")
+    version = r"\d+/" if base == _ANDROID else ""
+    return re.compile(rf"^{re.escape(base)}{version}(?:{names})(?:/|$)")
 
 
 # (path pattern, tags) -- checked in order, first match wins.

@@ -36,7 +36,7 @@ from .models import (
 from .models.ReturnOrder import LIVE_RETURN_STATUS_IDS
 from .NotificationOperations import NotificationEvent, notify_order_event
 from .ProductOperations import assert_products_usable, packaging_payload
-from .ReturnOrderOperations import order_return_payload
+from .ReturnOrderOperations import live_return_orders, order_return_payload, return_order_payload
 from .StockLedgerOperations import dispatch_detail, order_product_ids, recording
 
 if TYPE_CHECKING:
@@ -837,13 +837,15 @@ def order_detail_payload(order: Order) -> dict:
     :func:`ClientOperations.client_payload`, which is a superset, so the key is
     replaced wholesale rather than merged.
 
-    ``return_order`` is the order's live return (PENDING or ACCEPTED) in full,
-    or null; a REJECTED return is hidden.
+    ``return_orders`` are all the order's live returns (PENDING or ACCEPTED) in
+    full, newest first; a REJECTED return is hidden. ``return_order`` is the
+    newest of them, or null -- deprecated, kept for the current web UI.
     """
     return {
         **order_payload(order),
         "client": client_payload(order.client),
         "return_order": order_return_payload(order),
+        "return_orders": [return_order_payload(ret) for ret in live_return_orders(order)],
     }
 
 

@@ -404,6 +404,18 @@ EXPECTED_CONTRACTS = {
     "api/utilities/states": ("StatesView", SESSION_ADMIN),
 }
 
+# Every Android view is also served under each later version (android.api.routing),
+# with the same view class and permission -- unless a version overrides the class,
+# in which case it keeps its name (v2 ReturnOrderView). Derive those entries
+# instead of listing them twice.
+EXPECTED_CONTRACTS.update(
+    {
+        path.replace("android/api/v1/", "android/api/v2/", 1): contract
+        for path, contract in list(EXPECTED_CONTRACTS.items())
+        if path.startswith("android/api/v1/")
+    }
+)
+
 # Views that additionally demand a Django permission (``required_permission``),
 # on top of their role flags. Every other routed view must declare none.
 REQUIRED_PERMISSIONS = {
@@ -414,6 +426,7 @@ REQUIRED_PERMISSIONS = {
 # them. Anything else bypassing BaseApiView is a security regression.
 PRE_AUTH_VIEWS = {
     "android/api/v1/auth/login": "android.api.v1.LoginView.LoginView",
+    "android/api/v2/auth/login": "android.api.v1.LoginView.LoginView",
     "api/sales-admin/auth/otp/verify": "api.sales_admin.VerifyOTPView.VerifyOTPView",
 }
 

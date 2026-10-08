@@ -169,8 +169,9 @@ unnamed packagings are an explicit 0.
 
 - Only material types used by this product's recipes (live or deleted with layers)
   are shown.
-- **Rows listed:** this product's events, plus `INWARD_OPERATIONS` for those material
-  types even when booked against another product's recipe (detail names that product).
+- **Rows listed:** this product's events, plus `INWARD_OPERATIONS` and `RETURN_OPERATIONS`
+  for those material types even when booked against another product's recipe (detail
+  names that product).
 - Other products' packing of a shared material is **not** listed as a row. It shows up
   in the running `used_by_other_products`, so every row still reconciles:
   `incoming − packed − used_by_other_products = available`.
