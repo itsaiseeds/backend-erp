@@ -1443,11 +1443,11 @@ def update_raw_waste(
 #
 # Every packet also uses packing material -- leaflets, covers -- per the
 # product's ``OtherMaterialRecipe`` for its packet weight: ``recipe.quantity``
-# units of the material type per packet. The pool is the **material type**:
-# inward lots are booked against a recipe but any recipe of a type draws on
-# the same stock. Spent material is derived exactly like raw kilograms, from
-# the packets currently packed (latest bag and loose counts, plus what was
-# dispatched before them), valued at each product's *current* recipe.
+# units of the material type per packet. The pool is the **configuration**
+# ``(product, packet weight, material type)``: an inward lot is booked against
+# a recipe and only backs packets of that recipe's configuration. Spent
+# material is derived from the recipe layers of the packets currently packed,
+# each valued at the recipe frozen on it.
 
 
 def packed_packets(product: Product) -> dict[Decimal, int]:
@@ -1475,39 +1475,93 @@ def packed_packets(product: Product) -> dict[Decimal, int]:
     return packed
 
 
-def other_material_inward(
-    material_type_ids: Iterable[int] | None = None, as_of: date | None = None
-) -> dict[int, Decimal]:
-    """Units received per material type, over lots with a reached effective date.
+# A packing-material stock: material is printed for one product and one packet
+# size, so each ``(product, packet weight, material type)`` is its own pool.
+MaterialKey = tuple[int, Decimal, int]
 
-    Lots booked against a since-replaced recipe still count: the stock is the
-    material type's, whichever recipe version brought it in.
+
+def _narrow_keys(
+    query: models.QuerySet,
+    prefix: str,
+    keys: Iterable[MaterialKey] | None,
+    material_type_ids: Iterable[int] | None,
+) -> models.QuerySet:
+    """Narrow ``query`` to the products and material types of ``keys``.
+
+    A superset in SQL (products x types); callers drop the rest in Python.
+    ``prefix`` is the path from ``query``'s model to its recipe.
+    """
+    if keys is not None:
+        keys = list(keys)
+        query = query.filter(
+            **{
+                f"{prefix}product_id__in": {key[0] for key in keys},
+                f"{prefix}material_type_id__in": {key[2] for key in keys},
+            }
+        )
+    if material_type_ids is not None:
+        query = query.filter(
+            **{f"{prefix}material_type_id__in": list(material_type_ids)}
+        )
+    return query
+
+
+def _keyed_totals(
+    rows: Iterable[tuple[int, Decimal, int, Decimal]],
+    keys: Iterable[MaterialKey] | None,
+) -> dict[MaterialKey, Decimal]:
+    wanted = set(keys) if keys is not None else None
+    totals: dict[MaterialKey, Decimal] = {}
+    for product_id, weight, material_type_id, total in rows:
+        key = (product_id, Decimal(weight), material_type_id)
+        if wanted is None or key in wanted:
+            totals[key] = total
+    return totals
+
+
+def other_material_inward(
+    keys: Iterable[MaterialKey] | None = None,
+    as_of: date | None = None,
+    *,
+    material_type_ids: Iterable[int] | None = None,
+) -> dict[MaterialKey, Decimal]:
+    """Units received per configuration, over lots with a reached effective date.
+
+    The configuration is read from the lot's recipe. Lots booked against a
+    since-replaced (soft-deleted) recipe still count toward the same
+    configuration, whichever recipe version brought the stock in.
     """
     as_of = as_of or today()
     query = InwardOtherMaterial.objects.filter(
         effective_date__isnull=False, effective_date__lte=as_of
     )
-    if material_type_ids is not None:
-        query = query.filter(recipe__material_type_id__in=list(material_type_ids))
-    rows = query.values("recipe__material_type_id").annotate(total=Sum("quantity"))
-    return {row["recipe__material_type_id"]: row["total"] for row in rows}
+    query = _narrow_keys(query, "recipe__", keys, material_type_ids)
+    rows = (
+        query.values("recipe__product_id", "recipe__packet_weight", "recipe__material_type_id")
+        .annotate(total=Sum("quantity"))
+        .values_list(
+            "recipe__product_id", "recipe__packet_weight", "recipe__material_type_id", "total"
+        )
+    )
+    return _keyed_totals(rows, keys)
 
 
 def other_material_used(
-    material_type_ids: Iterable[int] | None = None,
+    keys: Iterable[MaterialKey] | None = None,
     *,
     product: Product | None = None,
-) -> dict[int, Decimal]:
-    """Units per material type spent on the packets currently packed.
+    material_type_ids: Iterable[int] | None = None,
+) -> dict[MaterialKey, Decimal]:
+    """Units per configuration spent on the packets currently packed.
 
     Read from the recipe layers of the latest bag and loose count rows: each
     layer charges ``recipe.quantity`` per packet it holds, at the recipe that was
-    live when those packets were packed. A NULL-recipe layer spends nothing.
-    ``product`` narrows it to one product's own usage.
+    live when those packets were packed, to that recipe's configuration. A
+    NULL-recipe layer spends nothing. ``product`` narrows it to one product's
+    own usage.
     """
     layers = PackedRecipeLayer.objects.filter(recipe__isnull=False)
-    if material_type_ids is not None:
-        layers = layers.filter(material_type_id__in=list(material_type_ids))
+    layers = _narrow_keys(layers, "recipe__", keys, material_type_ids)
     bag_date = latest_snapshot_date()
     loose_snapshot_date = latest_loose_snapshot_date()
     bag_rows = Q(
@@ -1527,33 +1581,69 @@ def other_material_used(
         loose_rows = Q(pk__in=[])
     rows = (
         layers.filter(bag_rows | loose_rows)
-        .values("material_type_id")
+        .values(
+            "recipe__product_id", "recipe__packet_weight", "recipe__material_type_id"
+        )
         .annotate(total=Sum(F("recipe__quantity") * F("packets")))
+        .values_list(
+            "recipe__product_id", "recipe__packet_weight", "recipe__material_type_id", "total"
+        )
     )
-    return {row["material_type_id"]: row["total"] for row in rows}
+    return _keyed_totals(rows, keys)
 
 
-def other_material_available(material_type_ids: Iterable[int]) -> dict[int, Decimal]:
-    """``inward - used`` for each of ``material_type_ids``."""
-    material_type_ids = list(material_type_ids)
-    inward = other_material_inward(material_type_ids)
-    used = other_material_used(material_type_ids)
+def other_material_available(keys: Iterable[MaterialKey]) -> dict[MaterialKey, Decimal]:
+    """``inward - used`` for each of ``keys``."""
+    keys = list(keys)
+    inward = other_material_inward(keys)
+    used = other_material_used(keys)
     return {
-        material_type_id: inward.get(material_type_id, Decimal("0"))
-        - used.get(material_type_id, Decimal("0"))
-        for material_type_id in material_type_ids
+        key: inward.get(key, Decimal("0")) - used.get(key, Decimal("0"))
+        for key in keys
     }
+
+
+def material_keys(product_ids: Iterable[int]) -> set[MaterialKey]:
+    """Every configuration of ``product_ids``, deleted recipes included."""
+    return {
+        (recipe.product_id, Decimal(recipe.packet_weight), recipe.material_type_id)
+        for recipe in OtherMaterialRecipe.all_objects.filter(
+            product_id__in=list(product_ids)
+        )
+    }
+
+
+def material_label(
+    key: MaterialKey,
+    products: Mapping[int, Product],
+    materials: Mapping[int, OtherMaterialType],
+) -> str:
+    """``'cover' for 'P' 1.500kg``: names the configuration in an error."""
+    product_id, weight, material_type_id = key
+    return (
+        f"'{materials[material_type_id].name}' for "
+        f"'{products[product_id].name}' {Decimal(weight):.3f}kg"
+    )
+
+
+def _material_labels(keys: Iterable[MaterialKey]) -> dict[MaterialKey, str]:
+    keys = list(keys)
+    products = Product.all_objects.in_bulk({key[0] for key in keys})
+    materials = OtherMaterialType.all_objects.in_bulk({key[2] for key in keys})
+    return {key: material_label(key, products, materials) for key in keys}
 
 
 def _lock_materials(product_ids, material_type_ids: Iterable[int] = ()) -> list[int]:
     """Lock the material types ``product_ids``' recipes use, plus ``material_type_ids``.
 
-    Rows are locked in pk order, so two writers sharing a material cannot both
-    spend its last units. Returns the locked ids.
+    Locks stay per material type, coarser than the per-configuration figures but
+    correct. Rows are locked in pk order, so two writers sharing a material
+    cannot both spend its last units. Deleted recipes count: their lots and
+    layers still charge their configuration. Returns the locked ids.
     """
     locked = sorted(
         set(
-            OtherMaterialRecipe.objects.filter(product_id__in=product_ids).values_list(
+            OtherMaterialRecipe.all_objects.filter(product_id__in=product_ids).values_list(
                 "material_type_id", flat=True
             )
         )
@@ -1568,13 +1658,16 @@ def _lock_materials(product_ids, material_type_ids: Iterable[int] = ()) -> list[
     return locked
 
 
-def _material_guard(product_ids) -> dict[int, Decimal]:
+def _material_guard(product_ids) -> dict[MaterialKey, Decimal]:
     """Lock the packing materials ``product_ids`` use; return their availability.
 
-    Called before a count write, inside its transaction. The returned figures
-    are what :func:`_assert_material_available` compares the write against.
+    Called before a count write, inside its transaction. The returned figures,
+    one per configuration, are what :func:`_assert_material_available` compares
+    the write against.
     """
-    return other_material_available(_lock_materials(product_ids))
+    product_ids = list(product_ids)
+    _lock_materials(product_ids)
+    return other_material_available(material_keys(product_ids))
 
 
 def guard_stock_deletion(
@@ -1583,7 +1676,7 @@ def guard_stock_deletion(
     product_ids: Iterable[int] = (),
     packagings: Iterable[ProductPackaging] = (),
     loose_pools: Iterable[tuple[Product, Decimal]] = (),
-    material_type_ids: Iterable[int] = (),
+    extra_material_keys: Iterable[MaterialKey] = (),
     ledger: tuple[StockEventType, StockEventDetail, models.Model] | None = None,
 ) -> None:
     """Run ``perform`` -- soft-deleting a count line or an inward lot -- or refuse it.
@@ -1604,7 +1697,7 @@ def guard_stock_deletion(
             product_ids=product_ids,
             packagings=packagings,
             loose_pools=loose_pools,
-            material_type_ids=material_type_ids,
+            extra_material_keys=extra_material_keys,
         )
         return
     event_type, detail, source = ledger
@@ -1624,7 +1717,7 @@ def guard_stock_deletion(
             product_ids=product_ids,
             packagings=packagings,
             loose_pools=loose_pools,
-            material_type_ids=material_type_ids,
+            extra_material_keys=extra_material_keys,
         )
         rec.actor = getattr(source, "deleted_by", None)
 
@@ -1635,14 +1728,14 @@ def _guard_stock_deletion(
     product_ids: Iterable[int] = (),
     packagings: Iterable[ProductPackaging] = (),
     loose_pools: Iterable[tuple[Product, Decimal]] = (),
-    material_type_ids: Iterable[int] = (),
+    extra_material_keys: Iterable[MaterialKey] = (),
 ) -> None:
     """Run ``perform`` -- soft-deleting a count line or an inward lot -- or refuse it.
 
     Every stock figure the deletion can move is read before and after it:
     available bags of ``packagings``, available loose packets of
-    ``loose_pools``, raw kilograms of ``product_ids``, and every packing
-    material those products use plus ``material_type_ids``. The deletion is
+    ``loose_pools``, raw kilograms of ``product_ids``, and every packing-material
+    configuration those products have plus ``extra_material_keys``. The deletion is
     refused -- ``ValidationError``, which also rolls ``perform`` back -- when a
     figure ends up negative *and* lower than before. A figure that was already
     negative and does not move does not block it, the same rule the count
@@ -1662,10 +1755,14 @@ def _guard_stock_deletion(
     lock_raw_pools(product_ids)
     lock_bag_pools(packagings)
     lock_loose_pools(product.id for product, _ in loose_pools)
-    material_ids = _lock_materials(product_ids, material_type_ids)
-    materials = {
-        material.id: material
-        for material in OtherMaterialType.all_objects.filter(id__in=material_ids)
+    watched = material_keys(product_ids) | set(extra_material_keys)
+    _lock_materials(product_ids, {key[2] for key in watched})
+    labels = _material_labels(watched)
+    units = {
+        material.id: material.unit_type
+        for material in OtherMaterialType.all_objects.filter(
+            id__in={key[2] for key in watched}
+        )
     }
 
     def figures() -> dict[str, tuple[Decimal, str]]:
@@ -1680,9 +1777,8 @@ def _guard_stock_deletion(
             )
         for product in Product.all_objects.filter(id__in=product_ids):
             current[f"raw material of '{product.name}'"] = (raw_available_kg(product), "kg")
-        for material_id, available in other_material_available(material_ids).items():
-            material = materials[material_id]
-            current[f"'{material.name}'"] = (available, material.unit_type)
+        for key, available in other_material_available(watched).items():
+            current[labels[key]] = (available, units[key[2]])
         return current
 
     before = figures()
@@ -1697,32 +1793,33 @@ def _guard_stock_deletion(
         raise ValidationError(f"This deletion would leave {'; '.join(short)}.")
 
 
-def _assert_material_available(before: Mapping[int, Decimal]) -> None:
+def _assert_material_available(before: Mapping[MaterialKey, Decimal]) -> None:
     """Raise if the count just written took a packing material below zero.
 
-    Only a write that *spends more* of a material and leaves it negative is
-    refused. A material already short before this write -- inward entries
-    lagging behind the counts -- does not block a count that uses no more of
-    it, so lowering a count is never refused. Same ``ValueError`` convention
-    as ``_assert_raw_available``: the whole write rolls back and the view
-    answers 400.
+    Only a write that *spends more* of a configuration's material and leaves it
+    negative is refused. A configuration already short before this write --
+    inward entries lagging behind the counts -- does not block a count that uses
+    no more of it, so lowering a count is never refused. Same ``ValueError``
+    convention as ``_assert_raw_available``: the whole write rolls back and the
+    view answers 400.
     """
     after = other_material_available(before)
     short = [
-        material_type_id
-        for material_type_id, available in after.items()
-        if available < 0 and available < before[material_type_id]
+        key
+        for key, available in after.items()
+        if available < 0 and available < before[key]
     ]
     if not short:
         return
-    names = {
-        material.id: material
-        for material in OtherMaterialType.all_objects.filter(id__in=short)
+    labels = _material_labels(short)
+    units = {
+        material.id: material.unit_type
+        for material in OtherMaterialType.all_objects.filter(
+            id__in={key[2] for key in short}
+        )
     }
     details = "; ".join(
-        f"'{names[material_type_id].name}' short by "
-        f"{-after[material_type_id]} {names[material_type_id].unit_type}"
-        for material_type_id in short
+        f"{labels[key]} short by {-after[key]} {units[key[2]]}" for key in short
     )
     raise ValueError(f"Not enough packing material: {details}.")
 

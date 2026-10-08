@@ -1,8 +1,9 @@
 """Shared fixture world for the product stock ledger tests.
 
 Two products (``P`` and ``Q``) that both pack with the same material type
-(``pouch``), a party, a client with an address, and helpers that drive every
-write through the real operations layer -- which is what records the ledger.
+(``pouch``), each its own configuration, a party, a client with an address, and
+helpers that drive every write through the real operations layer -- which is what
+records the ledger.
 """
 
 from __future__ import annotations
@@ -93,10 +94,19 @@ class LedgerWorldTestCase(DMLTestCase):
         return book_raw_material(product, Decimal(kg), actor=self.su)
 
     def pouches(self, quantity, recipe=None):
-        return InwardOperations.create_other_lot(
-            party=self.party, recipe=recipe or self.recipe_p,
-            quantity=Decimal(quantity), actor=self.su,
-        )
+        """A lot against ``recipe``; by default one for each product's configuration.
+
+        Packing material is stocked per ``(product, weight, type)``, so a lot only
+        backs its own recipe's packets. Returns the lot of the last recipe booked.
+        """
+        recipes = [recipe] if recipe else [self.recipe_p, self.recipe_q]
+        lots = [
+            InwardOperations.create_other_lot(
+                party=self.party, recipe=each, quantity=Decimal(quantity), actor=self.su,
+            )
+            for each in recipes
+        ]
+        return lots[0]
 
     def count_bags(self, counts: dict[ProductPackaging, int], *, day=None, **kwargs):
         """A bag count of exactly ``counts``; every other packaging stays unnamed."""

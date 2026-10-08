@@ -1958,7 +1958,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_stockeventline (
 		(pool_kind = 1 AND product_packaging_id IS NOT NULL AND packet_weight IS NULL AND material_type_id IS NULL)
 		OR (pool_kind = 2 AND product_packaging_id IS NULL AND packet_weight IS NOT NULL AND material_type_id IS NULL)
 		OR (pool_kind = 3 AND product_packaging_id IS NULL AND packet_weight IS NULL AND material_type_id IS NULL)
-		OR (pool_kind = 4 AND product_packaging_id IS NULL AND packet_weight IS NULL AND material_type_id IS NOT NULL)
+		OR (pool_kind = 4 AND product_packaging_id IS NULL AND packet_weight IS NOT NULL AND material_type_id IS NOT NULL)
 	)
 );
 CREATE INDEX IF NOT EXISTS ix_stock_event_line_event ON public.aggregator_stockeventline USING btree (event_id);

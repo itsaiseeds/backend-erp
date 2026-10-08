@@ -169,11 +169,11 @@ class LedgerMaterialTypeSerializer(serializers.Serializer):
 class LedgerOtherChangeSerializer(serializers.Serializer):
     incoming = serializers.CharField()
     packed = serializers.CharField()
-    used_by_other_products = serializers.CharField()
     available = serializers.CharField()
 
 
 class LedgerOtherMaterialSerializer(LedgerOtherChangeSerializer):
+    packet_weight = serializers.CharField()
     material_type = LedgerMaterialTypeSerializer()
     change = LedgerOtherChangeSerializer()
 

@@ -621,7 +621,12 @@ def revert_accept_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
     product_ids = set(raw_lots.values_list("product_id", flat=True)) | set(
         other_lots.values_list("recipe__product_id", flat=True)
     )
-    material_type_ids = set(other_lots.values_list("recipe__material_type_id", flat=True))
+    material_keys = {
+        (product_id, Decimal(weight), material_type_id)
+        for product_id, weight, material_type_id in other_lots.values_list(
+            "recipe__product_id", "recipe__packet_weight", "recipe__material_type_id"
+        )
+    }
 
     with recording(
         StockEventType.RETURN_OPERATIONS,
@@ -652,7 +657,7 @@ def revert_accept_return_order(ret: ReturnOrder, *, admin: User) -> ReturnOrder:
             other_lots.update(**removal)
 
         InventoryOperations.guard_stock_deletion(
-            perform, product_ids=product_ids, material_type_ids=material_type_ids
+            perform, product_ids=product_ids, extra_material_keys=material_keys
         )
 
         ret.status = Status.by_id(StatusIds.RETURN_PENDING)
