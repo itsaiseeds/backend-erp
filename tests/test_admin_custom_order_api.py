@@ -433,6 +433,7 @@ class SalesAdminCustomOrderApiTest(WebApiTestCase):
                     "packet_weight": "0.500",
                     "negotiated_selling_price": "50.00",
                     "packets": 6,
+                    "quantity_kg": None,
                     "line_total": "300.00",
                 }
             ],
@@ -687,6 +688,7 @@ class SalesAdminCustomOrderApiTest(WebApiTestCase):
                     "product": {"public_id": self.cotton.public_id, "name": "Loose Cotton"},
                     "packet_weight": "0.500",
                     "packets": 4,
+                    "quantity_kg": None,
                     "lot_number": "LOT-500G",
                     "negotiated_selling_price": "50.00",
                     "line_total": "200.00",
@@ -695,6 +697,7 @@ class SalesAdminCustomOrderApiTest(WebApiTestCase):
                     "product": {"public_id": self.cotton.public_id, "name": "Loose Cotton"},
                     "packet_weight": "1.000",
                     "packets": 10,
+                    "quantity_kg": None,
                     "lot_number": "LOT-1KG",
                     "negotiated_selling_price": "100.00",
                     "line_total": "1000.00",

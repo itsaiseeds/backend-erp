@@ -19,6 +19,13 @@ from .Order import (
 from .Status import StatusIds
 
 
+class OrderUnit(models.TextChoices):
+    """Unit a custom order's lines are counted in."""
+
+    PACKET = "packet", "packet"
+    KG = "kg", "kg"
+
+
 class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel):
     """A loose-packet order, made up of one or more ``CustomOrderItem`` rows.
 
@@ -101,6 +108,21 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         help_text="Sales admin who verified this custom order.",
     )
     verified_at = models.DateTimeField("verified at", null=True, blank=True)
+    made_from_waste = models.BooleanField(
+        "made from waste",
+        default=False,
+        help_text=(
+            "A waste order: its lines are kilograms drawn from the products' "
+            "waste pool (``RawMaterialWaste``) instead of loose packets."
+        ),
+    )
+    unit_of_measure = models.CharField(
+        "unit of measure",
+        max_length=8,
+        choices=OrderUnit.choices,
+        default=OrderUnit.PACKET,
+        help_text="``kg`` on a waste order, ``packet`` on every other custom order.",
+    )
 
     class Meta:
         verbose_name = "custom order"
@@ -113,6 +135,13 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
                     private_dispatch_details__isnull=False,
                 ),
                 name="ck_customorder_not_both_dispatch_details",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(made_from_waste=True, unit_of_measure="kg")
+                    | models.Q(made_from_waste=False, unit_of_measure="packet")
+                ),
+                name="ck_customorder_waste_unit",
             ),
         ]
 
@@ -130,8 +159,13 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
 
     @property
     def total_packets(self):
-        """Total loose packets across all lines (lines are already counted in packets)."""
-        return sum((item.packets for item in self.items.all()), 0)
+        """Total loose packets across all lines (0 on a waste order, which counts kg)."""
+        return sum((item.packets or 0 for item in self.items.all()), 0)
+
+    @property
+    def total_kg(self):
+        """Total kilograms across a waste order's lines (0 on a packet order)."""
+        return sum((item.quantity_kg or 0 for item in self.items.all()), 0)
 
     @property
     def is_verified(self):
@@ -155,6 +189,12 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
 
         if self.status_id and self.status.code not in ORDER_STATUS_CODES:
             errors["status"] = "Invalid status for a custom order."
+
+        expected_unit = OrderUnit.KG if self.made_from_waste else OrderUnit.PACKET
+        if self.unit_of_measure != expected_unit:
+            errors["unit_of_measure"] = (
+                "A waste order is counted in kg and every other custom order in packets."
+            )
 
         if (
             self.status_id

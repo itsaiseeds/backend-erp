@@ -1,3 +1,5 @@
+from decimal import ROUND_HALF_UP, Decimal
+
 from django.db import models
 
 from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
@@ -9,7 +11,9 @@ class DispatchEntryItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
     Either a **bag** line, copied from an ``OrderItem`` (``product_packaging``
     set, ``quantity`` in bags, price per bag), or a **loose** line, copied from
     a ``CustomOrderItem`` (``product`` + ``packet_weight`` set, ``quantity`` in
-    packets, price per packet). Exactly one of the two shapes
+    packets, price per packet), or a **waste** line, copied from a waste order's
+    kg line (``product`` + ``quantity_kg`` set, no ``packet_weight`` or
+    ``quantity``, price per kg). Exactly one of the three shapes
     (``ck_dispatchentryitem_one_kind``).
 
     The packaging and the negotiated price are copied from the order line
@@ -74,12 +78,28 @@ class DispatchEntryItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         ),
     )
     quantity = models.PositiveIntegerField(
-        "quantity", help_text="Bags on a bag line, packets on a loose line."
+        "quantity",
+        null=True,
+        blank=True,
+        help_text="Bags on a bag line, packets on a loose line. Null on a waste line.",
+    )
+    quantity_kg = models.DecimalField(
+        "quantity kg",
+        max_digits=10,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text="Kilograms on a waste line. Null on a bag or loose line.",
     )
     lot_number = models.CharField(
         "lot number",
         max_length=64,
-        help_text="The production batch these bags came from.",
+        blank=True,
+        default="",
+        help_text=(
+            "The production batch these bags came from. May be blank on a "
+            "waste line."
+        ),
     )
 
     class Meta:
@@ -95,9 +115,30 @@ class DispatchEntryItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
                 fields=["dispatch_entry", "product", "packet_weight"],
                 name="uniq_dispatchentryitem_entry_product_weight",
             ),
+            models.UniqueConstraint(
+                fields=["dispatch_entry", "product"],
+                condition=models.Q(packet_weight__isnull=True, product__isnull=False),
+                name="uniq_dispatchentryitem_entry_product_kg",
+            ),
             models.CheckConstraint(
-                condition=models.Q(negotiated_selling_price__gte=0) & models.Q(quantity__gt=0),
+                condition=(
+                    models.Q(negotiated_selling_price__gte=0)
+                    & (models.Q(quantity__isnull=True) | models.Q(quantity__gt=0))
+                    & (models.Q(quantity_kg__isnull=True) | models.Q(quantity_kg__gt=0))
+                ),
                 name="ck_dispatchentryitem_positive",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(quantity__isnull=False, quantity_kg__isnull=True)
+                    | models.Q(
+                        quantity__isnull=True,
+                        quantity_kg__isnull=False,
+                        product_packaging__isnull=True,
+                        packet_weight__isnull=True,
+                    )
+                ),
+                name="ck_dispatchentryitem_one_quantity",
             ),
             models.CheckConstraint(
                 condition=(
@@ -111,6 +152,11 @@ class DispatchEntryItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
                         product__isnull=False,
                         packet_weight__isnull=False,
                     )
+                    | models.Q(
+                        product_packaging__isnull=True,
+                        product__isnull=False,
+                        packet_weight__isnull=True,
+                    )
                 ),
                 name="ck_dispatchentryitem_one_kind",
             ),
@@ -119,6 +165,8 @@ class DispatchEntryItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
     def __str__(self):
         if self.product_packaging_id:
             return f"{self.quantity} × {self.product_packaging} (lot {self.lot_number})"
+        if self.product_id and self.quantity_kg is not None:
+            return f"{self.quantity_kg}kg {self.product.name} (lot {self.lot_number or '-'})"
         if self.product_id:
             return (
                 f"{self.quantity} × {self.packet_weight}kg {self.product.name} "
@@ -131,8 +179,13 @@ class DispatchEntryItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         """Packets on this line: bags x packets per bag, or the loose count itself."""
         if self.product_packaging_id:
             return self.quantity * self.product_packaging.packets
-        return self.quantity
+        return self.quantity or 0
 
     @property
     def line_total(self):
+        """Price x kg on a waste line (rounded to paise), price x quantity otherwise."""
+        if self.quantity_kg is not None:
+            return (self.negotiated_selling_price * self.quantity_kg).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
         return self.negotiated_selling_price * self.quantity

@@ -238,10 +238,17 @@ class CustomChallanLineSerializer(serializers.Serializer):
     """Output shape for one custom-order challan line: loose packets, a lot, money."""
 
     product = ProductRefSerializer()
-    packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
-    packets = serializers.IntegerField()
-    lot_number = serializers.CharField()
-    negotiated_selling_price = serializers.CharField(help_text="Per packet.")
+    packet_weight = serializers.CharField(
+        allow_null=True, help_text="Weight of one packet, in kg. Null on a waste order's kg line."
+    )
+    packets = serializers.IntegerField(allow_null=True, help_text="Null on a kg line.")
+    quantity_kg = serializers.CharField(
+        allow_null=True, help_text="Kilograms on a waste order's line. Null on a packet line."
+    )
+    lot_number = serializers.CharField(allow_blank=True, help_text="Blank on a waste line.")
+    negotiated_selling_price = serializers.CharField(
+        help_text="Per packet, or per kg on a waste order's line."
+    )
     line_total = serializers.CharField()
 
 
@@ -249,7 +256,8 @@ class CustomDispatchChallanItemSerializer(serializers.Serializer):
     """Output shape for one custom order's challan (schema only)."""
 
     order_public_id = serializers.CharField(help_text="The custom order's CORD-… id.")
-    order_type = serializers.ChoiceField(choices=["CUSTOM_ORDER"])
+    order_type = serializers.ChoiceField(choices=["CUSTOM_ORDER", "WASTE_ORDER"])
+    unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
     our_details = ChallanPartySerializer()
     receiver_details = ChallanReceiverSerializer()
     booked_for = ChildOrgPayloadSerializer(allow_null=True)
@@ -257,6 +265,7 @@ class CustomDispatchChallanItemSerializer(serializers.Serializer):
     financial_year = serializers.CharField(help_text='Indian FY, e.g. "2026-2027".')
     dispatch = ChallanDispatchSerializer()
     items = CustomChallanLineSerializer(many=True)
+    total_kg = serializers.CharField(help_text="Kilograms on a waste order; 0 on a custom order.")
     item_count = serializers.IntegerField()
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()

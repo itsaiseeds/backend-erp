@@ -194,6 +194,10 @@ class CreateCustomOrderSerializer(serializers.Serializer):
     def validate_items(self, value: list[dict]) -> list[dict]:
         return validate_custom_order_item_list(value)
 
+    def resolve_items(self, items: list[dict]) -> list[dict]:
+        """Turn the submitted lines into the operations' shape (overridden for waste orders)."""
+        return resolve_custom_order_items(items)
+
     def validate(self, attrs: dict) -> dict:
         client = (
             Client.objects.filter(public_id=attrs["client_public_id"])
@@ -231,7 +235,7 @@ class CreateCustomOrderSerializer(serializers.Serializer):
 
         attrs["client"] = client
         attrs["delivery_address"] = address_link.address
-        attrs["resolved_items"] = resolve_custom_order_items(attrs["items"])
+        attrs["resolved_items"] = self.resolve_items(attrs["items"])
         return attrs
 
 
