@@ -261,6 +261,16 @@ EXPECTED_CONTRACTS = {
         "RevertCustomOrderDispatchView",
         SESSION_ADMIN,
     ),
+    "api/sales-admin/waste-orders/": ("GetWasteOrdersView", SESSION_ADMIN),
+    "api/sales-admin/create-waste-order": ("CreateWasteOrderView", SESSION_ADMIN),
+    "api/sales-admin/edit-waste-order/<str:public_id>": (
+        "UpdateWasteOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/dispatch-waste-order/<str:public_id>": (
+        "DispatchWasteOrderView",
+        SESSION_ADMIN,
+    ),
     "api/sales-admin/get-clients/": ("GetClientsView", SESSION_ADMIN),
     "api/sales-admin/dispatch-order/<str:public_id>": ("DispatchOrderView", SESSION_ADMIN),
     "api/sales-admin/dispatch-challans/": ("GetDispatchChallansView", SESSION_ADMIN),

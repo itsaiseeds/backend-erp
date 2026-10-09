@@ -5336,6 +5336,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomOrderDetailPayload'
           description: ''
+  /api/sales-admin/create-waste-order:
+    post:
+      operationId: api_sales_admin_create_waste_order_create
+      description: Book a waste order for any verified client (app admin only).
+      summary: Book a waste order (kg, drawn from the waste pool)
+      tags:
+      - Admin · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWasteOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateWasteOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateWasteOrderRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
+          description: ''
   /api/sales-admin/crops:
     get:
       operationId: api_sales_admin_crops_list
@@ -5727,6 +5755,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
           description: ''
+  /api/sales-admin/dispatch-waste-order/{public_id}:
+    post:
+      operationId: api_sales_admin_dispatch_waste_order_create
+      description: Record an own-vehicle dispatch against a CONFIRMED waste order
+        (app admin only).
+      summary: Dispatch a waste order (always own vehicle)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Dispatch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispatchWasteOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DispatchWasteOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DispatchWasteOrderRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
+          description: ''
   /api/sales-admin/edit-custom-order/{public_id}:
     patch:
       operationId: api_sales_admin_edit_custom_order_partial_update
@@ -5862,6 +5926,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReturnOrderPayload'
+          description: ''
+  /api/sales-admin/edit-waste-order/{public_id}:
+    patch:
+      operationId: api_sales_admin_edit_waste_order_partial_update
+      description: Update a waste order, including its kg lines (app admin only).
+      summary: Update a waste order (including its items)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateWasteOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateWasteOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateWasteOrderRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
           description: ''
   /api/sales-admin/export/custom-orders:
     get:
@@ -8852,6 +8950,84 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderDetailPayload'
           description: ''
+  /api/sales-admin/waste-orders/:
+    get:
+      operationId: sales_admin_get_waste_orders_list
+      description: 'List every waste order: filter by admin / client / product / city
+        / status.'
+      summary: List waste orders (filter by sales admin / client / product / city
+        / status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the custom order is delivered to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client id(s) the custom order was booked for (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: created_by
+        schema:
+          type: string
+        description: User id(s) of the sales admin who booked the custom order (see
+          options). Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product id(s) the custom order contains (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (CORD-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, price); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Order lifecycle status. Comma-separated (any match); AND-ed with
+          the other filters.
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderListPage'
+          description: ''
   /api/test-sentry/:
     get:
       operationId: api_test_sentry_retrieve
@@ -10781,6 +10957,40 @@ components:
       - city
       - name
       - phone_number
+    CreateWasteOrderRequest:
+      type: object
+      description: Request validation for booking a waste order (kg lines, price per
+        kg required).
+      properties:
+        client_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id belonging to the client.
+        special_comments:
+          type: string
+          default: ''
+        expected_delivery_date:
+          type: string
+          format: date
+          nullable: true
+          description: Defaults to the day after booking.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WasteOrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: 'Optional child org the order is booked for: {id} to reuse
+            one, or {party_name, village_name, ...} to get-or-create it.'
+      required:
+      - client_address_id
+      - client_public_id
+      - items
     CropPayload:
       type: object
       description: Output shape for one crop row.
@@ -10812,14 +11022,22 @@ components:
           $ref: '#/components/schemas/ProductRef'
         packet_weight:
           type: string
-          description: Weight of one packet, in kg.
+          nullable: true
+          description: Weight of one packet, in kg. Null on a waste order's kg line.
         packets:
           type: integer
+          nullable: true
+          description: Null on a kg line.
+        quantity_kg:
+          type: string
+          nullable: true
+          description: Kilograms on a waste order's line. Null on a packet line.
         lot_number:
           type: string
+          description: Blank on a waste line.
         negotiated_selling_price:
           type: string
-          description: Per packet.
+          description: Per packet, or per kg on a waste order's line.
         line_total:
           type: string
       required:
@@ -10829,6 +11047,7 @@ components:
       - packet_weight
       - packets
       - product
+      - quantity_kg
     CustomDispatchChallanItem:
       type: object
       description: Output shape for one custom order's challan (schema only).
@@ -10838,6 +11057,8 @@ components:
           description: The custom order's CORD-… id.
         order_type:
           $ref: '#/components/schemas/OrderTypeEnum'
+        unit_of_measure:
+          $ref: '#/components/schemas/UnitOfMeasureEnum'
         our_details:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
@@ -10857,6 +11078,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CustomChallanLine'
+        total_kg:
+          type: string
+          description: Kilograms on a waste order; 0 on a custom order.
         item_count:
           type: integer
         total_amount:
@@ -10875,7 +11099,9 @@ components:
       - our_details
       - receiver_details
       - total_amount
+      - total_kg
       - total_packets
+      - unit_of_measure
     CustomDispatchItemLotRequest:
       type: object
       description: The lot number for one loose line of the custom order being dispatched.
@@ -10904,17 +11130,25 @@ components:
           $ref: '#/components/schemas/OrderCardProduct'
         packet_weight:
           type: string
-          description: Weight of one packet, in kg.
+          nullable: true
+          description: Weight of one packet, in kg. Null on a kg line.
         negotiated_selling_price:
           type: string
-          description: Per packet.
+          description: Per packet, or per kg on a waste order's line.
         packets:
           type: integer
+          nullable: true
+          description: Null on a kg line.
+        quantity_kg:
+          type: string
+          nullable: true
+          description: Kilograms on a waste order's line. Null on a packet line.
       required:
       - negotiated_selling_price
       - packet_weight
       - packets
       - product
+      - quantity_kg
     CustomOrderDetailPayload:
       type: object
       description: |-
@@ -10949,10 +11183,18 @@ components:
           type: string
           format: date-time
           nullable: true
+        made_from_waste:
+          type: boolean
+        unit_of_measure:
+          $ref: '#/components/schemas/UnitOfMeasureEnum'
         total_amount:
           type: string
         total_packets:
           type: integer
+          description: 0 on a waste order.
+        total_kg:
+          type: string
+          description: 0 on a packet order.
         items:
           type: array
           items:
@@ -10964,26 +11206,37 @@ components:
       - delivery_address
       - expected_delivery_date
       - items
+      - made_from_waste
       - public_id
       - special_comments
       - status
       - total_amount
+      - total_kg
       - total_packets
+      - unit_of_measure
       - verified_at
     CustomOrderItemPayload:
       type: object
-      description: Output shape for one loose-packet line of a custom order.
+      description: 'Output shape for one line of a custom order: loose packets, or
+        kg on a waste order.'
       properties:
         product:
           $ref: '#/components/schemas/ProductRef'
         packet_weight:
           type: string
-          description: Weight of one packet, in kg.
+          nullable: true
+          description: Weight of one packet, in kg. Null on a waste order's kg line.
         negotiated_selling_price:
           type: string
-          description: Per packet.
+          description: Per packet, or per kg on a waste order's line.
         packets:
           type: integer
+          nullable: true
+          description: Null on a kg line.
+        quantity_kg:
+          type: string
+          nullable: true
+          description: Kilograms on a waste order's line. Null on a packet line.
         line_total:
           type: string
       required:
@@ -10992,6 +11245,7 @@ components:
       - packet_weight
       - packets
       - product
+      - quantity_kg
     CustomOrderItemWriteRequest:
       type: object
       description: 'One line of a custom order: loose packets of one product at one
@@ -11082,10 +11336,18 @@ components:
           allOf:
           - $ref: '#/components/schemas/ChildOrgSummary'
           nullable: true
+        made_from_waste:
+          type: boolean
+        unit_of_measure:
+          $ref: '#/components/schemas/UnitOfMeasureEnum'
         total_amount:
           type: string
         total_packets:
           type: integer
+          description: 0 on a waste order.
+        total_kg:
+          type: string
+          description: 0 on a packet order.
         item_count:
           type: integer
         items:
@@ -11103,10 +11365,13 @@ components:
       - expected_delivery_date
       - item_count
       - items
+      - made_from_waste
       - public_id
       - status
       - total_amount
+      - total_kg
       - total_packets
+      - unit_of_measure
       - verified_by
     CustomOrderListPage:
       type: object
@@ -11364,6 +11629,37 @@ components:
       required:
       - from_city_id
       - items
+    DispatchWasteOrderRequest:
+      type: object
+      description: '``dispatch-order``''s request, with the driver and vehicle required
+        and optional lots.'
+      properties:
+        from_city_id:
+          type: integer
+          description: Where the goods left from. An input until a warehouse can default
+            it.
+        driver_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        driver_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        vehicle_number:
+          type: string
+          minLength: 1
+          maxLength: 32
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WasteDispatchItemLotRequest'
+          description: Optional lot numbers, one entry per product at most.
+      required:
+      - driver_name
+      - driver_number
+      - from_city_id
+      - vehicle_number
     ExecuteCodeRequestRequest:
       type: object
       properties:
@@ -11464,6 +11760,8 @@ components:
           description: The custom order's CORD-… id.
         order_type:
           $ref: '#/components/schemas/OrderTypeEnum'
+        unit_of_measure:
+          $ref: '#/components/schemas/UnitOfMeasureEnum'
         our_details:
           $ref: '#/components/schemas/ChallanParty'
         receiver_details:
@@ -11483,6 +11781,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CustomChallanLine'
+        total_kg:
+          type: string
+          description: Kilograms on a waste order; 0 on a custom order.
         item_count:
           type: integer
         total_amount:
@@ -11511,7 +11812,9 @@ components:
       - our_details
       - receiver_details
       - total_amount
+      - total_kg
       - total_packets
+      - unit_of_measure
     ExportCustomOrder:
       type: object
       description: One row of ``export/custom-orders`` (``custom_order_export_payload``).
@@ -11550,10 +11853,16 @@ components:
           type: string
           format: date-time
           nullable: true
+        made_from_waste:
+          type: boolean
+        unit_of_measure:
+          $ref: '#/components/schemas/UnitOfMeasureEnum'
         total_amount:
           type: string
         total_packets:
           type: integer
+        total_kg:
+          type: string
         items:
           type: array
           items:
@@ -11567,11 +11876,14 @@ components:
       - delivery_address
       - expected_delivery_date
       - items
+      - made_from_waste
       - public_id
       - special_comments
       - status
       - total_amount
+      - total_kg
       - total_packets
+      - unit_of_measure
       - verified_at
     ExportCustomOrderItem:
       type: object
@@ -11581,12 +11893,19 @@ components:
           $ref: '#/components/schemas/ProductRef'
         packet_weight:
           type: string
-          description: Weight of one packet, in kg.
+          nullable: true
+          description: Weight of one packet, in kg. Null on a kg line.
         negotiated_selling_price:
           type: string
-          description: Per packet.
+          description: Per packet, or per kg on a waste order's line.
         packets:
           type: integer
+          nullable: true
+          description: Null on a kg line.
+        quantity_kg:
+          type: string
+          nullable: true
+          description: Kilograms on a waste order's line. Null on a packet line.
         line_total:
           type: string
       required:
@@ -11595,6 +11914,7 @@ components:
       - packet_weight
       - packets
       - product
+      - quantity_kg
     ExportCustomOrdersResponse:
       type: object
       description: Fields every export response carries around its ``results`` (schema
@@ -14002,8 +14322,11 @@ components:
     OrderTypeEnum:
       enum:
       - CUSTOM_ORDER
+      - WASTE_ORDER
       type: string
-      description: '* `CUSTOM_ORDER` - CUSTOM_ORDER'
+      description: |-
+        * `CUSTOM_ORDER` - CUSTOM_ORDER
+        * `WASTE_ORDER` - WASTE_ORDER
     OtherMaterialStock:
       type: object
       description: Output shape for the whole other-material position.
@@ -14675,6 +14998,34 @@ components:
             minimum: 0
           description: Map of product-packaging public_id to its sealed-bag count;
             loose packets are recorded at ``update-sample-packet-stock``, not here.
+    PatchedUpdateWasteOrderRequest:
+      type: object
+      description: Request validation for a waste-order update -- every field optional.
+      properties:
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id belonging to the custom order's client.
+        expected_delivery_date:
+          type: string
+          format: date
+        actual_delivery_date:
+          type: string
+          format: date
+          nullable: true
+        special_comments:
+          type: string
+          description: A remark to add to the custom order. Appended as a new line
+            -- it never replaces what is already there.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WasteOrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: Child org to set ({id} or {party_name, village_name, ...});
+            send null to clear it, omit to leave it unchanged.
     ProductKg:
       type: object
       properties:
@@ -14884,6 +15235,16 @@ components:
           type: string
           description: Rejected KG with a reached effective date. Reported only, never
             spendable.
+        waste_reserved_kg:
+          type: string
+          description: Waste KG held by CONFIRMED waste orders. Does not change available_kg.
+        waste_consumed_kg:
+          type: string
+          description: Waste KG that left on DISPATCHED / DELIVERED waste orders.
+        waste_available_kg:
+          type: string
+          description: 'Waste KG still free for a waste order: wasted_kg minus reserved
+            minus consumed.'
       required:
       - available_kg
       - incoming_kg
@@ -14892,6 +15253,9 @@ components:
       - packed_kg
       - product
       - rejected_kg
+      - waste_available_kg
+      - waste_consumed_kg
+      - waste_reserved_kg
       - wasted_kg
     RawMaterialWasteListPage:
       type: object
@@ -15741,6 +16105,14 @@ components:
         * `ml` - ml
         * `count` - count
         * `packet` - packet
+    UnitOfMeasureEnum:
+      enum:
+      - packet
+      - kg
+      type: string
+      description: |-
+        * `packet` - packet
+        * `kg` - kg
     UnitTypeEnum:
       enum:
       - count
@@ -16009,6 +16381,44 @@ components:
       - name
       - phone_number
       - role
+    WasteDispatchItemLotRequest:
+      type: object
+      description: The (optional) lot number for one line of the waste order being
+        dispatched.
+      properties:
+        product_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        lot_number:
+          type: string
+          default: ''
+          maxLength: 64
+      required:
+      - product_public_id
+    WasteOrderItemWriteRequest:
+      type: object
+      description: 'One line of a waste order: kilograms of one product''s waste.'
+      properties:
+        product_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms of this product's waste to sell.
+        negotiated_selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Price per kg for this line. Required when booking an order
+            or adding a line; on an edit, omit it to leave an existing line's price
+            alone.
+      required:
+      - product_public_id
+      - quantity_kg
   securitySchemes:
     bearerAuth:
       type: http

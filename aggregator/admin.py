@@ -9,6 +9,7 @@ from common.admin import AUDIT_FIELDS, SoftDeleteModelAdmin
 from common.models import indian_now
 from common.storage import delete_image, upload_image
 
+from . import InventoryOperations
 from .CustomOrderOperations import assert_loose_stock_covers
 from .InwardOperations import locked_raw_lot, raw_status_detail
 from .LabTestingOperations import (
@@ -813,6 +814,11 @@ class CustomOrderItemFormSet(forms.BaseInlineFormSet):
             data = getattr(form, "cleaned_data", None)
             if not data or data.get("DELETE"):
                 continue
+            if data.get("packet_weight") is None or data.get("packets") is None:
+                # Waste orders (kg lines) are booked through the API only.
+                raise forms.ValidationError(
+                    "Every line needs a packet weight and a packet count."
+                )
             pool = (data["product"], data["packet_weight"])
             needed[pool] = needed.get(pool, 0) + data["packets"]
         if not needed:
@@ -833,6 +839,7 @@ class CustomOrderItemInline(CreatedByStampInlineMixin, admin.TabularInline):
     model = CustomOrderItem
     formset = CustomOrderItemFormSet
     extra = 0
+    fields = ("product", "packet_weight", "packets", "negotiated_selling_price")
     autocomplete_fields = ("product",)
 
     def has_add_permission(self, request, obj=None):
@@ -861,7 +868,7 @@ class CustomOrderAdmin(StockLedgerAdminMixin, SoftDeleteParentAdmin):
         "created_at",
     )
     search_fields = ("public_id", "client__company_name", "special_comments")
-    list_filter = ("status",)
+    list_filter = ("status", "made_from_waste")
     autocomplete_fields = (
         "client",
         "delivery_address",
@@ -875,7 +882,13 @@ class CustomOrderAdmin(StockLedgerAdminMixin, SoftDeleteParentAdmin):
     inlines = (CustomOrderItemInline,)
 
     def get_readonly_fields(self, request, obj=None):
-        return (*super().get_readonly_fields(request, obj), *ORDER_LIFECYCLE_FIELDS)
+        # Waste orders are booked through the API; the admin only books packet orders.
+        return (
+            *super().get_readonly_fields(request, obj),
+            *ORDER_LIFECYCLE_FIELDS,
+            "made_from_waste",
+            "unit_of_measure",
+        )
 
     def get_form(self, request, obj=None, change=False, **kwargs):
         form = super().get_form(request, obj, change=change, **kwargs)
@@ -916,6 +929,7 @@ class CustomOrderItemAdmin(ViewOnlyAdminMixin, SoftDeleteModelAdmin):
         "packet_weight",
         "negotiated_selling_price",
         "packets",
+        "quantity_kg",
         "created_at",
     )
     search_fields = ("custom_order__public_id", "product__name")
@@ -1147,6 +1161,11 @@ class RawMaterialWasteAdmin(
     list_select_related = ("product",)
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # Waste already sold on a waste order cannot be lowered away.
+        InventoryOperations.assert_waste_available([obj.product_id])
 
 
 @admin.register(NonStockInward)

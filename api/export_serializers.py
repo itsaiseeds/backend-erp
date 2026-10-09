@@ -77,9 +77,16 @@ class ExportCustomOrderItemSerializer(serializers.Serializer):
     """One loose-packet line of a custom order."""
 
     product = ProductRefSerializer()
-    packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
-    negotiated_selling_price = serializers.CharField(help_text="Per packet.")
-    packets = serializers.IntegerField()
+    packet_weight = serializers.CharField(
+        allow_null=True, help_text="Weight of one packet, in kg. Null on a kg line."
+    )
+    negotiated_selling_price = serializers.CharField(
+        help_text="Per packet, or per kg on a waste order's line."
+    )
+    packets = serializers.IntegerField(allow_null=True, help_text="Null on a kg line.")
+    quantity_kg = serializers.CharField(
+        allow_null=True, help_text="Kilograms on a waste order's line. Null on a packet line."
+    )
     line_total = serializers.CharField()
 
 
@@ -97,8 +104,11 @@ class ExportCustomOrderSerializer(serializers.Serializer):
     special_comments = serializers.CharField(allow_blank=True)
     booked_for = ChildOrgPayloadSerializer(allow_null=True)
     verified_at = serializers.DateTimeField(allow_null=True)
+    made_from_waste = serializers.BooleanField()
+    unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()
+    total_kg = serializers.CharField()
     items = ExportCustomOrderItemSerializer(many=True)
 
 

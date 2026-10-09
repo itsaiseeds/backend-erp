@@ -12,11 +12,13 @@ from .ApproveFieldTripView import ApproveFieldTripView
 from .BagStockView import BagStockView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .CreateCustomOrderView import CreateCustomOrderView
+from .CreateWasteOrderView import CreateWasteOrderView
 from .CropsView import CropsView
 from .CustomOrderView import CustomOrderView
 from .DeleteOtherMaterialRecipeView import DeleteOtherMaterialRecipeView
 from .DispatchCustomOrderView import DispatchCustomOrderView
 from .DispatchOrderView import DispatchOrderView
+from .DispatchWasteOrderView import DispatchWasteOrderView
 from .ExportCustomOrdersView import ExportCustomOrdersView
 from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
 from .ExportFarmerVisitsView import ExportFarmerVisitsView
@@ -36,6 +38,7 @@ from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
 from .GetReturnOrdersView import GetReturnOrdersView
+from .GetWasteOrdersView import GetWasteOrdersView
 from .GodownManagersView import GodownManagersView
 from .HoldOrderView import HoldOrderView
 from .InwardOtherMaterialsView import InwardOtherMaterialsView
@@ -89,6 +92,7 @@ from .UpdateRawMaterialWasteView import UpdateRawMaterialWasteView
 from .UpdateReturnOrderView import UpdateReturnOrderView
 from .UpdateSalesPersonView import UpdateSalesPersonView
 from .UpdateSamplePacketStockView import UpdateLooseStockView
+from .UpdateWasteOrderView import UpdateWasteOrderView
 from .UploadLRNumberView import UploadLRNumberView
 from .VerifyClientView import VerifyClientView
 from .VerifyOrderView import VerifyOrderView
@@ -280,6 +284,26 @@ urlpatterns = [
         "revert-custom-order-dispatch/<str:public_id>",
         RevertCustomOrderDispatchView.as_view(),
         name="revert-custom-order-dispatch",
+    ),
+    # Waste orders are custom orders made from the waste pool (kg lines). They
+    # share ``custom-order/<public_id>`` (GET / DELETE) and
+    # ``revert-custom-order-dispatch`` with packet orders; create, edit,
+    # dispatch and the list have their own routes because their lines differ.
+    path("waste-orders/", GetWasteOrdersView.as_view(), name="waste-orders"),
+    path(
+        "create-waste-order",
+        CreateWasteOrderView.as_view(),
+        name="create-waste-order",
+    ),
+    path(
+        "edit-waste-order/<str:public_id>",
+        UpdateWasteOrderView.as_view(),
+        name="edit-waste-order",
+    ),
+    path(
+        "dispatch-waste-order/<str:public_id>",
+        DispatchWasteOrderView.as_view(),
+        name="dispatch-waste-order",
     ),
     # Field trips follow the order convention: ``field-trips/`` is a collection,
     # ``field-trip/<public_id>`` a collection item (GET / DELETE), and the verbs

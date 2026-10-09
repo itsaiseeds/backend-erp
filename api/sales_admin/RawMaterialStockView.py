@@ -59,6 +59,9 @@ class RawMaterialStockView(AdminApiView):
                 "wasted_kg": str(line["wasted_kg"]),
                 "available_kg": str(line["available_kg"]),
                 "rejected_kg": str(line["rejected_kg"]),
+                "waste_reserved_kg": str(line["waste_reserved_kg"]),
+                "waste_consumed_kg": str(line["waste_consumed_kg"]),
+                "waste_available_kg": str(line["waste_available_kg"]),
             }
             for line in InwardOperations.raw_incoming_stock(
                 as_of, product_public_ids=product_public_ids
