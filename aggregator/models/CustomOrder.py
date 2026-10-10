@@ -7,6 +7,7 @@ from common.models import (
     PrefixedPublicIdModel,
     SoftDeletedModel,
     TimeStampedModel,
+    generate_public_id,
 )
 
 from .Order import (
@@ -39,11 +40,13 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
     most one of ``dispatch_details`` / ``private_dispatch_details`` may be set,
     and exactly one is required once the order is dispatched.
 
-    Exposed to the frontend by its ``public_id`` (``CORD-…``); the primary key
+    Exposed to the frontend by its ``public_id`` -- ``CORD-…`` for a packet order,
+    ``WORD-…`` for a waste order (``made_from_waste``); the primary key
     is never sent out.
     """
 
     public_id_prefix = "CORD-"
+    waste_public_id_prefix = "WORD-"
 
     client = models.ForeignKey(
         "aggregator.Client",
@@ -158,6 +161,15 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
                 name="ck_customorder_hsn_waste_only",
             ),
         ]
+
+    def _generate_public_id(self):
+        """``WORD-…`` on a waste order, ``CORD-…`` on every other custom order.
+
+        The prefix is picked when the id is first generated, so ``made_from_waste``
+        must already be set on the instance (``create_waste_order`` does).
+        """
+        prefix = self.waste_public_id_prefix if self.made_from_waste else self.public_id_prefix
+        return f"{prefix}{generate_public_id()}"
 
     def guard_soft_delete(self, perform):
         """See ``Order.refuse_deleting_stock_holder``."""
