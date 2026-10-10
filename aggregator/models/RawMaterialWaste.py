@@ -61,7 +61,7 @@ class RawMaterialWaste(
 
     def guard_soft_delete(self, perform):
         """Delete the waste row, recording the kilograms it gives back to raw."""
-        from aggregator import StockLedgerOperations
+        from aggregator import InventoryOperations, StockLedgerOperations
         from aggregator.ProductOperations import assert_products_usable
 
         with StockLedgerOperations.recording(
@@ -71,7 +71,10 @@ class RawMaterialWaste(
             source=self,
         ) as rec:
             assert_products_usable([self.product_id], action="have its waste entry deleted")
+            InventoryOperations.lock_waste_pools([self.product_id])
             perform()
+            # Waste already sold on a waste order cannot be taken away.
+            InventoryOperations.assert_waste_available([self.product_id])
             rec.actor = self.deleted_by
 
     def __str__(self):

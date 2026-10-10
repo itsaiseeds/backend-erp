@@ -329,6 +329,86 @@ def sync_custom_dispatch_entry(
     return entry
 
 
+def validated_waste_lot_numbers(
+    order: CustomOrder, lot_numbers: dict[str, str]
+) -> dict[str, str]:
+    """Check ``lot_numbers`` names only products on waste ``order``.
+
+    Keyed by the product's public id. Unlike a packet order's lot numbers these
+    are **optional**: waste records carry no production batch, so a line with no
+    entry is dispatched with a blank lot.
+    """
+    on_order = {item.product.public_id for item in order.items.select_related("product")}
+    unknown = sorted(lot_numbers.keys() - on_order)
+    if unknown:
+        raise ValidationError(
+            {"items": f"Not on this waste order: {', '.join(unknown)}."}
+        )
+    return lot_numbers
+
+
+@transaction.atomic
+def sync_waste_dispatch_entry(
+    order: CustomOrder,
+    *,
+    actor,
+    dispatched_at,
+    from_city,
+    to_city,
+    driver_name: str,
+    driver_number: str,
+    vehicle_number: str,
+    lot_numbers: dict[str, str],
+) -> DispatchEntry:
+    """Write (or rewrite) waste ``order``'s challan and its kg lines.
+
+    The waste counterpart of :func:`sync_custom_dispatch_entry`: one entry per
+    order, updated in place on a re-dispatch, with one kg line per product
+    (``quantity_kg`` set, ``quantity`` and ``packet_weight`` null). A line's lot
+    number is whatever ``lot_numbers`` says, or blank.
+    """
+    validated_waste_lot_numbers(order, lot_numbers)
+
+    entry = _upsert_entry(
+        {"custom_order": order},
+        order,
+        dispatched_at=dispatched_at,
+        from_city=from_city,
+        to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
+    )
+
+    existing = {
+        line.product_id: line
+        for line in DispatchEntryItem.all_objects.filter(
+            dispatch_entry=entry, packet_weight__isnull=True, product__isnull=False
+        )
+    }
+    for item in order.items.select_related("product"):
+        line = existing.pop(item.product_id, None)
+        if line is None:
+            line = DispatchEntryItem(
+                dispatch_entry=entry,
+                product=item.product,
+                created_by=actor,
+            )
+        else:
+            line.restore()
+        line.negotiated_selling_price = item.negotiated_selling_price
+        line.quantity = None
+        line.quantity_kg = item.quantity_kg
+        line.lot_number = lot_numbers.get(item.product.public_id, "")
+        line.full_clean()
+        line.save()
+
+    for stale in existing.values():
+        stale.mark_deleted(actor)
+
+    return entry
+
+
 def set_lr_number(order: Order, *, lr_number: str):
     """Record the transporter's consignment note against ``order``'s dispatch.
 
@@ -438,17 +518,22 @@ def custom_dispatch_challan_payload(order: CustomOrder) -> dict:
     set so a reader can tell the rows apart, and loose lines: a product, the
     weight of one packet, how many packets, the lot and the money. A custom
     order has no transport agency, so the dispatch block's is always null.
+
+    A waste order's challan has the same envelope, ``order_type`` ``WASTE_ORDER``
+    and kg lines (``quantity_kg`` set, ``packets`` and ``packet_weight`` null).
     """
     entry = order.dispatch_entry
     items = list(entry.items.all())
     return {
         **_challan_header(order, entry),
-        "order_type": "CUSTOM_ORDER",
+        "order_type": "WASTE_ORDER" if order.made_from_waste else "CUSTOM_ORDER",
+        "unit_of_measure": order.unit_of_measure,
         "dispatch": {**dispatch_entry_payload(entry), "transport_agency": None},
         "items": [_loose_line_payload(line) for line in items],
         "item_count": len(items),
         "total_amount": str(entry.total_amount),
         "total_packets": entry.total_packets,
+        "total_kg": str(sum((item.quantity_kg or 0 for item in items), Decimal("0"))),
     }
 
 
@@ -467,14 +552,17 @@ def _bag_line_payload(line: DispatchEntryItem) -> dict:
 
 
 def _loose_line_payload(line: DispatchEntryItem) -> dict:
-    """One loose-packet line of a custom order's challan."""
+    """One loose-packet line of a custom order's challan (or kg line of a waste order's)."""
     product = line.product
     if product is None:
         raise ValueError(f"Dispatch entry item {line.pk} is not a loose line.")
     return {
         "product": {"public_id": product.public_id, "name": product.name},
-        "packet_weight": str(line.packet_weight),
+        "packet_weight": (
+            str(line.packet_weight) if line.packet_weight is not None else None
+        ),
         "packets": line.quantity,
+        "quantity_kg": str(line.quantity_kg) if line.quantity_kg is not None else None,
         "lot_number": line.lot_number,
         "negotiated_selling_price": str(line.negotiated_selling_price),
         "line_total": str(line.line_total),

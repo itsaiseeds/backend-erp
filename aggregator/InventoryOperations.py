@@ -1078,6 +1078,7 @@ def _loose_demand(
         product=product,
         packet_weight=packet_weight,
         custom_order__is_deleted=False,
+        custom_order__made_from_waste=False,
         **order_filter,
     ).aggregate(total=Sum("packets"))["total"]
     return total or 0
@@ -1345,6 +1346,76 @@ def raw_available_kg(product: Product) -> Decimal:
     )
 
 
+# -- Waste pool ----------------------------------------------------------------
+#
+# ``RawMaterialWaste`` is a write-off from raw stock, not a stock of its own, so
+# a waste order does not edit or delete those rows (that would hand the
+# kilograms back to raw). Its kilograms are a derived pool, exactly like the
+# loose packets: what the waste rows total, less the kg on live waste orders --
+# reserved while CONFIRMED, consumed once DISPATCHED/DELIVERED. Deleting an
+# order or reverting its dispatch frees the kg on its own because both figures
+# follow the order's status. Raw availability is untouched by any of it.
+
+
+def lock_waste_pools(product_ids: Iterable[int]) -> None:
+    """Lock the ``Product`` rows whose waste pools this transaction will spend.
+
+    The waste pool has no row of its own, so the product row is the mutex --
+    the same one the loose pools use, taken in the same pk order.
+    """
+    lock_loose_pools(product_ids)
+
+
+def _waste_order_kg(product: Product, status_ids) -> Decimal:
+    """Sum ``CustomOrderItem.quantity_kg`` of ``product`` on live waste orders in ``status_ids``."""
+    total = CustomOrderItem.objects.filter(
+        product=product,
+        custom_order__made_from_waste=True,
+        custom_order__is_deleted=False,
+        custom_order__status_id__in=status_ids,
+    ).aggregate(total=Sum("quantity_kg"))["total"]
+    return total or Decimal("0.000")
+
+
+def waste_reserved_kg(product: Product) -> Decimal:
+    """Waste kilograms spoken for by CONFIRMED waste orders."""
+    return _waste_order_kg(product, RESERVING_STATUS_IDS)
+
+
+def waste_consumed_kg(product: Product) -> Decimal:
+    """Waste kilograms that left on a DISPATCHED / DELIVERED waste order."""
+    return _waste_order_kg(product, CONSUMING_STATUS_IDS)
+
+
+def waste_available_kg(product: Product) -> Decimal:
+    """Waste kilograms of ``product`` not yet on a waste order.
+
+    ``wasted - reserved - consumed``. Undated, like ``raw_wasted_kg``.
+    """
+    return (
+        raw_wasted_kg(product) - waste_reserved_kg(product) - waste_consumed_kg(product)
+    )
+
+
+def assert_waste_available(product_ids) -> None:
+    """Raise unless every product in ``product_ids`` still has waste kg >= 0.
+
+    Called after a waste row is lowered or deleted, inside the same
+    transaction, so waste a waste order already holds can never be taken away.
+    """
+    for product in Product.all_objects.filter(id__in=product_ids):
+        available = waste_available_kg(product)
+        if available < 0:
+            raise ValidationError(
+                {
+                    "quantity_kg": (
+                        f"'{product.name}' waste is already on waste orders: "
+                        f"this would leave it {-available} kg short."
+                    )
+                }
+            )
+
+
 def _assert_raw_available(product_ids) -> None:
     """Raise unless every product in ``product_ids`` still has raw kg >= 0.
 
@@ -1436,6 +1507,7 @@ def update_raw_waste(
             entry.full_clean()
             entry.save(update_fields=[*changed, "updated_at"])
             _assert_raw_available([entry.product_id])
+            assert_waste_available([entry.product_id])
     return entry
 
 

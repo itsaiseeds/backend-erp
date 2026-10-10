@@ -380,7 +380,10 @@ def raw_incoming_stock(
     (``InventoryOperations.raw_bagged_kg`` + ``raw_loose_kg``, read as of now
     -- a count has no "as of" of its own), ``wasted_kg`` is what was written
     off (``raw_wasted_kg``, undated) and ``available_kg`` is what is left to
-    pack; rejected kilograms are never counted there -- a rejected lot is
+    pack. The ``waste_*_kg`` figures are the waste pool waste orders draw on
+    (``InventoryOperations.waste_available_kg``): they do not change
+    ``available_kg``, since waste is already written off from raw. Rejected
+    kilograms are never counted there -- a rejected lot is
     invisible to the packing check regardless of its date. A product is
     listed whenever it has incoming or rejected kilograms, so a product whose
     entire intake was rejected still appears. The list is ready for display:
@@ -416,6 +419,9 @@ def raw_incoming_stock(
                 "wasted_kg": wasted_kg,
                 "available_kg": incoming_kg - packed_kg - wasted_kg,
                 "rejected_kg": rejected_kg,
+                "waste_reserved_kg": InventoryOperations.waste_reserved_kg(product),
+                "waste_consumed_kg": InventoryOperations.waste_consumed_kg(product),
+                "waste_available_kg": InventoryOperations.waste_available_kg(product),
             }
         )
     lines.sort(key=lambda line: line["name"])

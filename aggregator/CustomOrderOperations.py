@@ -38,6 +38,7 @@ from .models import (
     CustomOrder,
     CustomOrderItem,
     DispatchDetails,
+    OrderUnit,
     PrivateDispatchDetails,
     Product,
     Status,
@@ -116,6 +117,24 @@ def loose_requirements(items: Iterable[dict]) -> dict[tuple[Product, Decimal], i
         pool = (item["product"], item["packet_weight"])
         needed[pool] = needed.get(pool, 0) + item["packets"]
     return needed
+
+
+def assert_order_kind(order: CustomOrder, made_from_waste: bool, action: str) -> None:
+    """Raise unless ``order`` is a waste order (or a packet order), as ``action`` needs.
+
+    A waste order and a packet order share one table but not one set of rules
+    (kg lines against the waste pool, packet lines against the loose pools), so
+    each verb refuses the other kind rather than misreading its lines.
+    """
+    if order.made_from_waste == made_from_waste:
+        return
+    if made_from_waste:
+        raise ValidationError(
+            {"made_from_waste": f"Cannot {action} a custom order as a waste order."}
+        )
+    raise ValidationError(
+        {"made_from_waste": f"Cannot {action} a waste order as a custom order."}
+    )
 
 
 @transaction.atomic
@@ -334,6 +353,7 @@ def dispatch_custom_order(
     )
     from .OrderOperations import assert_driver_details
 
+    assert_order_kind(order, False, "dispatch")
     assert_custom_order_status(order, DISPATCHABLE_CUSTOM_ORDER_STATUS_CODES, "dispatch")
 
     # Validated before anything is written, so a bad lot number costs nothing.
@@ -444,6 +464,291 @@ def revert_dispatch(order: CustomOrder) -> CustomOrder:
     return order
 
 
+# -- Waste orders -----------------------------------------------------------
+#
+# A waste order is a custom order with ``made_from_waste`` set: its lines are
+# kilograms of a product, drawn from that product's waste pool
+# (``InventoryOperations.waste_available_kg``), at a per-kg price. It is born
+# CONFIRMED like any custom order and only ever reaches DISPATCHED.
+#
+# These verbs deliberately do not run inside ``recording``: a waste order moves
+# none of the stock-ledger figures (raw incoming/packed/wasted and the packet
+# pools are all untouched -- the kg is already written off), so there is
+# nothing to record. They take the product locks themselves instead.
+
+
+def waste_requirements(items: Iterable[dict]) -> dict[Product, Decimal]:
+    """Sum ``items``' kg per product; a product listed twice is refused."""
+    needed: dict[Product, Decimal] = {}
+    for item in items:
+        product = item["product"]
+        if product in needed:
+            raise ValidationError(
+                {"items": f"{product.name} is listed twice; use one line per product."}
+            )
+        needed[product] = Decimal(item["quantity_kg"])
+    return needed
+
+
+def assert_waste_covers(
+    needed: Mapping[Product, Decimal],
+    action: str = "create",
+    *,
+    held: Mapping[Product, Decimal] | None = None,
+) -> None:
+    """Raise unless each product's waste pool can supply ``needed`` kg.
+
+    The waste counterpart of :func:`assert_loose_stock_covers`, with the same
+    ``held`` contract: what the order already holds (its current lines, on an
+    edit) is credited back, and a product whose need does not exceed it asks for
+    nothing new, so shrinking an order is never refused. The pools are locked
+    first and stay locked until the caller's transaction commits.
+    """
+    from . import InventoryOperations
+
+    held = held or {}
+    increases = {
+        product: kg
+        for product, kg in needed.items()
+        if kg > held.get(product, Decimal("0"))
+    }
+    if not increases:
+        return
+
+    InventoryOperations.lock_waste_pools(product.id for product in increases)
+    shortages = []
+    for product, kg in increases.items():
+        available = InventoryOperations.waste_available_kg(product) + held.get(
+            product, Decimal("0")
+        )
+        if kg > available:
+            shortages.append(f"{product.name}: need {kg} kg, have {available} kg")
+    if shortages:
+        raise ValidationError(
+            {
+                "quantity_kg": (
+                    f"Not enough waste to {action} this waste order -- "
+                    f"{'; '.join(shortages)}."
+                )
+            }
+        )
+
+
+@transaction.atomic
+def create_waste_order(
+    *,
+    client: Client,
+    delivery_address: Address,
+    actor: User,
+    items: Iterable[dict],
+    special_comments: str = "",
+    expected_delivery_date=None,
+    booked_for: ClientChildOrg | None = None,
+) -> CustomOrder:
+    """Create a waste order and its kg lines atomically; it is born ``CONFIRMED``.
+
+    Each entry in ``items`` is ``{"product", "quantity_kg", "negotiated_selling_price"}``
+    (price per kg, required). Refused with a 400 -- and nothing written -- when
+    any product's waste pool cannot cover its kilograms, summed over the order.
+    """
+    items = list(items)
+    needed = waste_requirements(items)
+    assert_products_usable(
+        {product.pk for product in needed},
+        field="items",
+        action="be ordered",
+        subject="this waste order",
+    )
+    assert_waste_covers(needed)
+
+    order = CustomOrder(
+        client=client,
+        delivery_address=delivery_address,
+        status=Status.by_id(StatusIds.CONFIRMED),
+        created_by=actor,
+        verified_by=actor,
+        verified_at=indian_now(),
+        special_comments=special_comments,
+        booked_for=booked_for,
+        made_from_waste=True,
+        unit_of_measure=OrderUnit.KG,
+    )
+    if expected_delivery_date is not None:
+        order.expected_delivery_date = expected_delivery_date
+    order.full_clean()
+    order.save()
+
+    for item in items:
+        add_waste_order_item(
+            order,
+            product=item["product"],
+            quantity_kg=item["quantity_kg"],
+            negotiated_selling_price=item["negotiated_selling_price"],
+            actor=actor,
+        )
+    return order
+
+
+def add_waste_order_item(
+    order: CustomOrder,
+    *,
+    product: Product,
+    quantity_kg,
+    negotiated_selling_price,
+    actor: User,
+) -> CustomOrderItem:
+    """Add a kg line to waste ``order``; the per-kg price is required."""
+    item = CustomOrderItem(
+        custom_order=order,
+        product=product,
+        packet_weight=None,
+        packets=None,
+        quantity_kg=quantity_kg,
+        negotiated_selling_price=negotiated_selling_price,
+        created_by=actor,
+    )
+    item.full_clean()
+    item.save()
+    return item
+
+
+@transaction.atomic
+def sync_waste_order_items(
+    order: CustomOrder, items: list[dict], actor: User
+) -> list[CustomOrderItem]:
+    """Replace waste ``order``'s lines with ``items`` (full declarative replacement).
+
+    The waste counterpart of :func:`sync_custom_order_items`: lines are matched
+    by product (the natural key ``uniq_customorderitem_order_product_kg``), an
+    existing line is updated in place, a soft-deleted one is restored rather than
+    re-inserted, and one the caller omits is removed. A CONFIRMED order's lines
+    are reserved waste, so raising a quantity or adding a product is re-checked
+    against the pool with what the order already holds credited back.
+    """
+    assert_order_kind(order, True, "edit")
+    if not items:
+        raise ValidationError("A waste order must keep at least one item.")
+    needed = waste_requirements(items)
+
+    existing = {
+        line.product_id: line
+        for line in CustomOrderItem.all_objects.filter(custom_order=order).select_related(
+            "product"
+        )
+    }
+
+    assert_products_usable(
+        {
+            product.pk
+            for product, kg in needed.items()
+            if existing.get(product.pk) is None
+            or existing[product.pk].is_deleted
+            or kg > existing[product.pk].quantity_kg
+        },
+        field="items",
+        action="have waste order lines added or raised",
+        subject="this waste order",
+    )
+
+    if order.is_verified:
+        held = {
+            line.product: line.quantity_kg
+            for line in existing.values()
+            if not line.is_deleted
+        }
+        assert_waste_covers(needed, "edit", held=held)
+
+    ordered: list[CustomOrderItem] = []
+    for item in items:
+        line = existing.pop(item["product"].pk, None)
+        if line is None:
+            line = add_waste_order_item(
+                order,
+                product=item["product"],
+                quantity_kg=item["quantity_kg"],
+                negotiated_selling_price=item["negotiated_selling_price"],
+                actor=actor,
+            )
+        else:
+            line.restore()
+            line.quantity_kg = item["quantity_kg"]
+            if item.get("negotiated_selling_price") is not None:
+                line.negotiated_selling_price = item["negotiated_selling_price"]
+            line.full_clean()
+            line.save()
+        ordered.append(line)
+
+    for stale in existing.values():
+        stale.mark_deleted(actor)
+
+    return ordered
+
+
+@transaction.atomic
+def dispatch_waste_order(
+    order: CustomOrder,
+    *,
+    actor: User,
+    from_city: City,
+    driver_name: str,
+    driver_number: str,
+    vehicle_number: str,
+    lot_numbers: dict[str, str] | None = None,
+) -> CustomOrder:
+    """Record a dispatch against a CONFIRMED waste order and move it to DISPATCHED.
+
+    The counterpart of :func:`dispatch_custom_order`: own vehicle only, today's
+    date, the delivery address's city as the destination, and a challan
+    (``DispatchOperations.sync_waste_dispatch_entry``). ``lot_numbers`` (keyed
+    by product public id) is optional. No waste is written: CONFIRMED to
+    DISPATCHED moves the kg from reserved to consumed on its own.
+    """
+    from . import InventoryOperations
+    from .DispatchOperations import sync_waste_dispatch_entry, validated_waste_lot_numbers
+    from .OrderOperations import assert_driver_details
+
+    lot_numbers = lot_numbers or {}
+    assert_order_kind(order, True, "dispatch")
+    assert_custom_order_status(order, DISPATCHABLE_CUSTOM_ORDER_STATUS_CODES, "dispatch")
+    validated_waste_lot_numbers(order, lot_numbers)
+    assert_driver_details(driver_name, driver_number, vehicle_number)
+
+    product_ids = custom_order_product_ids(order)
+    InventoryOperations.lock_waste_pools(product_ids)
+    assert_products_usable(
+        product_ids,
+        field="status",
+        action="be dispatched",
+        subject="this waste order",
+    )
+
+    dispatched_at = indian_now()
+    to_city = order.delivery_address.city
+    attach_private_dispatch_details(
+        order,
+        dispatched_by=actor,
+        dispatch_date=dispatched_at.date(),
+        from_city=from_city,
+        to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
+    )
+    sync_waste_dispatch_entry(
+        order,
+        actor=actor,
+        dispatched_at=dispatched_at,
+        from_city=from_city,
+        to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
+        lot_numbers=lot_numbers,
+    )
+    update_custom_order_status(order, StatusIds.DISPATCHED)
+    return order
+
+
 # -- Admin edit / delete ----------------------------------------------------
 #
 # A custom order is born CONFIRMED, so that is the only status it can be
@@ -528,6 +833,7 @@ def sync_custom_order_items(
     custom order moves reserved loose packets, which the stock ledger records
     as ``ORDER_EDITED``.
     """
+    assert_order_kind(order, False, "edit")
     products = {item["product"].pk for item in items if "product" in item}
     with recording(
         StockEventType.ORDER_EDITED,
@@ -656,6 +962,11 @@ def delete_custom_order(order: CustomOrder, actor: User) -> None:
         order.mark_deleted(actor)
 
 
+def _weight_text(value) -> str | None:
+    """A decimal as text, or None where the line has none (e.g. a kg line's packet weight)."""
+    return None if value is None else str(value)
+
+
 def custom_order_payload(order: CustomOrder) -> dict:
     """Frontend-facing dict for a custom order, keyed by public ids only."""
     return {
@@ -673,17 +984,21 @@ def custom_order_payload(order: CustomOrder) -> dict:
         "special_comments": order.special_comments,
         "booked_for": child_org_payload(order.booked_for),
         "verified_at": order.verified_at.isoformat() if order.verified_at else None,
+        "made_from_waste": order.made_from_waste,
+        "unit_of_measure": order.unit_of_measure,
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,
+        "total_kg": str(order.total_kg),
         "items": [
             {
                 "product": {
                     "public_id": item.product.public_id,
                     "name": item.product.name,
                 },
-                "packet_weight": str(item.packet_weight),
+                "packet_weight": _weight_text(item.packet_weight),
                 "negotiated_selling_price": str(item.negotiated_selling_price),
                 "packets": item.packets,
+                "quantity_kg": _weight_text(item.quantity_kg),
                 "line_total": str(item.line_total),
             }
             for item in order.items.select_related("product").all()
@@ -729,8 +1044,11 @@ def custom_order_list_payload(order: CustomOrder) -> dict:
         "city": order_city_payload(order),
         "expected_delivery_date": order.expected_delivery_date.isoformat(),
         "booked_for": child_org_summary_payload(order.booked_for),
+        "made_from_waste": order.made_from_waste,
+        "unit_of_measure": order.unit_of_measure,
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,
+        "total_kg": str(order.total_kg),
         "item_count": len(items),
         "items": [
             {
@@ -739,9 +1057,10 @@ def custom_order_list_payload(order: CustomOrder) -> dict:
                     "name": item.product.name,
                     "image_url": item.product.image_url,
                 },
-                "packet_weight": str(item.packet_weight),
+                "packet_weight": _weight_text(item.packet_weight),
                 "negotiated_selling_price": str(item.negotiated_selling_price),
                 "packets": item.packets,
+                "quantity_kg": _weight_text(item.quantity_kg),
             }
             for item in items
         ],

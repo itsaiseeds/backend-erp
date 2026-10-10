@@ -36,6 +36,7 @@ from aggregator.CustomOrderOperations import (
     CUSTOM_ORDER_CORE_FIELDS,
     EDITABLE_CUSTOM_ORDER_STATUS_CODES,
     assert_custom_order_status,
+    assert_order_kind,
     custom_order_detail_payload,
     sync_custom_order_items,
     update_custom_order_core,
@@ -92,6 +93,10 @@ class UpdateCustomOrderSerializer(serializers.Serializer):
     def validate_items(self, value: list[dict]) -> list[dict]:
         return validate_custom_order_item_list(value)
 
+    def resolve_items(self, items: list[dict], order) -> list[dict]:
+        """Turn the submitted lines into the operations' shape (overridden for waste orders)."""
+        return resolve_custom_order_items(items, order)
+
     def validate(self, attrs: dict) -> dict:
         order = self.context["order"]
 
@@ -110,7 +115,7 @@ class UpdateCustomOrderSerializer(serializers.Serializer):
             attrs["delivery_address"] = link.address
 
         if "items" in attrs:
-            attrs["resolved_items"] = resolve_custom_order_items(attrs["items"], order)
+            attrs["resolved_items"] = self.resolve_items(attrs["items"], order)
 
         return attrs
 
@@ -120,6 +125,13 @@ class UpdateCustomOrderView(AdminApiView):
 
     serializer_class = UpdateCustomOrderSerializer
     admin_required = True
+
+    def assert_kind(self, order) -> None:
+        """A packet order only: waste orders are edited through ``edit-waste-order``."""
+        assert_order_kind(order, False, "edit")
+
+    def sync_items(self, order, items, actor) -> None:
+        sync_custom_order_items(order, items, actor)
 
     @extend_schema(
         summary="Update a custom order (including its items)",
@@ -133,9 +145,10 @@ class UpdateCustomOrderView(AdminApiView):
         # write.
         with transaction.atomic():
             order = get_locked_custom_order(public_id)
+            self.assert_kind(order)
             assert_custom_order_status(order, EDITABLE_CUSTOM_ORDER_STATUS_CODES, "edit")
 
-            serializer = UpdateCustomOrderSerializer(
+            serializer = self.serializer_class(
                 data=request.data, context={"order": order}
             )
             serializer.is_valid(raise_exception=True)
@@ -154,7 +167,7 @@ class UpdateCustomOrderView(AdminApiView):
             if core:
                 update_custom_order_core(order, **core)
             if "items" in data:
-                sync_custom_order_items(order, data["resolved_items"], request.user)
+                self.sync_items(order, data["resolved_items"], request.user)
 
         # Re-read in full: the prefetched lines are stale once rewritten.
         order = custom_order_detail_queryset().get(pk=order.pk)
