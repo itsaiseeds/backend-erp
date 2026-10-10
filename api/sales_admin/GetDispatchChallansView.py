@@ -7,10 +7,10 @@ HSN code, the financial year, the journey, and every line with its lot number.
 The two kinds are one list, paged and sorted together, because both challans
 live in ``DispatchEntry`` -- the list pages over entries rather than orders. An
 order's row is exactly what it always was. A custom order's row has the same
-envelope (``order_public_id`` is its ``CORD-…`` id) plus ``order_type:
-"CUSTOM_ORDER"``, and its lines are loose packets: a product, a packet weight
-and a packet count instead of a bag. A custom order always goes on our own
-vehicle.
+envelope (``order_public_id`` is its ``CORD-…`` id; ``WORD-…`` for a waste order)
+plus ``order_type: "CUSTOM_ORDER"`` (``"WASTE_ORDER"`` for a waste order), and its
+lines are loose packets: a product, a packet weight and a packet count instead of a
+bag. A custom order always goes on our own vehicle.
 
 **A dispatch is listed as soon as it is recorded**, whichever way the goods went.
 An agency dispatch is no longer held back until its ``lr_number`` arrives: the
@@ -255,7 +255,9 @@ class CustomChallanLineSerializer(serializers.Serializer):
 class CustomDispatchChallanItemSerializer(serializers.Serializer):
     """Output shape for one custom order's challan (schema only)."""
 
-    order_public_id = serializers.CharField(help_text="The custom order's CORD-… id.")
+    order_public_id = serializers.CharField(
+        help_text="The custom order's CORD-… id (WORD-… for a waste order)."
+    )
     order_type = serializers.ChoiceField(choices=["CUSTOM_ORDER", "WASTE_ORDER"])
     unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
     our_details = ChallanPartySerializer()

@@ -5723,7 +5723,8 @@ paths:
         name: public_id
         schema:
           type: string
-        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
         required: true
       tags:
       - Admin · Orders
@@ -5745,7 +5746,8 @@ paths:
         name: public_id
         schema:
           type: string
-        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
         required: true
       tags:
       - Admin · Orders
@@ -5922,7 +5924,8 @@ paths:
         name: public_id
         schema:
           type: string
-        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
         required: true
       tags:
       - Admin · Dispatch
@@ -6020,7 +6023,8 @@ paths:
         name: public_id
         schema:
           type: string
-        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
         required: true
       tags:
       - Admin · Dispatch
@@ -6055,7 +6059,8 @@ paths:
         name: public_id
         schema:
           type: string
-        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
         required: true
       tags:
       - Admin · Orders
@@ -6191,7 +6196,8 @@ paths:
         name: public_id
         schema:
           type: string
-        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
         required: true
       tags:
       - Admin · Orders
@@ -8690,7 +8696,8 @@ paths:
         name: public_id
         schema:
           type: string
-        description: The custom order's public id, e.g. CORD-E79QA0E2OIHF.
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
         required: true
       tags:
       - Admin · Dispatch
@@ -9257,7 +9264,7 @@ paths:
         name: public_id
         schema:
           type: string
-        description: Case-insensitive substring of the public id (CORD-XXXXXXXXXXXX).
+        description: Case-insensitive substring of the public id (WORD-XXXXXXXXXXXX).
           Single value; AND-ed with the other filters.
       - in: query
         name: sort
@@ -11313,7 +11320,7 @@ components:
       properties:
         order_public_id:
           type: string
-          description: The custom order's CORD-… id.
+          description: The custom order's CORD-… id (WORD-… for a waste order).
         order_type:
           $ref: '#/components/schemas/OrderTypeEnum'
         unit_of_measure:
@@ -12022,7 +12029,7 @@ components:
       properties:
         order_public_id:
           type: string
-          description: The custom order's CORD-… id.
+          description: The custom order's CORD-… id (WORD-… for a waste order).
         order_type:
           $ref: '#/components/schemas/OrderTypeEnum'
         unit_of_measure:

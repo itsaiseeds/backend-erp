@@ -9,7 +9,8 @@ Every line names a ``packet_weight`` because a loose packet has a definite
 weight: 5 x 1kg and 5 x 500g draw on different pools and are worth different
 money.
 
-Custom orders are exposed to the frontend by their ``public_id`` (``CORD-…``);
+Custom orders are exposed to the frontend by their ``public_id`` (``CORD-…``, or
+``WORD-…`` for a waste order);
 payloads never include the internal primary key.
 """
 
