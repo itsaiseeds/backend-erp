@@ -10987,6 +10987,11 @@ components:
           nullable: true
           description: 'Optional child org the order is booked for: {id} to reuse
             one, or {party_name, village_name, ...} to get-or-create it.'
+        hsn_code:
+          type: string
+          default: ''
+          description: Optional free-text HSN code kept on the order.
+          maxLength: 32
       required:
       - client_address_id
       - client_public_id
@@ -11187,6 +11192,9 @@ components:
           type: boolean
         unit_of_measure:
           $ref: '#/components/schemas/UnitOfMeasureEnum'
+        hsn_code:
+          type: string
+          description: Free-text HSN code. Present on waste orders only.
         total_amount:
           type: string
         total_packets:
@@ -11340,6 +11348,9 @@ components:
           type: boolean
         unit_of_measure:
           $ref: '#/components/schemas/UnitOfMeasureEnum'
+        hsn_code:
+          type: string
+          description: Free-text HSN code. Present on waste orders only.
         total_amount:
           type: string
         total_packets:
@@ -15026,6 +15037,10 @@ components:
           nullable: true
           description: Child org to set ({id} or {party_name, village_name, ...});
             send null to clear it, omit to leave it unchanged.
+        hsn_code:
+          type: string
+          description: Free-text HSN code; send an empty string to clear it.
+          maxLength: 32
     ProductKg:
       type: object
       properties:

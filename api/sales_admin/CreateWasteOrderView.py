@@ -133,6 +133,13 @@ class CreateWasteOrderSerializer(CreateCustomOrderSerializer):
     """Request validation for booking a waste order (kg lines, price per kg required)."""
 
     items = WasteOrderItemWriteSerializer(many=True)
+    hsn_code = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Optional free-text HSN code kept on the order.",
+    )
 
     def validate_items(self, value: list[dict]) -> list[dict]:
         value = validate_waste_order_item_list(value)
@@ -181,6 +188,7 @@ class CreateWasteOrderView(AdminApiView):
                 special_comments=data["special_comments"],
                 expected_delivery_date=data["expected_delivery_date"],
                 booked_for=booked_for,
+                hsn_code=data["hsn_code"],
             )
         order = custom_order_detail_queryset().get(pk=order.pk)
         return Response(custom_order_detail_payload(order), status=status.HTTP_201_CREATED)

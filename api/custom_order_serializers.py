@@ -56,6 +56,11 @@ class CustomOrderDetailPayloadSerializer(serializers.Serializer):
     verified_at = serializers.DateTimeField(allow_null=True)
     made_from_waste = serializers.BooleanField()
     unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
+    hsn_code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Free-text HSN code. Present on waste orders only.",
+    )
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField(help_text="0 on a waste order.")
     total_kg = serializers.CharField(help_text="0 on a packet order.")
@@ -115,6 +120,11 @@ class CustomOrderListItemSerializer(serializers.Serializer):
     booked_for = ChildOrgSummarySerializer(allow_null=True)
     made_from_waste = serializers.BooleanField()
     unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
+    hsn_code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Free-text HSN code. Present on waste orders only.",
+    )
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField(help_text="0 on a waste order.")
     total_kg = serializers.CharField(help_text="0 on a packet order.")
