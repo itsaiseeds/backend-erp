@@ -13,6 +13,7 @@ enum ExportKind {
   dispatchReceipts,
   inwardEntries,
   inventorySnapshots,
+  labTestings,
 }
 
 extension ExportKindX on ExportKind {
@@ -28,6 +29,8 @@ extension ExportKindX on ExportKind {
         return ExportsEndpoints.inwardEntries;
       case ExportKind.inventorySnapshots:
         return ExportsEndpoints.inventorySnapshots;
+      case ExportKind.labTestings:
+        return ExportsEndpoints.labTestings;
     }
   }
 
@@ -43,6 +46,8 @@ extension ExportKindX on ExportKind {
         return AppStrings.EXPORT_INWARD_ENTRIES;
       case ExportKind.inventorySnapshots:
         return AppStrings.EXPORT_INVENTORY_SNAPSHOTS;
+      case ExportKind.labTestings:
+        return AppStrings.EXPORT_LAB_TESTINGS;
     }
   }
 
@@ -58,6 +63,8 @@ extension ExportKindX on ExportKind {
         return AppStrings.EXPORT_INWARD_ENTRIES_BODY;
       case ExportKind.inventorySnapshots:
         return AppStrings.EXPORT_INVENTORY_SNAPSHOTS_BODY;
+      case ExportKind.labTestings:
+        return AppStrings.EXPORT_LAB_TESTINGS_BODY;
     }
   }
 
@@ -73,6 +80,8 @@ extension ExportKindX on ExportKind {
         return Icons.input_outlined;
       case ExportKind.inventorySnapshots:
         return Icons.inventory_outlined;
+      case ExportKind.labTestings:
+        return Icons.biotech_outlined;
     }
   }
 
@@ -89,6 +98,8 @@ extension ExportKindX on ExportKind {
         return 'inward-entries';
       case ExportKind.inventorySnapshots:
         return 'inventory-snapshots';
+      case ExportKind.labTestings:
+        return 'lab-testings';
     }
   }
 
@@ -99,4 +110,9 @@ extension ExportKindX on ExportKind {
   /// Only dispatch receipts have a printable document behind each row, so
   /// only they can be downloaded as challan PDFs instead of a sheet.
   bool get supportsReceipts => this == ExportKind.dispatchReceipts;
+
+  /// Lab testing reports are only ever one PDF document -- the same report
+  /// the lab tester's own app previews/shares -- never a spreadsheet, so the
+  /// dialog skips the format choice entirely for this kind.
+  bool get isPdfOnly => this == ExportKind.labTestings;
 }

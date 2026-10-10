@@ -12,4 +12,6 @@ class ExportsEndpoints {
   static const String inwardEntries = '$_base/inward-entries';
 
   static const String inventorySnapshots = '$_base/inventory-snapshots';
+
+  static const String labTestings = '$_base/lab-testings';
 }

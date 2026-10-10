@@ -78,19 +78,12 @@ class _ReturnOrderAcceptDialogState extends State<ReturnOrderAcceptDialog> {
   bool _isSubmitting = false;
   String? _error;
 
-  bool get _hasAnyRecipe => widget.recipes.lines.any((line) => line.hasRecipes);
-
-  bool get _isValid {
-    if (!_includeMaterials) return true;
-    if (!_hasAnyRecipe) return false;
-
-    for (int index = 0; index < widget.recipes.lines.length; index++) {
-      final ReturnRecipeLineModel line = widget.recipes.lines[index];
-      if (!line.hasRecipes) continue;
-      if (!(_selected[index]?.isNotEmpty ?? false)) return false;
-    }
-    return true;
-  }
+  /// Picking a recipe for a line is optional: a line left unticked (its only
+  /// recipe may have since been deleted, or the admin may simply not want to
+  /// book that material back in) just books nothing for that line. [_toggle]
+  /// already keeps at most one recipe per material type selected, so there is
+  /// no other client-side rule left to enforce before submitting.
+  bool get _isValid => true;
 
   List<String> get _flatSelection => [
     for (final Set<String> ids in _selected.values) ...ids,

@@ -718,6 +718,7 @@ class AppStrings {
   static const String RETURN_ORDER_UNREJECT = 'Unreject';
   static const String RETURN_ORDER_REVERT_ACCEPT = 'Revert accept';
   static const String RETURN_ORDER_EDIT = 'Edit';
+  static const String RETURN_ORDER_VIEW_SLIP = 'View return order slip';
 
   static const String RETURN_ORDER_ACCEPT_TITLE = 'Accept this return?';
   static const String RETURN_ORDER_ACCEPT_BODY =
@@ -750,6 +751,8 @@ class AppStrings {
       'Only an accepted return can have its acceptance undone.';
   static const String RETURN_ORDER_EDIT_BLOCKED =
       'Only a pending return can be edited.';
+  static const String RETURN_ORDER_VIEW_SLIP_BLOCKED =
+      'Only an accepted return has a slip to view.';
 
   static const String RETURN_ORDER_ACCEPT_INCLUDE_MATERIALS =
       'Book the packing materials back in too';
@@ -987,6 +990,14 @@ class AppStrings {
   static const String CHALLAN_VIEW = 'View challan';
   static const String CHALLAN_PREVIEW_TITLE = 'Delivery challan';
   static const String CHALLAN_FILE_PREFIX = 'challan-';
+  static const String RETURN_SLIP_PREVIEW_TITLE = 'Return order slip';
+  static const String RETURN_SLIP_FILE_PREFIX = 'return-slip-';
+  static const String RETURN_SLIP_LOAD_FAILED =
+      'Could not load the order for this return.';
+  static const String RETURN_SLIP_PRINT_FAILED =
+      'Could not open the print dialog.';
+  static const String RETURN_SLIP_DOWNLOAD_FAILED =
+      'Could not generate the return slip PDF.';
   static const String EXPORTS = 'Exports';
   static const String EXPORT = 'Export';
   static const String EXPORT_SUBTITLE =
@@ -1038,6 +1049,9 @@ class AppStrings {
   static const String EXPORT_INVENTORY_SNAPSHOTS = 'Inventory Snapshots';
   static const String EXPORT_INVENTORY_SNAPSHOTS_BODY =
       'Bag and loose stock counts. Leave the dates empty for all history.';
+  static const String EXPORT_LAB_TESTINGS = 'Lab Testing Reports';
+  static const String EXPORT_LAB_TESTINGS_BODY =
+      'Lab tests done in the window, one row per test.';
   static const String EXPORT_WINDOW_OPTIONAL =
       'Optional for this report -- leave both empty for the full history.';
   static const String COLUMN_PRODUCT_USABLE = 'Availability';

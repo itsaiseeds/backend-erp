@@ -11,6 +11,7 @@ import '../../../../core/widgets/tables/app_data_column.dart';
 import '../../../../core/widgets/tables/app_data_table.dart';
 import '../../../clients/data/models/client_filter_model.dart';
 import '../../data/models/return_order_model.dart';
+import '../../data/models/return_order_status.dart';
 import 'return_order_status_badge.dart';
 
 /// The returns queue.
@@ -46,6 +47,7 @@ class ReturnOrdersTable extends StatefulWidget {
   final void Function(ReturnOrderModel returnOrder)? onReject;
   final void Function(ReturnOrderModel returnOrder)? onUnreject;
   final void Function(ReturnOrderModel returnOrder)? onRevertAccept;
+  final void Function(ReturnOrderModel returnOrder)? onViewSlip;
   final bool hasMore;
   final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
@@ -71,6 +73,7 @@ class ReturnOrdersTable extends StatefulWidget {
     this.onReject,
     this.onUnreject,
     this.onRevertAccept,
+    this.onViewSlip,
     this.hasMore = false,
     this.onLoadMore,
     this.searchBarActions = const [],
@@ -272,6 +275,17 @@ class ReturnOrdersTableState extends State<ReturnOrdersTable> {
       child: RowActionsMenu(
         enabled: !isBusy,
         actions: [
+          RowAction(
+            label: AppStrings.RETURN_ORDER_VIEW_SLIP,
+            icon: Icons.receipt_long_outlined,
+            blockedHint: AppStrings.RETURN_ORDER_VIEW_SLIP_BLOCKED,
+            onSelected:
+                returnOrder.status != ReturnOrderStatus.accepted ||
+                    isBusy ||
+                    widget.onViewSlip == null
+                ? null
+                : () => widget.onViewSlip!(returnOrder),
+          ),
           RowAction(
             label: AppStrings.RETURN_ORDER_ACCEPT,
             icon: Icons.check_circle_outline_rounded,
