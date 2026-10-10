@@ -522,8 +522,16 @@ class ChallanGenerator {
                 ),
               ),
               _td(item.lotNumber, pw.TextAlign.left),
-              _td('${item.packetWeight} kg', pw.TextAlign.center),
-              _tdBold('${item.shippedPackets}', pw.TextAlign.right),
+              // A waste line has no packaging at all -- not even the "one
+              // loose bag" a custom-order line is treated as -- so Packing,
+              // Packets and Bags have nothing to report, only Total Wt. does.
+              _td(
+                item.isWasteLine ? _blank : '${item.packetWeight} kg',
+                pw.TextAlign.center,
+              ),
+              item.isWasteLine
+                  ? _td(_blank, pw.TextAlign.right)
+                  : _tdBold('${item.shippedPackets}', pw.TextAlign.right),
               _td(
                 item.shippedWeight.isEmpty
                     ? _blank
@@ -531,7 +539,9 @@ class ChallanGenerator {
                 pw.TextAlign.right,
               ),
               _td(
-                item.hasBags ? '${item.quantity}' : _blank,
+                item.isWasteLine
+                    ? _blank
+                    : (item.hasBags ? '${item.quantity}' : _blank),
                 pw.TextAlign.right,
               ),
             ],
@@ -612,10 +622,12 @@ class ChallanGenerator {
                 'Total Weight',
                 '${totalWeight.toStringAsFixed(3)} kg',
               ),
-              _totalLine('Total Bags', '$totalBags'),
+              // A waste order has no bags or packets at all -- Bags and
+              // Packets would otherwise print a misleading zero.
+              _totalLine('Total Bags', challan.isWasteOrder ? _blank : '$totalBags'),
               _totalLine(
                 'Total Packets',
-                '${challan.totalPackets}',
+                challan.isWasteOrder ? _blank : '${challan.totalPackets}',
                 isEmphasis: true,
               ),
             ],

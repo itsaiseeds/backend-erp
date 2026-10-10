@@ -346,7 +346,11 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
       case DispatchChallansTable.COLUMN_ITEMS:
         return _textCell('${challan.itemCount}');
       case DispatchChallansTable.COLUMN_PACKETS:
-        return _textCell('${challan.totalPackets}');
+        // A waste order sells by the kilogram, so its row has no packet
+        // count to show -- the weight it actually moved stands in instead.
+        return _textCell(
+          challan.isWasteOrder ? '${challan.totalKg} kg' : '${challan.totalPackets}',
+        );
       case DispatchChallansTable.COLUMN_AMOUNT:
         return _textCell(challan.totalAmount, isStrong: true);
       case AppStrings.TABLE_ACTIONS_COLUMN_LABEL:

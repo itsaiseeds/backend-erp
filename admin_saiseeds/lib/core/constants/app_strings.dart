@@ -1097,6 +1097,44 @@ class AppStrings {
   static const String CUSTOM_ORDER_NO_LINES = 'Add at least one order line.';
   static const String CUSTOM_ORDER_LINE_INVALID =
       'Every line needs a product, a packet weight, packets and a price.';
+
+  static const String WASTE_ORDERS = 'Waste Orders';
+  static const String COLUMN_WASTE_ORDER_KG = 'Kg';
+  static const String WASTE_ORDERS_SEARCH_HINT = 'Search waste orders...';
+  static const String WASTE_ORDERS_EMPTY_TITLE = 'No waste orders found';
+  static const String WASTE_ORDERS_EMPTY_BODY =
+      'Orders booked from the waste pool for verified clients will appear here.';
+  static const String WASTE_ORDER_PER_KG = 'per kg';
+  static const String WASTE_ORDER_ADD = 'Book waste order';
+  static const String WASTE_ORDER_ADD_SUBTITLE =
+      'Book an order drawn from the waste pool for a verified client.';
+  static const String WASTE_ORDER_STEP_CLIENT_CAPTION = 'Who it is for';
+  static const String WASTE_ORDER_STEP_ITEMS_CAPTION = 'Kilograms on this order';
+  static const String WASTE_ORDER_STEP_DELIVERY_CAPTION = 'When and where';
+  static const String WASTE_ORDER_DETAIL_TITLE = 'Waste order';
+  static const String WASTE_ORDER_DETAIL_SUBTITLE =
+      'Review the order and its lines.';
+  static const String WASTE_ORDER_CREATED = 'Waste order booked';
+  static const String WASTE_ORDER_UPDATED = 'Waste order updated';
+  static const String WASTE_ORDER_DELETE_TITLE = 'Delete this waste order?';
+  static const String WASTE_ORDER_DELETE_BODY =
+      'The order and all of its lines are removed. This cannot be undone.';
+  static const String WASTE_ORDER_DELETE_BLOCKED =
+      'A dispatched order cannot be deleted.';
+  static const String WASTE_ORDER_NO_LINES = 'Add at least one order line.';
+  static const String WASTE_ORDER_LINE_INVALID =
+      'Every line needs a product, a quantity in kg and a price per kg.';
+  static const String WASTE_ORDER_FIELD_QUANTITY_KG = 'Quantity (kg)';
+  static const String WASTE_ORDER_FIELD_QUANTITY_KG_HINT = 'e.g. 12.500';
+  static const String WASTE_ORDER_FIELD_PRICE_PER_KG = 'Price per kg';
+  static const String WASTE_ORDER_ADD_ITEM = 'Add product';
+  static const String WASTE_ORDER_VIEW_SLIP = 'View';
+  static const String WASTE_ORDER_DISPATCH_LOT_OPTIONAL =
+      'Lot numbers are optional for a waste order -- leave a line blank to '
+      'dispatch it without one.';
+  static const String WASTE_ORDER_FIELD_HSN_CODE = 'HSN Code';
+  static const String WASTE_ORDER_FIELD_HSN_CODE_HINT =
+      'Optional, for the whole order';
   static const String FIELD_NEGOTIATED_PRICE = 'Negotiated price';
   static const String FIELD_NEGOTIATED_PRICE_HINT = 'Price per packet';
   static const String FIELD_SPECIAL_COMMENTS = 'Special comments';

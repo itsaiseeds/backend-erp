@@ -129,13 +129,15 @@ class ChallanDetailDialog extends StatelessWidget {
       case _COLUMN_LOT:
         return _textCell(item.lotNumber);
       case _COLUMN_WEIGHT:
-        return _textCell(item.packetWeight);
+        // A waste line has no packaging at all, so there is no packet weight
+        // to show -- only the kg the item actually moved, in Total Weight.
+        return _textCell(item.isWasteLine ? '' : item.packetWeight);
       case _COLUMN_PACKETS:
-        return _textCell('${item.packets}');
+        return _textCell(item.isWasteLine ? '' : '${item.packets}');
       case _COLUMN_QUANTITY:
-        return _textCell('${item.quantity}');
+        return _textCell(item.isWasteLine ? '' : '${item.quantity}');
       case _COLUMN_TOTAL_WEIGHT:
-        return _textCell(item.totalWeight);
+        return _textCell(item.isWasteLine ? item.quantityKg : item.totalWeight);
       case _COLUMN_PRICE:
         return _textCell(_effectivePrice(item));
       case _COLUMN_LINE_TOTAL:

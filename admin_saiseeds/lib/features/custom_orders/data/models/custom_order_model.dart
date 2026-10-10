@@ -63,12 +63,19 @@ class CustomOrderItemModel {
   final int packets;
   final String lineTotal;
 
+  /// Only present on a waste order's line -- kilograms of a product's waste,
+  /// not packets. [packetWeight]/[packets] are carried on the same payload
+  /// shape but are not meaningful here; [quantityKg] and the per-kg price in
+  /// [negotiatedSellingPrice] are what a waste line is actually priced on.
+  final String quantityKg;
+
   const CustomOrderItemModel({
     this.product,
     this.packetWeight = '',
     this.negotiatedSellingPrice = '',
     this.packets = 0,
     this.lineTotal = '',
+    this.quantityKg = '',
   });
 
   factory CustomOrderItemModel.fromJson(Map<String, dynamic> json) {
@@ -82,6 +89,7 @@ class CustomOrderItemModel {
       negotiatedSellingPrice: _decimalOf(json['negotiated_selling_price']),
       packets: _asInt(json['packets']),
       lineTotal: _decimalOf(json['line_total']),
+      quantityKg: _decimalOf(json['quantity_kg']),
     );
   }
 
@@ -102,8 +110,12 @@ class CustomOrderItemModel {
 
   num? get priceValue => num.tryParse(negotiatedSellingPrice);
 
+  num? get quantityKgValue => num.tryParse(quantityKg);
+
   num get lineTotalValue {
     final num price = num.tryParse(negotiatedSellingPrice) ?? 0;
+    final num? kg = quantityKgValue;
+    if (kg != null) return price * kg;
     return price * packets;
   }
 
@@ -111,6 +123,13 @@ class CustomOrderItemModel {
     'product_public_id': productPublicId,
     'packet_weight': packetWeight,
     'packets': packets,
+    'negotiated_selling_price': negotiatedSellingPrice,
+  };
+
+  /// A waste order's line, keyed on kilograms rather than packets/weight.
+  Map<String, dynamic> toWasteRequestJson() => {
+    'product_public_id': productPublicId,
+    'quantity_kg': quantityKg,
     'negotiated_selling_price': negotiatedSellingPrice,
   };
 
@@ -143,7 +162,14 @@ class CustomOrderModel {
   final String specialComments;
   final String totalAmount;
   final int totalPackets;
+  final String totalKg;
   final int itemCount;
+  final bool madeFromWaste;
+  final String unitOfMeasure;
+
+  /// Only ever present for a waste order -- a packet custom order's payload
+  /// carries no ``hsn_code`` key at all (see ``_hsn_payload``).
+  final String hsnCode;
   final List<CustomOrderItemModel> items;
 
   const CustomOrderModel({
@@ -162,7 +188,11 @@ class CustomOrderModel {
     this.specialComments = '',
     this.totalAmount = '',
     this.totalPackets = 0,
+    this.totalKg = '',
     this.itemCount = 0,
+    this.madeFromWaste = false,
+    this.unitOfMeasure = '',
+    this.hsnCode = '',
     this.items = const [],
   });
 
@@ -219,10 +249,14 @@ class CustomOrderModel {
       specialComments: json['special_comments'] as String? ?? '',
       totalAmount: _decimalOf(json['total_amount']),
       totalPackets: _asInt(json['total_packets']),
+      totalKg: _decimalOf(json['total_kg']),
       // The list endpoint sends item_count; the detail one only sends items.
       itemCount: json.containsKey('item_count')
           ? _asInt(json['item_count'])
           : lines.length,
+      madeFromWaste: json['made_from_waste'] == true,
+      unitOfMeasure: json['unit_of_measure'] as String? ?? '',
+      hsnCode: json['hsn_code'] as String? ?? '',
       items: lines,
     );
   }
