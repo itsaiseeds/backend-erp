@@ -40,6 +40,7 @@ from .GodownOtherMaterialRecipesView import GodownOtherMaterialRecipesView
 from .GodownOtherMaterialStockView import GodownOtherMaterialStockView
 from .GodownProductPackagingsView import GodownProductPackagingsView
 from .GodownRawMaterialStockView import GodownRawMaterialStockView
+from .GodownRawMaterialWastesView import GodownRawMaterialWastesView
 from .GodownSamplePacketStockView import GodownSamplePacketStockView
 from .GodownUpdateBagStockView import GodownUpdateBagStockView
 from .GodownUpdateSamplePacketStockView import GodownUpdateSamplePacketStockView
@@ -69,6 +70,7 @@ from .UpdateFarmerVisitView import UpdateFarmerVisitView
 from .UpdateFieldTripView import UpdateFieldTripView
 from .UpdateGodownInwardOtherMaterialView import UpdateGodownInwardOtherMaterialView
 from .UpdateGodownInwardRawMaterialView import UpdateGodownInwardRawMaterialView
+from .UpdateGodownRawMaterialWasteView import UpdateGodownRawMaterialWasteView
 
 ROUTES: dict[str, type] = {
     "auth/login": LoginView,
@@ -127,6 +129,8 @@ ROUTES: dict[str, type] = {
     "godown/bag-stock": GodownBagStockView,
     "godown/sample-packet-stock": GodownSamplePacketStockView,
     "godown/product-packagings": GodownProductPackagingsView,
+    "godown/raw-material-wastes": GodownRawMaterialWastesView,
+    "godown/raw-material-waste/<public_id>": UpdateGodownRawMaterialWasteView,
     "lab/pending-lots": LabPendingLotsView,
     "lab/lab-testings": LabTestingsView,
     "lab/export/lab-testings": LabExportLabTestingsView,

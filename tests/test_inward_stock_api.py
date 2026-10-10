@@ -203,6 +203,9 @@ class InwardStockApiTest(WebApiTestCase):
             "wasted_kg": "0.000",
             "available_kg": "100.000",
             "rejected_kg": "0.000",
+            "waste_reserved_kg": "0.000",
+            "waste_consumed_kg": "0.000",
+            "waste_available_kg": "0.000",
         })
 
     def test_raw_stock_sums_multiple_lots_and_supports_product_filtering(self):
@@ -271,6 +274,9 @@ class InwardStockApiTest(WebApiTestCase):
             "wasted_kg": "0.000",
             "available_kg": "25.000",
             "rejected_kg": "0.000",
+            "waste_reserved_kg": "0.000",
+            "waste_consumed_kg": "0.000",
+            "waste_available_kg": "0.000",
         }])
 
     def test_a_reverted_lot_stops_counting_against_the_stock_read(self):
@@ -306,6 +312,9 @@ class InwardStockApiTest(WebApiTestCase):
             "wasted_kg": "0.000",
             "available_kg": "25.000",
             "rejected_kg": "0.000",
+            "waste_reserved_kg": "0.000",
+            "waste_consumed_kg": "0.000",
+            "waste_available_kg": "0.000",
         }])
 
         reverted = self.client.patch(url, {"status": "Lab Testing"}, format="json")
@@ -367,6 +376,9 @@ class InwardStockApiTest(WebApiTestCase):
             "wasted_kg": "0.000",
             "available_kg": "1000.000",
             "rejected_kg": "500.000",
+            "waste_reserved_kg": "0.000",
+            "waste_consumed_kg": "0.000",
+            "waste_available_kg": "0.000",
         }])
 
         # A bag count needing more than the 1000 kg In Use is refused -- the
@@ -408,6 +420,9 @@ class InwardStockApiTest(WebApiTestCase):
             "wasted_kg": "0.000",
             "available_kg": "0.000",
             "rejected_kg": "80.000",
+            "waste_reserved_kg": "0.000",
+            "waste_consumed_kg": "0.000",
+            "waste_available_kg": "0.000",
         }])
 
     def test_sending_a_rejected_lot_back_to_lab_testing_drops_rejected_kg(self):

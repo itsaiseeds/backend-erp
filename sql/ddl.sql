@@ -1058,6 +1058,8 @@ CREATE INDEX IF NOT EXISTS aggregator_dispatchentry_deleted_by_id_idx ON public.
 -- the order cannot rewrite a challan already in the driver's hand.
 -- A custom order's loose line sets product_id + packet_weight instead of
 -- product_packaging_id (quantity is then packets, the price per packet).
+-- A waste order's line sets product_id + quantity_kg (quantity and packet_weight
+-- NULL, the price per kg, lot_number may be '').
 CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentryitem (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1071,18 +1073,29 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentryitem (
 	product_id int8 NULL,
 	packet_weight numeric(8, 3) NULL,
 	negotiated_selling_price numeric(12, 2) NOT NULL,
-	quantity int8 NOT NULL,
-	lot_number varchar(64) NOT NULL,
+	quantity int8 NULL,
+	quantity_kg numeric(10, 3) NULL,
+	lot_number varchar(64) NOT NULL DEFAULT '',
 	CONSTRAINT aggregator_dispatchentryitem_pkey PRIMARY KEY (id),
 	CONSTRAINT uniq_dispatchentryitem_entry_packaging UNIQUE (dispatch_entry_id, product_packaging_id),
 	CONSTRAINT uniq_dispatchentryitem_entry_product_weight UNIQUE (dispatch_entry_id, product_id, packet_weight),
 	CONSTRAINT ck_dispatchentryitem_one_kind CHECK (
 		(product_packaging_id IS NOT NULL AND product_id IS NULL AND packet_weight IS NULL)
 		OR (product_packaging_id IS NULL AND product_id IS NOT NULL AND packet_weight IS NOT NULL)
+		OR (product_packaging_id IS NULL AND product_id IS NOT NULL AND packet_weight IS NULL)
 	),
-	CONSTRAINT ck_dispatchentryitem_positive CHECK (negotiated_selling_price >= 0 AND quantity > 0),
+	CONSTRAINT ck_dispatchentryitem_one_quantity CHECK (
+		(quantity IS NOT NULL AND quantity_kg IS NULL)
+		OR (quantity IS NULL AND quantity_kg IS NOT NULL AND product_packaging_id IS NULL AND packet_weight IS NULL)
+	),
+	CONSTRAINT ck_dispatchentryitem_positive CHECK (
+		negotiated_selling_price >= 0
+		AND (quantity IS NULL OR quantity > 0)
+		AND (quantity_kg IS NULL OR quantity_kg > 0)
+	),
 	CONSTRAINT aggregator_dispatchentryitem_quantity_check CHECK (quantity >= 0)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_dispatchentryitem_entry_product_kg ON public.aggregator_dispatchentryitem USING btree (dispatch_entry_id, product_id) WHERE packet_weight IS NULL AND product_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_dispatch_entry_id_idx ON public.aggregator_dispatchentryitem USING btree (dispatch_entry_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_product_packaging_id_idx ON public.aggregator_dispatchentryitem USING btree (product_packaging_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_product_id_idx ON public.aggregator_dispatchentryitem USING btree (product_id);
@@ -1186,9 +1199,17 @@ CREATE TABLE IF NOT EXISTS public.aggregator_customorder (
 	special_comments text NOT NULL,
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
+	made_from_waste bool NOT NULL DEFAULT false,
+	unit_of_measure varchar(8) NOT NULL DEFAULT 'packet',
+	hsn_code varchar(32) NOT NULL DEFAULT '',
 	CONSTRAINT aggregator_customorder_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_customorder_public_id_key UNIQUE (public_id),
-	CONSTRAINT ck_customorder_not_both_dispatch_details CHECK (NOT (dispatch_details_id IS NOT NULL AND private_dispatch_details_id IS NOT NULL))
+	CONSTRAINT ck_customorder_not_both_dispatch_details CHECK (NOT (dispatch_details_id IS NOT NULL AND private_dispatch_details_id IS NOT NULL)),
+	CONSTRAINT ck_customorder_waste_unit CHECK (
+		(made_from_waste AND unit_of_measure = 'kg')
+		OR (NOT made_from_waste AND unit_of_measure = 'packet')
+	),
+	CONSTRAINT ck_customorder_hsn_waste_only CHECK (made_from_waste OR hsn_code = '')
 );
 CREATE INDEX IF NOT EXISTS aggregator_customorder_public_id_like ON public.aggregator_customorder USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_customorder_client_id_idx ON public.aggregator_customorder USING btree (client_id);
@@ -1208,6 +1229,8 @@ CREATE INDEX IF NOT EXISTS aggregator_customorder_deleted_by_id_idx ON public.ag
 -- aggregator_loosestocksnapshot is keyed by -- and deliberately no packaging.
 -- packet_weight is required because a loose packet has a definite weight:
 -- 5 x 1kg and 5 x 500g draw on different pools and are worth different money.
+-- A waste order's line is a kg line instead: quantity_kg set, packet_weight and
+-- packets NULL, at a per-kg price.
 CREATE TABLE IF NOT EXISTS public.aggregator_customorderitem (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1219,13 +1242,26 @@ CREATE TABLE IF NOT EXISTS public.aggregator_customorderitem (
 	custom_order_id int8 NOT NULL,
 	product_id int8 NOT NULL,
 	negotiated_selling_price numeric(12, 2) NOT NULL,
-	packet_weight numeric(8,3) NOT NULL,
-	packets int8 NOT NULL,
+	packet_weight numeric(8,3) NULL,
+	packets int8 NULL,
+	quantity_kg numeric(10,3) NULL,
 	CONSTRAINT aggregator_customorderitem_pkey PRIMARY KEY (id),
 	CONSTRAINT uniq_customorderitem_order_product_weight UNIQUE (custom_order_id, product_id, packet_weight),
-	CONSTRAINT ck_customorderitem_positive CHECK (negotiated_selling_price >= 0 AND packets > 0 AND packet_weight > 0),
+	CONSTRAINT ck_customorderitem_one_kind CHECK (
+		(packet_weight IS NOT NULL AND packets IS NOT NULL AND quantity_kg IS NULL)
+		OR (packet_weight IS NULL AND packets IS NULL AND quantity_kg IS NOT NULL)
+	),
+	CONSTRAINT ck_customorderitem_positive CHECK (
+		negotiated_selling_price >= 0
+		AND (packets IS NULL OR packets > 0)
+		AND (packet_weight IS NULL OR packet_weight > 0)
+		AND (quantity_kg IS NULL OR quantity_kg > 0)
+	),
 	CONSTRAINT aggregator_customorderitem_packets_check CHECK (packets >= 0)
 );
+-- A waste order's kg line has no packet_weight, so the unique constraint above
+-- (NULLs are distinct) cannot stop a product being listed twice on one order.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_customorderitem_order_product_kg ON public.aggregator_customorderitem USING btree (custom_order_id, product_id) WHERE packet_weight IS NULL;
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_custom_order_id_idx ON public.aggregator_customorderitem USING btree (custom_order_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_product_id_idx ON public.aggregator_customorderitem USING btree (product_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_is_deleted_idx ON public.aggregator_customorderitem USING btree (is_deleted);

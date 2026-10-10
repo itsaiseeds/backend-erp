@@ -1004,6 +1004,15 @@ class RawMaterialStockLineSerializer(serializers.Serializer):
     rejected_kg = serializers.CharField(
         help_text="Rejected KG with a reached effective date. Reported only, never spendable."
     )
+    waste_reserved_kg = serializers.CharField(
+        help_text="Waste KG held by CONFIRMED waste orders. Does not change available_kg."
+    )
+    waste_consumed_kg = serializers.CharField(
+        help_text="Waste KG that left on DISPATCHED / DELIVERED waste orders."
+    )
+    waste_available_kg = serializers.CharField(
+        help_text="Waste KG still free for a waste order: wasted_kg minus reserved minus consumed."
+    )
 
 
 class RawMaterialStockSerializer(serializers.Serializer):

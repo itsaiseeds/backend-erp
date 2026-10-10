@@ -1,7 +1,7 @@
 """Custom-order export: ``GET /api/sales-admin/export/custom-orders``.
 
-Every live custom order **booked** (``created_at``) inside the window, oldest
-first, each with its loose-packet lines nested -- the product, the packet
+Every live custom order (waste orders excluded) **booked** (``created_at``)
+inside the window, oldest first, each with its loose-packet lines nested -- the product, the packet
 weight, the negotiated per-packet price, the packet count and the line total.
 The client is named with its delivery city. See :mod:`api.export_views` for the
 window contract.
@@ -33,7 +33,7 @@ class ExportCustomOrdersView(AdminDateRangeExportView):
 
     def export(self, window: DateWindow) -> list[dict]:
         orders = (
-            window.created_between(CustomOrder.objects.all())
+            window.created_between(CustomOrder.objects.filter(made_from_waste=False))
             .select_related(
                 "client",
                 "status",

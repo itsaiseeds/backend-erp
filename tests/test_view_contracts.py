@@ -163,6 +163,11 @@ EXPECTED_CONTRACTS = {
     "android/api/v1/utilities/sales-admins": ("SalesAdminsView", TOKEN_ANDROID),
     "android/api/v1/utilities/sales-persons": ("SalesPersonsView", TOKEN_ANDROID_ADMIN),
     "android/api/v1/godown/raw-material-stock": ("GodownRawMaterialStockView", TOKEN_GODOWN),
+    "android/api/v1/godown/raw-material-wastes": ("GodownRawMaterialWastesView", TOKEN_GODOWN),
+    "android/api/v1/godown/raw-material-waste/<public_id>": (
+        "UpdateGodownRawMaterialWasteView",
+        TOKEN_GODOWN,
+    ),
     "android/api/v1/godown/other-material-stock": (
         "GodownOtherMaterialStockView",
         TOKEN_GODOWN,
@@ -259,6 +264,16 @@ EXPECTED_CONTRACTS = {
     ),
     "api/sales-admin/revert-custom-order-dispatch/<str:public_id>": (
         "RevertCustomOrderDispatchView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/waste-orders/": ("GetWasteOrdersView", SESSION_ADMIN),
+    "api/sales-admin/create-waste-order": ("CreateWasteOrderView", SESSION_ADMIN),
+    "api/sales-admin/edit-waste-order/<str:public_id>": (
+        "UpdateWasteOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/dispatch-waste-order/<str:public_id>": (
+        "DispatchWasteOrderView",
         SESSION_ADMIN,
     ),
     "api/sales-admin/get-clients/": ("GetClientsView", SESSION_ADMIN),

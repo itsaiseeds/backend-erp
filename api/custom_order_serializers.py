@@ -22,12 +22,19 @@ from common.views.paginated_date_range import (
 
 
 class CustomOrderItemPayloadSerializer(serializers.Serializer):
-    """Output shape for one loose-packet line of a custom order."""
+    """Output shape for one line of a custom order: loose packets, or kg on a waste order."""
 
     product = ProductRefSerializer()
-    packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
-    negotiated_selling_price = serializers.CharField(help_text="Per packet.")
-    packets = serializers.IntegerField()
+    packet_weight = serializers.CharField(
+        allow_null=True, help_text="Weight of one packet, in kg. Null on a waste order's kg line."
+    )
+    negotiated_selling_price = serializers.CharField(
+        help_text="Per packet, or per kg on a waste order's line."
+    )
+    packets = serializers.IntegerField(allow_null=True, help_text="Null on a kg line.")
+    quantity_kg = serializers.CharField(
+        allow_null=True, help_text="Kilograms on a waste order's line. Null on a packet line."
+    )
     line_total = serializers.CharField()
 
 
@@ -47,8 +54,16 @@ class CustomOrderDetailPayloadSerializer(serializers.Serializer):
     special_comments = serializers.CharField(allow_blank=True)
     booked_for = ChildOrgPayloadSerializer(allow_null=True)
     verified_at = serializers.DateTimeField(allow_null=True)
+    made_from_waste = serializers.BooleanField()
+    unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
+    hsn_code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Free-text HSN code. Present on waste orders only.",
+    )
     total_amount = serializers.CharField()
-    total_packets = serializers.IntegerField()
+    total_packets = serializers.IntegerField(help_text="0 on a waste order.")
+    total_kg = serializers.CharField(help_text="0 on a packet order.")
     items = CustomOrderItemPayloadSerializer(many=True)
 
 
@@ -70,9 +85,16 @@ class CustomOrderCardItemSerializer(serializers.Serializer):
     """Output shape for one line on a custom-order card."""
 
     product = OrderCardProductSerializer()
-    packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
-    negotiated_selling_price = serializers.CharField(help_text="Per packet.")
-    packets = serializers.IntegerField()
+    packet_weight = serializers.CharField(
+        allow_null=True, help_text="Weight of one packet, in kg. Null on a kg line."
+    )
+    negotiated_selling_price = serializers.CharField(
+        help_text="Per packet, or per kg on a waste order's line."
+    )
+    packets = serializers.IntegerField(allow_null=True, help_text="Null on a kg line.")
+    quantity_kg = serializers.CharField(
+        allow_null=True, help_text="Kilograms on a waste order's line. Null on a packet line."
+    )
 
 
 class CustomOrderListItemSerializer(serializers.Serializer):
@@ -96,8 +118,16 @@ class CustomOrderListItemSerializer(serializers.Serializer):
     city = CustomOrderListCitySerializer(allow_null=True)
     expected_delivery_date = serializers.DateField()
     booked_for = ChildOrgSummarySerializer(allow_null=True)
+    made_from_waste = serializers.BooleanField()
+    unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
+    hsn_code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Free-text HSN code. Present on waste orders only.",
+    )
     total_amount = serializers.CharField()
-    total_packets = serializers.IntegerField()
+    total_packets = serializers.IntegerField(help_text="0 on a waste order.")
+    total_kg = serializers.CharField(help_text="0 on a packet order.")
     item_count = serializers.IntegerField()
     items = CustomOrderCardItemSerializer(many=True)
 
