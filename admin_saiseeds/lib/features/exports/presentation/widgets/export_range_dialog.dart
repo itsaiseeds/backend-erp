@@ -53,7 +53,9 @@ class _ExportRangeDialogState extends State<ExportRangeDialog> {
 
   DateTime? _start;
   DateTime? _end;
-  ExportFormat _format = ExportFormat.spreadsheet;
+  late ExportFormat _format = widget.kind.isPdfOnly
+      ? ExportFormat.pdfReport
+      : ExportFormat.spreadsheet;
   bool _isSubmitting = false;
   String? _error;
 

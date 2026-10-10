@@ -60,6 +60,11 @@ class SidebarItems {
       icon: Icons.tune_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.WASTE_ORDERS,
+      label: AppStrings.WASTE_ORDERS,
+      icon: Icons.recycling_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.EXPORTS,
       label: AppStrings.EXPORTS,
       icon: Icons.download_outlined,
@@ -165,6 +170,7 @@ class SidebarItems {
           TabIds.ORDERS,
           TabIds.RETURN_ORDERS,
           TabIds.CUSTOM_ORDERS,
+          TabIds.WASTE_ORDERS,
           TabIds.DISPATCH_CHALLANS,
         ],
       ),

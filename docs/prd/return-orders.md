@@ -25,7 +25,7 @@ All code lives in `backend-erp/`. The schema is raw SQL in `sql/ddl.sql` and `sq
 - **Packing materials.** When `include_in_other_raw_materials` is true, the admin also sends a flat `recipe_public_ids` list. Live and soft-deleted recipes are both accepted (`OtherMaterialRecipe.all_objects`). Rules:
   - Each recipe is matched to the return line with the same `(product, packet_weight)`. A recipe that matches no line returns 400.
   - Each `(product, weight)` can have at most one recipe per material type (400 otherwise).
-  - Every line must get at least one recipe, or the accept returns 400 and names the uncovered lines.
+  - Picking a recipe for a line is optional. A line left uncovered (e.g. its only recipe has since been deleted, or the admin does not want to book that material back in) simply books no packing material for that line -- nothing else about the accept is affected.
   - Each chosen recipe books `recipe.quantity × packets` of its material.
   - When the flag is false, `recipe_public_ids` must be empty or omitted.
 - **New recipe picker endpoint.** `GET return-order-recipes/<RET-public_id>` returns, for each line of the return, every recipe for that line's `(product, packet_weight)`, including deleted ones. Each recipe shows `public_id`, material type (id, name, unit), quantity per packet, `is_deleted`, `created_at` and `deleted_at`.

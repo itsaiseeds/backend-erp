@@ -12,6 +12,7 @@ import '../bloc/return_orders_cubit.dart';
 import '../widgets/return_order_accept_dialog.dart';
 import '../widgets/return_order_detail_dialog.dart';
 import '../widgets/return_order_edit_dialog.dart';
+import '../widgets/return_order_slip_dialog.dart';
 import '../widgets/return_orders_table.dart';
 
 class ReturnOrdersView extends StatelessWidget {
@@ -76,6 +77,14 @@ class _ReturnOrdersContentState extends State<_ReturnOrdersContent> {
 
     if (!saved || !mounted) return;
     ToastUtils.showSuccess(context, AppStrings.RETURN_ORDER_EDIT_DONE);
+  }
+
+  Future<void> _onViewSlip(ReturnOrderModel returnOrder) {
+    return ReturnOrderSlipDialog.show(
+      context,
+      returnOrder: returnOrder,
+      apiClient: context.read<ApiClient>(),
+    );
   }
 
   Future<void> _onEdit(ReturnOrderModel returnOrder) async {
@@ -215,6 +224,7 @@ class _ReturnOrdersContentState extends State<_ReturnOrdersContent> {
             hasMore: state.hasMore,
             onLoadMore: cubit.loadMore,
             onView: _onView,
+            onViewSlip: _onViewSlip,
             onEdit: _onEdit,
             onAccept: _onAccept,
             onReject: _onReject,

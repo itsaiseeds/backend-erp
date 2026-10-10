@@ -92,6 +92,11 @@ class ExportSheets {
         return _inwardEntries(results);
       case ExportKind.inventorySnapshots:
         return _inventorySnapshots(results);
+      case ExportKind.labTestings:
+        throw UnsupportedError(
+          'Lab testing reports are a PDF document, not a spreadsheet -- see '
+          'ExportsCubit.export, which never reaches this branch for them.',
+        );
     }
   }
 

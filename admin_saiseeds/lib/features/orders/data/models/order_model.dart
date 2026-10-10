@@ -90,6 +90,37 @@ class OrderPackagingModel {
     );
   }
 
+  /// The order-detail endpoint's shape for one line: the packaging nested
+  /// under `packaging`, with `negotiated_selling_price`/`quantity`/
+  /// `line_total` as siblings rather than flattened onto the packaging
+  /// itself (that flattening is `order_list_payload`'s `packagings`, a
+  /// different, admin-list-only endpoint). Both shapes end up as the same
+  /// model so every call site reads one type regardless of which endpoint it
+  /// came from.
+  factory OrderPackagingModel.fromDetailItemJson(Map<String, dynamic> json) {
+    final dynamic packaging = json['packaging'];
+    final Map<String, dynamic> packagingMap = packaging is Map
+        ? Map<String, dynamic>.from(packaging)
+        : const {};
+    final dynamic product = packagingMap['product'];
+    final Map<String, dynamic> productMap = product is Map
+        ? Map<String, dynamic>.from(product)
+        : const {};
+
+    return OrderPackagingModel(
+      publicId: packagingMap['public_id'] as String? ?? '',
+      productPublicId: productMap['public_id'] as String? ?? '',
+      productName: productMap['name'] as String? ?? '',
+      imageUrl: productMap['image_url'] as String? ?? '',
+      packetWeight: _asNum(packagingMap['packet_weight']),
+      packets: _asInt(packagingMap['packets']),
+      totalWeight: _asNum(packagingMap['total_weight']),
+      sellingPrice: _asNum(packagingMap['selling_price']),
+      negotiatedSellingPrice: _asNum(json['negotiated_selling_price']),
+      quantity: _asInt(json['quantity']),
+    );
+  }
+
   num get effectivePrice =>
       negotiatedSellingPrice > 0 ? negotiatedSellingPrice : sellingPrice;
 
@@ -214,23 +245,43 @@ class OrderModel {
       totalPackets: _asInt(json['total_packets']),
       itemCount: _asInt(json['item_count']),
       specialComments: json['special_comments'] as String? ?? '',
-      packagings: json['packagings'] is List
-          ? (json['packagings'] as List)
-                .whereType<Map>()
-                .map(
-                  (entry) => OrderPackagingModel.fromJson(
-                    Map<String, dynamic>.from(entry),
-                  ),
-                )
-                .toList()
-          : const [],
-      returns: _returnList(json['return_order']),
+      packagings: _packagings(json),
+      returns: _returnList(json['return_orders'] ?? json['return_order']),
     );
   }
 
-  /// The detail endpoint embeds the return (or returns) against this order.
-  /// A single object is the current shape; a list is accepted so the model does
-  /// not break if the backend ever returns several.
+  /// `packagings` (the admin order-LIST endpoint's flattened shape) when
+  /// present, else `items` (the order-DETAIL endpoint's nested shape) -- the
+  /// two endpoints describe the same lines differently, so whichever one
+  /// actually sent them is parsed into the same [OrderPackagingModel] list.
+  static List<OrderPackagingModel> _packagings(Map<String, dynamic> json) {
+    if (json['packagings'] is List) {
+      return (json['packagings'] as List)
+          .whereType<Map>()
+          .map(
+            (entry) =>
+                OrderPackagingModel.fromJson(Map<String, dynamic>.from(entry)),
+          )
+          .toList();
+    }
+    if (json['items'] is List) {
+      return (json['items'] as List)
+          .whereType<Map>()
+          .map(
+            (entry) => OrderPackagingModel.fromDetailItemJson(
+              Map<String, dynamic>.from(entry),
+            ),
+          )
+          .toList();
+    }
+    return const [];
+  }
+
+  /// The detail endpoint sends every live return on `return_orders` (newest
+  /// first); `return_order` is the older, single-object key kept only for
+  /// backward compatibility and used as a fallback if `return_orders` is
+  /// ever absent. A single object is still accepted from either key so the
+  /// model does not break against an older response shape.
   static List<ReturnOrderModel> _returnList(dynamic value) {
     if (value is Map) {
       return [
@@ -248,11 +299,14 @@ class OrderModel {
     return const [];
   }
 
-  /// The detail endpoint only carries what the list leaves out: the return
-  /// block, transport, comments and dates. Merging fills those gaps without
-  /// discarding a single field of the list row, because the two endpoints use
-  /// different shapes for the goods (`items` vs `packagings`) and only the
-  /// list one supplies identity fields the steps read.
+  /// The detail endpoint carries what the list leaves out: the return block,
+  /// transport, comments and dates. Merging fills those gaps without
+  /// discarding a single field of the list row. The two endpoints describe
+  /// an order's lines in different shapes on the wire (`items` vs
+  /// `packagings`), but [_packagings] parses either into the same
+  /// [OrderPackagingModel] list, so `detail.packagings` is populated too --
+  /// it wins here whenever it came back non-empty, same as every other
+  /// detail-preferred field.
   OrderModel mergedWithDetail(OrderModel detail) {
     final OrderModel base = this;
 

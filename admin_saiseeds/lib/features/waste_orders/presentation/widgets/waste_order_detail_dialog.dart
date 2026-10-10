@@ -1,0 +1,437 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/services/products_service.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utils/formatters/currency_formatter.dart';
+import '../../../../core/utils/formatters/date_formatter.dart';
+import '../../../../core/utils/toast_utils.dart';
+import '../../../../core/widgets/buttons/icon_action_button.dart';
+import '../../../../core/widgets/dialogs/app_record_dialog.dart';
+import '../../../../core/widgets/feedback/detail_field.dart';
+import '../../../../core/widgets/feedback/section_title.dart';
+import '../../../../core/widgets/inputs/app_text_field.dart';
+import '../../../../core/widgets/inputs/single_date_field.dart';
+import '../../../../core/widgets/layout/app_hairline.dart';
+import '../../../orders/presentation/widgets/delivery_to_field.dart';
+import '../../../orders/presentation/widgets/order_status_badge.dart';
+import '../../../custom_orders/data/models/custom_order_model.dart';
+import '../../../products/data/models/product_model.dart';
+import '../bloc/waste_orders_cubit.dart';
+import 'waste_order_line_row.dart';
+
+/// Views and edits a waste order over the same three steps a custom order
+/// uses, with kg lines instead of packet lines.
+class WasteOrderDetailDialog extends StatefulWidget {
+  final CustomOrderModel order;
+  final RecordDialogMode initialMode;
+
+  const WasteOrderDetailDialog({
+    super.key,
+    required this.order,
+    this.initialMode = RecordDialogMode.view,
+  });
+
+  static final DateFormat isoDate = DateFormat('yyyy-MM-dd');
+
+  static Future<void> show(
+    BuildContext context, {
+    required WasteOrdersCubit cubit,
+    required CustomOrderModel order,
+    RecordDialogMode initialMode = RecordDialogMode.view,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BlocProvider<WasteOrdersCubit>.value(
+        value: cubit,
+        child: WasteOrderDetailDialog(order: order, initialMode: initialMode),
+      ),
+    );
+  }
+
+  @override
+  State<WasteOrderDetailDialog> createState() =>
+      _WasteOrderDetailDialogState();
+}
+
+class _WasteOrderDetailDialogState extends State<WasteOrderDetailDialog> {
+  static const List<IconData> _ICONS = [
+    Icons.summarize_outlined,
+    Icons.recycling_outlined,
+    Icons.local_shipping_outlined,
+  ];
+
+  static const List<String> _STEPS = [
+    AppStrings.ORDER_STEP_SUMMARY,
+    AppStrings.ORDER_STEP_ITEMS,
+    AppStrings.ORDER_STEP_DELIVERY,
+  ];
+
+  static const List<String> _CAPTIONS = [
+    AppStrings.ORDER_STEP_SUMMARY_CAPTION,
+    AppStrings.WASTE_ORDER_STEP_ITEMS_CAPTION,
+    AppStrings.ORDER_STEP_DELIVERY_CAPTION,
+  ];
+
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _commentsController = TextEditingController();
+  final TextEditingController _hsnCodeController = TextEditingController();
+
+  int _stepIndex = 0;
+  late RecordDialogMode _mode;
+  late List<WasteOrderLine> _lines;
+  DateTime? _expectedDelivery;
+  DeliveryToValue _deliveryTo = const DeliveryToValue.untouchedValue();
+  bool _isSubmitting = false;
+  String? _linesError;
+
+  CustomOrderModel get _order => widget.order;
+
+  bool get _isEditing => _mode == RecordDialogMode.edit;
+
+  bool get _canEdit => _isEditing && !_isSubmitting;
+
+  bool get _isFirstStep => _stepIndex == 0;
+
+  bool get _isLastStep => _stepIndex == _STEPS.length - 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _mode = widget.initialMode;
+    _resetDraft();
+    _loadCatalogue();
+  }
+
+  Future<void> _loadCatalogue() async {
+    await ProductsService.instance.loadProducts();
+    if (mounted) setState(() {});
+  }
+
+  void _resetDraft() {
+    _commentsController.text = _order.specialComments;
+    _hsnCodeController.text = _order.hsnCode;
+    _expectedDelivery = _order.expectedDeliveryDateTime;
+    _deliveryTo = const DeliveryToValue.untouchedValue();
+    _lines = [
+      for (final CustomOrderItemModel item in _order.items)
+        WasteOrderLine(
+          product: ProductsService.instance.productByPublicId(
+            item.productPublicId,
+          ),
+          productPublicId: item.productPublicId,
+          productName: item.productName,
+          imageUrl: item.imageUrl,
+          quantityKgText: item.quantityKg,
+          priceText: item.negotiatedSellingPrice,
+        ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _commentsController.dispose();
+    _hsnCodeController.dispose();
+    for (final WasteOrderLine line in _lines) {
+      line.dispose();
+    }
+    super.dispose();
+  }
+
+  void _enterEditMode() => setState(() => _mode = RecordDialogMode.edit);
+
+  void _cancelEdit() {
+    setState(() {
+      for (final WasteOrderLine line in _lines) {
+        line.dispose();
+      }
+      _resetDraft();
+      _linesError = null;
+      _mode = RecordDialogMode.view;
+    });
+  }
+
+  void _goTo(int index) =>
+      setState(() => _stepIndex = index.clamp(0, _STEPS.length - 1));
+
+  void _addLine() => setState(() => _lines = [..._lines, WasteOrderLine()]);
+
+  /// Every product not already picked on another line -- a product already on
+  /// the order combines into that line's kg rather than appearing twice, so
+  /// it drops out of the remaining pickers' options.
+  List<ProductModel> _productOptionsFor(WasteOrderLine line) {
+    final Set<String> takenByOthers = _lines
+        .where((other) => other != line)
+        .map((other) => other.productPublicId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    return ProductsService.instance.products
+        .where((product) => !takenByOthers.contains(product.publicId))
+        .toList();
+  }
+
+  void _removeLine(int index) {
+    setState(() {
+      final List<WasteOrderLine> next = [..._lines];
+      next.removeAt(index).dispose();
+      _lines = next;
+    });
+  }
+
+  num get _liveTotalAmount =>
+      _lines.fold<num>(0, (sum, line) => sum + line.lineTotal);
+
+  num get _liveTotalKg => _lines.fold<num>(
+    0,
+    (sum, line) => sum + (num.tryParse(line.quantityKg.text.trim()) ?? 0),
+  );
+
+  Future<void> _submit() async {
+    final bool formValid = _formKey.currentState?.validate() ?? false;
+    final bool linesValid =
+        _lines.isNotEmpty && _lines.every((line) => line.isValid);
+
+    setState(
+      () => _linesError = linesValid
+          ? null
+          : AppStrings.WASTE_ORDER_LINE_INVALID,
+    );
+
+    if (!formValid || !linesValid) {
+      setState(() => _stepIndex = 1);
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    final WasteOrdersCubit cubit = context.read<WasteOrdersCubit>();
+
+    final bool succeeded = await cubit.updateWasteOrder(
+      publicId: _order.publicId,
+      changes: {
+        'special_comments': _commentsController.text.trim(),
+        if (_expectedDelivery != null)
+          'expected_delivery_date': WasteOrderDetailDialog.isoDate.format(
+            _expectedDelivery!,
+          ),
+        'items': [for (final WasteOrderLine line in _lines) line.toJson()],
+        if (!_deliveryTo.untouched)
+          'booked_for': _deliveryTo.toRequestValue(),
+        'hsn_code': _hsnCodeController.text.trim(),
+      },
+    );
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (succeeded) {
+      Navigator.of(context).pop();
+      ToastUtils.showSuccess(context, AppStrings.WASTE_ORDER_UPDATED);
+      return;
+    }
+
+    ToastUtils.showError(
+      context,
+      cubit.state.errorMessage ?? AppStrings.SOMETHING_WENT_WRONG,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppRecordDialog(
+      icon: Icons.recycling_outlined,
+      title: AppStrings.WASTE_ORDER_DETAIL_TITLE,
+      subtitle: _subtitle,
+      mode: _mode,
+      isSubmitting: _isSubmitting,
+      showFooterInViewMode: true,
+      extraWidth: AppSizes.recordDialogRoomyBump * 2,
+      extraHeight: AppSizes.recordDialogRoomyBump * 3,
+      badge: OrderStatusBadge(status: _order.statusValue),
+      onEdit: _enterEditMode,
+      onCancelEdit: _isFirstStep ? _cancelEdit : () => _goTo(_stepIndex - 1),
+      cancelLabel: _isFirstStep ? AppStrings.CANCEL : AppStrings.STEP_BACK,
+      isCancelEnabled: _isEditing || !_isFirstStep,
+      onSubmit: _isSubmitting
+          ? null
+          : (_isLastStep
+                ? (_isEditing ? _submit : null)
+                : () => _goTo(_stepIndex + 1)),
+      submitLabel: _isLastStep ? AppStrings.UPDATE : AppStrings.STEP_NEXT,
+      body: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SectionTitle(
+              title: _STEPS[_stepIndex],
+              icon: _ICONS[_stepIndex],
+              hasRule: true,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _buildStep(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String get _subtitle =>
+      '${AppStrings.ORDER_STEP_PREFIX} ${_stepIndex + 1}'
+      '${AppStrings.LABEL_SEPARATOR} ${_CAPTIONS[_stepIndex]}';
+
+  Widget _buildStep() {
+    switch (_stepIndex) {
+      case 1:
+        return _buildItems();
+      case 2:
+        return _buildDelivery();
+      default:
+        return _buildSummary();
+    }
+  }
+
+  Widget _buildSummary() {
+    return DetailFieldGrid(
+      fields: [
+        DetailField(label: AppStrings.COLUMN_ORDER_ID, value: _order.publicId),
+        DetailField(
+          label: AppStrings.COLUMN_ORDER_CLIENT,
+          value: _order.clientName,
+        ),
+        DetailField(
+          label: AppStrings.COLUMN_ORDER_AMOUNT,
+          value: CurrencyFormatter.rupees(_liveTotalAmount),
+        ),
+        DetailField(
+          label: AppStrings.COLUMN_WASTE_ORDER_KG,
+          value: '$_liveTotalKg kg',
+        ),
+        DetailField(
+          label: AppStrings.COLUMN_ORDER_SALES_PERSON,
+          value: _order.createdBy,
+        ),
+        DetailField(
+          label: AppStrings.COLUMN_ORDER_PLACED,
+          value: DateFormatter.instantLabel(_order.createdAtDateTime),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildItems() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int index = 0; index < _lines.length; index++) ...[
+          if (index > 0) ...[
+            const SizedBox(height: AppSpacing.sm),
+            const AppHairline(),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          WasteOrderLineRow(
+            line: _lines[index],
+            products: _productOptionsFor(_lines[index]),
+            isEditable: _isEditing,
+            onRemove: _canEdit ? () => _removeLine(index) : null,
+            onChanged: () => setState(() {}),
+          ),
+        ],
+        if (_isEditing) ...[
+          const SizedBox(height: AppSpacing.md),
+          IconActionButton(
+            icon: Icons.add_rounded,
+            tooltip: AppStrings.WASTE_ORDER_ADD_ITEM,
+            type: IconActionType.primary,
+            onPressed: _canEdit ? _addLine : null,
+          ),
+        ],
+        if (_linesError != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            _linesError!,
+            style: AppTypography.bodySmall.copyWith(color: AppColors.ERROR),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDelivery() {
+    if (!_isEditing) {
+      return DetailFieldGrid(
+        fields: [
+          DetailField(
+            label: AppStrings.FIELD_DELIVERY_ADDRESS_PICK,
+            value: _order.deliveryAddress,
+          ),
+          if (_order.bookedFor != null)
+            DetailField(
+              label: AppStrings.DELIVERY_TO_LABEL,
+              value: _order.bookedFor!.displayLabel,
+            ),
+          DetailField(
+            label: AppStrings.COLUMN_CUSTOM_ORDER_CITY,
+            value: _order.cityName,
+          ),
+          DetailField(
+            label: AppStrings.FIELD_EXPECTED_DELIVERY,
+            value: DateFormatter.dayLabel(_order.expectedDeliveryDateTime),
+          ),
+          DetailField(
+            label: AppStrings.FIELD_SPECIAL_COMMENTS,
+            value: _order.specialComments,
+          ),
+          DetailField(
+            label: AppStrings.WASTE_ORDER_FIELD_HSN_CODE,
+            value: _order.hsnCode,
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SingleDateField(
+          label: AppStrings.FIELD_EXPECTED_DELIVERY,
+          value: _expectedDelivery,
+          enabled: _canEdit,
+          onChanged: (date) => setState(() => _expectedDelivery = date),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppTextField(
+          controller: _commentsController,
+          label: AppStrings.FIELD_SPECIAL_COMMENTS,
+          hint: AppStrings.FIELD_SPECIAL_COMMENTS_HINT,
+          enabled: _canEdit,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppTextField(
+          controller: _hsnCodeController,
+          label: AppStrings.WASTE_ORDER_FIELD_HSN_CODE,
+          hint: AppStrings.WASTE_ORDER_FIELD_HSN_CODE_HINT,
+          enabled: _canEdit,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DeliveryToField(
+          apiClient: context.read(),
+          clientPublicId: _order.clientPublicId,
+          initial: _deliveryTo.untouched
+              ? (_order.bookedFor != null
+                    ? DeliveryToValue.existingChild(_order.bookedFor!)
+                    : const DeliveryToValue.none())
+              : _deliveryTo,
+          enabled: _canEdit,
+          onChanged: (value) => setState(() => _deliveryTo = value),
+        ),
+      ],
+    );
+  }
+}

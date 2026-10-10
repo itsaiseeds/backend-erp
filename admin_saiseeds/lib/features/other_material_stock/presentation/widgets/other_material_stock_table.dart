@@ -10,6 +10,7 @@ import '../../data/models/other_material_stock_model.dart';
 
 class OtherMaterialStockTable extends StatefulWidget {
   static const String CONFIG_KEY = 'other-material-stock';
+  static const String COLUMN_PACKAGING = 'packaging';
   static const String COLUMN_MATERIAL_TYPE = 'material_type';
   static const String COLUMN_UNIT = 'unit_type';
   static const String COLUMN_ON_HAND = 'on_hand';
@@ -53,6 +54,11 @@ class OtherMaterialStockTable extends StatefulWidget {
 class OtherMaterialStockTableState extends State<OtherMaterialStockTable> {
   static const List<AppDataColumn> _COLUMNS = [
     AppDataColumn(
+      id: OtherMaterialStockTable.COLUMN_PACKAGING,
+      label: AppStrings.COLUMN_PACKAGING,
+      width: AppSizes.tableColumnWidthWide,
+    ),
+    AppDataColumn(
       id: OtherMaterialStockTable.COLUMN_MATERIAL_TYPE,
       label: AppStrings.COLUMN_MATERIAL_TYPE,
       width: AppSizes.tableColumnWidthWide,
@@ -74,32 +80,38 @@ class OtherMaterialStockTableState extends State<OtherMaterialStockTable> {
 
   void showColumnSettings() => _tableKey.currentState?.showColumnSettings();
 
-  // The endpoint sends no available_filters, so the material-type options
-  // are derived from the rows already on screen.
+  // The endpoint sends no available_filters, so the product and material-type
+  // options are derived from the rows already on screen.
   List<FilterValueOption> _valueOptionsFor(String key) {
-    if (key != AppStrings.FILTER_BY_MATERIAL_TYPE) return const [];
+    final Iterable<String> raw = switch (key) {
+      AppStrings.FILTER_BY_MATERIAL_TYPE => widget.lines.map(
+        (line) => line.materialTypeName,
+      ),
+      AppStrings.FILTER_BY_PRODUCT => widget.lines.map(
+        (line) => line.productName,
+      ),
+      _ => const [],
+    };
 
     final List<String> names =
-        widget.lines
-            .map((line) => line.materialTypeName.trim())
-            .where((name) => name.isNotEmpty)
-            .toSet()
-            .toList()
+        raw.map((name) => name.trim()).where((name) => name.isNotEmpty).toSet().toList()
           ..sort();
     return names
         .map((name) => FilterValueOption(value: name, label: name))
         .toList();
   }
 
-  static String _filterLabel(String key) =>
-      key == AppStrings.FILTER_BY_MATERIAL_TYPE
-      ? AppStrings.FILTER_LABEL_MATERIAL_TYPE
-      : key;
+  static String _filterLabel(String key) => switch (key) {
+    AppStrings.FILTER_BY_MATERIAL_TYPE => AppStrings.FILTER_LABEL_MATERIAL_TYPE,
+    AppStrings.FILTER_BY_PRODUCT => AppStrings.FILTER_LABEL_PRODUCT,
+    _ => key,
+  };
 
-  static String _sortLabel(String key) =>
-      key == AppStrings.SORT_BY_MATERIAL_TYPE
-      ? AppStrings.SORT_LABEL_MATERIAL_TYPE
-      : key;
+  static String _sortLabel(String key) => switch (key) {
+    AppStrings.SORT_BY_MATERIAL_TYPE => AppStrings.SORT_LABEL_MATERIAL_TYPE,
+    AppStrings.SORT_BY_PRODUCT => AppStrings.SORT_LABEL_PRODUCT,
+    _ => key,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -117,12 +129,18 @@ class OtherMaterialStockTableState extends State<OtherMaterialStockTable> {
       columns: _COLUMNS,
       configKey: OtherMaterialStockTable.CONFIG_KEY,
       initialPinnedColumns: const [
-        OtherMaterialStockTable.COLUMN_MATERIAL_TYPE,
+        OtherMaterialStockTable.COLUMN_PACKAGING,
       ],
-      excludeFromPin: const [OtherMaterialStockTable.COLUMN_MATERIAL_TYPE],
-      excludeFromHide: const [OtherMaterialStockTable.COLUMN_MATERIAL_TYPE],
-      sortByOptions: const [AppStrings.SORT_BY_MATERIAL_TYPE],
-      filterByOptions: const [AppStrings.FILTER_BY_MATERIAL_TYPE],
+      excludeFromPin: const [OtherMaterialStockTable.COLUMN_PACKAGING],
+      excludeFromHide: const [OtherMaterialStockTable.COLUMN_PACKAGING],
+      sortByOptions: const [
+        AppStrings.SORT_BY_PRODUCT,
+        AppStrings.SORT_BY_MATERIAL_TYPE,
+      ],
+      filterByOptions: const [
+        AppStrings.FILTER_BY_PRODUCT,
+        AppStrings.FILTER_BY_MATERIAL_TYPE,
+      ],
       filterValueOptions: _valueOptionsFor,
       getHumanReadableFilterName: _filterLabel,
       getHumanReadableSortName: _sortLabel,
@@ -143,6 +161,8 @@ class OtherMaterialStockTableState extends State<OtherMaterialStockTable> {
     AppDataColumn col,
   ) {
     switch (col.id) {
+      case OtherMaterialStockTable.COLUMN_PACKAGING:
+        return _textCell(line.configurationLabel, isStrong: true);
       case OtherMaterialStockTable.COLUMN_MATERIAL_TYPE:
         return _textCell(line.materialTypeName, isStrong: true);
       case OtherMaterialStockTable.COLUMN_UNIT:

@@ -274,6 +274,11 @@ class ChallanItemModel {
   final String negotiatedSellingPrice;
   final String lineTotal;
 
+  /// Only a waste order's line carries this -- kilograms sold, not packets in
+  /// a bag. `packetWeight`/`packets`/`totalWeight` are all absent (`null`
+  /// over the wire, parsed here as blank/zero) on that kind of line.
+  final String quantityKg;
+
   const ChallanItemModel({
     this.publicId = '',
     this.productName = '',
@@ -285,6 +290,7 @@ class ChallanItemModel {
     this.quantity = 0,
     this.negotiatedSellingPrice = '',
     this.lineTotal = '',
+    this.quantityKg = '',
   });
 
   factory ChallanItemModel.fromJson(Map<String, dynamic> json) {
@@ -301,8 +307,14 @@ class ChallanItemModel {
       quantity: _asInt(json['quantity']),
       negotiatedSellingPrice: _decimalOf(json['negotiated_selling_price']),
       lineTotal: _decimalOf(json['line_total']),
+      quantityKg: _decimalOf(json['quantity_kg']),
     );
   }
+
+  /// A waste line has no packaging at all -- not even the "one loose bag" a
+  /// custom-order line is treated as -- so every packaging-derived figure
+  /// below is meaningless for it and must be asked for separately.
+  bool get isWasteLine => quantityKg.trim().isNotEmpty;
 
   /// Bags on this line, or 1 for a loose custom-order line which has none.
   int get effectiveBags => quantity <= 0 ? 1 : quantity;
@@ -317,11 +329,13 @@ class ChallanItemModel {
   /// bag count, so the Bags column has nothing to show for it.
   bool get hasBags => quantity > 0;
 
-  /// Weight actually shipped: packet weight x packets x bags.
+  /// Weight actually shipped: packet weight x packets x bags for a packaged
+  /// line, or the kilograms sold directly for a waste line.
   ///
   /// Derived rather than read from `total_weight`, which a custom order's
   /// line omits and which counts one bag only where it is present.
   String get shippedWeight {
+    if (isWasteLine) return quantityKg;
     final double? unit = double.tryParse(packetWeight.trim());
     if (unit == null) return '';
     final double total = unit * shippedPackets;
@@ -353,6 +367,14 @@ class DispatchChallanModel {
   final int itemCount;
   final String totalAmount;
   final int totalPackets;
+  final String totalKg;
+
+  /// ``WASTE_ORDER`` for an order booked from the waste pool, otherwise
+  /// absent (a regular order) or ``CUSTOM_ORDER`` (a loose-packet order).
+  final String orderType;
+
+  /// ``kg`` for a waste order, ``packet`` for every other kind.
+  final String unitOfMeasure;
 
   const DispatchChallanModel({
     this.orderPublicId = '',
@@ -366,6 +388,9 @@ class DispatchChallanModel {
     this.itemCount = 0,
     this.totalAmount = '',
     this.totalPackets = 0,
+    this.totalKg = '',
+    this.orderType = '',
+    this.unitOfMeasure = '',
   });
 
   factory DispatchChallanModel.fromJson(Map<String, dynamic> json) {
@@ -404,8 +429,17 @@ class DispatchChallanModel {
       itemCount: _asInt(json['item_count']),
       totalAmount: _decimalOf(json['total_amount']),
       totalPackets: _asInt(json['total_packets']),
+      totalKg: _decimalOf(json['total_kg']),
+      orderType: '${json['order_type'] ?? ''}',
+      unitOfMeasure: json['unit_of_measure'] as String? ?? '',
     );
   }
+
+  /// A waste order sells by the kilogram, not the packet -- the challan's
+  /// Packing/Packets/Bags columns have nothing to say for it, only weight and
+  /// price do.
+  bool get isWasteOrder =>
+      orderType == 'WASTE_ORDER' || unitOfMeasure == 'kg';
 
   String get dispatchPublicId => dispatch?.publicId ?? '';
 

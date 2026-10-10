@@ -718,6 +718,7 @@ class AppStrings {
   static const String RETURN_ORDER_UNREJECT = 'Unreject';
   static const String RETURN_ORDER_REVERT_ACCEPT = 'Revert accept';
   static const String RETURN_ORDER_EDIT = 'Edit';
+  static const String RETURN_ORDER_VIEW_SLIP = 'View return order slip';
 
   static const String RETURN_ORDER_ACCEPT_TITLE = 'Accept this return?';
   static const String RETURN_ORDER_ACCEPT_BODY =
@@ -750,6 +751,8 @@ class AppStrings {
       'Only an accepted return can have its acceptance undone.';
   static const String RETURN_ORDER_EDIT_BLOCKED =
       'Only a pending return can be edited.';
+  static const String RETURN_ORDER_VIEW_SLIP_BLOCKED =
+      'Only an accepted return has a slip to view.';
 
   static const String RETURN_ORDER_ACCEPT_INCLUDE_MATERIALS =
       'Book the packing materials back in too';
@@ -987,6 +990,14 @@ class AppStrings {
   static const String CHALLAN_VIEW = 'View challan';
   static const String CHALLAN_PREVIEW_TITLE = 'Delivery challan';
   static const String CHALLAN_FILE_PREFIX = 'challan-';
+  static const String RETURN_SLIP_PREVIEW_TITLE = 'Return order slip';
+  static const String RETURN_SLIP_FILE_PREFIX = 'return-slip-';
+  static const String RETURN_SLIP_LOAD_FAILED =
+      'Could not load the order for this return.';
+  static const String RETURN_SLIP_PRINT_FAILED =
+      'Could not open the print dialog.';
+  static const String RETURN_SLIP_DOWNLOAD_FAILED =
+      'Could not generate the return slip PDF.';
   static const String EXPORTS = 'Exports';
   static const String EXPORT = 'Export';
   static const String EXPORT_SUBTITLE =
@@ -1038,6 +1049,9 @@ class AppStrings {
   static const String EXPORT_INVENTORY_SNAPSHOTS = 'Inventory Snapshots';
   static const String EXPORT_INVENTORY_SNAPSHOTS_BODY =
       'Bag and loose stock counts. Leave the dates empty for all history.';
+  static const String EXPORT_LAB_TESTINGS = 'Lab Testing Reports';
+  static const String EXPORT_LAB_TESTINGS_BODY =
+      'Lab tests done in the window, one row per test.';
   static const String EXPORT_WINDOW_OPTIONAL =
       'Optional for this report -- leave both empty for the full history.';
   static const String COLUMN_PRODUCT_USABLE = 'Availability';
@@ -1083,6 +1097,44 @@ class AppStrings {
   static const String CUSTOM_ORDER_NO_LINES = 'Add at least one order line.';
   static const String CUSTOM_ORDER_LINE_INVALID =
       'Every line needs a product, a packet weight, packets and a price.';
+
+  static const String WASTE_ORDERS = 'Waste Orders';
+  static const String COLUMN_WASTE_ORDER_KG = 'Kg';
+  static const String WASTE_ORDERS_SEARCH_HINT = 'Search waste orders...';
+  static const String WASTE_ORDERS_EMPTY_TITLE = 'No waste orders found';
+  static const String WASTE_ORDERS_EMPTY_BODY =
+      'Orders booked from the waste pool for verified clients will appear here.';
+  static const String WASTE_ORDER_PER_KG = 'per kg';
+  static const String WASTE_ORDER_ADD = 'Book waste order';
+  static const String WASTE_ORDER_ADD_SUBTITLE =
+      'Book an order drawn from the waste pool for a verified client.';
+  static const String WASTE_ORDER_STEP_CLIENT_CAPTION = 'Who it is for';
+  static const String WASTE_ORDER_STEP_ITEMS_CAPTION = 'Kilograms on this order';
+  static const String WASTE_ORDER_STEP_DELIVERY_CAPTION = 'When and where';
+  static const String WASTE_ORDER_DETAIL_TITLE = 'Waste order';
+  static const String WASTE_ORDER_DETAIL_SUBTITLE =
+      'Review the order and its lines.';
+  static const String WASTE_ORDER_CREATED = 'Waste order booked';
+  static const String WASTE_ORDER_UPDATED = 'Waste order updated';
+  static const String WASTE_ORDER_DELETE_TITLE = 'Delete this waste order?';
+  static const String WASTE_ORDER_DELETE_BODY =
+      'The order and all of its lines are removed. This cannot be undone.';
+  static const String WASTE_ORDER_DELETE_BLOCKED =
+      'A dispatched order cannot be deleted.';
+  static const String WASTE_ORDER_NO_LINES = 'Add at least one order line.';
+  static const String WASTE_ORDER_LINE_INVALID =
+      'Every line needs a product, a quantity in kg and a price per kg.';
+  static const String WASTE_ORDER_FIELD_QUANTITY_KG = 'Quantity (kg)';
+  static const String WASTE_ORDER_FIELD_QUANTITY_KG_HINT = 'e.g. 12.500';
+  static const String WASTE_ORDER_FIELD_PRICE_PER_KG = 'Price per kg';
+  static const String WASTE_ORDER_ADD_ITEM = 'Add product';
+  static const String WASTE_ORDER_VIEW_SLIP = 'View';
+  static const String WASTE_ORDER_DISPATCH_LOT_OPTIONAL =
+      'Lot numbers are optional for a waste order -- leave a line blank to '
+      'dispatch it without one.';
+  static const String WASTE_ORDER_FIELD_HSN_CODE = 'HSN Code';
+  static const String WASTE_ORDER_FIELD_HSN_CODE_HINT =
+      'Optional, for the whole order';
   static const String FIELD_NEGOTIATED_PRICE = 'Negotiated price';
   static const String FIELD_NEGOTIATED_PRICE_HINT = 'Price per packet';
   static const String FIELD_SPECIAL_COMMENTS = 'Special comments';
@@ -1181,7 +1233,7 @@ class AppStrings {
   static const String PRODUCT_STOCK = 'Product Stock';
   static const String RAW_MATERIAL_STOCK = 'Raw Material';
 
-  static const String OTHER_MATERIAL_STOCK = 'Material Stock';
+  static const String OTHER_MATERIAL_STOCK = 'Other Material Stock';
   static const String PACKETS_PER_BAG_SUFFIX = 'packets / bag';
   static const String FILTER_BY_TYPE = 'type';
   static const String FILTER_LABEL_PRODUCT = 'Product';
@@ -1191,6 +1243,7 @@ class AppStrings {
   static const String SORT_LABEL_PACKET_WEIGHT = 'Packet Weight';
   static const String SORT_LABEL_MATERIAL_TYPE = 'Material Type';
   static const String COLUMN_ON_HAND = 'On Hand';
+  static const String COLUMN_PACKAGING = 'Packaging';
   static const String OTHER_MATERIAL_STOCK_TABLE_SEARCH_HINT =
       'Search other material stock...';
   static const String OTHER_MATERIAL_STOCK_EMPTY_STATE_TITLE =

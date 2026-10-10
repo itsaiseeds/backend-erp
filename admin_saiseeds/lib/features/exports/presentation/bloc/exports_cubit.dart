@@ -8,6 +8,8 @@ import '../../../../core/utils/download/file_download.dart';
 import '../../data/exports_repository.dart';
 import '../../data/models/export_kind.dart';
 import '../../../dispatch_challans/data/models/dispatch_challan_model.dart';
+import '../../../lab_testing_report/data/models/lab_testing_report_model.dart';
+import '../../../lab_testing_report/utils/lab_report_generator.dart';
 import '../../utils/challan_zip_writer.dart';
 import '../../utils/excel_writer.dart';
 import '../../utils/export_sheets.dart';
@@ -15,7 +17,7 @@ import '../../utils/export_sheets.dart';
 enum ExportOutcome { success, empty, failure }
 
 /// What the download should contain.
-enum ExportFormat { spreadsheet, receipts }
+enum ExportFormat { spreadsheet, receipts, pdfReport }
 
 class ExportResult {
   final ExportOutcome outcome;
@@ -76,6 +78,15 @@ class ExportsCubit extends SafeCubit<ExportsState> {
 
       if (format == ExportFormat.receipts) {
         return await _downloadReceipts(
+          payload: payload,
+          kind: kind,
+          startDate: startDate,
+          endDate: endDate,
+        );
+      }
+
+      if (format == ExportFormat.pdfReport) {
+        return await _downloadLabReport(
           payload: payload,
           kind: kind,
           startDate: startDate,
@@ -163,6 +174,53 @@ class ExportsCubit extends SafeCubit<ExportsState> {
       outcome: ExportOutcome.success,
       rowCount: challans.length,
     );
+  }
+
+  /// One PDF listing every lab test in the window -- the same document the
+  /// lab tester's own app previews and shares, so the two are byte-for-byte
+  /// identical.
+  Future<ExportResult> _downloadLabReport({
+    required Map<String, dynamic> payload,
+    required ExportKind kind,
+    String? startDate,
+    String? endDate,
+  }) async {
+    final dynamic raw = payload['results'];
+    final List<LabTestingReportModel> tests = raw is List
+        ? raw
+              .whereType<Map>()
+              .map(
+                (item) => LabTestingReportModel.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .toList()
+        : const [];
+
+    if (tests.isEmpty) {
+      emit(const ExportsState());
+      return const ExportResult(outcome: ExportOutcome.empty);
+    }
+
+    final Uint8List bytes = await LabReportGenerator.generate(
+      startDate: '${payload['start_date'] ?? startDate ?? ''}',
+      endDate: '${payload['end_date'] ?? endDate ?? ''}',
+      results: tests,
+    );
+
+    await downloadBytes(
+      bytes: bytes,
+      fileName: fileNameFor(
+        kind,
+        startDate: startDate,
+        endDate: endDate,
+        extension: 'pdf',
+      ),
+      mimeType: 'application/pdf',
+    );
+
+    emit(const ExportsState());
+    return ExportResult(outcome: ExportOutcome.success, rowCount: tests.length);
   }
 
   /// e.g. `orders_2026-10-01_to_2026-10-03.xlsx`, or just the stem plus the

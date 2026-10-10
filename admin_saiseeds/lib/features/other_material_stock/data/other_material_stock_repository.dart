@@ -11,8 +11,11 @@ class OtherMaterialStockRepository {
     : _apiClient = apiClient;
 
   Future<OtherMaterialStockModel> fetchOtherMaterialStock() async {
+    // Per product packaging rather than one row per material type: the same
+    // leaflet is a different stock position for a 1.5 kg bag than a 5 kg one.
     final dynamic response = await _apiClient.get(
       InventoryEndpoints.otherMaterialStock,
+      queryParams: const {'group_by': 'configuration'},
     );
 
     if (response is! Map) {
