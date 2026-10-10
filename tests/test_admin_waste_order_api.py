@@ -238,7 +238,7 @@ class SalesAdminWasteOrderApiTest(WebApiTestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        self.assertTrue(response.data["public_id"].startswith("CORD-"))
+        self.assertTrue(response.data["public_id"].startswith("WORD-"))
         self.assertEqual(response.data["status"], "CONFIRMED")
         self.assertTrue(response.data["made_from_waste"])
         self.assertEqual(response.data["unit_of_measure"], "kg")
@@ -836,3 +836,30 @@ class SalesAdminWasteOrderApiTest(WebApiTestCase):
             packet_order.full_clean()
         with self.assertRaises(IntegrityError), transaction.atomic():  # database rule
             CustomOrder.objects.filter(pk=packet_order.pk).update(hsn_code="1209")
+
+    # -- public id prefix ---------------------------------------------------------
+
+    def test_a_waste_order_id_starts_with_word_and_a_packet_order_with_cord(self):
+        """WORD-… for waste orders, CORD-… for packet custom orders; every endpoint takes either.
+
+        tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_a_waste_order_id_starts_with_word_and_a_packet_order_with_cord
+        """
+        waste = self._book((self.cotton, "30"))
+        packet_order = self._book_packet_order()
+
+        self.assertRegex(waste.public_id, r"^WORD-[A-Z0-9]{12}$")
+        self.assertRegex(packet_order.public_id, r"^CORD-[A-Z0-9]{12}$")
+        # Detail, list (incl. the public_id search), edit and dispatch all work on the WORD- id.
+        self.assertEqual(
+            self.client.get(DETAIL_URL.format(public_id=waste.public_id)).status_code,
+            status.HTTP_200_OK,
+        )
+        listed = self.client.get(LIST_URL, {"public_id": "WORD-"})
+        self.assertEqual([o["public_id"] for o in listed.data["results"]], [waste.public_id])
+        self.assertEqual(self._patch(waste, {"special_comments": "x"}).status_code, status.HTTP_200_OK)
+        dispatched = self._dispatch(waste)
+        self.assertEqual(dispatched.status_code, status.HTTP_200_OK, dispatched.data)
+        self.assertTrue(dispatched.data["public_id"].startswith("WORD-"))
+        # Its challan names the same id.
+        entry_order = waste.dispatch_entry.source_order
+        self.assertEqual(entry_order.public_id, waste.public_id)

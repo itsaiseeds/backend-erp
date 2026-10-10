@@ -40,7 +40,7 @@ CUSTOM_ORDER_PUBLIC_ID_PARAMETER = OpenApiParameter(
     "public_id",
     OpenApiTypes.STR,
     OpenApiParameter.PATH,
-    description="The custom order's public id, e.g. CORD-E79QA0E2OIHF.",
+    description="The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste order).",
 )
 
 

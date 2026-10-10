@@ -165,7 +165,7 @@ def _by_product(queryset: QuerySet, product_ids: list[int]) -> QuerySet:
 def queryset_filters(waste: bool) -> tuple[QuerysetFilter, ...]:
     """The list's filters, with option pickers limited to orders of one kind."""
     return (
-        public_id_filter("CORD-"),
+        public_id_filter("WORD-" if waste else "CORD-"),
         QuerysetFilter(
             "created_by",
             label="Sales Admin",
