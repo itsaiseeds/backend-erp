@@ -1,18 +1,14 @@
-"""Raw material waste endpoint: ``GET``/``POST`` ``/api/sales-admin/raw-material-wastes``.
+"""Godown raw-material waste: GET/POST ``godown/raw-material-wastes``.
 
-Only an application Admin may view or record waste (``admin_required``). A row
-writes off ``quantity_kg`` of a ``Product``'s raw material -- spoiled, spilled
-or otherwise unusable -- with an optional free-text ``reason``. There is no
-date: a waste row is a standing deduction from the product's unpacked raw pool
-(see ``InventoryOperations.raw_wasted_kg``) from the moment it exists, and
-shows up as ``wasted_kg`` on ``raw-material-stock`` (and on the godown manager's
-stock view). The godown manager may also add, edit and delete waste entries
-(``godown/raw-material-wastes``); waste *orders* stay admin-only.
+The Android counterpart of ``api.sales_admin.RawMaterialWastesView``: same
+request/response shapes, filters and rules, for the godown manager. Recording
+waste writes off ``quantity_kg`` of a product's raw material, refused (400) when
+it exceeds the product's unpacked raw kilograms
+(``InventoryOperations.record_raw_waste``).
 
-A waste larger than the product's unpacked raw kilograms is refused (400).
-Every row is exposed by its ``public_id`` (``WS-…``); the primary key is never
-sent out. A wrong row is corrected with ``PATCH`` or removed with ``DELETE`` (see
-``UpdateRawMaterialWasteView``).
+Together with ``UpdateGodownRawMaterialWasteView`` (PATCH/DELETE one row) this is
+everything a godown manager may do with waste: add, list, edit and delete a
+waste *entry*. Waste orders are admin-only. Godown-manager token only.
 """
 
 from __future__ import annotations
@@ -26,6 +22,7 @@ from rest_framework.response import Response
 from aggregator import InventoryOperations
 from aggregator.InwardOperations import raw_waste_payload
 from aggregator.models import RawMaterialWaste
+from android.api.paginated_views import AndroidGodownPaginatedDateRangeListView
 from api.inward_serializers import (
     RAW_WASTE_QUERYSET_FILTERS,
     RAW_WASTE_SORT_OPTIONS,
@@ -33,12 +30,11 @@ from api.inward_serializers import (
     RawMaterialWasteListPageSerializer,
     RawMaterialWastePayloadSerializer,
 )
-from api.paginated_views import AdminPaginatedDateRangeListView
 from common.views.paginated_date_range import list_query_parameters
 
 
-class RawMaterialWastesView(AdminPaginatedDateRangeListView):
-    """List (GET) or record (POST) raw-material waste (app admin only)."""
+class GodownRawMaterialWastesView(AndroidGodownPaginatedDateRangeListView):
+    """List (GET) or record (POST) raw-material waste (godown manager only)."""
 
     serializer_class = CreateRawMaterialWasteSerializer
     enforce_date_range_filters = False
@@ -47,7 +43,7 @@ class RawMaterialWastesView(AdminPaginatedDateRangeListView):
     sort_options = RAW_WASTE_SORT_OPTIONS
 
     @extend_schema(
-        operation_id="sales_admin_raw_material_wastes_list",
+        operation_id="android_api_v1_godown_raw_material_wastes_list",
         summary="List raw-material waste (filter by product, sortable)",
         parameters=list_query_parameters(
             queryset_filters=RAW_WASTE_QUERYSET_FILTERS,
@@ -68,11 +64,12 @@ class RawMaterialWastesView(AdminPaginatedDateRangeListView):
         return [raw_waste_payload(entry) for entry in page_items]
 
     @extend_schema(
+        operation_id="android_api_v1_godown_raw_material_wastes_create",
         summary="Record raw-material waste",
         request=CreateRawMaterialWasteSerializer,
         responses={201: RawMaterialWastePayloadSerializer},
     )
-    def post(self, request):
+    def post(self, request: Request) -> Response:
         serializer = CreateRawMaterialWasteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
