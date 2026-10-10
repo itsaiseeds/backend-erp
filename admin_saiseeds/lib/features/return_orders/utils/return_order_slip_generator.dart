@@ -143,6 +143,8 @@ class ReturnOrderSlipGenerator {
           _summaryStrip(returnOrder),
           pw.SizedBox(height: 12),
           _itemsTable(lines),
+          pw.SizedBox(height: 4),
+          _netSaleNote(),
           pw.SizedBox(height: 10),
           _totalsRow(lines, returnOrder),
         ],
@@ -498,7 +500,7 @@ class ReturnOrderSlipGenerator {
             _th('PRICE/PKT', pw.TextAlign.right),
             _th('RETURNED AMT.', pw.TextAlign.right),
             _th('ORIGINAL VALUE', pw.TextAlign.right),
-            _th('NET SALE', pw.TextAlign.right),
+            _th('NET SALE (THIS ITEM)', pw.TextAlign.right),
           ],
         ),
         ...lines.asMap().entries.map((entry) {
@@ -506,6 +508,14 @@ class ReturnOrderSlipGenerator {
           final ReturnSlipLine line = entry.value;
           final ReturnOrderItemModel item = line.item;
           final PdfColor bg = index.isEven ? _white : _tintSoft;
+          // "20 x 1.5 kg": packets per bag times the bag's own weight, the
+          // packaging the order itself sold -- shown only when a matching
+          // order line was found, since an unmatched return has no bag count
+          // to report, only the packet weight already in its own column.
+          final OrderPackagingModel? packaging = line.matchedPackaging;
+          final String? packagingLabel = packaging == null
+              ? null
+              : '${packaging.packets} x ${item.packetWeightLabel}';
 
           return pw.TableRow(
             decoration: pw.BoxDecoration(color: bg),
@@ -516,13 +526,28 @@ class ReturnOrderSlipGenerator {
                   horizontal: 6,
                   vertical: 5,
                 ),
-                child: pw.Text(
-                  item.product.name.isEmpty ? _blank : item.product.name,
-                  style: pw.TextStyle(
-                    fontSize: 7.5,
-                    fontWeight: pw.FontWeight.bold,
-                    color: _textPrimary,
-                  ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      item.product.name.isEmpty ? _blank : item.product.name,
+                      style: pw.TextStyle(
+                        fontSize: 7.5,
+                        fontWeight: pw.FontWeight.bold,
+                        color: _textPrimary,
+                      ),
+                    ),
+                    if (packagingLabel != null) ...[
+                      pw.SizedBox(height: 1),
+                      pw.Text(
+                        packagingLabel,
+                        style: const pw.TextStyle(
+                          fontSize: 6.3,
+                          color: _textMuted,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               _td(item.packetWeightLabel, pw.TextAlign.center),
@@ -600,6 +625,23 @@ class ReturnOrderSlipGenerator {
           fontWeight: pw.FontWeight.bold,
           color: net == null ? _textMuted : _primaryDark,
         ),
+      ),
+    );
+  }
+
+  /// Printed once under the table rather than on every row: the NET SALE
+  /// column reads like a running figure until it is told otherwise, so the
+  /// slip says in words what the header already says in short -- this
+  /// column, like RETURNED AMT. and ORIGINAL VALUE beside it, is this one
+  /// item's own figure, not a cumulative total.
+  static pw.Widget _netSaleNote() {
+    return pw.Text(
+      'Net sale is for this item only -- what the line was worth before the '
+      'return, less what was returned.',
+      style: pw.TextStyle(
+        fontSize: 6.3,
+        fontStyle: pw.FontStyle.italic,
+        color: _textMuted,
       ),
     );
   }

@@ -1195,7 +1195,7 @@ class AppStrings {
   static const String PRODUCT_STOCK = 'Product Stock';
   static const String RAW_MATERIAL_STOCK = 'Raw Material';
 
-  static const String OTHER_MATERIAL_STOCK = 'Material Stock';
+  static const String OTHER_MATERIAL_STOCK = 'Other Material Stock';
   static const String PACKETS_PER_BAG_SUFFIX = 'packets / bag';
   static const String FILTER_BY_TYPE = 'type';
   static const String FILTER_LABEL_PRODUCT = 'Product';
@@ -1205,6 +1205,7 @@ class AppStrings {
   static const String SORT_LABEL_PACKET_WEIGHT = 'Packet Weight';
   static const String SORT_LABEL_MATERIAL_TYPE = 'Material Type';
   static const String COLUMN_ON_HAND = 'On Hand';
+  static const String COLUMN_PACKAGING = 'Packaging';
   static const String OTHER_MATERIAL_STOCK_TABLE_SEARCH_HINT =
       'Search other material stock...';
   static const String OTHER_MATERIAL_STOCK_EMPTY_STATE_TITLE =

@@ -169,6 +169,8 @@ class OtherMaterialStockCubit extends SafeCubit<OtherMaterialStockState> {
             line.materialTypeName,
             line.unitType,
             line.onHand,
+            line.productName,
+            line.configurationLabel,
           ],
         );
 
@@ -177,7 +179,10 @@ class OtherMaterialStockCubit extends SafeCubit<OtherMaterialStockState> {
           source: searched,
           filters: source.filters,
           fieldValue: _fieldValue,
-          exactFields: const {AppStrings.FILTER_BY_MATERIAL_TYPE},
+          exactFields: const {
+            AppStrings.FILTER_BY_MATERIAL_TYPE,
+            AppStrings.FILTER_BY_PRODUCT,
+          },
         );
 
     final List<OtherMaterialStockLineModel> sorted =
@@ -205,6 +210,8 @@ class OtherMaterialStockCubit extends SafeCubit<OtherMaterialStockState> {
     switch (field) {
       case AppStrings.FILTER_BY_MATERIAL_TYPE:
         return line.materialTypeName;
+      case AppStrings.FILTER_BY_PRODUCT:
+        return line.productName;
       default:
         return null;
     }
@@ -217,6 +224,8 @@ class OtherMaterialStockCubit extends SafeCubit<OtherMaterialStockState> {
     switch (field) {
       case AppStrings.SORT_BY_MATERIAL_TYPE:
         return line.materialTypeName.toLowerCase();
+      case AppStrings.SORT_BY_PRODUCT:
+        return line.productName.toLowerCase();
       default:
         return null;
     }
