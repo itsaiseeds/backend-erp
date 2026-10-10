@@ -163,6 +163,11 @@ EXPECTED_CONTRACTS = {
     "android/api/v1/utilities/sales-admins": ("SalesAdminsView", TOKEN_ANDROID),
     "android/api/v1/utilities/sales-persons": ("SalesPersonsView", TOKEN_ANDROID_ADMIN),
     "android/api/v1/godown/raw-material-stock": ("GodownRawMaterialStockView", TOKEN_GODOWN),
+    "android/api/v1/godown/raw-material-wastes": ("GodownRawMaterialWastesView", TOKEN_GODOWN),
+    "android/api/v1/godown/raw-material-waste/<public_id>": (
+        "UpdateGodownRawMaterialWasteView",
+        TOKEN_GODOWN,
+    ),
     "android/api/v1/godown/other-material-stock": (
         "GodownOtherMaterialStockView",
         TOKEN_GODOWN,

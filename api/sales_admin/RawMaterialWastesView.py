@@ -6,7 +6,8 @@ or otherwise unusable -- with an optional free-text ``reason``. There is no
 date: a waste row is a standing deduction from the product's unpacked raw pool
 (see ``InventoryOperations.raw_wasted_kg``) from the moment it exists, and
 shows up as ``wasted_kg`` on ``raw-material-stock`` (and on the godown manager's
-stock view, which can see the figure but never write it).
+stock view). The godown manager may also add, edit and delete waste entries
+(``godown/raw-material-wastes``); waste *orders* stay admin-only.
 
 A waste larger than the product's unpacked raw kilograms is refused (400).
 Every row is exposed by its ``public_id`` (``WS-…``); the primary key is never

@@ -10,6 +10,7 @@ already holds counting towards it; a shortfall is a 400 and nothing is written.
 from __future__ import annotations
 
 from drf_spectacular.utils import extend_schema
+from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -32,6 +33,13 @@ class UpdateWasteOrderSerializer(UpdateCustomOrderSerializer):
     """Request validation for a waste-order update -- every field optional."""
 
     items = WasteOrderItemWriteSerializer(many=True, required=False)
+    # No ``default``: the view applies a field only when its key was sent.
+    hsn_code = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text="Free-text HSN code; send an empty string to clear it.",
+    )
 
     def validate_items(self, value: list[dict]) -> list[dict]:
         return validate_waste_order_item_list(value)

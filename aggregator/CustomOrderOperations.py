@@ -544,8 +544,11 @@ def create_waste_order(
     special_comments: str = "",
     expected_delivery_date=None,
     booked_for: ClientChildOrg | None = None,
+    hsn_code: str = "",
 ) -> CustomOrder:
     """Create a waste order and its kg lines atomically; it is born ``CONFIRMED``.
+
+    ``hsn_code`` is an optional free-text HSN code kept on the order.
 
     Each entry in ``items`` is ``{"product", "quantity_kg", "negotiated_selling_price"}``
     (price per kg, required). Refused with a 400 -- and nothing written -- when
@@ -572,6 +575,7 @@ def create_waste_order(
         booked_for=booked_for,
         made_from_waste=True,
         unit_of_measure=OrderUnit.KG,
+        hsn_code=hsn_code,
     )
     if expected_delivery_date is not None:
         order.expected_delivery_date = expected_delivery_date
@@ -765,6 +769,7 @@ CUSTOM_ORDER_CORE_FIELDS = (
     "expected_delivery_date",
     "actual_delivery_date",
     "special_comments",
+    "hsn_code",
 )
 
 
@@ -962,6 +967,15 @@ def delete_custom_order(order: CustomOrder, actor: User) -> None:
         order.mark_deleted(actor)
 
 
+def _hsn_payload(order: CustomOrder) -> dict:
+    """``{"hsn_code": ...}`` for a waste order, nothing for a packet custom order.
+
+    The HSN code belongs to waste orders only, so a packet order's responses do
+    not carry the key at all.
+    """
+    return {"hsn_code": order.hsn_code} if order.made_from_waste else {}
+
+
 def _weight_text(value) -> str | None:
     """A decimal as text, or None where the line has none (e.g. a kg line's packet weight)."""
     return None if value is None else str(value)
@@ -986,6 +1000,7 @@ def custom_order_payload(order: CustomOrder) -> dict:
         "verified_at": order.verified_at.isoformat() if order.verified_at else None,
         "made_from_waste": order.made_from_waste,
         "unit_of_measure": order.unit_of_measure,
+        **_hsn_payload(order),
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,
         "total_kg": str(order.total_kg),
@@ -1046,6 +1061,7 @@ def custom_order_list_payload(order: CustomOrder) -> dict:
         "booked_for": child_org_summary_payload(order.booked_for),
         "made_from_waste": order.made_from_waste,
         "unit_of_measure": order.unit_of_measure,
+        **_hsn_payload(order),
         "total_amount": str(order.total_amount),
         "total_packets": order.total_packets,
         "total_kg": str(order.total_kg),

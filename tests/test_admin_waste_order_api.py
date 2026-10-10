@@ -758,3 +758,81 @@ class SalesAdminWasteOrderApiTest(WebApiTestCase):
         )
         for key in ("incoming_kg", "packed_kg", "wasted_kg", "available_kg"):
             self.assertEqual(dispatched[key], before[key], key)
+
+    # -- HSN code: free text, waste orders only ---------------------------------
+
+    def test_hsn_code_is_optional_free_text_on_a_waste_order(self):
+        """Blank by default; set on create, shown in detail and list, edited and cleared on edit.
+
+        tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_hsn_code_is_optional_free_text_on_a_waste_order
+        """
+        plain = self._book((self.wheat, "1"))
+        self.assertEqual(plain.hsn_code, "")
+
+        created = self._create([self._line(self.cotton, "5")], hsn_code="  1209 10 00 (waste)  ")
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        self.assertEqual(created.data["hsn_code"], "1209 10 00 (waste)")
+        order_id = created.data["public_id"]
+
+        detail = self.client.get(DETAIL_URL.format(public_id=order_id))
+        self.assertEqual(detail.data["hsn_code"], "1209 10 00 (waste)")
+        listed = self.client.get(LIST_URL, {"public_id": order_id})
+        self.assertEqual(listed.data["results"][0]["hsn_code"], "1209 10 00 (waste)")
+
+        order = CustomOrder.objects.get(public_id=order_id)
+        edited = self._patch(order, {"hsn_code": "23099010"})
+        self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
+        self.assertEqual(edited.data["hsn_code"], "23099010")
+        # An edit that does not send it leaves it alone; an empty string clears it.
+        self.assertEqual(self._patch(order, {"special_comments": "x"}).data["hsn_code"], "23099010")
+        self.assertEqual(self._patch(order, {"hsn_code": ""}).data["hsn_code"], "")
+
+    def test_hsn_code_is_limited_to_32_characters(self):
+        """tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_hsn_code_is_limited_to_32_characters"""
+        response = self._create([self._line(self.cotton, "5")], hsn_code="9" * 33)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(CustomOrder.all_objects.exists())
+
+    def test_only_a_waste_order_has_an_hsn_code(self):
+        """A packet custom order never shows, takes or stores an HSN code.
+
+        tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_only_a_waste_order_has_an_hsn_code
+        """
+        waste = self._book((self.cotton, "5"))
+        packet_order = self._book_packet_order()
+
+        # Waste order: the key is always there (blank when not given).
+        self.assertEqual(
+            self.client.get(DETAIL_URL.format(public_id=waste.public_id)).data["hsn_code"], ""
+        )
+        # Packet order: no key in the detail, the list card or the edit response.
+        detail = self.client.get(DETAIL_URL.format(public_id=packet_order.public_id))
+        self.assertNotIn("hsn_code", detail.data)
+        listed = self.client.get(CUSTOM_LIST_URL, {"public_id": packet_order.public_id})
+        self.assertNotIn("hsn_code", listed.data["results"][0])
+        patched = self.client.patch(
+            EDIT_CUSTOM_URL.format(public_id=packet_order.public_id),
+            {"hsn_code": "1209"},
+            format="json",
+        )
+        self.assertEqual(patched.status_code, status.HTTP_200_OK, patched.data)
+        self.assertNotIn("hsn_code", patched.data)
+        packet_order.refresh_from_db()
+        self.assertEqual(packet_order.hsn_code, "")
+
+    def test_the_database_refuses_an_hsn_code_on_a_packet_order(self):
+        """Even code that bypasses the API cannot put an HSN code on a packet order.
+
+        tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_the_database_refuses_an_hsn_code_on_a_packet_order
+        """
+        from django.core.exceptions import ValidationError
+        from django.db import IntegrityError, transaction
+
+        packet_order = self._book_packet_order()
+        packet_order.hsn_code = "1209"
+
+        with self.assertRaises(ValidationError):  # model rule
+            packet_order.full_clean()
+        with self.assertRaises(IntegrityError), transaction.atomic():  # database rule
+            CustomOrder.objects.filter(pk=packet_order.pk).update(hsn_code="1209")

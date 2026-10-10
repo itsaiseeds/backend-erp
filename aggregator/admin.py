@@ -888,6 +888,7 @@ class CustomOrderAdmin(StockLedgerAdminMixin, SoftDeleteParentAdmin):
             *ORDER_LIFECYCLE_FIELDS,
             "made_from_waste",
             "unit_of_measure",
+            "hsn_code",
         )
 
     def get_form(self, request, obj=None, change=False, **kwargs):

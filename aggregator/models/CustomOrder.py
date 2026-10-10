@@ -123,6 +123,16 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         default=OrderUnit.PACKET,
         help_text="``kg`` on a waste order, ``packet`` on every other custom order.",
     )
+    hsn_code = models.CharField(
+        "HSN code",
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=(
+            "Free-text HSN code, optional. Waste orders only: a packet custom "
+            "order must leave it blank (``ck_customorder_hsn_waste_only``)."
+        ),
+    )
 
     class Meta:
         verbose_name = "custom order"
@@ -142,6 +152,10 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
                     | models.Q(made_from_waste=False, unit_of_measure="packet")
                 ),
                 name="ck_customorder_waste_unit",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(made_from_waste=True) | models.Q(hsn_code=""),
+                name="ck_customorder_hsn_waste_only",
             ),
         ]
 
@@ -189,6 +203,9 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
 
         if self.status_id and self.status.code not in ORDER_STATUS_CODES:
             errors["status"] = "Invalid status for a custom order."
+
+        if self.hsn_code and not self.made_from_waste:
+            errors["hsn_code"] = "Only a waste order can carry an HSN code."
 
         expected_unit = OrderUnit.KG if self.made_from_waste else OrderUnit.PACKET
         if self.unit_of_measure != expected_unit:

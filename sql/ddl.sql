@@ -1201,13 +1201,15 @@ CREATE TABLE IF NOT EXISTS public.aggregator_customorder (
 	verified_at timestamptz NULL,
 	made_from_waste bool NOT NULL DEFAULT false,
 	unit_of_measure varchar(8) NOT NULL DEFAULT 'packet',
+	hsn_code varchar(32) NOT NULL DEFAULT '',
 	CONSTRAINT aggregator_customorder_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_customorder_public_id_key UNIQUE (public_id),
 	CONSTRAINT ck_customorder_not_both_dispatch_details CHECK (NOT (dispatch_details_id IS NOT NULL AND private_dispatch_details_id IS NOT NULL)),
 	CONSTRAINT ck_customorder_waste_unit CHECK (
 		(made_from_waste AND unit_of_measure = 'kg')
 		OR (NOT made_from_waste AND unit_of_measure = 'packet')
-	)
+	),
+	CONSTRAINT ck_customorder_hsn_waste_only CHECK (made_from_waste OR hsn_code = '')
 );
 CREATE INDEX IF NOT EXISTS aggregator_customorder_public_id_like ON public.aggregator_customorder USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_customorder_client_id_idx ON public.aggregator_customorder USING btree (client_id);
