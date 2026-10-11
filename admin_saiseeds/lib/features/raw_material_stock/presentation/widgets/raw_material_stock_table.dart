@@ -14,6 +14,9 @@ class RawMaterialStockTable extends StatefulWidget {
   static const String COLUMN_INCOMING = 'incoming_kg';
   static const String COLUMN_PACKED = 'packed_kg';
   static const String COLUMN_WASTED = 'wasted_kg';
+  static const String COLUMN_WASTE_RESERVED = 'waste_reserved_kg';
+  static const String COLUMN_WASTE_CONSUMED = 'waste_consumed_kg';
+  static const String COLUMN_WASTE_AVAILABLE = 'waste_available_kg';
   static const String COLUMN_REJECTED = 'rejected_kg';
   static const String COLUMN_AVAILABLE = 'available_kg';
 
@@ -72,6 +75,21 @@ class RawMaterialStockTableState extends State<RawMaterialStockTable> {
     AppDataColumn(
       id: RawMaterialStockTable.COLUMN_WASTED,
       label: AppStrings.COLUMN_WASTED_KG,
+      width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: RawMaterialStockTable.COLUMN_WASTE_RESERVED,
+      label: AppStrings.COLUMN_WASTE_RESERVED_KG,
+      width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: RawMaterialStockTable.COLUMN_WASTE_CONSUMED,
+      label: AppStrings.COLUMN_WASTE_CONSUMED_KG,
+      width: AppSizes.tableColumnWidthMedium,
+    ),
+    AppDataColumn(
+      id: RawMaterialStockTable.COLUMN_WASTE_AVAILABLE,
+      label: AppStrings.COLUMN_WASTE_AVAILABLE_KG,
       width: AppSizes.tableColumnWidthMedium,
     ),
     AppDataColumn(
@@ -163,6 +181,12 @@ class RawMaterialStockTableState extends State<RawMaterialStockTable> {
         return _textCell(line.packedKg);
       case RawMaterialStockTable.COLUMN_WASTED:
         return _textCell(line.wastedKg);
+      case RawMaterialStockTable.COLUMN_WASTE_RESERVED:
+        return _textCell(line.wasteReservedKg);
+      case RawMaterialStockTable.COLUMN_WASTE_CONSUMED:
+        return _textCell(line.wasteConsumedKg);
+      case RawMaterialStockTable.COLUMN_WASTE_AVAILABLE:
+        return _textCell(line.wasteAvailableKg);
       case RawMaterialStockTable.COLUMN_REJECTED:
         return _textCell(line.rejectedKg);
       case RawMaterialStockTable.COLUMN_AVAILABLE:

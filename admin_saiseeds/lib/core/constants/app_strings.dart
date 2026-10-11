@@ -1259,6 +1259,9 @@ class AppStrings {
   static const String COLUMN_WASTED_KG = 'Wasted (kg)';
   static const String COLUMN_AVAILABLE_KG = 'Available (kg)';
   static const String COLUMN_REJECTED_KG = 'Rejected (kg)';
+  static const String COLUMN_WASTE_RESERVED_KG = 'Waste Reserved (kg)';
+  static const String COLUMN_WASTE_CONSUMED_KG = 'Waste Consumed (kg)';
+  static const String COLUMN_WASTE_AVAILABLE_KG = 'Waste Available (kg)';
 
   static const String STOCK_KIND_BAG = 'Bag';
   static const String STOCK_KIND_LOOSE = 'Packet';
