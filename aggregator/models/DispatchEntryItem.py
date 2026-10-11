@@ -116,7 +116,7 @@ class DispatchEntryItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
                 name="uniq_dispatchentryitem_entry_product_weight",
             ),
             models.UniqueConstraint(
-                fields=["dispatch_entry", "product"],
+                fields=["dispatch_entry", "product", "lot_number"],
                 condition=models.Q(packet_weight__isnull=True, product__isnull=False),
                 name="uniq_dispatchentryitem_entry_product_kg",
             ),

@@ -41,7 +41,7 @@ from aggregator.CustomOrderOperations import (
     sync_custom_order_items,
     update_custom_order_core,
 )
-from aggregator.models import ClientAddress
+from aggregator.models import ClientAddress, OrderKind
 from api.admin import AdminApiView
 from api.client_serializers import BookedForSerializer
 from api.custom_order_serializers import CustomOrderDetailPayloadSerializer
@@ -128,7 +128,7 @@ class UpdateCustomOrderView(AdminApiView):
 
     def assert_kind(self, order) -> None:
         """A packet order only: waste orders are edited through ``edit-waste-order``."""
-        assert_order_kind(order, False, "edit")
+        assert_order_kind(order, OrderKind.CUSTOM, "edit")
 
     def sync_items(self, order, items, actor) -> None:
         sync_custom_order_items(order, items, actor)

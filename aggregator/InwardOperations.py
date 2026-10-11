@@ -134,14 +134,21 @@ def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
     Only a lot that is currently ``In Use`` *and* whose ``effective_date`` has
     come is counted in ``InventoryOperations.raw_available_kg`` at all --
     removing anything else (still ``Lab Testing``, dated in the future, or
-    ``Rejected``) is always safe. A rejected lot was never packable in the
-    first place, so leaving it is never refused. Removing a counted lot must
+    ``Rejected``) is always safe -- except that a rejected lot with kg on a
+    rejected order cannot leave Rejected. A rejected lot was never packable in
+    the first place, so nothing else refuses it. Removing a counted lot must
     not strand bags or sample packets that were packed from its kilograms
     with no raw material behind them.
 
     Raises ``ValueError`` with a message an API renders as a 400, the same
     convention as ``assert_raw_status_transition``.
     """
+    if raw_status_of(entry) == InwardRawMaterialStatus.RAW_MATERIAL_REJECTED:
+        try:
+            InventoryOperations.assert_rejected_lot_not_booked(entry, "remove this lot")
+        except ValidationError as exc:
+            raise ValueError(exc.messages[0]) from None
+        return
     is_counted = (
         raw_status_of(entry) == InwardRawMaterialStatus.IN_USE
         and entry.effective_date is not None
@@ -158,6 +165,49 @@ def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
 
 
 # -- Payloads ------------------------------------------------------------------
+
+
+def other_material_stock_payload(
+    material_type_ids: list[int] | None = None, *, by_configuration: bool = False
+) -> dict:
+    """The other-material on-hand position as ``{"as_of", "lines"}``.
+
+    Shared by the sales-admin view and both Android versions. Grouped by
+    ``(product, packet_weight, material type)`` when ``by_configuration``, each
+    line then carrying ``product`` and ``packet_weight``; otherwise one line per
+    material type.
+    """
+    as_of = today()
+    lines = (
+        other_material_on_hand_by_configuration(as_of, material_type_ids=material_type_ids)
+        if by_configuration
+        else other_material_on_hand(as_of, material_type_ids=material_type_ids)
+    )
+    return {
+        "as_of": as_of.isoformat(),
+        "lines": [
+            {
+                **(
+                    {
+                        "product": {
+                            "public_id": line["product_public_id"],
+                            "name": line["product_name"],
+                        },
+                        "packet_weight": str(line["packet_weight"]),
+                    }
+                    if by_configuration
+                    else {}
+                ),
+                "material_type": {
+                    "id": line["material_type_id"],
+                    "name": line["name"],
+                    "unit_type": line["unit_type"],
+                },
+                "on_hand": str(line["on_hand"]),
+            }
+            for line in lines
+        ],
+    }
 
 
 def party_payload(party: Party) -> dict:

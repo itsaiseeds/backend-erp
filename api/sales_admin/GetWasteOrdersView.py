@@ -2,7 +2,7 @@
 
 ``GET custom-orders/`` over the other kind of custom order: the same pagination /
 filter / sort contract and card payload, restricted to waste orders
-(``made_from_waste``). The filter pickers offer only admins, clients, products and
+(``order_kind`` waste). The filter pickers offer only admins, clients, products and
 cities that have a waste order. ``price`` sorts on the order total (per-kg price
 x kg, summed).
 """
@@ -17,14 +17,14 @@ from common.views.paginated_date_range import list_query_parameters
 
 from .GetCustomOrdersView import _SORT_OPTIONS, GetCustomOrdersView, queryset_filters
 
-_WASTE_QUERYSET_FILTERS = queryset_filters(True)
+_WASTE_QUERYSET_FILTERS = queryset_filters("waste")
 
 
 class GetWasteOrdersView(GetCustomOrdersView):
     """List every waste order: filter by admin / client / product / city / status."""
 
     queryset_filters = _WASTE_QUERYSET_FILTERS
-    made_from_waste = True
+    order_kind = "waste"
 
     @extend_schema(
         operation_id="sales_admin_get_waste_orders_list",

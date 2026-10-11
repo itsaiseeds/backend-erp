@@ -9,7 +9,7 @@ from .ClientTransportAgency import ClientTransportAgency
 from .Contact import Contact
 from .Country import Country
 from .Crop import Crop
-from .CustomOrder import CustomOrder, OrderUnit
+from .CustomOrder import CustomOrder, OrderKind, OrderUnit, kind_lookup
 from .CustomOrderItem import CustomOrderItem
 from .DispatchDetails import DispatchDetails
 from .DispatchEntry import DispatchEntry
@@ -84,6 +84,8 @@ __all__ = [
     "Order",
     "OrderItem",
     "CustomOrder",
+    "OrderKind",
+    "kind_lookup",
     "OrderUnit",
     "CustomOrderItem",
     "NonStockInward",

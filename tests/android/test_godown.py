@@ -280,6 +280,46 @@ class GodownManagerApiTest(AndroidApiTestCase):
         listed = self.client.get(BASE + "godown/inward-other-materials")
         self.assertEqual(listed.data["results"], [])
 
+    def test_v2_other_material_stock_can_group_by_configuration(self):
+        """v2 ``?group_by=configuration`` adds product + packet weight; v1 is unchanged.
+
+        tests/android/test_godown.py::GodownManagerApiTest::test_v2_other_material_stock_can_group_by_configuration
+        """
+        recipe = OtherMaterialRecipe.objects.create(
+            product=self.product,
+            material_type=self.material_type,
+            packet_weight="1.000",
+            quantity="2.000",
+            created_by=self.superuser,
+        )
+        self.login_as(self.manager.user)
+        self.client.post(
+            BASE + "godown/inward-other-materials",
+            {"party": self.other_party.id, "recipe": recipe.public_id, "quantity": "25"},
+            format="json",
+        )
+        v2 = "/android/api/v2/godown/other-material-stock"
+
+        v1_grouped = self.client.get(BASE + "godown/other-material-stock", {"group_by": "configuration"})
+        v2_plain = self.client.get(v2)
+        v2_grouped = self.client.get(v2, {"group_by": "configuration"})
+
+        self.assertEqual(v2_grouped.status_code, 200, v2_grouped.data)
+        grouped = next(
+            line
+            for line in v2_grouped.data["lines"]
+            if line["material_type"]["id"] == self.material_type.id
+        )
+        self.assertEqual(grouped["product"]["public_id"], self.product.public_id)
+        self.assertEqual(Decimal(grouped["packet_weight"]), Decimal("1"))
+        self.assertEqual(Decimal(grouped["on_hand"]), Decimal("25"))
+        for response in (v1_grouped, v2_plain):
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(
+                all("product" not in line and "packet_weight" not in line for line in response.data["lines"])
+            )
+        self.assertEqual(v1_grouped.data, v2_plain.data)
+
     # -- shared look-ups ---------------------------------------------------------
 
     def test_lookups_are_flat_lists(self):

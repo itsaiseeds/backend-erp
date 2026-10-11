@@ -46,7 +46,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from aggregator.CustomOrderOperations import custom_order_list_payload
-from aggregator.models import CustomOrder, CustomOrderItem
+from aggregator.models import CustomOrder, CustomOrderItem, kind_lookup
 from aggregator.models.Status import StatusIds
 from api.custom_order_serializers import CustomOrderListPageSerializer
 from api.paginated_views import AdminPaginatedDateRangeListView
@@ -84,15 +84,17 @@ _TOTAL_PRICE = Coalesce(
 )
 
 
-# Every option provider and filter below is built per kind -- ``waste`` False
-# for the custom-order list, True for the waste-order list -- so a picker only
+_PUBLIC_ID_PREFIXES = {"custom": "CORD-", "waste": "WORD-", "rejected": "RORD-"}
+
+# Every option provider and filter below is built per kind -- ``custom``,
+# ``waste`` or ``rejected`` -- so a picker only
 # ever offers an admin, client, product or city with an order of that kind.
 
 
-def _admins_with_custom_orders(waste: bool, request: Request) -> list[dict]:
+def _admins_with_custom_orders(kind: str, request: Request) -> list[dict]:
     """The distinct sales admins who have booked a custom order."""
     rows = (
-        CustomOrder.objects.filter(made_from_waste=waste, created_by__isnull=False)
+        CustomOrder.objects.filter(**kind_lookup(kind), created_by__isnull=False)
         .values_list("created_by_id", "created_by__name")
         .distinct()
         .order_by("created_by__name")
@@ -100,10 +102,10 @@ def _admins_with_custom_orders(waste: bool, request: Request) -> list[dict]:
     return [{"value": user_id, "label": name} for user_id, name in rows]
 
 
-def _clients_with_custom_orders(waste: bool, request: Request) -> list[dict]:
+def _clients_with_custom_orders(kind: str, request: Request) -> list[dict]:
     """Every distinct client that has a custom order."""
     rows = (
-        CustomOrder.objects.filter(made_from_waste=waste)
+        CustomOrder.objects.filter(**kind_lookup(kind))
         .values_list("client_id", "client__company_name")
         .distinct()
         .order_by("client__company_name")
@@ -111,7 +113,7 @@ def _clients_with_custom_orders(waste: bool, request: Request) -> list[dict]:
     return [{"value": client_id, "label": name} for client_id, name in rows]
 
 
-def _products_on_custom_orders(waste: bool, request: Request) -> list[dict]:
+def _products_on_custom_orders(kind: str, request: Request) -> list[dict]:
     """Every distinct product appearing on a custom order.
 
     ``custom_order__is_deleted`` is explicit because a lookup that spans the
@@ -120,7 +122,7 @@ def _products_on_custom_orders(waste: bool, request: Request) -> list[dict]:
     rows = (
         CustomOrderItem.objects.filter(
             custom_order__is_deleted=False,
-            custom_order__made_from_waste=waste,
+            **kind_lookup(kind, "custom_order__"),
             product__is_usable=True,
         )
         .values_list("product_id", "product__name")
@@ -130,10 +132,10 @@ def _products_on_custom_orders(waste: bool, request: Request) -> list[dict]:
     return [{"value": product_id, "label": name} for product_id, name in rows]
 
 
-def _delivery_cities(waste: bool, request: Request) -> list[dict]:
+def _delivery_cities(kind: str, request: Request) -> list[dict]:
     """Every distinct city a custom order is delivered to."""
     rows = (
-        CustomOrder.objects.filter(made_from_waste=waste)
+        CustomOrder.objects.filter(**kind_lookup(kind))
         .values_list("delivery_address__city_id", "delivery_address__city__name")
         .distinct()
         .order_by("delivery_address__city__name")
@@ -162,17 +164,17 @@ def _by_product(queryset: QuerySet, product_ids: list[int]) -> QuerySet:
     ).distinct()
 
 
-def queryset_filters(waste: bool) -> tuple[QuerysetFilter, ...]:
+def queryset_filters(kind: str) -> tuple[QuerysetFilter, ...]:
     """The list's filters, with option pickers limited to orders of one kind."""
     return (
-        public_id_filter("WORD-" if waste else "CORD-"),
+        public_id_filter(_PUBLIC_ID_PREFIXES[kind]),
         QuerysetFilter(
             "created_by",
             label="Sales Admin",
             lookup="created_by_id__in",
             parse=parse_int,
             description="User id(s) of the sales admin who booked the custom order (see options).",
-            options=partial(_admins_with_custom_orders, waste),
+            options=partial(_admins_with_custom_orders, kind),
         ),
         QuerysetFilter(
             "client",
@@ -180,7 +182,7 @@ def queryset_filters(waste: bool) -> tuple[QuerysetFilter, ...]:
             lookup="client_id__in",
             parse=parse_int,
             description="Client id(s) the custom order was booked for (see options).",
-            options=partial(_clients_with_custom_orders, waste),
+            options=partial(_clients_with_custom_orders, kind),
         ),
         QuerysetFilter(
             "product",
@@ -188,7 +190,7 @@ def queryset_filters(waste: bool) -> tuple[QuerysetFilter, ...]:
             parse=parse_int,
             apply=_by_product,
             description="Product id(s) the custom order contains (see options).",
-            options=partial(_products_on_custom_orders, waste),
+            options=partial(_products_on_custom_orders, kind),
         ),
         QuerysetFilter(
             "city_id",
@@ -196,7 +198,7 @@ def queryset_filters(waste: bool) -> tuple[QuerysetFilter, ...]:
             lookup="delivery_address__city_id__in",
             parse=parse_int,
             description="City id(s) the custom order is delivered to (see options).",
-            options=partial(_delivery_cities, waste),
+            options=partial(_delivery_cities, kind),
         ),
         QuerysetFilter(
             "status",
@@ -212,7 +214,7 @@ def queryset_filters(waste: bool) -> tuple[QuerysetFilter, ...]:
     )
 
 
-_QUERYSET_FILTERS = queryset_filters(False)
+_QUERYSET_FILTERS = queryset_filters("custom")
 _SORT_OPTIONS = (
     SortOption(
         "created_at",
@@ -236,7 +238,7 @@ class GetCustomOrdersView(AdminPaginatedDateRangeListView):
     queryset_filters = _QUERYSET_FILTERS
     sort_options = _SORT_OPTIONS
     # Waste orders have their own list (``GetWasteOrdersView``).
-    made_from_waste = False
+    order_kind = "custom"
 
     @extend_schema(
         operation_id="sales_admin_get_custom_orders_list",
@@ -256,7 +258,7 @@ class GetCustomOrdersView(AdminPaginatedDateRangeListView):
 
     def get_queryset(self, request: Request) -> QuerySet:
         return (
-            CustomOrder.objects.filter(made_from_waste=self.made_from_waste)
+            CustomOrder.objects.filter(**kind_lookup(self.order_kind))
             .select_related(
                 "status",
                 "created_by",

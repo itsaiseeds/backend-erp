@@ -105,6 +105,8 @@ class ExportCustomOrderSerializer(serializers.Serializer):
     booked_for = ChildOrgPayloadSerializer(allow_null=True)
     verified_at = serializers.DateTimeField(allow_null=True)
     made_from_waste = serializers.BooleanField()
+    made_from_rejected = serializers.BooleanField()
+    order_kind = serializers.ChoiceField(choices=["custom", "waste", "rejected"])
     unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField()

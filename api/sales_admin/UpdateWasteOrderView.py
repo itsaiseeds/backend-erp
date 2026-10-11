@@ -18,6 +18,7 @@ from aggregator.CustomOrderOperations import (
     assert_order_kind,
     sync_waste_order_items,
 )
+from aggregator.models import OrderKind
 from api.custom_order_serializers import CustomOrderDetailPayloadSerializer
 
 from .CreateWasteOrderView import (
@@ -54,7 +55,7 @@ class UpdateWasteOrderView(UpdateCustomOrderView):
     serializer_class = UpdateWasteOrderSerializer
 
     def assert_kind(self, order) -> None:
-        assert_order_kind(order, True, "edit")
+        assert_order_kind(order, OrderKind.WASTE, "edit")
 
     def sync_items(self, order, items, actor) -> None:
         sync_waste_order_items(order, items, actor)

@@ -1095,7 +1095,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentryitem (
 	),
 	CONSTRAINT aggregator_dispatchentryitem_quantity_check CHECK (quantity >= 0)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_dispatchentryitem_entry_product_kg ON public.aggregator_dispatchentryitem USING btree (dispatch_entry_id, product_id) WHERE packet_weight IS NULL AND product_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_dispatchentryitem_entry_product_kg ON public.aggregator_dispatchentryitem USING btree (dispatch_entry_id, product_id, lot_number) WHERE packet_weight IS NULL AND product_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_dispatch_entry_id_idx ON public.aggregator_dispatchentryitem USING btree (dispatch_entry_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_product_packaging_id_idx ON public.aggregator_dispatchentryitem USING btree (product_packaging_id);
 CREATE INDEX IF NOT EXISTS aggregator_dispatchentryitem_product_id_idx ON public.aggregator_dispatchentryitem USING btree (product_id);
@@ -1200,16 +1200,18 @@ CREATE TABLE IF NOT EXISTS public.aggregator_customorder (
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
 	made_from_waste bool NOT NULL DEFAULT false,
+	made_from_rejected bool NOT NULL DEFAULT false,
 	unit_of_measure varchar(8) NOT NULL DEFAULT 'packet',
 	hsn_code varchar(32) NOT NULL DEFAULT '',
 	CONSTRAINT aggregator_customorder_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_customorder_public_id_key UNIQUE (public_id),
 	CONSTRAINT ck_customorder_not_both_dispatch_details CHECK (NOT (dispatch_details_id IS NOT NULL AND private_dispatch_details_id IS NOT NULL)),
+	CONSTRAINT ck_customorder_not_waste_and_rejected CHECK (NOT (made_from_waste AND made_from_rejected)),
 	CONSTRAINT ck_customorder_waste_unit CHECK (
-		(made_from_waste AND unit_of_measure = 'kg')
-		OR (NOT made_from_waste AND unit_of_measure = 'packet')
+		((made_from_waste OR made_from_rejected) AND unit_of_measure = 'kg')
+		OR (NOT made_from_waste AND NOT made_from_rejected AND unit_of_measure = 'packet')
 	),
-	CONSTRAINT ck_customorder_hsn_waste_only CHECK (made_from_waste OR hsn_code = '')
+	CONSTRAINT ck_customorder_hsn_waste_only CHECK (made_from_waste OR made_from_rejected OR hsn_code = '')
 );
 CREATE INDEX IF NOT EXISTS aggregator_customorder_public_id_like ON public.aggregator_customorder USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_customorder_client_id_idx ON public.aggregator_customorder USING btree (client_id);
@@ -1230,7 +1232,8 @@ CREATE INDEX IF NOT EXISTS aggregator_customorder_deleted_by_id_idx ON public.ag
 -- packet_weight is required because a loose packet has a definite weight:
 -- 5 x 1kg and 5 x 500g draw on different pools and are worth different money.
 -- A waste order's line is a kg line instead: quantity_kg set, packet_weight and
--- packets NULL, at a per-kg price.
+-- packets NULL, at a per-kg price. A rejected order's line is a kg line that also
+-- names the lab-rejected lot (inward_raw_material_id) it sells.
 CREATE TABLE IF NOT EXISTS public.aggregator_customorderitem (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1245,6 +1248,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_customorderitem (
 	packet_weight numeric(8,3) NULL,
 	packets int8 NULL,
 	quantity_kg numeric(10,3) NULL,
+	inward_raw_material_id int8 NULL,
 	CONSTRAINT aggregator_customorderitem_pkey PRIMARY KEY (id),
 	CONSTRAINT uniq_customorderitem_order_product_weight UNIQUE (custom_order_id, product_id, packet_weight),
 	CONSTRAINT ck_customorderitem_one_kind CHECK (
@@ -1257,11 +1261,16 @@ CREATE TABLE IF NOT EXISTS public.aggregator_customorderitem (
 		AND (packet_weight IS NULL OR packet_weight > 0)
 		AND (quantity_kg IS NULL OR quantity_kg > 0)
 	),
-	CONSTRAINT aggregator_customorderitem_packets_check CHECK (packets >= 0)
+	CONSTRAINT aggregator_customorderitem_packets_check CHECK (packets >= 0),
+	CONSTRAINT ck_customorderitem_lot_is_kg CHECK (inward_raw_material_id IS NULL OR quantity_kg IS NOT NULL)
 );
 -- A waste order's kg line has no packet_weight, so the unique constraint above
 -- (NULLs are distinct) cannot stop a product being listed twice on one order.
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_customorderitem_order_product_kg ON public.aggregator_customorderitem USING btree (custom_order_id, product_id) WHERE packet_weight IS NULL;
+-- Rejected-order lines are exempt: two lots of one product may share an order,
+-- but one lot may appear only once.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_customorderitem_order_product_kg ON public.aggregator_customorderitem USING btree (custom_order_id, product_id) WHERE packet_weight IS NULL AND inward_raw_material_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_customorderitem_order_lot ON public.aggregator_customorderitem USING btree (custom_order_id, inward_raw_material_id) WHERE inward_raw_material_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS aggregator_customorderitem_inward_raw_material_id_idx ON public.aggregator_customorderitem USING btree (inward_raw_material_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_custom_order_id_idx ON public.aggregator_customorderitem USING btree (custom_order_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_product_id_idx ON public.aggregator_customorderitem USING btree (product_id);
 CREATE INDEX IF NOT EXISTS aggregator_customorderitem_is_deleted_idx ON public.aggregator_customorderitem USING btree (is_deleted);
@@ -1816,6 +1825,7 @@ ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_
 ALTER TABLE public.aggregator_customorder ADD CONSTRAINT aggregator_customorder_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_custom_order_id_fk FOREIGN KEY (custom_order_id) REFERENCES public.aggregator_customorder(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_inward_raw_material_id_fk FOREIGN KEY (inward_raw_material_id) REFERENCES public.aggregator_inwardrawmaterial(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_customorderitem ADD CONSTRAINT aggregator_customorderitem_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;

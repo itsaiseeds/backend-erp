@@ -39,6 +39,7 @@ from .models import (
     CustomOrder,
     CustomOrderItem,
     DispatchDetails,
+    OrderKind,
     OrderUnit,
     PrivateDispatchDetails,
     Product,
@@ -120,21 +121,29 @@ def loose_requirements(items: Iterable[dict]) -> dict[tuple[Product, Decimal], i
     return needed
 
 
-def assert_order_kind(order: CustomOrder, made_from_waste: bool, action: str) -> None:
-    """Raise unless ``order`` is a waste order (or a packet order), as ``action`` needs.
+_KIND_LABELS = {
+    OrderKind.CUSTOM: "Custom order",
+    OrderKind.WASTE: "Waste order",
+    OrderKind.REJECTED: "Rejected order",
+}
 
-    A waste order and a packet order share one table but not one set of rules
-    (kg lines against the waste pool, packet lines against the loose pools), so
-    each verb refuses the other kind rather than misreading its lines.
+
+def assert_order_kind(order: CustomOrder, kind: OrderKind, action: str) -> None:
+    """Raise unless ``order`` is of ``kind``, as ``action`` needs.
+
+    A packet, a waste and a rejected order share one table but not one set of
+    rules (loose packets, the waste pool, specific rejected lots), so each verb
+    refuses the other kinds rather than misreading its lines.
     """
-    if order.made_from_waste == made_from_waste:
+    if order.order_kind == kind:
         return
-    if made_from_waste:
-        raise ValidationError(
-            {"made_from_waste": f"Cannot {action} a custom order as a waste order."}
-        )
     raise ValidationError(
-        {"made_from_waste": f"Cannot {action} a waste order as a custom order."}
+        {
+            "made_from_waste": (
+                f"Cannot {action} a {_KIND_LABELS[OrderKind(order.order_kind)]} "
+                f"as a {_KIND_LABELS[kind]}."
+            )
+        }
     )
 
 
@@ -354,7 +363,7 @@ def dispatch_custom_order(
     )
     from .OrderOperations import assert_driver_details
 
-    assert_order_kind(order, False, "dispatch")
+    assert_order_kind(order, OrderKind.CUSTOM, "dispatch")
     assert_custom_order_status(order, DISPATCHABLE_CUSTOM_ORDER_STATUS_CODES, "dispatch")
 
     # Validated before anything is written, so a bad lot number costs nothing.
@@ -450,6 +459,10 @@ def revert_dispatch(order: CustomOrder) -> CustomOrder:
     """
     from .OrderOperations import assert_dispatched_today
 
+    if order.order_kind == OrderKind.REJECTED:
+        raise ValidationError(
+            {"made_from_waste": "Cannot revert the dispatch of a rejected order."}
+        )
     _assert_dispatched(order, "revert the dispatch of")
     assert_dispatched_today(order)
     with recording(
@@ -470,7 +483,7 @@ def revert_dispatch(order: CustomOrder) -> CustomOrder:
 # A waste order is a custom order with ``made_from_waste`` set: its lines are
 # kilograms of a product, drawn from that product's waste pool
 # (``InventoryOperations.waste_available_kg``), at a per-kg price. It is born
-# CONFIRMED like any custom order and only ever reaches DISPATCHED.
+# CONFIRMED like any custom order and then DISPATCHED (DELIVERED by hand).
 #
 # These verbs deliberately do not run inside ``recording``: a waste order moves
 # none of the stock-ledger figures (raw incoming/packed/wasted and the packet
@@ -630,7 +643,7 @@ def sync_waste_order_items(
     are reserved waste, so raising a quantity or adding a product is re-checked
     against the pool with what the order already holds credited back.
     """
-    assert_order_kind(order, True, "edit")
+    assert_order_kind(order, OrderKind.WASTE, "edit")
     if not items:
         raise ValidationError("A waste order must keep at least one item.")
     needed = waste_requirements(items)
@@ -713,7 +726,7 @@ def dispatch_waste_order(
     from .OrderOperations import assert_driver_details
 
     lot_numbers = lot_numbers or {}
-    assert_order_kind(order, True, "dispatch")
+    assert_order_kind(order, OrderKind.WASTE, "dispatch")
     assert_custom_order_status(order, DISPATCHABLE_CUSTOM_ORDER_STATUS_CODES, "dispatch")
     validated_waste_lot_numbers(order, lot_numbers)
     assert_driver_details(driver_name, driver_number, vehicle_number)
@@ -752,6 +765,185 @@ def dispatch_waste_order(
     )
     update_custom_order_status(order, StatusIds.DISPATCHED)
     return order
+
+
+# -- Rejected orders --------------------------------------------------------
+#
+# A rejected order sells kilograms of specific lab-rejected lots. It is booked
+# and dispatched in one step (own vehicle) and, once DISPATCHED, can only be
+# deleted on the dispatch day. Like a waste order it runs outside ``recording``:
+# the ledger's RAW ``rejected`` figure is the whole lot and never moves for it.
+
+
+def rejected_order_requirements(items: Iterable[dict]) -> dict[int, Decimal]:
+    """Sum ``items``' kg per lot id; a lot listed twice is refused."""
+    needed: dict[int, Decimal] = {}
+    for item in items:
+        lot_id = item["lot"].pk
+        if lot_id in needed:
+            raise ValidationError(
+                {"items": f"Lot '{item['lot'].lot_no}' is listed twice."}
+            )
+        needed[lot_id] = Decimal(item["quantity_kg"])
+    return needed
+
+
+@transaction.atomic
+def create_rejected_order(
+    *,
+    client: Client,
+    delivery_address: Address,
+    actor: User,
+    items: Iterable[dict],
+    from_city: City,
+    driver_name: str,
+    driver_number: str,
+    vehicle_number: str,
+    special_comments: str = "",
+    expected_delivery_date=None,
+    booked_for: ClientChildOrg | None = None,
+    hsn_code: str = "",
+) -> CustomOrder:
+    """Book a rejected order and dispatch it on our own vehicle, atomically.
+
+    Each entry in ``items`` is ``{"lot", "quantity_kg", "negotiated_selling_price"}``
+    plus an optional ``"lot_number"`` (price per kg, required; ``lot`` an
+    ``InwardRawMaterial``). ``lot_number`` is the lot number printed on that
+    line's challan; left out, it is the lot's own ``lot_no``. Every lot must be
+    a bookable rejected lot with enough kg left; the lots are locked first so
+    two bookings cannot spend the same kilograms. The order ends DISPATCHED with
+    its challan written.
+    """
+    from . import InventoryOperations
+    from .DispatchOperations import sync_waste_dispatch_entry
+    from .OrderOperations import assert_driver_details
+
+    items = list(items)
+    if not items:
+        raise ValidationError({"items": "A rejected order needs at least one item."})
+    needed = rejected_order_requirements(items)
+    assert_driver_details(driver_name, driver_number, vehicle_number)
+
+    InventoryOperations.lock_rejected_lots(needed)
+    bookable = {
+        lot.pk: lot
+        for lot in InventoryOperations.bookable_rejected_lots()
+        .filter(pk__in=needed)
+        .select_related("product")
+    }
+    booked = InventoryOperations.rejected_lot_booked_kg(needed)
+    errors = []
+    for item in items:
+        lot = item["lot"]
+        current = bookable.get(lot.pk)
+        if current is None:
+            errors.append(f"Lot '{lot.lot_no}' is not a rejected lot available to sell.")
+            continue
+        remaining = current.quantity_kg - booked.get(lot.pk, Decimal("0.000"))
+        if needed[lot.pk] > remaining:
+            errors.append(
+                f"Lot '{lot.lot_no}': need {needed[lot.pk]} kg, have {remaining} kg"
+            )
+    if errors:
+        raise ValidationError({"quantity_kg": "; ".join(errors)})
+    assert_products_usable(
+        {lot.product_id for lot in bookable.values()},
+        field="items",
+        action="be ordered",
+        subject="this rejected order",
+    )
+
+    order = CustomOrder(
+        client=client,
+        delivery_address=delivery_address,
+        status=Status.by_id(StatusIds.CONFIRMED),
+        created_by=actor,
+        verified_by=actor,
+        verified_at=indian_now(),
+        special_comments=special_comments,
+        booked_for=booked_for,
+        made_from_rejected=True,
+        unit_of_measure=OrderUnit.KG,
+        hsn_code=hsn_code,
+    )
+    if expected_delivery_date is not None:
+        order.expected_delivery_date = expected_delivery_date
+    order.full_clean()
+    order.save()
+
+    for item in items:
+        lot = bookable[item["lot"].pk]
+        line = CustomOrderItem(
+            custom_order=order,
+            product=lot.product,
+            inward_raw_material=lot,
+            packet_weight=None,
+            packets=None,
+            quantity_kg=item["quantity_kg"],
+            negotiated_selling_price=item["negotiated_selling_price"],
+            created_by=actor,
+        )
+        line.full_clean()
+        line.save()
+
+    dispatched_at = indian_now()
+    to_city = delivery_address.city
+    attach_private_dispatch_details(
+        order,
+        dispatched_by=actor,
+        dispatch_date=dispatched_at.date(),
+        from_city=from_city,
+        to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
+    )
+    sync_waste_dispatch_entry(
+        order,
+        actor=actor,
+        dispatched_at=dispatched_at,
+        from_city=from_city,
+        to_city=to_city,
+        driver_name=driver_name,
+        driver_number=driver_number,
+        vehicle_number=vehicle_number,
+        lot_numbers={
+            item["lot"].public_id: item["lot_number"]
+            for item in items
+            if item.get("lot_number")
+        },
+    )
+    update_custom_order_status(order, StatusIds.DISPATCHED)
+    return order
+
+
+@transaction.atomic
+def delete_rejected_order(order: CustomOrder, actor: User) -> None:
+    """Withdraw a rejected order dispatched today; its lots' kg is bookable again.
+
+    Only while DISPATCHED and on the dispatch day (IST). The order is moved to
+    REJECTED to get past ``refuse_deleting_stock_holder``, then it, its lines and
+    its challan are soft-deleted. No ledger figure moves.
+    """
+    from . import InventoryOperations
+    from .OrderOperations import assert_dispatched_today
+
+    assert_order_kind(order, OrderKind.REJECTED, "delete")
+    InventoryOperations.lock_rejected_lots(
+        CustomOrderItem.all_objects.filter(custom_order=order).values_list(
+            "inward_raw_material_id", flat=True
+        )
+    )
+    _assert_dispatched(order, "delete")
+    assert_dispatched_today(order)
+
+    entry = getattr(order, "dispatch_entry", None)
+    update_custom_order_status(order, StatusIds.REJECTED)
+    for line in CustomOrderItem.objects.filter(custom_order=order):
+        line.mark_deleted(actor)
+    if entry is not None:
+        entry.mark_deleted(actor)
+    order.mark_deleted(actor)
 
 
 # -- Admin edit / delete ----------------------------------------------------
@@ -839,7 +1031,7 @@ def sync_custom_order_items(
     custom order moves reserved loose packets, which the stock ledger records
     as ``ORDER_EDITED``.
     """
-    assert_order_kind(order, False, "edit")
+    assert_order_kind(order, OrderKind.CUSTOM, "edit")
     products = {item["product"].pk for item in items if "product" in item}
     with recording(
         StockEventType.ORDER_EDITED,
@@ -969,17 +1161,34 @@ def delete_custom_order(order: CustomOrder, actor: User) -> None:
 
 
 def _hsn_payload(order: CustomOrder) -> dict:
-    """``{"hsn_code": ...}`` for a waste order, nothing for a packet custom order.
+    """``{"hsn_code": ...}`` for a waste or rejected order, nothing for a packet order.
 
-    The HSN code belongs to waste orders only, so a packet order's responses do
+    The HSN code belongs to kg orders only, so a packet order's responses do
     not carry the key at all.
     """
-    return {"hsn_code": order.hsn_code} if order.made_from_waste else {}
+    return {"hsn_code": order.hsn_code} if order.order_kind != OrderKind.CUSTOM else {}
 
 
 def _weight_text(value) -> str | None:
     """A decimal as text, or None where the line has none (e.g. a kg line's packet weight)."""
     return None if value is None else str(value)
+
+
+def _lot_payload(item: CustomOrderItem) -> dict:
+    """``{"lot": ...}`` for a rejected order's line, nothing for any other line."""
+    lot = item.inward_raw_material
+    if lot is None:
+        return {}
+    return {
+        "lot": {
+            "public_id": lot.public_id,
+            "lot_no": lot.lot_no,
+            "farmer_name": lot.farmer_name,
+            "party": (
+                None if lot.party_id is None else {"id": lot.party_id, "name": lot.party.name}
+            ),
+        }
+    }
 
 
 def custom_order_payload(order: CustomOrder) -> dict:
@@ -1000,6 +1209,8 @@ def custom_order_payload(order: CustomOrder) -> dict:
         "booked_for": child_org_payload(order.booked_for),
         "verified_at": order.verified_at.isoformat() if order.verified_at else None,
         "made_from_waste": order.made_from_waste,
+        "made_from_rejected": order.made_from_rejected,
+        "order_kind": order.order_kind.value,
         "unit_of_measure": order.unit_of_measure,
         **_hsn_payload(order),
         "total_amount": str(order.total_amount),
@@ -1016,8 +1227,11 @@ def custom_order_payload(order: CustomOrder) -> dict:
                 "packets": item.packets,
                 "quantity_kg": _weight_text(item.quantity_kg),
                 "line_total": str(item.line_total),
+                **_lot_payload(item),
             }
-            for item in order.items.select_related("product").all()
+            for item in order.items.select_related(
+                "product", "inward_raw_material__party"
+            ).all()
         ],
     }
 
@@ -1061,6 +1275,8 @@ def custom_order_list_payload(order: CustomOrder) -> dict:
         "expected_delivery_date": order.expected_delivery_date.isoformat(),
         "booked_for": child_org_summary_payload(order.booked_for),
         "made_from_waste": order.made_from_waste,
+        "made_from_rejected": order.made_from_rejected,
+        "order_kind": order.order_kind.value,
         "unit_of_measure": order.unit_of_measure,
         **_hsn_payload(order),
         "total_amount": str(order.total_amount),

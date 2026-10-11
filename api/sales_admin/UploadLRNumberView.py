@@ -11,6 +11,10 @@ rather than accepting one. The number identifies a third party's consignment;
 when the goods went on our own vehicle there is no third party and no
 consignment note, so a value here would be a fiction the challan then printed.
 
+Recording the LR **delivers** a DISPATCHED order (status DELIVERED, delivered
+today); once delivered its dispatch can no longer be reverted. Recording the LR
+again on a DELIVERED order only updates the number.
+
 Re-dispatching an order (revert, dispatch again) starts a new journey on a new
 ``DispatchDetails`` row, so the LR must be recorded again -- the old note
 described the old journey.
@@ -63,4 +67,6 @@ class UploadLRNumberView(OrderTransitionView):
         serializer = UploadLRNumberSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        set_lr_number(order, lr_number=serializer.validated_data["lr_number"])
+        set_lr_number(
+            order, lr_number=serializer.validated_data["lr_number"], actor=request.user
+        )

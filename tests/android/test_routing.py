@@ -92,14 +92,22 @@ def test_a_v2_only_route_is_unreachable_under_v1():
 def test_the_real_v2_inherits_v1_routes_and_overrides_return_order():
     """tests/android/test_routing.py::test_the_real_v2_inherits_v1_routes_and_overrides_return_order"""
     from android.api.v2 import routes as v2_routes
+    from android.api.v2.GodownOtherMaterialStockView import (
+        GodownOtherMaterialStockView as GodownOtherMaterialStockViewV2,
+    )
     from android.api.v2.ReturnOrderView import ReturnOrderView as ReturnOrderViewV2
 
     route = "return-order/<order_public_id>"
     merged = routing.merged_routes(["v1", "v2"])
     assert merged[route] is ReturnOrderViewV2
-    assert v2_routes.ROUTES == {route: ReturnOrderViewV2}
+    stock_route = "godown/other-material-stock"
+    assert merged[stock_route] is GodownOtherMaterialStockViewV2
+    assert v2_routes.ROUTES == {
+        route: ReturnOrderViewV2,
+        stock_route: GodownOtherMaterialStockViewV2,
+    }
     for key, view_class in v1_routes.ROUTES.items():
-        if key != route:
+        if key not in v2_routes.ROUTES:
             assert merged[key] is view_class, key
 
     assert resolve("/android/api/v2/utilities/cities").func.view_class is CitiesView

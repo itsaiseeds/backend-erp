@@ -21,6 +21,20 @@ from common.views.paginated_date_range import (
 )
 
 
+class RejectedLotPartySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
+class RejectedLotRefSerializer(serializers.Serializer):
+    """The lot a rejected order's line sells."""
+
+    public_id = serializers.CharField()
+    lot_no = serializers.CharField()
+    farmer_name = serializers.CharField()
+    party = RejectedLotPartySerializer(allow_null=True)
+
+
 class CustomOrderItemPayloadSerializer(serializers.Serializer):
     """Output shape for one line of a custom order: loose packets, or kg on a waste order."""
 
@@ -36,6 +50,9 @@ class CustomOrderItemPayloadSerializer(serializers.Serializer):
         allow_null=True, help_text="Kilograms on a waste order's line. Null on a packet line."
     )
     line_total = serializers.CharField()
+    lot = RejectedLotRefSerializer(
+        required=False, help_text="The rejected lot sold. Present on a rejected order's line only."
+    )
 
 
 class CustomOrderDetailPayloadSerializer(serializers.Serializer):
@@ -55,11 +72,13 @@ class CustomOrderDetailPayloadSerializer(serializers.Serializer):
     booked_for = ChildOrgPayloadSerializer(allow_null=True)
     verified_at = serializers.DateTimeField(allow_null=True)
     made_from_waste = serializers.BooleanField()
+    made_from_rejected = serializers.BooleanField()
+    order_kind = serializers.ChoiceField(choices=["custom", "waste", "rejected"])
     unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
     hsn_code = serializers.CharField(
         required=False,
         allow_blank=True,
-        help_text="Free-text HSN code. Present on waste orders only.",
+        help_text="Free-text HSN code. Present on waste and rejected orders only.",
     )
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField(help_text="0 on a waste order.")
@@ -119,11 +138,13 @@ class CustomOrderListItemSerializer(serializers.Serializer):
     expected_delivery_date = serializers.DateField()
     booked_for = ChildOrgSummarySerializer(allow_null=True)
     made_from_waste = serializers.BooleanField()
+    made_from_rejected = serializers.BooleanField()
+    order_kind = serializers.ChoiceField(choices=["custom", "waste", "rejected"])
     unit_of_measure = serializers.ChoiceField(choices=["packet", "kg"])
     hsn_code = serializers.CharField(
         required=False,
         allow_blank=True,
-        help_text="Free-text HSN code. Present on waste orders only.",
+        help_text="Free-text HSN code. Present on waste and rejected orders only.",
     )
     total_amount = serializers.CharField()
     total_packets = serializers.IntegerField(help_text="0 on a waste order.")

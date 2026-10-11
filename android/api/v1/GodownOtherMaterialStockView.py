@@ -26,21 +26,4 @@ class GodownOtherMaterialStockView(AndroidGodownBaseView):
     def get(self, request: Request) -> Response:
         raw = request.query_params.get("material_type")
         material_type_ids = [parse_int(part) for part in raw.split(",")] if raw else None
-        as_of = InwardOperations.today()
-        lines = InwardOperations.other_material_on_hand(as_of, material_type_ids=material_type_ids)
-        return Response(
-            {
-                "as_of": as_of.isoformat(),
-                "lines": [
-                    {
-                        "material_type": {
-                            "id": line["material_type_id"],
-                            "name": line["name"],
-                            "unit_type": line["unit_type"],
-                        },
-                        "on_hand": str(line["on_hand"]),
-                    }
-                    for line in lines
-                ],
-            }
-        )
+        return Response(InwardOperations.other_material_stock_payload(material_type_ids))
