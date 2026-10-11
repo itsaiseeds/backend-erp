@@ -65,7 +65,12 @@ def custom_order_detail_queryset() -> QuerySet:
         "booked_for__address__country",
         "booked_for",
     ).prefetch_related(
-        Prefetch("items", queryset=CustomOrderItem.objects.select_related("product")),
+        Prefetch(
+            "items",
+            queryset=CustomOrderItem.objects.select_related(
+                "product", "inward_raw_material__party"
+            ),
+        ),
         Prefetch(
             "client__client_addresses",
             queryset=ClientAddress.objects.select_related(

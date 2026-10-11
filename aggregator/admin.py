@@ -868,7 +868,7 @@ class CustomOrderAdmin(StockLedgerAdminMixin, SoftDeleteParentAdmin):
         "created_at",
     )
     search_fields = ("public_id", "client__company_name", "special_comments")
-    list_filter = ("status", "made_from_waste")
+    list_filter = ("status", "made_from_waste", "made_from_rejected")
     autocomplete_fields = (
         "client",
         "delivery_address",
@@ -887,6 +887,7 @@ class CustomOrderAdmin(StockLedgerAdminMixin, SoftDeleteParentAdmin):
             *super().get_readonly_fields(request, obj),
             *ORDER_LIFECYCLE_FIELDS,
             "made_from_waste",
+            "made_from_rejected",
             "unit_of_measure",
             "hsn_code",
         )

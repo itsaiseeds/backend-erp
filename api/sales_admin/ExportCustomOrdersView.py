@@ -14,7 +14,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.request import Request
 
 from aggregator.CustomOrderOperations import custom_order_export_payload
-from aggregator.models import CustomOrder, CustomOrderItem
+from aggregator.models import CustomOrder, CustomOrderItem, kind_lookup
 from api.export_serializers import ExportCustomOrderSerializer
 from api.export_views import (
     EXPORT_QUERY_PARAMETERS,
@@ -33,7 +33,7 @@ class ExportCustomOrdersView(AdminDateRangeExportView):
 
     def export(self, window: DateWindow) -> list[dict]:
         orders = (
-            window.created_between(CustomOrder.objects.filter(made_from_waste=False))
+            window.created_between(CustomOrder.objects.filter(**kind_lookup("custom")))
             .select_related(
                 "client",
                 "status",

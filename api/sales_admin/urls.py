@@ -12,10 +12,12 @@ from .ApproveFieldTripView import ApproveFieldTripView
 from .BagStockView import BagStockView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .CreateCustomOrderView import CreateCustomOrderView
+from .CreateRejectedOrderView import CreateRejectedOrderView
 from .CreateWasteOrderView import CreateWasteOrderView
 from .CropsView import CropsView
 from .CustomOrderView import CustomOrderView
 from .DeleteOtherMaterialRecipeView import DeleteOtherMaterialRecipeView
+from .DeleteRejectedOrderView import DeleteRejectedOrderView
 from .DispatchCustomOrderView import DispatchCustomOrderView
 from .DispatchOrderView import DispatchOrderView
 from .DispatchWasteOrderView import DispatchWasteOrderView
@@ -26,6 +28,7 @@ from .ExportInventorySnapshotsView import ExportInventorySnapshotsView
 from .ExportInwardEntriesView import ExportInwardEntriesView
 from .ExportLabTestingsView import ExportLabTestingsView
 from .ExportOrdersView import ExportOrdersView
+from .ExportRejectedOrdersView import ExportRejectedOrdersView
 from .FieldTripView import FieldTripView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
@@ -37,6 +40,8 @@ from .GetFieldTripFarmerVisitsView import GetFieldTripFarmerVisitsView
 from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
+from .GetPartyRejectedLotsView import GetPartyRejectedLotsView
+from .GetRejectedOrdersView import GetRejectedOrdersView
 from .GetReturnOrdersView import GetReturnOrdersView
 from .GetWasteOrdersView import GetWasteOrdersView
 from .GodownManagersView import GodownManagersView
@@ -47,6 +52,8 @@ from .LabTestersView import LabTestersView
 from .LabTestingDetailView import LabTestingDetailView
 from .LabTestingsView import LabTestingsView
 from .LogoutView import LogoutView
+from .MarkCustomOrderDeliveredView import MarkCustomOrderDeliveredView
+from .MarkOrderDeliveredView import MarkOrderDeliveredView
 from .NonStockInwardsView import NonStockInwardsView
 from .OtherMaterialRecipesView import OtherMaterialRecipesView
 from .OtherMaterialStockView import OtherMaterialStockView
@@ -281,6 +288,16 @@ urlpatterns = [
         name="dispatch-custom-order",
     ),
     path(
+        "mark-order-delivered/<str:public_id>",
+        MarkOrderDeliveredView.as_view(),
+        name="mark-order-delivered",
+    ),
+    path(
+        "mark-custom-order-delivered/<str:public_id>",
+        MarkCustomOrderDeliveredView.as_view(),
+        name="mark-custom-order-delivered",
+    ),
+    path(
         "revert-custom-order-dispatch/<str:public_id>",
         RevertCustomOrderDispatchView.as_view(),
         name="revert-custom-order-dispatch",
@@ -304,6 +321,25 @@ urlpatterns = [
         "dispatch-waste-order/<str:public_id>",
         DispatchWasteOrderView.as_view(),
         name="dispatch-waste-order",
+    ),
+    # Rejected orders sell specific lab-rejected lots (kg lines), dispatched at
+    # booking. They share ``custom-order/<public_id>`` (GET) with the other
+    # kinds; create, list, delete and the lot picker have their own routes.
+    path("rejected-orders/", GetRejectedOrdersView.as_view(), name="rejected-orders"),
+    path(
+        "create-rejected-order",
+        CreateRejectedOrderView.as_view(),
+        name="create-rejected-order",
+    ),
+    path(
+        "rejected-order/<str:public_id>",
+        DeleteRejectedOrderView.as_view(),
+        name="delete-rejected-order",
+    ),
+    path(
+        "party-rejected-lots/<int:party_id>",
+        GetPartyRejectedLotsView.as_view(),
+        name="party-rejected-lots",
     ),
     # Field trips follow the order convention: ``field-trips/`` is a collection,
     # ``field-trip/<public_id>`` a collection item (GET / DELETE), and the verbs
@@ -427,6 +463,11 @@ urlpatterns = [
         "export/custom-orders",
         ExportCustomOrdersView.as_view(),
         name="export-custom-orders",
+    ),
+    path(
+        "export/rejected-orders",
+        ExportRejectedOrdersView.as_view(),
+        name="export-rejected-orders",
     ),
     path(
         "export/dispatch-receipts",

@@ -41,10 +41,10 @@ ADDRESSES_URL = "/android/api/v1/utilities/client-addresses"
 AGENCIES_URL = "/android/api/v1/utilities/client-transport-agencies"
 
 
-class AndroidBagOrderApiTest(AndroidApiTestCase):
-    """Cover booking an order and the pickers that feed it.
+class BagOrderFixture:
+    """Two sales people, one verified client each, and two bags to book.
 
-    tests/android/test_bag_orders.py::AndroidBagOrderApiTest
+    Shared by the order-booking and order-editing Android tests.
     """
 
     @classmethod
@@ -144,6 +144,13 @@ class AndroidBagOrderApiTest(AndroidApiTestCase):
             transport_agencies=[{"name": agency_name}],
             actor=actor,
         )
+
+
+class AndroidBagOrderApiTest(BagOrderFixture, AndroidApiTestCase):
+    """Cover booking an order and the pickers that feed it.
+
+    tests/android/test_bag_orders.py::AndroidBagOrderApiTest
+    """
 
     # -- helpers --------------------------------------------------------------
 

@@ -53,7 +53,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from aggregator.DispatchOperations import challan_entry_payload
-from aggregator.models import DispatchEntry, DispatchEntryItem
+from aggregator.models import DispatchEntry, DispatchEntryItem, kind_lookup
 from aggregator.models.Order import DISPATCH_REQUIRED_STATUS_CODES
 from api.client_serializers import ChildOrgPayloadSerializer
 from api.order_serializers import ProductRefSerializer, TransportAgencyRefSerializer
@@ -320,8 +320,50 @@ def _challan_destination_cities(request: Request) -> list[dict]:
     return [{"value": city_id, "label": name} for city_id, name in rows]
 
 
+# The order types a challan can belong to, as ``order_type`` on the challan
+# payload (``DispatchOperations._CUSTOM_ORDER_TYPES``). A normal order is the
+# one with an ``order``; every other type is a custom order of that kind.
+_ORDER_TYPE_KINDS = {
+    "CUSTOM_ORDER": "custom",
+    "WASTE_ORDER": "waste",
+    "REJECTED_ORDER": "rejected",
+}
+_ORDER_TYPES = ("NORMAL_ORDER", *_ORDER_TYPE_KINDS)
+
+
+def _parse_order_type(raw: str) -> str:
+    value = raw.strip().upper()
+    if value not in _ORDER_TYPES:
+        raise serializers.ValidationError(
+            f"'{raw}' is not an order type. Allowed: {', '.join(_ORDER_TYPES)}."
+        )
+    return value
+
+
+def _apply_order_type(queryset: QuerySet, values: list[str]) -> QuerySet:
+    """OR together the selected types: normal orders and/or custom orders by kind."""
+    condition = Q()
+    if "NORMAL_ORDER" in values:
+        condition |= Q(order__isnull=False)
+    for value in values:
+        if value in _ORDER_TYPE_KINDS:
+            condition |= Q(**kind_lookup(_ORDER_TYPE_KINDS[value], "custom_order__"))
+    return queryset.filter(condition)
+
+
 _QUERYSET_FILTERS = (
     public_id_filter("DE-"),
+    QuerysetFilter(
+        "order_type",
+        label="Order Type",
+        parse=_parse_order_type,
+        apply=_apply_order_type,
+        description="Order type(s) the challan belongs to (see options); selected types are OR-ed.",
+        options=[
+            {"value": value, "label": value.replace("_", " ").title()}
+            for value in _ORDER_TYPES
+        ],
+    ),
     QuerysetFilter(
         "client",
         label="Client",

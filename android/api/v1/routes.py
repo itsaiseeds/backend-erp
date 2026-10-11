@@ -19,6 +19,7 @@ from .CreateFieldTripView import CreateFieldTripView
 from .CreateMultiSelectBagOrderView import CreateMultiSelectBagOrderView
 from .CropsView import CropsView
 from .DeleteFieldTripView import DeleteFieldTripView
+from .EditOrderView import EditOrderView
 from .EndFieldTripView import EndFieldTripView
 from .FarmerDetailView import FarmerDetailView
 from .FarmersView import FarmersView
@@ -104,6 +105,7 @@ ROUTES: dict[str, type] = {
     "update-client": UpdateClientView,
     "sales-person-catalogue": SalesPersonCatalogueView,
     "create-multi-select-bag-order": CreateMultiSelectBagOrderView,
+    "edit-order/<public_id>": EditOrderView,
     "create-field-trip": CreateFieldTripView,
     "get-field-trips": GetFieldTripsView,
     "edit-field-trip/<public_id>": UpdateFieldTripView,

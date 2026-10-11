@@ -20,6 +20,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 
 from aggregator import InventoryOperations as inv
+from aggregator import StockLedgerOperations
 from aggregator.ClientOperations import create_client_with_details
 from aggregator.CompanyDetails import COMPANY_DETAILS, DEFAULT_HSN_CODE
 from aggregator.models import (
@@ -43,6 +44,7 @@ VERIFY_URL = "/api/sales-admin/verify-order/{public_id}"
 DISPATCH_URL = "/api/sales-admin/dispatch-order/{public_id}"
 REVERT_URL = "/api/sales-admin/revert-dispatch/{public_id}"
 LR_URL = "/api/sales-admin/upload-lr-number/{public_id}"
+MARK_DELIVERED_URL = "/api/sales-admin/mark-order-delivered/{public_id}"
 CHALLANS_URL = "/api/sales-admin/dispatch-challans/"
 
 
@@ -268,6 +270,52 @@ class DispatchChallansApiTest(WebApiTestCase):
         order.refresh_from_db()
         self.assertEqual(order.dispatch_details.lr_number, "LR-12345")
 
+    def test_recording_the_lr_delivers_the_order_and_blocks_a_revert(self):
+        """The LR is the proof of handover: DISPATCHED -> DELIVERED, then no revert.
+
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_recording_the_lr_delivers_the_order_and_blocks_a_revert
+        """
+        order = self._dispatched_order()
+
+        response = self._upload_lr(order)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        self.assertEqual(order.status.code, "DELIVERED")
+        self.assertEqual(order.actual_delivery_date, indian_now().date())
+        reverted = self._post(REVERT_URL, order)
+        self.assertEqual(reverted.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(StockLedgerOperations.check_ledger(), [])
+
+    def test_re_recording_an_lr_on_a_delivered_order_only_updates_it(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_re_recording_an_lr_on_a_delivered_order_only_updates_it"""
+        order = self._dispatched_order()
+        self._upload_lr(order)
+        order.refresh_from_db()
+        delivered_on = order.actual_delivery_date
+
+        response = self._upload_lr(order, "LR-99999")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        self.assertEqual(order.dispatch_details.lr_number, "LR-99999")
+        self.assertEqual(order.status.code, "DELIVERED")
+        self.assertEqual(order.actual_delivery_date, delivered_on)
+
+    def test_mark_order_delivered_takes_a_private_order_but_not_an_agency_one(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_mark_order_delivered_takes_a_private_order_but_not_an_agency_one"""
+        agency_order = self._dispatched_order()
+        refused = self._post(MARK_DELIVERED_URL, agency_order)
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("LR", refused.data["detail"])
+
+        private_order = self._dispatched_order(by_agency=False)
+        done = self._post(MARK_DELIVERED_URL, private_order)
+
+        self.assertEqual(done.status_code, status.HTTP_200_OK, done.data)
+        self.assertEqual(done.data["status"], "DELIVERED")
+        self.assertEqual(StockLedgerOperations.check_ledger(), [])
+
     def test_a_blank_lr_number_is_refused(self):
         """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_blank_lr_number_is_refused"""
         order = self._dispatched_order()
@@ -391,7 +439,6 @@ class DispatchChallansApiTest(WebApiTestCase):
         tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_reverting_a_dispatch_takes_the_challan_off_the_list
         """
         order = self._dispatched_order()
-        self._upload_lr(order)
         self.assertEqual(self._challans().data["total_count"], 1)
 
         self._post(REVERT_URL, order)
@@ -400,7 +447,6 @@ class DispatchChallansApiTest(WebApiTestCase):
         # The goods are back on the shelf, but the paperwork is untouched.
         self.assertEqual(order.status.code, "CONFIRMED")
         self.assertIsNotNone(order.dispatch_details_id)
-        self.assertEqual(order.dispatch_entry.lr_number, "LR-12345")
         self.assertEqual(self._challans().data["total_count"], 0)
 
     def test_a_delivered_order_keeps_its_challan(self):
@@ -472,7 +518,6 @@ class DispatchChallansApiTest(WebApiTestCase):
         tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_re_dispatching_keeps_the_order_listed_with_a_blank_lr
         """
         order = self._dispatched_order()
-        self._upload_lr(order)
         self.assertEqual(self._challans().data["total_count"], 1)
 
         self._post(REVERT_URL, order)

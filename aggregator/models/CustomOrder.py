@@ -27,6 +27,29 @@ class OrderUnit(models.TextChoices):
     KG = "kg", "kg"
 
 
+class OrderKind(models.TextChoices):
+    """What a custom order sells: loose packets, waste kg, or rejected-lot kg."""
+
+    CUSTOM = "custom", "custom"
+    WASTE = "waste", "waste"
+    REJECTED = "rejected", "rejected"
+
+
+# ORM filters selecting one kind of custom order, so a query never has to know
+# that a kind is spread over two flags. ``prefix`` reaches it through a relation
+# (``"custom_order__"`` from a ``CustomOrderItem``).
+_KIND_FLAGS = {
+    OrderKind.CUSTOM: {"made_from_waste": False, "made_from_rejected": False},
+    OrderKind.WASTE: {"made_from_waste": True},
+    OrderKind.REJECTED: {"made_from_rejected": True},
+}
+
+
+def kind_lookup(kind: str, prefix: str = "") -> dict[str, bool]:
+    """Keyword filters selecting custom orders of ``kind``: custom, waste or rejected."""
+    return {f"{prefix}{field}": value for field, value in _KIND_FLAGS[OrderKind(kind)].items()}
+
+
 class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, CreatedByModel):
     """A loose-packet order, made up of one or more ``CustomOrderItem`` rows.
 
@@ -41,12 +64,13 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
     and exactly one is required once the order is dispatched.
 
     Exposed to the frontend by its ``public_id`` -- ``CORD-…`` for a packet order,
-    ``WORD-…`` for a waste order (``made_from_waste``); the primary key
-    is never sent out.
+    ``WORD-…`` for a waste order and ``RORD-…`` for a rejected order
+    (``made_from_rejected``); the primary key is never sent out.
     """
 
     public_id_prefix = "CORD-"
     waste_public_id_prefix = "WORD-"
+    rejected_public_id_prefix = "RORD-"
 
     client = models.ForeignKey(
         "aggregator.Client",
@@ -119,12 +143,21 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
             "waste pool (``RawMaterialWaste``) instead of loose packets."
         ),
     )
+    made_from_rejected = models.BooleanField(
+        "made from rejected",
+        default=False,
+        help_text=(
+            "A rejected order: its lines are kilograms of specific lab-rejected "
+            "lots (``CustomOrderItem.inward_raw_material``). Never set together "
+            "with ``made_from_waste``."
+        ),
+    )
     unit_of_measure = models.CharField(
         "unit of measure",
         max_length=8,
         choices=OrderUnit.choices,
         default=OrderUnit.PACKET,
-        help_text="``kg`` on a waste order, ``packet`` on every other custom order.",
+        help_text="``kg`` on a waste or rejected order, ``packet`` on a custom order.",
     )
     hsn_code = models.CharField(
         "HSN code",
@@ -132,8 +165,9 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         blank=True,
         default="",
         help_text=(
-            "Free-text HSN code, optional. Waste orders only: a packet custom "
-            "order must leave it blank (``ck_customorder_hsn_waste_only``)."
+            "Free-text HSN code, optional. Waste and rejected orders only: a "
+            "packet custom order must leave it blank "
+            "(``ck_customorder_hsn_waste_only``)."
         ),
     )
 
@@ -150,25 +184,41 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
                 name="ck_customorder_not_both_dispatch_details",
             ),
             models.CheckConstraint(
+                condition=~models.Q(made_from_waste=True, made_from_rejected=True),
+                name="ck_customorder_not_waste_and_rejected",
+            ),
+            models.CheckConstraint(
                 condition=(
                     models.Q(made_from_waste=True, unit_of_measure="kg")
-                    | models.Q(made_from_waste=False, unit_of_measure="packet")
+                    | models.Q(made_from_rejected=True, unit_of_measure="kg")
+                    | models.Q(
+                        made_from_waste=False,
+                        made_from_rejected=False,
+                        unit_of_measure="packet",
+                    )
                 ),
                 name="ck_customorder_waste_unit",
             ),
             models.CheckConstraint(
-                condition=models.Q(made_from_waste=True) | models.Q(hsn_code=""),
+                condition=(
+                    models.Q(made_from_waste=True)
+                    | models.Q(made_from_rejected=True)
+                    | models.Q(hsn_code="")
+                ),
                 name="ck_customorder_hsn_waste_only",
             ),
         ]
 
     def _generate_public_id(self):
-        """``WORD-…`` on a waste order, ``CORD-…`` on every other custom order.
+        """``WORD-…`` waste, ``RORD-…`` rejected, ``CORD-…`` every other custom order.
 
-        The prefix is picked when the id is first generated, so ``made_from_waste``
-        must already be set on the instance (``create_waste_order`` does).
+        The prefix is picked when the id is first generated, so the kind flags
+        must already be set on the instance (the create operations do).
         """
-        prefix = self.waste_public_id_prefix if self.made_from_waste else self.public_id_prefix
+        prefix = {
+            OrderKind.WASTE: self.waste_public_id_prefix,
+            OrderKind.REJECTED: self.rejected_public_id_prefix,
+        }.get(self.order_kind, self.public_id_prefix)
         return f"{prefix}{generate_public_id()}"
 
     def guard_soft_delete(self, perform):
@@ -178,6 +228,15 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
 
     def __str__(self):
         return self.public_id or "Custom order"
+
+    @property
+    def order_kind(self) -> OrderKind:
+        """Which of the three kinds this is, derived from the two flags."""
+        if self.made_from_rejected:
+            return OrderKind.REJECTED
+        if self.made_from_waste:
+            return OrderKind.WASTE
+        return OrderKind.CUSTOM
 
     @property
     def total_amount(self):
@@ -216,13 +275,17 @@ class CustomOrder(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         if self.status_id and self.status.code not in ORDER_STATUS_CODES:
             errors["status"] = "Invalid status for a custom order."
 
-        if self.hsn_code and not self.made_from_waste:
-            errors["hsn_code"] = "Only a waste order can carry an HSN code."
+        if self.made_from_waste and self.made_from_rejected:
+            errors["made_from_rejected"] = "An order cannot be both a waste and a rejected order."
 
-        expected_unit = OrderUnit.KG if self.made_from_waste else OrderUnit.PACKET
+        if self.hsn_code and self.order_kind == OrderKind.CUSTOM:
+            errors["hsn_code"] = "Only a waste or rejected order can carry an HSN code."
+
+        expected_unit = OrderUnit.PACKET if self.order_kind == OrderKind.CUSTOM else OrderUnit.KG
         if self.unit_of_measure != expected_unit:
             errors["unit_of_measure"] = (
-                "A waste order is counted in kg and every other custom order in packets."
+                "Waste and rejected orders are counted in kg and every other "
+                "custom order in packets."
             )
 
         if (

@@ -46,6 +46,7 @@ from django.http import Http404
 
 from common.models import indian_now
 
+from . import InventoryOperations
 from .InwardOperations import (
     assert_raw_lot_removable,
     inward_raw_material_payload,
@@ -243,6 +244,14 @@ def update_lab_test(
                 assert_raw_lot_removable(lot)
             except ValueError as exc:
                 raise ValidationError({"result": str(exc)}) from None
+        elif test.result == LabTestResult.FAIL:
+            # Fail -> Pass takes the lot out of Rejected.
+            try:
+                InventoryOperations.assert_rejected_lot_not_booked(
+                    lot, "change this lab result"
+                )
+            except ValidationError as exc:
+                raise ValidationError({"result": exc.messages[0]}) from None
         test.result = new_result
         test.save()
         _move_lot(lot, new_result, test, actor)

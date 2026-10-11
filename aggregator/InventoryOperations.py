@@ -81,6 +81,7 @@ from .models import (
     StockEventDetail,
     StockEventType,
     StockPoolKind,
+    kind_lookup,
 )
 from .ProductOperations import assert_products_usable
 
@@ -1078,7 +1079,7 @@ def _loose_demand(
         product=product,
         packet_weight=packet_weight,
         custom_order__is_deleted=False,
-        custom_order__made_from_waste=False,
+        **kind_lookup("custom", "custom_order__"),
         **order_filter,
     ).aggregate(total=Sum("packets"))["total"]
     return total or 0
@@ -1370,7 +1371,7 @@ def _waste_order_kg(product: Product, status_ids) -> Decimal:
     """Sum ``CustomOrderItem.quantity_kg`` of ``product`` on live waste orders in ``status_ids``."""
     total = CustomOrderItem.objects.filter(
         product=product,
-        custom_order__made_from_waste=True,
+        **kind_lookup("waste", "custom_order__"),
         custom_order__is_deleted=False,
         custom_order__status_id__in=status_ids,
     ).aggregate(total=Sum("quantity_kg"))["total"]
@@ -1414,6 +1415,80 @@ def assert_waste_available(product_ids) -> None:
                     )
                 }
             )
+
+
+# -- Rejected lots ----------------------------------------------------------
+#
+# A rejected order sells kilograms of specific lab-rejected lots. A lot is
+# bookable once it is live, ``RAW_MATERIAL_REJECTED`` and its ``effective_date``
+# has been reached -- the same pool as the ledger's RAW ``rejected`` figure.
+# That figure is the lot's whole ``quantity_kg`` and a rejected order never
+# changes it, so none of this writes a ledger event. A rejected order is born
+# DISPATCHED, so a lot's booked kg is simply its live lines on orders in
+# ``CONSUMING_STATUS_IDS``.
+
+
+def bookable_rejected_lots() -> models.QuerySet:
+    """Live rejected lots whose ``effective_date`` has been reached."""
+    return InwardRawMaterial.objects.filter(
+        status_id=StatusIds.RAW_MATERIAL_REJECTED.value,
+        effective_date__isnull=False,
+        effective_date__lte=today(),
+    )
+
+
+def lock_rejected_lots(lot_ids: Iterable[int]) -> None:
+    """``SELECT ... FOR UPDATE`` the given lot rows, in id order.
+
+    Booking, deleting a rejected order and every guard that would move a lot out
+    of Rejected take this, so a lot's remaining kg cannot be double-spent.
+    Inside ``@transaction.atomic``.
+    """
+    ids = sorted(set(lot_ids))
+    if not ids:
+        return
+    list(
+        InwardRawMaterial.all_objects.select_for_update()
+        .filter(pk__in=ids)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+
+
+def rejected_lot_booked_kg(lot_ids: Iterable[int]) -> dict[int, Decimal]:
+    """Kg of each lot on live rejected orders (DISPATCHED / DELIVERED), by lot id."""
+    rows = (
+        CustomOrderItem.objects.filter(
+            inward_raw_material_id__in=list(lot_ids),
+            **kind_lookup("rejected", "custom_order__"),
+            custom_order__is_deleted=False,
+            custom_order__status_id__in=CONSUMING_STATUS_IDS,
+        )
+        .values("inward_raw_material_id")
+        .annotate(total=Sum("quantity_kg"))
+    )
+    return {row["inward_raw_material_id"]: row["total"] for row in rows}
+
+
+def rejected_lot_remaining_kg(lot: InwardRawMaterial) -> Decimal:
+    """``lot.quantity_kg`` less what live rejected orders already hold."""
+    booked = rejected_lot_booked_kg([lot.pk]).get(lot.pk, Decimal("0.000"))
+    return lot.quantity_kg - booked
+
+
+def assert_rejected_lot_not_booked(lot: InwardRawMaterial, action: str) -> None:
+    """Raise unless ``lot`` has no kg on a live rejected order.
+
+    Guards every move of a lot out of Rejected (revert to lab testing, a lab
+    result flipped to Pass, a soft delete). Callers hold the lot's row lock
+    (``locked_raw_lot``), the same lock booking takes, so the read is stable.
+    """
+    booked = rejected_lot_booked_kg([lot.pk]).get(lot.pk, Decimal("0.000"))
+    if booked > 0:
+        raise ValidationError(
+            f"Cannot {action}: {booked} kg of lot '{lot.lot_no}' is already sold "
+            "on a rejected order."
+        )
 
 
 def _assert_raw_available(product_ids) -> None:

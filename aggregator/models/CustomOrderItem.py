@@ -1,5 +1,6 @@
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from common.models import CreatedByModel, SoftDeletedModel, TimeStampedModel
@@ -23,6 +24,9 @@ class CustomOrderItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
     instead: ``quantity_kg`` set, ``packet_weight`` and ``packets`` null, drawn
     from the product's waste pool. Exactly one of the two shapes
     (``ck_customorderitem_one_kind``).
+
+    A **rejected order** line is also a kg line, but it names the specific
+    lab-rejected ``InwardRawMaterial`` lot it sells (``inward_raw_material``).
     """
 
     custom_order = models.ForeignKey(
@@ -69,6 +73,15 @@ class CustomOrderItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         blank=True,
         help_text="Kilograms of waste on a waste order's line. Null on a packet line.",
     )
+    inward_raw_material = models.ForeignKey(
+        "aggregator.InwardRawMaterial",
+        verbose_name="rejected lot",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="custom_order_items",
+        help_text="The rejected lot a rejected-order line sells. Null on every other line.",
+    )
 
     class Meta:
         verbose_name = "custom order item"
@@ -81,8 +94,20 @@ class CustomOrderItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
             ),
             models.UniqueConstraint(
                 fields=["custom_order", "product"],
-                condition=models.Q(packet_weight__isnull=True),
+                condition=models.Q(packet_weight__isnull=True, inward_raw_material__isnull=True),
                 name="uniq_customorderitem_order_product_kg",
+            ),
+            models.UniqueConstraint(
+                fields=["custom_order", "inward_raw_material"],
+                condition=models.Q(inward_raw_material__isnull=False),
+                name="uniq_customorderitem_order_lot",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(inward_raw_material__isnull=True)
+                    | models.Q(quantity_kg__isnull=False)
+                ),
+                name="ck_customorderitem_lot_is_kg",
             ),
             models.CheckConstraint(
                 condition=(
@@ -122,6 +147,24 @@ class CustomOrderItem(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         if self.product_id:
             return f"{self.packets} × {self.packet_weight}kg {self.product.name}"
         return "custom order item"
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.custom_order_id:
+            rejected = self.custom_order.made_from_rejected
+            if rejected and not self.inward_raw_material_id:
+                errors["inward_raw_material"] = "A rejected order line must name its lot."
+            if not rejected and self.inward_raw_material_id:
+                errors["inward_raw_material"] = "Only a rejected order line can name a lot."
+        if (
+            self.inward_raw_material_id
+            and self.product_id
+            and self.inward_raw_material.product_id != self.product_id
+        ):
+            errors["product"] = "The line's product must be the lot's product."
+        if errors:
+            raise ValidationError(errors)
 
     @property
     def is_kg_line(self):

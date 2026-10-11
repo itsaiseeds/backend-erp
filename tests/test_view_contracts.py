@@ -124,6 +124,7 @@ EXPECTED_CONTRACTS = {
         "CreateMultiSelectBagOrderView",
         TOKEN_SALESPERSON,
     ),
+    "android/api/v1/edit-order/<public_id>": ("EditOrderView", TOKEN_SALESPERSON),
     "android/api/v1/get-clients": ("GetClientsView", TOKEN_SALESPERSON),
     "android/api/v1/get-orders": ("GetOrdersView", TOKEN_SALESPERSON),
     "android/api/v1/get-challans": ("GetChallansView", TOKEN_SALESPERSON),
@@ -276,6 +277,25 @@ EXPECTED_CONTRACTS = {
         "DispatchWasteOrderView",
         SESSION_ADMIN,
     ),
+    "api/sales-admin/rejected-orders/": ("GetRejectedOrdersView", SESSION_ADMIN),
+    "api/sales-admin/create-rejected-order": ("CreateRejectedOrderView", SESSION_ADMIN),
+    "api/sales-admin/rejected-order/<str:public_id>": (
+        "DeleteRejectedOrderView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/party-rejected-lots/<int:party_id>": (
+        "GetPartyRejectedLotsView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/mark-order-delivered/<str:public_id>": (
+        "MarkOrderDeliveredView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/mark-custom-order-delivered/<str:public_id>": (
+        "MarkCustomOrderDeliveredView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/export/rejected-orders": ("ExportRejectedOrdersView", SESSION_ADMIN),
     "api/sales-admin/get-clients/": ("GetClientsView", SESSION_ADMIN),
     "api/sales-admin/dispatch-order/<str:public_id>": ("DispatchOrderView", SESSION_ADMIN),
     "api/sales-admin/dispatch-challans/": ("GetDispatchChallansView", SESSION_ADMIN),

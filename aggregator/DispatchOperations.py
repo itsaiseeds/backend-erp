@@ -24,7 +24,7 @@ from django.db import transaction
 from .AddressOperations import address_payload
 from .ClientChildOrgOperations import child_org_payload
 from .CompanyDetails import COMPANY_DETAILS, DEFAULT_HSN_CODE, current_financial_year
-from .models import CustomOrder, DispatchEntry, DispatchEntryItem, Order
+from .models import CustomOrder, DispatchEntry, DispatchEntryItem, Order, StatusIds
 from .ProductOperations import packaging_payload
 
 # Fields re-stamped every time an order is dispatched. The receiver snapshot and
@@ -338,11 +338,19 @@ def validated_waste_lot_numbers(
     are **optional**: waste records carry no production batch, so a line with no
     entry is dispatched with a blank lot.
     """
-    on_order = {item.product.public_id for item in order.items.select_related("product")}
+    on_order = set()
+    for item in order.items.select_related("product", "inward_raw_material"):
+        # A rejected order's lines are keyed by their lot's public id: two lots
+        # of one product are two lines, so the product cannot name one.
+        on_order.add(
+            item.inward_raw_material.public_id
+            if item.inward_raw_material_id
+            else item.product.public_id
+        )
     unknown = sorted(lot_numbers.keys() - on_order)
     if unknown:
         raise ValidationError(
-            {"items": f"Not on this waste order: {', '.join(unknown)}."}
+            {"items": f"Not on this order: {', '.join(unknown)}."}
         )
     return lot_numbers
 
@@ -360,12 +368,17 @@ def sync_waste_dispatch_entry(
     vehicle_number: str,
     lot_numbers: dict[str, str],
 ) -> DispatchEntry:
-    """Write (or rewrite) waste ``order``'s challan and its kg lines.
+    """Write (or rewrite) a kg order's challan and its kg lines.
 
     The waste counterpart of :func:`sync_custom_dispatch_entry`: one entry per
     order, updated in place on a re-dispatch, with one kg line per product
     (``quantity_kg`` set, ``quantity`` and ``packet_weight`` null). A line's lot
     number is whatever ``lot_numbers`` says, or blank.
+
+    On a **rejected order** each line is one rejected lot, keyed in
+    ``lot_numbers`` by the lot's public id; a line given no lot number prints the
+    lot's own ``lot_no``. Two lots of one product are two challan lines, so they
+    may not end up with the same lot number.
     """
     validated_waste_lot_numbers(order, lot_numbers)
 
@@ -381,13 +394,24 @@ def sync_waste_dispatch_entry(
     )
 
     existing = {
-        line.product_id: line
+        (line.product_id, line.lot_number): line
         for line in DispatchEntryItem.all_objects.filter(
             dispatch_entry=entry, packet_weight__isnull=True, product__isnull=False
         )
     }
-    for item in order.items.select_related("product"):
-        line = existing.pop(item.product_id, None)
+    seen: set[tuple[int, str]] = set()
+    for item in order.items.select_related("product", "inward_raw_material"):
+        if item.inward_raw_material_id:
+            lot = item.inward_raw_material
+            lot_number = lot_numbers.get(lot.public_id) or lot.lot_no
+        else:
+            lot_number = lot_numbers.get(item.product.public_id, "")
+        if (item.product_id, lot_number) in seen:
+            raise ValidationError(
+                {"items": f"Lot number '{lot_number}' is used twice for one product."}
+            )
+        seen.add((item.product_id, lot_number))
+        line = existing.pop((item.product_id, lot_number), None)
         if line is None:
             line = DispatchEntryItem(
                 dispatch_entry=entry,
@@ -399,7 +423,7 @@ def sync_waste_dispatch_entry(
         line.negotiated_selling_price = item.negotiated_selling_price
         line.quantity = None
         line.quantity_kg = item.quantity_kg
-        line.lot_number = lot_numbers.get(item.product.public_id, "")
+        line.lot_number = lot_number
         line.full_clean()
         line.save()
 
@@ -409,7 +433,7 @@ def sync_waste_dispatch_entry(
     return entry
 
 
-def set_lr_number(order: Order, *, lr_number: str):
+def set_lr_number(order: Order, *, lr_number: str, actor):
     """Record the transporter's consignment note against ``order``'s dispatch.
 
     An LR number exists only where a third party carried the goods. A private
@@ -424,8 +448,13 @@ def set_lr_number(order: Order, *, lr_number: str):
     dispatch record, so that alone would let an LR land on goods still on the
     shelf; the status check comes after the record checks so an undispatched or
     private order keeps its more specific message.
+
+    **The LR is the proof the goods are with the transporter, so recording it
+    delivers a DISPATCHED order** (``OrderOperations.mark_delivered``: today's
+    date, the ORDER_DELIVERED notification). Re-recording an LR on a DELIVERED
+    order only updates the number.
     """
-    from .OrderOperations import LR_RECORDABLE_STATUS_CODES, assert_order_status
+    from .OrderOperations import LR_RECORDABLE_STATUS_CODES, assert_order_status, mark_delivered
 
     dispatch = order.dispatch_details
     if dispatch is None:
@@ -445,6 +474,8 @@ def set_lr_number(order: Order, *, lr_number: str):
     dispatch.lr_number = lr_number.strip()
     dispatch.full_clean()
     dispatch.save(update_fields=["lr_number", "updated_at"])
+    if order.status.code == StatusIds.DISPATCHED.name:
+        mark_delivered(order, actor=actor)
     return dispatch
 
 
@@ -493,13 +524,20 @@ def dispatch_challan_payload(order: Order) -> dict:
     }
 
 
+_CUSTOM_ORDER_TYPES = {
+    "custom": "CUSTOM_ORDER",
+    "waste": "WASTE_ORDER",
+    "rejected": "REJECTED_ORDER",
+}
+
+
 def _challan_hsn_code(order: Order | CustomOrder) -> str:
     """The HSN code a challan prints.
 
-    A waste order carries its own, so its challan shows that and never the
+    A waste or rejected order carries its own, so its challan shows that and never the
     stand-in. Every other order has no HSN of its own and takes the default.
     """
-    if isinstance(order, CustomOrder) and order.made_from_waste:
+    if isinstance(order, CustomOrder) and order.order_kind != "custom":
         return order.hsn_code
     return DEFAULT_HSN_CODE
 
@@ -537,7 +575,7 @@ def custom_dispatch_challan_payload(order: CustomOrder) -> dict:
     items = list(entry.items.all())
     return {
         **_challan_header(order, entry),
-        "order_type": "WASTE_ORDER" if order.made_from_waste else "CUSTOM_ORDER",
+        "order_type": _CUSTOM_ORDER_TYPES[order.order_kind],
         "unit_of_measure": order.unit_of_measure,
         "dispatch": {**dispatch_entry_payload(entry), "transport_agency": None},
         "items": [_loose_line_payload(line) for line in items],

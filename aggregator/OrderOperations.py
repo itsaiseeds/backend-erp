@@ -248,6 +248,8 @@ LR_RECORDABLE_STATUS_CODES = frozenset(
 # they are parked awaiting a decision -- verify the order first, then edit it.
 # Editing a CONFIRMED order re-checks stock (see ``sync_order_items``).
 EDITABLE_STATUS_CODES = frozenset({StatusIds.BOOKED.name, StatusIds.CONFIRMED.name})
+# A sales person may only correct an order the office has not yet picked up.
+SALESPERSON_EDITABLE_STATUS_CODES = frozenset({StatusIds.BOOKED.name})
 
 
 def assert_order_status(order: Order, allowed: frozenset[str], action: str) -> None:
@@ -711,6 +713,24 @@ def mark_delivered(order: Order, actual_delivery_date=None, *, actor: User) -> O
     order.save(update_fields=["status", "actual_delivery_date", "updated_at"])
     notify_order_event(order, NotificationEvent.ORDER_DELIVERED, actor=actor)
     return order
+
+
+def mark_private_order_delivered(order: Order, *, actor: User) -> Order:
+    """Deliver a DISPATCHED order that went on our own vehicle (no LR will ever come).
+
+    An agency dispatch is delivered by recording its LR number instead
+    (``DispatchOperations.set_lr_number``), so it is refused here.
+    """
+    if order.dispatch_details_id:
+        raise ValidationError(
+            {
+                "status": (
+                    "This order went with a transport agency: upload its LR number "
+                    "to mark it delivered."
+                )
+            }
+        )
+    return mark_delivered(order, actor=actor)
 
 
 def order_payload(order: Order) -> dict:
