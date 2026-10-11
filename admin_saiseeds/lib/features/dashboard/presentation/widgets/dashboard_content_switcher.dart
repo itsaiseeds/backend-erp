@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/tab_ids.dart';
 import '../../../profile/presentation/profile_screen.dart';
 import '../../../admins/presentation/views/admins_view.dart';
-import '../views/dashboard_overview_view.dart';
 import '../../../products/presentation/views/products_view.dart';
 import '../../../product_packagings/presentation/views/product_packagings_view.dart';
 import '../../../clients/presentation/views/clients_view.dart';
@@ -24,6 +23,7 @@ import '../../../waste_management/presentation/views/waste_management_view.dart'
 import '../../../product_stock/presentation/views/product_stock_view.dart';
 import '../../../raw_material_stock/presentation/views/raw_material_stock_view.dart';
 import '../../../other_material_stock/presentation/views/other_material_stock_view.dart';
+import '../../../stock_ledger/presentation/views/stock_ledger_view.dart';
 import '../../../godown_managers/presentation/views/godown_managers_view.dart';
 import '../../../lab_testers/presentation/views/lab_testers_view.dart';
 import '../../../sales_people/presentation/views/sales_people_view.dart';
@@ -96,7 +96,7 @@ class DashboardContentSwitcher {
         return const FarmersView();
       case TabIds.DASHBOARD:
       default:
-        return const DashboardOverviewView();
+        return const StockLedgerView();
     }
   }
 }
