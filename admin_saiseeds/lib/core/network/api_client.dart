@@ -99,6 +99,23 @@ class ApiClient {
     }
   }
 
+  /// Like [get], but also hands back the response headers -- for an endpoint
+  /// whose caller needs `Cache-Control` (how long the body stays fresh) or,
+  /// on a 429, `Retry-After`. [ApiException.headers] carries the error
+  /// response's headers on a non-2xx status.
+  Future<ApiResponseWithHeaders> getWithHeaders(
+    String endpoint, {
+    Map<String, dynamic>? queryParams,
+  }) async {
+    try {
+      final response = await _dio.get(endpoint, queryParameters: queryParams);
+      final dynamic data = _processResponse(response);
+      return ApiResponseWithHeaders(data: data, headers: response.headers);
+    } on DioException catch (e) {
+      throw _handleDioError(e, headers: e.response?.headers);
+    }
+  }
+
   Future<ApiProbeResult> probe(String endpoint) async {
     try {
       final response = await _dio.get(endpoint);
@@ -172,13 +189,14 @@ class ApiClient {
     );
   }
 
-  ApiException _handleDioError(DioException e) {
+  ApiException _handleDioError(DioException e, {Headers? headers}) {
     final response = e.response;
     if (response != null) {
       final int? statusCode = response.statusCode;
       return ApiException(
         statusCode: statusCode ?? 500,
         message: _extractErrorMessage(response.data, statusCode),
+        headers: headers,
       );
     }
 
@@ -239,6 +257,13 @@ class ApiClient {
     }
     return AppStrings.SOMETHING_WENT_WRONG;
   }
+}
+
+class ApiResponseWithHeaders {
+  final dynamic data;
+  final Headers headers;
+
+  const ApiResponseWithHeaders({required this.data, required this.headers});
 }
 
 class ApiProbeResult {

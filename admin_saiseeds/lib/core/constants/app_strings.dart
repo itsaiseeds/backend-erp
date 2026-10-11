@@ -1661,4 +1661,121 @@ class AppStrings {
 
   static const String FIELD_REASON = 'Reason';
   static const String FIELD_REASON_HINT = 'Why it was wasted (optional)';
+
+  // ---- Stock Ledger ----
+  static const String STOCK_LEDGER_SUBTITLE = 'Stock ledger';
+  static const String STOCK_LEDGER_HEADER_EYEBROW = 'Inventory';
+  static const String STOCK_LEDGER_DATE_RANGE_LABEL =
+      'Date range · inclusive, max 62 days';
+  static const String STOCK_LEDGER_QUICK_TODAY = 'Today';
+  static const String STOCK_LEDGER_QUICK_LAST_7_DAYS = 'Last 7 days';
+  static const String STOCK_LEDGER_QUICK_THIS_MONTH = 'This month';
+  static const String STOCK_LEDGER_LOAD = 'Load ledger';
+  static const String STOCK_LEDGER_AVAILABLE_IN = 'Available in';
+  static const String STOCK_LEDGER_ALLOWANCE_SUFFIX =
+      'new ledger builds left today for this product';
+  static const String STOCK_LEDGER_CACHE_NOTE =
+      'Loaded from cache (up to 5 min old for today’s data)';
+  static const String STOCK_LEDGER_SELECT_PRODUCT = 'Choose a product…';
+
+  static const String STOCK_LEDGER_CHAIN_OVERVIEW = 'Chain overview';
+  static const String STOCK_LEDGER_AVAILABLE = 'Available';
+  static const String STOCK_LEDGER_LEGEND_TITLE = 'Link colour · Available';
+  static const String STOCK_LEDGER_LEGEND_GREW = 'grew';
+  static const String STOCK_LEDGER_LEGEND_SHRANK = 'shrank / below zero';
+  static const String STOCK_LEDGER_LEGEND_BOTH = 'both (packing)';
+  static const String STOCK_LEDGER_LEGEND_UNCHANGED = 'unchanged';
+  static const String STOCK_LEDGER_MINIMAP_EMPTY = 'No chain yet';
+
+  static const String STOCK_LEDGER_POOL_LABEL = 'Pool';
+  static const String STOCK_LEDGER_EVENTS_LABEL = 'Events';
+  static const String STOCK_LEDGER_POOL_ALL = 'All';
+  static const String STOCK_LEDGER_POOL_BAGS = 'Bags';
+  static const String STOCK_LEDGER_POOL_LOOSE = 'Loose';
+  static const String STOCK_LEDGER_POOL_RAW = 'Raw';
+  static const String STOCK_LEDGER_POOL_PACKING = 'Packing';
+
+  static const String STOCK_LEDGER_FOLLOWING = 'Following';
+  static const String STOCK_LEDGER_LINKED_EVENTS_HIGHLIGHTED =
+      'linked events highlighted';
+  static const String STOCK_LEDGER_CLEAR = 'Clear';
+
+  static const String STOCK_LEDGER_DAILY_LIMIT_TITLE = 'Daily limit reached.';
+  static const String STOCK_LEDGER_DAILY_LIMIT_BODY =
+      'You have built every ledger this product allows for today. Windows you '
+      'have already loaded are still available. Try again tomorrow.';
+  static const String STOCK_LEDGER_NOT_STARTED_TITLE =
+      'The stock ledger has not started yet.';
+  static const String STOCK_LEDGER_NOT_STARTED_BODY =
+      'Events will appear here once the product’s go-live opening balance '
+      'is recorded.';
+
+  static const String STOCK_LEDGER_BUILDING_PREFIX = 'Building the ledger for';
+
+  static const String STOCK_LEDGER_NO_EVENTS_NOTE =
+      'No stock events in this period — the opening state is carried '
+      'straight to the close.';
+  static const String STOCK_LEDGER_IDENTICAL_TO_OPENING =
+      '· identical to opening';
+
+  static const String STOCK_LEDGER_EMPTY_TITLE =
+      'Pick a product to build its stock chain';
+  static const String STOCK_LEDGER_EMPTY_BODY =
+      'Choose a product and a date range (up to 62 days), then Load. Each '
+      'event becomes a node; the state after one event is where the next one '
+      'starts.';
+
+  static const String STOCK_LEDGER_OPENING_BALANCE = 'Opening balance';
+  static const String STOCK_LEDGER_CLOSING_BALANCE = 'Closing balance';
+  static const String STOCK_LEDGER_HEAD = 'HEAD';
+  static const String STOCK_LEDGER_TAIL = 'TAIL';
+  static const String STOCK_LEDGER_STARTING_STATE = 'starting state of the range';
+  static const String STOCK_LEDGER_ENDING_STATE = 'ending state of the range';
+  static const String STOCK_LEDGER_BELOW_ZERO_PREFIX = 'Below zero ·';
+
+  static const String STOCK_LEDGER_AVAILABLE_AFTER = 'Available after';
+  static const String STOCK_LEDGER_FULL_STATE = 'Full state';
+  static const String STOCK_LEDGER_HIDE_FULL_STATE = 'Hide full state';
+  static const String STOCK_LEDGER_OTHER_EVENTS_SUFFIX = 'other events';
+  static const String STOCK_LEDGER_SHOW = 'show';
+  static const String STOCK_LEDGER_FILTERED_OUT = 'filtered out';
+  static const String STOCK_LEDGER_DIDNT_TOUCH_PREFIX = 'didn’t touch';
+
+  static const String STOCK_LEDGER_BY_PREFIX = 'by';
+  static const String STOCK_LEDGER_SYSTEM_ACTOR = 'system';
+
+  static const String STOCK_LEDGER_INSPECTOR = 'Inspector';
+  static const String STOCK_LEDGER_OCCURRED = 'Occurred';
+  static const String STOCK_LEDGER_SOURCE = 'Source';
+  static const String STOCK_LEDGER_ID = 'ID';
+  static const String STOCK_LEDGER_LABEL = 'Label';
+  static const String STOCK_LEDGER_ACTOR = 'Actor';
+  static const String STOCK_LEDGER_AUTOMATIC_ACTOR = 'System (automatic)';
+  static const String STOCK_LEDGER_LINKED_EVENTS = 'Linked events';
+  static const String STOCK_LEDGER_HIGHLIGHT_ON_CHAIN = 'Highlight on chain';
+  static const String STOCK_LEDGER_CLEAR_HIGHLIGHT = 'Clear highlight';
+  static const String STOCK_LEDGER_BEFORE_AFTER = 'Before → after';
+  static const String STOCK_LEDGER_UNTOUCHED_POOLS =
+      'Untouched pools · available (carried)';
+  static const String STOCK_LEDGER_AVAILABLE_BY_POOL = 'Available by pool';
+  static const String STOCK_LEDGER_NO_SELECTION =
+      'Nothing to inspect yet.';
+  static const String STOCK_LEDGER_SELECT_WHEN_LOADED =
+      'Select a node once the chain has loaded.';
+  static const String STOCK_LEDGER_INSPECTOR_OPEN = 'Inspector';
+
+  static const String STOCK_LEDGER_POOL_NAME_BAGS = 'Bags';
+  static const String STOCK_LEDGER_POOL_NAME_LOOSE = 'Loose';
+  static const String STOCK_LEDGER_POOL_NAME_RAW = 'Raw material';
+  static const String STOCK_LEDGER_FIELD_ON_HAND = 'On hand';
+  static const String STOCK_LEDGER_FIELD_RESERVED = 'Reserved';
+  static const String STOCK_LEDGER_FIELD_CONSUMED = 'Consumed';
+  static const String STOCK_LEDGER_FIELD_AVAILABLE = 'Available';
+  static const String STOCK_LEDGER_FIELD_INCOMING = 'Incoming';
+  static const String STOCK_LEDGER_FIELD_PACKED = 'Packed';
+  static const String STOCK_LEDGER_FIELD_REJECTED = 'Rejected';
+  static const String STOCK_LEDGER_FIELD_WASTED = 'Wasted';
+  static const String STOCK_LEDGER_FIELD_USED_BY_OTHERS = 'Used by others';
+
+  static const String STOCK_LEDGER_LOAD_FAILED_TITLE = 'Could not load the ledger';
 }
