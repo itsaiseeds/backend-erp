@@ -382,6 +382,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/FieldTripPayload'
           description: ''
+  /android/api/v1/edit-order/{public_id}:
+    patch:
+      operationId: android_api_v1_edit_order_partial_update
+      description: Edit one of the caller's BOOKED orders.
+      summary: Edit a BOOKED order (sales person)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEditOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEditOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEditOrderRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /android/api/v1/end-field-trip/{public_id}:
     post:
       operationId: android_api_v1_end_field_trip_create
@@ -3010,6 +3044,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/FieldTripPayload'
           description: ''
+  /android/api/v2/edit-order/{public_id}:
+    patch:
+      operationId: android_api_v2_edit_order_partial_update
+      description: Edit one of the caller's BOOKED orders.
+      summary: Edit a BOOKED order (sales person)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Android · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEditOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEditOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEditOrderRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /android/api/v2/end-field-trip/{public_id}:
     post:
       operationId: android_api_v2_end_field_trip_create
@@ -4100,7 +4168,16 @@ paths:
     get:
       operationId: android_api_v2_godown_other_material_stock_retrieve
       description: Read the other-material on-hand position (godown manager only).
-      summary: Other-material on-hand stock, per material type
+      summary: Other-material on-hand stock, per material type or per configuration
+      parameters:
+      - in: query
+        name: group_by
+        schema:
+          type: string
+          enum:
+          - configuration
+        description: '``configuration`` groups by product, packet weight and material
+          type.'
       tags:
       - Android · Godown
       security:
@@ -5590,6 +5667,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomOrderDetailPayload'
           description: ''
+  /api/sales-admin/create-rejected-order:
+    post:
+      operationId: api_sales_admin_create_rejected_order_create
+      description: Sell rejected lots to a verified client, dispatched at once (app
+        admin only).
+      summary: Book and dispatch a rejected order (kg of specific rejected lots)
+      tags:
+      - Admin · Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRejectedOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateRejectedOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateRejectedOrderRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
+          description: ''
   /api/sales-admin/create-waste-order:
     post:
       operationId: api_sales_admin_create_waste_order_create
@@ -5873,6 +5979,12 @@ paths:
           format: date-time
         description: ISO 8601. End date time of the window.
         required: true
+      - in: query
+        name: order_type
+        schema:
+          type: string
+        description: Order type(s) the challan belongs to (see options); selected
+          types are OR-ed. Comma-separated (any match); AND-ed with the other filters.
       - in: query
         name: page
         schema:
@@ -6469,6 +6581,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExportOrdersResponse'
+          description: ''
+  /api/sales-admin/export/rejected-orders:
+    get:
+      operationId: sales_admin_export_rejected_orders
+      description: Export the rejected orders booked in a date window, with their
+        items.
+      summary: Export rejected orders (with items) booked in a date range
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Last day of the window (inclusive, IST). At most 62 days after-and-including
+          start_date.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: First day of the window (inclusive, IST).
+        required: true
+      tags:
+      - Admin · Orders
+      - Admin · Exports
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportRejectedOrdersResponse'
           description: ''
   /api/sales-admin/farmers/:
     get:
@@ -7515,6 +7661,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/LabTestingListPage'
           description: ''
+  /api/sales-admin/mark-custom-order-delivered/{public_id}:
+    post:
+      operationId: api_sales_admin_mark_custom_order_delivered_create
+      description: Deliver a custom, waste or rejected order (app admin only).
+      summary: Mark a custom / waste / rejected order delivered (DISPATCHED -> DELIVERED)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderDetailPayload'
+          description: ''
+  /api/sales-admin/mark-order-delivered/{public_id}:
+    post:
+      operationId: api_sales_admin_mark_order_delivered_create
+      description: Deliver an own-vehicle order (app admin only).
+      summary: Mark an own-vehicle order delivered (DISPATCHED -> DELIVERED)
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. ORD-E79QA0E2OIHF.
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailPayload'
+          description: ''
   /api/sales-admin/non-stock-inward/{public_id}:
     patch:
       operationId: api_sales_admin_non_stock_inward_partial_update
@@ -8110,6 +8303,30 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/party-rejected-lots/{party_id}:
+    get:
+      operationId: api_sales_admin_party_rejected_lots_list
+      description: List a party's rejected lots (app admin only).
+      summary: List a party's rejected lots with booked and remaining kg
+      parameters:
+      - in: path
+        name: party_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartyRejectedLot'
+          description: ''
   /api/sales-admin/product-packagings:
     get:
       operationId: api_sales_admin_product_packagings_list
@@ -8560,6 +8777,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReturnOrderPayload'
+          description: ''
+  /api/sales-admin/rejected-order/{public_id}:
+    delete:
+      operationId: api_sales_admin_rejected_order_destroy
+      description: Delete a rejected order dispatched today (app admin only).
+      summary: Delete a rejected order dispatched today
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        description: The order's public id, e.g. CORD-E79QA0E2OIHF (WORD-… for a waste
+          order).
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sales-admin/rejected-orders/:
+    get:
+      operationId: sales_admin_get_rejected_orders_list
+      description: 'List every rejected order: filter by admin / client / product
+        / city / status.'
+      summary: List rejected orders (filter by sales admin / client / product / city
+        / status, sortable)
+      parameters:
+      - in: query
+        name: all
+        schema:
+          type: boolean
+          default: false
+        description: When true, ignore page / page_size and return every row matching
+          the filters as a single page (total_pages 1, page numbers null).
+      - in: query
+        name: city_id
+        schema:
+          type: string
+        description: City id(s) the custom order is delivered to (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: client
+        schema:
+          type: string
+        description: Client id(s) the custom order was booked for (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: created_by
+        schema:
+          type: string
+        description: User id(s) of the sales admin who booked the custom order (see
+          options). Comma-separated (any match); AND-ed with the other filters.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Rows per page (default 10, max 100).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Product id(s) the custom order contains (see options). Comma-separated
+          (any match); AND-ed with the other filters.
+      - in: query
+        name: public_id
+        schema:
+          type: string
+        description: Case-insensitive substring of the public id (RORD-XXXXXXXXXXXX).
+          Single value; AND-ed with the other filters.
+      - in: query
+        name: sort
+        schema:
+          type: string
+        description: Comma-separated sort keys (created_at, price); prefix a key with
+          '-' for descending. Defaults to the view's natural order.
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Order lifecycle status. Comma-separated (any match); AND-ed with
+          the other filters.
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOrderListPage'
           description: ''
   /api/sales-admin/return-order-recipes/{public_id}:
     get:
@@ -11193,6 +11508,64 @@ components:
       - packet_weight
       - product
       - quantity
+    CreateRejectedOrderRequest:
+      type: object
+      description: Request validation for booking a rejected order (lot lines, price
+        per kg required).
+      properties:
+        client_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id belonging to the client.
+        special_comments:
+          type: string
+          default: ''
+        expected_delivery_date:
+          type: string
+          format: date
+          nullable: true
+          description: Defaults to the day after booking.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RejectedOrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: 'Optional child org the order is booked for: {id} to reuse
+            one, or {party_name, village_name, ...} to get-or-create it.'
+        hsn_code:
+          type: string
+          default: ''
+          description: Optional free-text HSN code kept on the order.
+          maxLength: 32
+        from_city_id:
+          type: integer
+          description: Where the goods left from.
+        driver_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        driver_number:
+          type: string
+          minLength: 1
+          maxLength: 10
+        vehicle_number:
+          type: string
+          minLength: 1
+          maxLength: 32
+      required:
+      - client_address_id
+      - client_public_id
+      - driver_name
+      - driver_number
+      - from_city_id
+      - items
+      - vehicle_number
     CreateSalesPersonRequest:
       type: object
       description: Request validation for creating a new ``SalesPerson`` (city only).
@@ -11451,11 +11824,15 @@ components:
           nullable: true
         made_from_waste:
           type: boolean
+        made_from_rejected:
+          type: boolean
+        order_kind:
+          $ref: '#/components/schemas/OrderKindEnum'
         unit_of_measure:
           $ref: '#/components/schemas/UnitOfMeasureEnum'
         hsn_code:
           type: string
-          description: Free-text HSN code. Present on waste orders only.
+          description: Free-text HSN code. Present on waste and rejected orders only.
         total_amount:
           type: string
         total_packets:
@@ -11475,7 +11852,9 @@ components:
       - delivery_address
       - expected_delivery_date
       - items
+      - made_from_rejected
       - made_from_waste
+      - order_kind
       - public_id
       - special_comments
       - status
@@ -11508,6 +11887,10 @@ components:
           description: Kilograms on a waste order's line. Null on a packet line.
         line_total:
           type: string
+        lot:
+          allOf:
+          - $ref: '#/components/schemas/RejectedLotRef'
+          description: The rejected lot sold. Present on a rejected order's line only.
       required:
       - line_total
       - negotiated_selling_price
@@ -11607,11 +11990,15 @@ components:
           nullable: true
         made_from_waste:
           type: boolean
+        made_from_rejected:
+          type: boolean
+        order_kind:
+          $ref: '#/components/schemas/OrderKindEnum'
         unit_of_measure:
           $ref: '#/components/schemas/UnitOfMeasureEnum'
         hsn_code:
           type: string
-          description: Free-text HSN code. Present on waste orders only.
+          description: Free-text HSN code. Present on waste and rejected orders only.
         total_amount:
           type: string
         total_packets:
@@ -11637,7 +12024,9 @@ components:
       - expected_delivery_date
       - item_count
       - items
+      - made_from_rejected
       - made_from_waste
+      - order_kind
       - public_id
       - status
       - total_amount
@@ -12127,6 +12516,10 @@ components:
           nullable: true
         made_from_waste:
           type: boolean
+        made_from_rejected:
+          type: boolean
+        order_kind:
+          $ref: '#/components/schemas/OrderKindEnum'
         unit_of_measure:
           $ref: '#/components/schemas/UnitOfMeasureEnum'
         total_amount:
@@ -12148,7 +12541,9 @@ components:
       - delivery_address
       - expected_delivery_date
       - items
+      - made_from_rejected
       - made_from_waste
+      - order_kind
       - public_id
       - special_comments
       - status
@@ -12687,6 +13082,28 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ExportOrder'
+      required:
+      - count
+      - end_date
+      - results
+      - start_date
+    ExportRejectedOrdersResponse:
+      type: object
+      description: Fields every export response carries around its ``results`` (schema
+        only).
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportCustomOrder'
       required:
       - count
       - end_date
@@ -14351,6 +14768,16 @@ components:
       required:
       - product_packaging_public_id
       - quantity
+    OrderKindEnum:
+      enum:
+      - custom
+      - waste
+      - rejected
+      type: string
+      description: |-
+        * `custom` - custom
+        * `waste` - waste
+        * `rejected` - rejected
     OrderListCity:
       type: object
       description: Output shape for the ``city`` reference on an order card.
@@ -14789,6 +15216,53 @@ components:
       - id
       - name
       - party_type
+    PartyRejectedLot:
+      type: object
+      description: Output shape for one rejected lot.
+      properties:
+        inward_raw_material_public_id:
+          type: string
+        party:
+          $ref: '#/components/schemas/_PartyRef'
+        farmer_name:
+          type: string
+        product:
+          $ref: '#/components/schemas/_ProductRef'
+        lot_no:
+          type: string
+        quantity_kg:
+          type: string
+        booked_kg:
+          type: string
+        remaining_kg:
+          type: string
+        inward_date:
+          type: string
+          format: date-time
+        rejected_on:
+          type: string
+          format: date
+        lab_sampling_date:
+          type: string
+          format: date
+          nullable: true
+        lab_test:
+          allOf:
+          - $ref: '#/components/schemas/_LabTest'
+          nullable: true
+      required:
+      - booked_kg
+      - farmer_name
+      - inward_date
+      - inward_raw_material_public_id
+      - lab_sampling_date
+      - lab_test
+      - lot_no
+      - party
+      - product
+      - quantity_kg
+      - rejected_on
+      - remaining_kg
     PartyTypeEnum:
       enum:
       - RAW_MATERIAL
@@ -14847,6 +15321,39 @@ components:
             type: string
             minLength: 1
           description: Replaces the products the farmer uses; empty if none.
+    PatchedEditOrderRequest:
+      type: object
+      description: The admin edit request without prices or an actual delivery date.
+      properties:
+        client_address_id:
+          type: integer
+          description: A ClientAddress link id belonging to the order's client.
+        client_transport_agency_id:
+          type: integer
+          nullable: true
+          description: A ClientTransportAgency link id belonging to the order's client;
+            send null for a private (own-vehicle) dispatch.
+        expected_delivery_date:
+          type: string
+          format: date
+        special_comments:
+          type: string
+          description: A remark to add to the order. Appended as a new line -- it
+            never replaces what is already there.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesPersonOrderItemWriteRequest'
+        booked_for:
+          allOf:
+          - $ref: '#/components/schemas/BookedForRequest'
+          nullable: true
+          description: Child org to set ({id} or {party_name, village_name, ...});
+            send null to clear it, omit to leave it unchanged.
+        created_by:
+          type: integer
+          nullable: true
+          description: 'Admin only: user id of the sales person whose order this is.'
     PatchedFieldTripWriteRequest:
       type: object
       description: |-
@@ -15730,6 +16237,63 @@ components:
           maxLength: 32
       required:
       - fcm_token
+    RejectedLotParty:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    RejectedLotRef:
+      type: object
+      description: The lot a rejected order's line sells.
+      properties:
+        public_id:
+          type: string
+        lot_no:
+          type: string
+        farmer_name:
+          type: string
+        party:
+          allOf:
+          - $ref: '#/components/schemas/RejectedLotParty'
+          nullable: true
+      required:
+      - farmer_name
+      - lot_no
+      - party
+      - public_id
+    RejectedOrderItemWriteRequest:
+      type: object
+      description: 'One line of a rejected order: kilograms of one rejected lot.'
+      properties:
+        inward_raw_material_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms of this lot to sell.
+        negotiated_selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Price per kg for this line.
+        lot_number:
+          type: string
+          default: ''
+          description: The lot number printed on this line of the challan. Omit it
+            to print the lot's own lot_no.
+          maxLength: 64
+      required:
+      - inward_raw_material_public_id
+      - negotiated_selling_price
+      - quantity_kg
     ResultEnum:
       enum:
       - Pass
@@ -16190,6 +16754,21 @@ components:
       required:
       - id
       - name
+    SalesPersonOrderItemWriteRequest:
+      type: object
+      description: 'One desired line: a bag and how many -- always at the bag''s list
+        price.'
+      properties:
+        product_packaging_public_id:
+          type: string
+          minLength: 1
+          maxLength: 20
+        quantity:
+          type: integer
+          minimum: 1
+      required:
+      - product_packaging_public_id
+      - quantity
     SalesPersonPayload:
       type: object
       description: Swagger schema for one sales person row (city only).
@@ -16695,6 +17274,45 @@ components:
       required:
       - product_public_id
       - quantity_kg
+    _LabTest:
+      type: object
+      properties:
+        public_id:
+          type: string
+        result:
+          type: string
+          nullable: true
+        comment:
+          type: string
+        tested_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - comment
+      - public_id
+      - result
+      - tested_at
+    _PartyRef:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    _ProductRef:
+      type: object
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+      required:
+      - name
+      - public_id
   securitySchemes:
     bearerAuth:
       type: http
