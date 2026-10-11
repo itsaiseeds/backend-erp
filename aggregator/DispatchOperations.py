@@ -493,6 +493,17 @@ def dispatch_challan_payload(order: Order) -> dict:
     }
 
 
+def _challan_hsn_code(order: Order | CustomOrder) -> str:
+    """The HSN code a challan prints.
+
+    A waste order carries its own, so its challan shows that and never the
+    stand-in. Every other order has no HSN of its own and takes the default.
+    """
+    if isinstance(order, CustomOrder) and order.made_from_waste:
+        return order.hsn_code
+    return DEFAULT_HSN_CODE
+
+
 def _challan_header(order: Order | CustomOrder, entry: DispatchEntry) -> dict:
     """The part of a challan that is the same for either kind of order."""
     return {
@@ -506,7 +517,7 @@ def _challan_header(order: Order | CustomOrder, entry: DispatchEntry) -> dict:
             "contact_person_number": entry.contact_number,
         },
         "booked_for": child_org_payload(order.booked_for),
-        "hsn_code": DEFAULT_HSN_CODE,
+        "hsn_code": _challan_hsn_code(order),
         "financial_year": current_financial_year(entry.dispatch_date),
     }
 
