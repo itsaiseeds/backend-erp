@@ -24,6 +24,7 @@ from rest_framework import status
 
 from aggregator import InventoryOperations as inv
 from aggregator.ClientOperations import create_client_with_details, verify_client
+from aggregator.CompanyDetails import DEFAULT_HSN_CODE
 from aggregator.CustomOrderOperations import create_custom_order
 from aggregator.models import (
     City,
@@ -786,6 +787,29 @@ class SalesAdminWasteOrderApiTest(WebApiTestCase):
         # An edit that does not send it leaves it alone; an empty string clears it.
         self.assertEqual(self._patch(order, {"special_comments": "x"}).data["hsn_code"], "23099010")
         self.assertEqual(self._patch(order, {"hsn_code": ""}).data["hsn_code"], "")
+
+    def test_the_challan_prints_the_waste_orders_own_hsn_code(self):
+        """The dispatch challan shows the order's stored HSN code, not the stand-in.
+
+        tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_the_challan_prints_the_waste_orders_own_hsn_code
+        """
+        created = self._create([self._line(self.cotton, "5")], hsn_code="23099010")
+        order = CustomOrder.objects.get(public_id=created.data["public_id"])
+        self.assertEqual(self._dispatch(order).status_code, status.HTTP_200_OK)
+
+        now = indian_now()
+        challans = self.client.get(
+            CHALLANS_URL,
+            {
+                "start_date_time": (now - timedelta(days=1)).isoformat(),
+                "end_date_time": (now + timedelta(days=1)).isoformat(),
+            },
+        )
+        (row,) = [
+            r for r in challans.data["results"] if r["order_public_id"] == order.public_id
+        ]
+        self.assertEqual(row["hsn_code"], "23099010")
+        self.assertNotEqual(row["hsn_code"], DEFAULT_HSN_CODE)
 
     def test_hsn_code_is_limited_to_32_characters(self):
         """tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_hsn_code_is_limited_to_32_characters"""
