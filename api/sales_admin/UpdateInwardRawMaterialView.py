@@ -16,7 +16,9 @@ Two jobs live here:
   ``rejected_kg``.
 * **Correct a booking.** ``product`` / ``party`` / ``lot_no`` / ``quantity_kg``
   are immutable once a lot exists; a wrong amount is removed with ``DELETE``
-  (soft) and re-booked. ``DELETE`` is the only corrective verb.
+  (soft) and re-booked. ``DELETE`` is the only corrective verb. (The one
+  exception is ``transfer-product``, which draws kilograms off a lot to
+  re-book them on another product of the same crop.)
 
 A revert from ``In Use`` to ``Lab Testing`` and a ``DELETE`` of an ``In Use``
 lot are refused (400) when the lot's kilograms are already packed into a bag

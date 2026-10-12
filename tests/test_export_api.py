@@ -368,10 +368,9 @@ class ExportApiTest(WebApiTestCase):
 
     def test_clients_export_query_count_does_not_grow_with_clients(self):
         """tests/test_export_api.py::ExportApiTest::test_clients_export_query_count_does_not_grow_with_clients"""
-        with CaptureQueriesContext(connection) as one:
-            self.client.get(CLIENTS_URL)
         link_id = self.client_row.client_addresses.first().id
-        for index in range(3):
+
+        def add_child(index):
             resolve_child_org(
                 self.client_row,
                 {
@@ -381,6 +380,14 @@ class ExportApiTest(WebApiTestCase):
                 },
                 self.sales_person,
             )
+
+        # One child first: with none, the nested child prefetches are skipped
+        # altogether, which would make the baseline cheaper than any real export.
+        add_child(0)
+        with CaptureQueriesContext(connection) as one:
+            self.client.get(CLIENTS_URL)
+        for index in range(1, 4):
+            add_child(index)
         with CaptureQueriesContext(connection) as many:
             self.client.get(CLIENTS_URL)
         self.assertEqual(len(one), len(many))

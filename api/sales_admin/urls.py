@@ -77,6 +77,7 @@ from .RotateSalesPersonQrView import RotateSalesPersonQrView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
 from .StockView import StockView
+from .TransferProductView import TransferProductView
 from .UnapproveFieldTripView import UnapproveFieldTripView
 from .UnrejectReturnOrderView import UnrejectReturnOrderView
 from .UnverifyOrderView import UnverifyOrderView
@@ -448,6 +449,8 @@ urlpatterns = [
         UpdateNonStockInwardView.as_view(),
         name="update-non-stock-inward",
     ),
+    # Re-homes unpacked raw material between two products of one crop.
+    path("transfer-product", TransferProductView.as_view(), name="transfer-product"),
     path(
         "raw-material-stock",
         RawMaterialStockView.as_view(),

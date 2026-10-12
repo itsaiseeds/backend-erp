@@ -9202,6 +9202,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/LooseStockPosition'
           description: ''
+  /api/sales-admin/transfer-product:
+    post:
+      operationId: sales_admin_transfer_product
+      description: Transfer raw material from one product to another of the same crop
+        (app admin only).
+      summary: Transfer raw material from one product to another of the same crop
+      tags:
+      - Admin · Inward
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TransferProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TransferProductRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferProductResponse'
+          description: ''
   /api/sales-admin/unapprove-field-trip/{public_id}:
     post:
       operationId: api_sales_admin_unapprove_field_trip_create
@@ -15714,6 +15743,15 @@ components:
           items:
             $ref: '#/components/schemas/LooseCountLineRequest'
           description: Loose lines, one per (product, packet_weight) pair.
+        reuse_other_material:
+          type: boolean
+          default: true
+          description: '``true`` (default): counts may go up or down, and packets
+            taken off the count give their packing material (leaflets, covers) back.
+            ``false``: counts may only go down -- a line above the packets on hand
+            now is a 400 -- and the packing material of the packets taken off is discarded,
+            not given back. The seed of those packets returns to raw material either
+            way.'
     PatchedUpdateNonStockInwardRequest:
       type: object
       description: Request validation for a partial edit (every field optional, at
@@ -15929,6 +15967,14 @@ components:
             minimum: 0
           description: Map of product-packaging public_id to its sealed-bag count;
             loose packets are recorded at ``update-sample-packet-stock``, not here.
+        reuse_other_material:
+          type: boolean
+          default: true
+          description: '``true`` (default): counts may go up or down, and bags taken
+            off the count give their packing material (leaflets, covers) back. ``false``:
+            counts may only go down -- a line above the bags on hand now is a 400
+            -- and the packing material of the bags taken off is discarded, not given
+            back. The seed of those bags returns to raw material either way.'
     PatchedUpdateWasteOrderRequest:
       type: object
       description: Request validation for a waste-order update -- every field optional.
@@ -17085,6 +17131,70 @@ components:
           type: string
       required:
       - provisioning_uri
+    TransferProductRequest:
+      type: object
+      description: |-
+        Request validation for moving raw material from one product to another.
+
+        Both products are named by ``name`` (or public id, to tell apart two
+        products that share a name); the rules that need stock figures are in
+        ``InwardOperations.transfer_raw_material``.
+      properties:
+        source_product:
+          type: string
+          minLength: 1
+          description: Name (or public id) of the product the kilograms leave.
+        target_product:
+          type: string
+          minLength: 1
+          description: Name (or public id) of the product that receives them; same
+            crop.
+        quantity_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          description: Kilograms to move, at most the source's unpacked raw material.
+      required:
+      - quantity_kg
+      - source_product
+      - target_product
+    TransferProductResponse:
+      type: object
+      description: Response of ``transfer-product``.
+      properties:
+        transferred_kg:
+          type: string
+        source:
+          $ref: '#/components/schemas/TransferProductSide'
+        target:
+          $ref: '#/components/schemas/TransferProductSide'
+        target_lots:
+          type: array
+          items:
+            $ref: '#/components/schemas/InwardRawMaterialPayload'
+          description: The In Use lots booked on the target, one per source lot drawn
+            on.
+      required:
+      - source
+      - target
+      - target_lots
+      - transferred_kg
+    TransferProductSide:
+      type: object
+      description: One product of a transfer response, with its raw material left
+        to pack.
+      properties:
+        public_id:
+          type: string
+        name:
+          type: string
+        available_kg:
+          type: string
+          description: Unpacked raw material the product has after the transfer.
+      required:
+      - available_kg
+      - name
+      - public_id
     TransportAgencyRef:
       type: object
       description: Output shape for the ``transport_agency`` reference on an order.
@@ -17174,6 +17284,15 @@ components:
           items:
             $ref: '#/components/schemas/LooseCountLineRequest'
           description: Loose lines, one per (product, packet_weight) pair.
+        reuse_other_material:
+          type: boolean
+          default: true
+          description: '``true`` (default): counts may go up or down, and packets
+            taken off the count give their packing material (leaflets, covers) back.
+            ``false``: counts may only go down -- a line above the packets on hand
+            now is a 400 -- and the packing material of the packets taken off is discarded,
+            not given back. The seed of those packets returns to raw material either
+            way.'
       required:
       - counts
     UpdateTodaysInventoryRequest:
@@ -17191,6 +17310,14 @@ components:
             minimum: 0
           description: Map of product-packaging public_id to its sealed-bag count;
             loose packets are recorded at ``update-sample-packet-stock``, not here.
+        reuse_other_material:
+          type: boolean
+          default: true
+          description: '``true`` (default): counts may go up or down, and bags taken
+            off the count give their packing material (leaflets, covers) back. ``false``:
+            counts may only go down -- a line above the bags on hand now is a 400
+            -- and the packing material of the bags taken off is discarded, not given
+            back. The seed of those bags returns to raw material either way.'
       required:
       - counts
     UploadLRNumberRequest:
