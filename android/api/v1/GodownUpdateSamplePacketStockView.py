@@ -113,7 +113,8 @@ class GodownUpdateSamplePacketStockView(AndroidGodownBaseView):
                             "packet_weight": "0.500",
                             "packets": 0,
                         },
-                    ]
+                    ],
+                    "reuse_other_material": True,
                 },
                 request_only=True,
             ),
@@ -157,7 +158,26 @@ class GodownUpdateSamplePacketStockView(AndroidGodownBaseView):
                             "packet_weight": "1.000",
                             "packets": 12,
                         }
-                    ]
+                    ],
+                    "reuse_other_material": True,
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "End-of-season clear-out (reuse_other_material false)",
+                description=(
+                    "Counts may only go down; the packing material of the packets "
+                    "taken off is not given back. The seed returns to raw material."
+                ),
+                value={
+                    "counts": [
+                        {
+                            "product": "P-A1B2C3D4E0F1",
+                            "packet_weight": "1.000",
+                            "packets": 2,
+                        }
+                    ],
+                    "reuse_other_material": False,
                 },
                 request_only=True,
             ),

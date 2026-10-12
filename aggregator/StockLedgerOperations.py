@@ -265,7 +265,8 @@ class Recording:
     # Pools a count write carried forward rather than counted (PRD section 3.5).
     # Keyed by product too: two products can share a packet weight.
     carried: set[tuple[int, PoolKey]] = field(default_factory=set)
-    # Packets a count takes off are discarded: their packing material stays spent.
+    # Packets a count takes off are discarded: their packing material is
+    # written off the inward lots rather than given back to stock.
     discard_other_material: bool = False
     events: list[StockEvent] = field(default_factory=list)
     # Guards that need the packing-material figures *after* the write: material
@@ -352,10 +353,12 @@ def recording(
         )
         yield handle
         after = read_positions(tracked)
-        if _sync_recipe_layers(
-            tracked, before, after, discard=handle.discard_other_material
-        ):
+        if _sync_recipe_layers(tracked, before, after):
             # Packing-material usage is read from the layers, so re-read.
+            after = read_positions(tracked)
+        if handle.discard_other_material and _write_off_discarded(
+            tracked, before, after, handle.actor
+        ):
             after = read_positions(tracked)
         for check in handle.after_sync_checks:
             check()
@@ -386,8 +389,6 @@ def _sync_recipe_layers(
     tracked: Iterable[int],
     before: dict[int, Position],
     after: dict[int, Position],
-    *,
-    discard: bool = False,
 ) -> bool:
     """Keep every pool's recipe layers in step with its packed packets.
 
@@ -424,9 +425,41 @@ def _sync_recipe_layers(
                 )
                 InventoryOperations.add_packed_packets(row, product_id, weight, delta)
             elif delta < 0:
-                InventoryOperations.remove_packed_packets(row, -delta, discard=discard)
+                InventoryOperations.remove_packed_packets(row, -delta)
             trimmed = InventoryOperations.clamp_recipe_layers(row, packed_after)
             changed = changed or delta != 0 or trimmed
+    return changed
+
+
+def _write_off_discarded(
+    tracked: Iterable[int],
+    before: dict[int, Position],
+    after: dict[int, Position],
+    actor: User | None,
+) -> bool:
+    """Keep the packing material of discarded packets spent.
+
+    A count lowered with ``reuse_other_material`` false removes the packets'
+    layers like any other, which lowers each ``OTHER`` pool's ``packed``. That
+    much is written off the pool's inward lots
+    (``InventoryOperations.write_off_other_material``), so the material does
+    not return to stock. Returns whether anything was written off.
+    """
+    changed = False
+    for product_id in tracked:
+        old = before.get(product_id, {})
+        new = after.get(product_id, {})
+        for key, figures in old.items():
+            if key[0] != OTHER:
+                continue
+            freed = figures["packed"] - new.get(key, {}).get("packed", ZERO)
+            if freed <= 0:
+                continue
+            weight, material_type_id = cast(tuple[Decimal, int], key[1])
+            written = InventoryOperations.write_off_other_material(
+                (product_id, weight, material_type_id), freed, actor
+            )
+            changed = changed or written > 0
     return changed
 
 

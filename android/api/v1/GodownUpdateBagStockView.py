@@ -86,7 +86,8 @@ class GodownUpdateBagStockView(AndroidGodownBaseView):
                     "counts": {
                         "PP-A1B2C3D4E0F1": 12,
                         "PP-A1B2C3D4E0F2": 0,
-                    }
+                    },
+                    "reuse_other_material": True,
                 },
                 request_only=True,
             ),
@@ -128,7 +129,16 @@ class GodownUpdateBagStockView(AndroidGodownBaseView):
         examples=[
             OpenApiExample(
                 "Partial bag count",
-                value={"counts": {"PP-A1B2C3D4E0F1": 12}},
+                value={"counts": {"PP-A1B2C3D4E0F1": 12}, "reuse_other_material": True},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "End-of-season clear-out (reuse_other_material false)",
+                description=(
+                    "Counts may only go down; the packing material of the bags "
+                    "taken off is not given back. The seed returns to raw material."
+                ),
+                value={"counts": {"PP-A1B2C3D4E0F1": 2}, "reuse_other_material": False},
                 request_only=True,
             ),
         ],

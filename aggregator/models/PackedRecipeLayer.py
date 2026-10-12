@@ -12,10 +12,8 @@ class PackedRecipeLayer(models.Model):
     newest first by ``opened_at``; any remainder comes off the implicit
     "unlayered" packets packed before the type's first recipe.
 
-    Invariant, per latest pool row and material type: the sum of ``packets`` of
-    the live (not ``is_discarded``) layers never exceeds the row's packed
-    packets. Discarded layers sit outside it: they record material that was
-    spent on packets that were thrown away.
+    Invariant, per latest pool row and material type: the sum of ``packets``
+    never exceeds the row's packed packets.
     """
 
     inventory_snapshot = models.ForeignKey(
@@ -47,19 +45,6 @@ class PackedRecipeLayer(models.Model):
     )
     packets = models.PositiveBigIntegerField("packets")
     opened_at = models.DateTimeField("opened at")
-    is_discarded = models.BooleanField(
-        "discarded",
-        default=False,
-        # Mirrors ``DEFAULT false`` in sql/ddl.sql, so a model-built schema and
-        # raw INSERTs naming no ``is_discarded`` column both work.
-        db_default=False,
-        help_text=(
-            "True once the packets were discarded (a count lowered with "
-            "reuse_other_material false). They no longer exist, so they are not "
-            "unpacked, trimmed or counted against the packed packets, but the "
-            "packing material they used stays spent."
-        ),
-    )
 
     class Meta:
         verbose_name = "packed recipe layer"
