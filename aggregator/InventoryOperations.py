@@ -249,7 +249,7 @@ def record_stock_counts(
     raise its bag count above what is on the floor now (``ValueError``, so the
     whole upload is refused), and bags taken off the count are discarded -- their
     seed goes back to raw as ever, but the packing material used on them is
-    not given back (see :func:`remove_packed_packets`).
+    not given back (see :func:`write_off_other_material`).
     """
     from . import StockLedgerOperations
 
@@ -401,26 +401,13 @@ def _layer_field(row: CountRow) -> str:
     )
 
 
-def all_recipe_layers(row: CountRow):
-    """Every layer of ``row`` -- live and discarded -- oldest first."""
+def recipe_layers(row: CountRow):
+    """``row``'s layers, oldest first."""
     return PackedRecipeLayer.objects.filter(**{_layer_field(row): row})
 
 
-def recipe_layers(row: CountRow):
-    """``row``'s live layers, oldest first: the packets still packed.
-
-    Discarded layers (see :func:`remove_packed_packets`) are left out, so
-    packing, unpacking and trimming never touch them.
-    """
-    return all_recipe_layers(row).filter(is_discarded=False)
-
-
 def copy_recipe_layers(source: CountRow, target: CountRow) -> None:
-    """Give a new count row its predecessor's layers, ``opened_at`` preserved.
-
-    Discarded layers come along too: the material they spent stays spent on
-    every later count.
-    """
+    """Give a new count row its predecessor's layers, ``opened_at`` preserved."""
     field = _layer_field(target)
     PackedRecipeLayer.objects.bulk_create(
         PackedRecipeLayer(
@@ -429,9 +416,8 @@ def copy_recipe_layers(source: CountRow, target: CountRow) -> None:
             recipe_id=layer.recipe_id,
             packets=layer.packets,
             opened_at=layer.opened_at,
-            is_discarded=layer.is_discarded,
         )
-        for layer in all_recipe_layers(source)
+        for layer in recipe_layers(source)
     )
 
 
@@ -478,22 +464,18 @@ def add_packed_packets(row: CountRow, product_id: int, packet_weight, packets: i
         _add_layer(row, material_type_id, None, packets)
 
 
-def remove_packed_packets(row: CountRow, packets: int, *, discard: bool = False) -> None:
+def remove_packed_packets(row: CountRow, packets: int) -> None:
     """Unpack ``packets`` from ``row``, newest layer first, per material type.
 
     Whatever a type's layers cannot cover comes off the implicit "unlayered"
     packets at the bottom -- those packed before the type's first recipe.
-
-    With ``discard`` the packets are thrown away rather than taken apart: their
-    layers are kept, marked discarded, so the packing material they used is not
-    given back (see :func:`other_material_used`).
     """
     if packets <= 0:
         return
     for material_type_id in set(
         recipe_layers(row).values_list("material_type_id", flat=True)
     ):
-        _unpack_type(row, material_type_id, packets, discard=discard)
+        _unpack_type(row, material_type_id, packets)
 
 
 def clamp_recipe_layers(row: CountRow, packed_packets: int) -> bool:
@@ -524,7 +506,7 @@ def seed_recipe_layers() -> int:
     if bag_date is not None:
         bag_rows = InventorySnapshot.objects.filter(snapshot_date=bag_date)
         for bag_row in bag_rows.select_related("product_packaging"):
-            if all_recipe_layers(bag_row).exists():
+            if recipe_layers(bag_row).exists():
                 continue
             packaging = bag_row.product_packaging
             packed = (
@@ -537,7 +519,7 @@ def seed_recipe_layers() -> int:
     if loose_snapshot_date is not None:
         loose_rows = LooseStockSnapshot.objects.filter(snapshot_date=loose_snapshot_date)
         for loose_row in loose_rows:
-            if all_recipe_layers(loose_row).exists():
+            if recipe_layers(loose_row).exists():
                 continue
             packed = loose_row.packets + _loose_dispatched_before(
                 loose_row.product, loose_row.packet_weight, loose_snapshot_date
@@ -567,31 +549,16 @@ def _seed_row(row: CountRow, product_id: int, packet_weight, packed: int) -> int
     return len(recipes)
 
 
-def _unpack_type(
-    row: CountRow, material_type_id: int, packets: int, *, discard: bool = False
-) -> None:
+def _unpack_type(row: CountRow, material_type_id: int, packets: int) -> None:
     remaining = packets
     layers = recipe_layers(row).filter(material_type_id=material_type_id)
     for layer in layers.order_by("-opened_at", "-id"):
         take = min(layer.packets, remaining)
         if take == layer.packets:
-            if discard:
-                layer.is_discarded = True
-                layer.save(update_fields=["is_discarded"])
-            else:
-                layer.delete()
+            layer.delete()
         else:
             layer.packets -= take
             layer.save(update_fields=["packets"])
-            if discard:
-                PackedRecipeLayer.objects.create(
-                    **{_layer_field(row): row},
-                    material_type_id=layer.material_type_id,
-                    recipe_id=layer.recipe_id,
-                    packets=take,
-                    opened_at=layer.opened_at,
-                    is_discarded=True,
-                )
         remaining -= take
         if remaining == 0:
             break
@@ -1796,10 +1763,6 @@ def other_material_used(
     live when those packets were packed, to that recipe's configuration. A
     NULL-recipe layer spends nothing. ``product`` narrows it to one product's
     own usage.
-
-    Discarded layers count too: packets thrown away when a count was lowered
-    with ``reuse_other_material`` false no longer exist, but the material they
-    used is not given back.
     """
     layers = PackedRecipeLayer.objects.filter(recipe__isnull=False)
     layers = _narrow_keys(layers, "recipe__", keys, material_type_ids)
@@ -1842,6 +1805,55 @@ def other_material_available(keys: Iterable[MaterialKey]) -> dict[MaterialKey, D
         key: inward.get(key, Decimal("0")) - used.get(key, Decimal("0"))
         for key in keys
     }
+
+
+def write_off_other_material(key: MaterialKey, quantity: Decimal, actor: User | None) -> Decimal:
+    """Take ``quantity`` units of one configuration's packing material off its lots.
+
+    For a count lowered with ``reuse_other_material`` false: the packets are
+    thrown away, so the material they used must not come back to stock. The
+    packets' layers are removed as for any lowered count (which frees the
+    material), and this takes the same units off the inward lots of
+    ``key`` -- oldest effective lot first, an emptied lot soft-deleted -- so what
+    is available does not go up. Lots booked by an accepted return are left
+    alone: only reverting that return may change them.
+
+    Must run inside the count's transaction, with the material types locked
+    (``StockLedgerOperations.recording`` does both). Returns the units written
+    off, which is less than ``quantity`` only when the lots hold less.
+    """
+    product_id, packet_weight, material_type_id = key
+    lots = (
+        InwardOtherMaterial.objects.select_for_update(of=("self",))
+        .filter(
+            recipe__product_id=product_id,
+            recipe__packet_weight=packet_weight,
+            recipe__material_type_id=material_type_id,
+            return_order__isnull=True,
+            effective_date__isnull=False,
+            effective_date__lte=today(),
+        )
+        .order_by("effective_date", "pk")
+    )
+    remaining = quantity
+    for lot in lots:
+        if remaining <= 0:
+            break
+        take = min(lot.quantity, remaining)
+        if take == lot.quantity:
+            # Emptied: retire it directly. Its quantity stays as booked (the
+            # column must be positive); a deleted lot no longer counts. The
+            # soft-delete guard is skipped because this write is already
+            # inside the ledger recording of the count.
+            lot.is_deleted = True
+            lot.deleted_at = indian_now()
+            lot.deleted_by = actor
+            lot.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        else:
+            lot.quantity -= take
+            lot.save(update_fields=["quantity", "updated_at"])
+        remaining -= take
+    return quantity - remaining
 
 
 def material_keys(product_ids: Iterable[int]) -> set[MaterialKey]:

@@ -296,49 +296,25 @@ class CreateRawMaterialWasteSerializer(serializers.Serializer):
         return attrs
 
 
-def _find_product(reference: str) -> Product:
-    """The live product a transfer names: by public id (``P-…``) or by name.
-
-    A name is matched case-insensitively and is only unique within a crop, so a
-    name shared by two products is refused with their public ids -- send one of
-    those instead.
-    """
-    reference = reference.strip()
-    product = Product.objects.filter(public_id=reference).first()
-    if product is not None:
-        return product
-    matches = list(Product.objects.filter(name__iexact=reference).select_related("crop"))
-    if not matches:
-        raise serializers.ValidationError(f"No product named '{reference}'.")
-    if len(matches) > 1:
-        options = ", ".join(f"{match.public_id} ({match.crop.name})" for match in matches)
-        raise serializers.ValidationError(
-            f"More than one product is named '{reference}'; send its public id instead: {options}."
-        )
-    return matches[0]
-
-
 class TransferProductSerializer(serializers.Serializer):
     """Request validation for moving raw material from one product to another.
 
-    Both products are named by ``name`` (or public id, to tell apart two
-    products that share a name); the rules that need stock figures are in
-    ``InwardOperations.transfer_raw_material``.
+    Both products are named by ``public_id`` (``P-...``), as everywhere else in
+    the API: a name is neither unique across crops nor stable. The rules that
+    need stock figures are in ``InwardOperations.transfer_raw_material``.
     """
 
-    source_product = serializers.CharField(
-        error_messages={
-            "required": "Source product is required.",
-            "blank": "Source product is required.",
-        },
-        help_text="Name (or public id) of the product the kilograms leave.",
+    source_product = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Product.objects.all(),
+        error_messages={"required": "Source product is required."},
+        help_text="Public id of the product the kilograms leave.",
     )
-    target_product = serializers.CharField(
-        error_messages={
-            "required": "Target product is required.",
-            "blank": "Target product is required.",
-        },
-        help_text="Name (or public id) of the product that receives them; same crop.",
+    target_product = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Product.objects.all(),
+        error_messages={"required": "Target product is required."},
+        help_text="Public id of the product that receives them; same crop.",
     )
     quantity_kg = serializers.DecimalField(
         max_digits=10,
@@ -347,12 +323,6 @@ class TransferProductSerializer(serializers.Serializer):
         error_messages={"required": "Quantity in kg is required."},
         help_text="Kilograms to move, at most the source's unpacked raw material.",
     )
-
-    def validate_source_product(self, value):
-        return _find_product(value)
-
-    def validate_target_product(self, value):
-        return _find_product(value)
 
     def validate(self, attrs):
         if attrs["quantity_kg"] <= 0:

@@ -2,8 +2,9 @@
 
 Moves raw material that is already in stock from one product to another of the
 same crop, so leftover kilograms are re-homed instead of written off: send
-``{"source_product": "sai-33", "target_product": "sai-balwan", "quantity_kg": 55}``
-and 55 kg leave sai-33 (45 kg stay, if it had 100) and arrive on sai-balwan.
+``{"source_product": "P-...", "target_product": "P-...", "quantity_kg": 55}``
+(the products' public ids) and 55 kg leave the source (45 kg stay, if it had 100)
+and arrive on the target.
 
 Only an application Admin may call it, and only one allowed to change inward
 material (the same gate as booking or deleting a lot). The source must be idle
