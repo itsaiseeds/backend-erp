@@ -21,6 +21,7 @@ from .DeleteRejectedOrderView import DeleteRejectedOrderView
 from .DispatchCustomOrderView import DispatchCustomOrderView
 from .DispatchOrderView import DispatchOrderView
 from .DispatchWasteOrderView import DispatchWasteOrderView
+from .ExportClientsView import ExportClientsView
 from .ExportCustomOrdersView import ExportCustomOrdersView
 from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
 from .ExportFarmerVisitsView import ExportFarmerVisitsView
@@ -458,6 +459,8 @@ urlpatterns = [
         name="other-material-stock",
     ),
     # -- Date-range exports (api/export_views.py) -------------------------------
+    # The one export with no date window: the client master, children nested.
+    path("export/clients", ExportClientsView.as_view(), name="export-clients"),
     path("export/orders", ExportOrdersView.as_view(), name="export-orders"),
     path(
         "export/custom-orders",

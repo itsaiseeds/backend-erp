@@ -269,6 +269,20 @@ class ClientPayloadSerializer(serializers.Serializer):
     transport_agencies = ClientTransportAgencyPayloadSerializer(many=True)
 
 
+class ChildOrgAddressPayloadSerializer(serializers.Serializer):
+    """Output shape for a child org's address: a client address minus the link fields."""
+
+    line_1 = serializers.CharField()
+    line_2 = serializers.CharField()
+    pincode = serializers.CharField()
+    city = serializers.CharField()
+    state = serializers.CharField()
+    country = serializers.CharField()
+    city_id = serializers.IntegerField()
+    state_id = serializers.IntegerField()
+    country_id = serializers.IntegerField()
+
+
 class ChildOrgPayloadSerializer(serializers.Serializer):
     """Output shape for a child org in full (schema only)."""
 

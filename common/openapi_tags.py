@@ -236,6 +236,7 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
         ),
         (ADMIN_FIELD_TRIPS,),
     ),
+    (_route(_ADMIN, "export/clients"), (ADMIN_CLIENTS, ADMIN_EXPORTS)),
     (
         _route(_ADMIN, "export/orders", "export/custom-orders", "export/rejected-orders"),
         (ADMIN_ORDERS, ADMIN_EXPORTS),

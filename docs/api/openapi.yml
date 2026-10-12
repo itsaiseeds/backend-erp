@@ -6333,6 +6333,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomOrderDetailPayload'
           description: ''
+  /api/sales-admin/export/clients:
+    get:
+      operationId: sales_admin_export_clients
+      description: Export every client with its addresses, contacts, agencies and
+        child orgs.
+      summary: Export every client (with its child clients)
+      tags:
+      - Admin · Clients
+      - Admin · Exports
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportClientsResponse'
+          description: ''
   /api/sales-admin/export/custom-orders:
     get:
       operationId: sales_admin_export_custom_orders
@@ -10510,6 +10528,39 @@ components:
       required:
       - is_complete
       - stock_admins
+    ChildOrgAddressPayload:
+      type: object
+      description: 'Output shape for a child org''s address: a client address minus
+        the link fields.'
+      properties:
+        line_1:
+          type: string
+        line_2:
+          type: string
+        pincode:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        city_id:
+          type: integer
+        state_id:
+          type: integer
+        country_id:
+          type: integer
+      required:
+      - city
+      - city_id
+      - country
+      - country_id
+      - line_1
+      - line_2
+      - pincode
+      - state
+      - state_id
     ChildOrgAddressRequest:
       type: object
       description: 'The address of a new child org: a client address without label
@@ -12386,6 +12437,34 @@ components:
       - bag
       type: string
       description: '* `bag` - bag'
+    ExportChildOrg:
+      type: object
+      description: A child org of a client (``child_org_payload`` plus ``created_at``).
+      properties:
+        id:
+          type: integer
+        party_name:
+          type: string
+        village_name:
+          type: string
+        transport_name:
+          type: string
+        contact_number:
+          type: string
+          nullable: true
+        address:
+          $ref: '#/components/schemas/ChildOrgAddressPayload'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - address
+      - contact_number
+      - created_at
+      - id
+      - party_name
+      - transport_name
+      - village_name
     ExportCity:
       type: object
       description: '``ClientOperations.order_city_payload``: the order''s delivery
@@ -12412,6 +12491,79 @@ components:
       - company_name
       - gst_number
       - public_id
+    ExportClientDetail:
+      type: object
+      description: One row of ``export/clients`` (``ClientOperations.client_export_payload``).
+      properties:
+        public_id:
+          type: string
+        company_name:
+          type: string
+        company_phone:
+          type: string
+        gst_number:
+          type: string
+        status:
+          type: string
+        is_verified:
+          type: boolean
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        verified_by:
+          type: string
+          nullable: true
+        created_by:
+          type: string
+          nullable: true
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientAddressPayload'
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientContactPayload'
+        transport_agencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientTransportAgencyPayload'
+        created_at:
+          type: string
+          format: date-time
+        child_orgs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportChildOrg'
+      required:
+      - addresses
+      - child_orgs
+      - company_name
+      - company_phone
+      - contacts
+      - created_at
+      - created_by
+      - gst_number
+      - is_verified
+      - public_id
+      - status
+      - transport_agencies
+      - verified_at
+      - verified_by
+    ExportClientsResponse:
+      type: object
+      description: Response envelope of ``export/clients`` (schema only).
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportClientDetail'
+      required:
+      - count
+      - results
     ExportCustomDispatchReceipt:
       type: object
       description: A custom order's row of ``export/dispatch-receipts``.
