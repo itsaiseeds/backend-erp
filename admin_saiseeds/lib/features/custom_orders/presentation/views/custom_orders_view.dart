@@ -154,6 +154,32 @@ class _CustomOrdersContentState extends State<_CustomOrdersContent> {
     );
   }
 
+  Future<void> _onMarkDelivered(CustomOrderModel order) async {
+    final CustomOrdersCubit cubit = context.read<CustomOrdersCubit>();
+
+    final bool confirmed = await ConfirmationDialog.show(
+      context,
+      title: AppStrings.ORDER_MARK_DELIVERED_TITLE,
+      message:
+          '${order.publicId} - '
+          '${AppStrings.ORDER_MARK_DELIVERED_BODY}',
+      confirmLabel: AppStrings.ORDER_MARK_DELIVERED,
+    );
+    if (!confirmed) return;
+
+    final bool succeeded = await cubit.markDelivered(order.publicId);
+    if (!mounted) return;
+
+    if (succeeded) {
+      ToastUtils.showSuccess(context, AppStrings.ORDER_MARK_DELIVERED_DONE);
+      return;
+    }
+    ToastUtils.showError(
+      context,
+      cubit.state.errorMessage ?? AppStrings.SOMETHING_WENT_WRONG,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<CustomOrdersCubit, CustomOrdersState>(
@@ -192,6 +218,7 @@ class _CustomOrdersContentState extends State<_CustomOrdersContent> {
             onDelete: _onDelete,
             onDispatch: _onDispatch,
             onRevertDispatch: _onRevertDispatch,
+            onMarkDelivered: _onMarkDelivered,
             searchBarActions: [
               IconActionButton(
                 expand: true,

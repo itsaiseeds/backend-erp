@@ -93,10 +93,9 @@ class ExportSheets {
       case ExportKind.inventorySnapshots:
         return _inventorySnapshots(results);
       case ExportKind.labTestings:
-        throw UnsupportedError(
-          'Lab testing reports are a PDF document, not a spreadsheet -- see '
-          'ExportsCubit.export, which never reaches this branch for them.',
-        );
+        return _labTestings(results);
+      case ExportKind.clients:
+        return _clients(results);
     }
   }
 
@@ -452,6 +451,146 @@ class ExportSheets {
     }
 
     return ExportSheet(headers: headers, rows: rows);
+  }
+
+  // ─────────────────────────── lab testings ──────────────────────
+
+  static ExportSheet _labTestings(List<Map<String, dynamic>> results) {
+    const List<String> headers = [
+      'Test ID',
+      'Tested At',
+      'Tested By',
+      'Product',
+      'Party',
+      'Lot Number',
+      'Lot Quantity (kg)',
+      'Lot Status',
+      'No. of Plants',
+      'Female Count',
+      'OT Count',
+      'Genetical Impurity',
+      'Grow Out Test',
+      'Result',
+      'Comment',
+    ];
+
+    final List<List<String>> rows = [];
+
+    for (final Map<String, dynamic> test in results) {
+      final Map<String, dynamic> testedBy = _mapOf(test['tested_by']);
+      final Map<String, dynamic> lot = _mapOf(test['inward_raw_material']);
+      final Map<String, dynamic> product = _mapOf(lot['product']);
+      final Map<String, dynamic> party = _mapOf(lot['party']);
+
+      rows.add([
+        _text(test['public_id']),
+        _date(test['tested_at']),
+        _text(testedBy['name']),
+        _text(product['name']),
+        _text(party['name']),
+        _text(lot['lot_no']),
+        _text(lot['quantity_kg']),
+        _text(lot['status']),
+        _text(test['number_of_plants']),
+        _text(test['female_count']),
+        _text(test['ot_count']),
+        _text(test['genetical_impurity']),
+        _text(test['grow_out_test']),
+        _text(test['result']),
+        _text(test['comment']),
+      ]);
+    }
+
+    return ExportSheet(headers: headers, rows: rows);
+  }
+
+  // ─────────────────────────────── clients ───────────────────────
+
+  static ExportSheet _clients(List<Map<String, dynamic>> results) {
+    const List<String> headers = [
+      'Client ID',
+      'Company Name',
+      'Company Phone',
+      'GST Number',
+      'Status',
+      'Verified',
+      'Verified At',
+      'Verified By',
+      'Created By',
+      'Created At',
+      'Contacts',
+      'Transport Agencies',
+      'Child Clients',
+      'Address Label',
+      'Address Line 1',
+      'Address Line 2',
+      'Pincode',
+      'City',
+      'State',
+      'Country',
+    ];
+
+    final List<List<String>> rows = [];
+
+    for (final Map<String, dynamic> client in results) {
+      final List<String> head = [
+        _text(client['public_id']),
+        _text(client['company_name']),
+        _text(client['company_phone']),
+        _text(client['gst_number']),
+        _text(client['status']),
+        client['is_verified'] == true ? 'Yes' : 'No',
+        _date(client['verified_at']),
+        _text(client['verified_by']),
+        _text(client['created_by']),
+        _date(client['created_at']),
+        _joinedContacts(_listOf(client['contacts'])),
+        _joinedNames(_listOf(client['transport_agencies'])),
+        _joinedChildOrgs(_listOf(client['child_orgs'])),
+      ];
+
+      final List<Map<String, dynamic>> addresses = _listOf(client['addresses']);
+      if (addresses.isEmpty) {
+        rows.add([...head, ...List.filled(7, '')]);
+        continue;
+      }
+
+      for (final Map<String, dynamic> address in addresses) {
+        rows.add([
+          ...head,
+          _text(address['label']),
+          _text(address['line_1']),
+          _text(address['line_2']),
+          _text(address['pincode']),
+          _text(address['city']),
+          _text(address['state']),
+          _text(address['country']),
+        ]);
+      }
+    }
+
+    return ExportSheet(headers: headers, rows: rows, headSpan: 13);
+  }
+
+  static String _joinedContacts(List<Map<String, dynamic>> contacts) {
+    return contacts
+        .map((contact) => _text(contact['name']))
+        .where((name) => name.isNotEmpty)
+        .join(', ');
+  }
+
+  static String _joinedNames(List<Map<String, dynamic>> items) {
+    return items
+        .map((item) => _text(item['name']))
+        .where((name) => name.isNotEmpty)
+        .join(', ');
+  }
+
+  static String _joinedChildOrgs(List<Map<String, dynamic>> childOrgs) {
+    return childOrgs
+        .map((child) => _text(child['party_name']))
+        .where((name) => name.isNotEmpty)
+        .join(', ');
   }
 
   // ───────────────────────────── helpers ────────────────────────

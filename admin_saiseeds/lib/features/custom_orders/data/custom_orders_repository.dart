@@ -65,4 +65,8 @@ class CustomOrdersRepository {
   Future<void> revertDispatch(String publicId) async {
     await _apiClient.post(CustomOrdersEndpoints.revertDispatch(publicId));
   }
+
+  Future<void> markDelivered(String publicId) async {
+    await _apiClient.post(CustomOrdersEndpoints.markDelivered(publicId));
+  }
 }

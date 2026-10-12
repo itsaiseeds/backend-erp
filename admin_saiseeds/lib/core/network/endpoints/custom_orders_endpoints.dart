@@ -16,4 +16,7 @@ class CustomOrdersEndpoints {
 
   static String revertDispatch(String publicId) =>
       '$_base/revert-custom-order-dispatch/$publicId';
+
+  static String markDelivered(String publicId) =>
+      '$_base/mark-custom-order-delivered/$publicId';
 }

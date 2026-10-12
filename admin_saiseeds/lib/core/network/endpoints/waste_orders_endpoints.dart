@@ -23,4 +23,7 @@ class WasteOrdersEndpoints {
 
   static String revertDispatch(String publicId) =>
       CustomOrdersEndpoints.revertDispatch(publicId);
+
+  static String markDelivered(String publicId) =>
+      CustomOrdersEndpoints.markDelivered(publicId);
 }

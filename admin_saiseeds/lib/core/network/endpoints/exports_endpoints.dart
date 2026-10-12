@@ -14,4 +14,6 @@ class ExportsEndpoints {
   static const String inventorySnapshots = '$_base/inventory-snapshots';
 
   static const String labTestings = '$_base/lab-testings';
+
+  static const String clients = '$_base/clients';
 }

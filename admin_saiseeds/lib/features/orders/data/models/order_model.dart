@@ -386,6 +386,12 @@ class OrderModel {
 
   bool get canUploadLr => OrderStatusX.canUploadLr(status);
 
+  /// Marking delivered without an LR only ever applies to an own-vehicle
+  /// dispatch -- an agency order must upload its LR instead (the backend
+  /// 400s on `dispatch_details_id` being set).
+  bool get canMarkDelivered =>
+      OrderStatusX.canMarkDelivered(status) && !isAgencyDispatch;
+
   bool get canEdit => OrderStatusX.canEdit(status);
 
   static DateTime? _parseInstant(dynamic value) {

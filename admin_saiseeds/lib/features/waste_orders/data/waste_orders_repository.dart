@@ -71,4 +71,8 @@ class WasteOrdersRepository {
   Future<void> revertDispatch(String publicId) async {
     await _apiClient.post(WasteOrdersEndpoints.revertDispatch(publicId));
   }
+
+  Future<void> markDelivered(String publicId) async {
+    await _apiClient.post(WasteOrdersEndpoints.markDelivered(publicId));
+  }
 }
