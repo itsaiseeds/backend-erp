@@ -14,6 +14,7 @@ enum ExportKind {
   inwardEntries,
   inventorySnapshots,
   labTestings,
+  clients,
 }
 
 extension ExportKindX on ExportKind {
@@ -31,6 +32,8 @@ extension ExportKindX on ExportKind {
         return ExportsEndpoints.inventorySnapshots;
       case ExportKind.labTestings:
         return ExportsEndpoints.labTestings;
+      case ExportKind.clients:
+        return ExportsEndpoints.clients;
     }
   }
 
@@ -48,6 +51,8 @@ extension ExportKindX on ExportKind {
         return AppStrings.EXPORT_INVENTORY_SNAPSHOTS;
       case ExportKind.labTestings:
         return AppStrings.EXPORT_LAB_TESTINGS;
+      case ExportKind.clients:
+        return AppStrings.EXPORT_CLIENTS;
     }
   }
 
@@ -65,6 +70,8 @@ extension ExportKindX on ExportKind {
         return AppStrings.EXPORT_INVENTORY_SNAPSHOTS_BODY;
       case ExportKind.labTestings:
         return AppStrings.EXPORT_LAB_TESTINGS_BODY;
+      case ExportKind.clients:
+        return AppStrings.EXPORT_CLIENTS_BODY;
     }
   }
 
@@ -82,6 +89,8 @@ extension ExportKindX on ExportKind {
         return Icons.inventory_outlined;
       case ExportKind.labTestings:
         return Icons.biotech_outlined;
+      case ExportKind.clients:
+        return Icons.groups_outlined;
     }
   }
 
@@ -100,12 +109,19 @@ extension ExportKindX on ExportKind {
         return 'inventory-snapshots';
       case ExportKind.labTestings:
         return 'lab-testings';
+      case ExportKind.clients:
+        return 'clients';
     }
   }
 
   /// Inventory snapshots page rather than taking a required window, so the
   /// dates are optional there and `all=true` fetches the lot in one call.
   bool get isPaginated => this == ExportKind.inventorySnapshots;
+
+  /// Clients is the master record, not a period's activity -- the backend
+  /// ignores `start_date`/`end_date` entirely for it, so the dialog never
+  /// sends or shows a window for this kind.
+  bool get hasNoDateWindow => this == ExportKind.clients;
 
   /// Only dispatch receipts have a printable document behind each row, so
   /// only they can be downloaded as challan PDFs instead of a sheet.

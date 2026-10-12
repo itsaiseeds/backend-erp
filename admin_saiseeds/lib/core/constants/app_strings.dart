@@ -1014,6 +1014,9 @@ class AppStrings {
       'spreadsheet.';
   static const String EXPORT_CARD_ACTION = 'Choose dates';
   static const String EXPORT_BUILDING = 'Building...';
+  static const String EXPORT_COLUMN_REPORT = 'Report';
+  static const String EXPORT_COLUMN_DATE_RANGE = 'Date range';
+  static const String EXPORT_COLUMN_ACTION = 'Action';
   static const String EXPORT_HINT_TITLE = 'Good to know';
   static const String EXPORT_HINT_WINDOW = 'A window can cover up to 62 days.';
   static const String EXPORT_HINT_ROWS =
@@ -1063,8 +1066,13 @@ class AppStrings {
   static const String EXPORT_LAB_TESTINGS = 'Lab Testing Reports';
   static const String EXPORT_LAB_TESTINGS_BODY =
       'Lab tests done in the window, one row per test.';
+  static const String EXPORT_CLIENTS = 'Clients';
+  static const String EXPORT_CLIENTS_BODY =
+      'Every live client in full -- addresses, contacts, agencies and child clients. No date window.';
   static const String EXPORT_WINDOW_OPTIONAL =
       'Optional for this report -- leave both empty for the full history.';
+  static const String EXPORT_WINDOW_NOT_APPLICABLE =
+      'This report has no date window -- it is the client master, not a period\'s activity.';
   static const String COLUMN_PRODUCT_USABLE = 'Availability';
   static const String PRODUCT_USABLE_YES = 'Available';
   static const String PRODUCT_USABLE_NO = 'Frozen';

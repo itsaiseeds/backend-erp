@@ -131,6 +131,27 @@ class _DateRangeFieldState extends State<DateRangeField> {
     return room < AppSizes.dateRangePopoverHeight;
   }
 
+  /// Flips the panel to grow leftward from the field's right edge when
+  /// anchoring at its left edge would push the wide popover off-screen --
+  /// true for fields sitting in the right half of a row, where it would
+  /// otherwise be clipped by the window's right side. Only flips when the
+  /// right-anchored panel still fits on the left, so a very narrow window
+  /// keeps the (clipped) left anchor rather than overflowing the other side.
+  bool get _opensLeftward {
+    final RenderObject? box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return false;
+
+    const double margin = AppSpacing.md;
+    final double left = box.localToGlobal(Offset.zero).dx;
+    final double right = left + box.size.width;
+    final double screenWidth = MediaQuery.sizeOf(context).width;
+    final bool spilledRight =
+        left + AppSizes.dateRangePopoverWidth > screenWidth - margin;
+    final bool fitsLeft =
+        right - AppSizes.dateRangePopoverWidth > margin;
+    return spilledRight && fitsLeft;
+  }
+
   void _rebuildOverlay() => _overlayEntry?.markNeedsBuild();
 
   void _applyPreset(DateRangePreset preset) {
@@ -177,6 +198,13 @@ class _DateRangeFieldState extends State<DateRangeField> {
   }
 
   Widget _buildOverlay(BuildContext overlayContext) {
+    final bool upward = _opensUpward;
+    final bool leftward = _opensLeftward;
+    // Hug whichever horizontal edge of the field keeps the panel on-screen;
+    // vertical edges stay opposite so the panel stacks above or below it.
+    final double anchorX = leftward ? 1.0 : -1.0;
+    final double anchorY = upward ? -1.0 : 1.0;
+
     return Stack(
       children: [
         Positioned.fill(
@@ -190,13 +218,9 @@ class _DateRangeFieldState extends State<DateRangeField> {
           child: CompositedTransformFollower(
             link: _layerLink,
             showWhenUnlinked: false,
-            targetAnchor: _opensUpward
-                ? Alignment.topLeft
-                : Alignment.bottomLeft,
-            followerAnchor: _opensUpward
-                ? Alignment.bottomLeft
-                : Alignment.topLeft,
-            offset: Offset(0, _opensUpward ? -AppSpacing.xs : AppSpacing.xs),
+            targetAnchor: Alignment(anchorX, anchorY),
+            followerAnchor: Alignment(anchorX, -anchorY),
+            offset: Offset(0, upward ? -AppSpacing.xs : AppSpacing.xs),
             child: Material(
               color: AppColors.TRANSPARENT,
               child: Container(
