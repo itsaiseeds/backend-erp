@@ -21,6 +21,7 @@ from .DeleteRejectedOrderView import DeleteRejectedOrderView
 from .DispatchCustomOrderView import DispatchCustomOrderView
 from .DispatchOrderView import DispatchOrderView
 from .DispatchWasteOrderView import DispatchWasteOrderView
+from .ExportClientsView import ExportClientsView
 from .ExportCustomOrdersView import ExportCustomOrdersView
 from .ExportDispatchReceiptsView import ExportDispatchReceiptsView
 from .ExportFarmerVisitsView import ExportFarmerVisitsView
@@ -76,6 +77,7 @@ from .RotateSalesPersonQrView import RotateSalesPersonQrView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
 from .StockView import StockView
+from .TransferProductView import TransferProductView
 from .UnapproveFieldTripView import UnapproveFieldTripView
 from .UnrejectReturnOrderView import UnrejectReturnOrderView
 from .UnverifyOrderView import UnverifyOrderView
@@ -447,6 +449,8 @@ urlpatterns = [
         UpdateNonStockInwardView.as_view(),
         name="update-non-stock-inward",
     ),
+    # Re-homes unpacked raw material between two products of one crop.
+    path("transfer-product", TransferProductView.as_view(), name="transfer-product"),
     path(
         "raw-material-stock",
         RawMaterialStockView.as_view(),
@@ -458,6 +462,8 @@ urlpatterns = [
         name="other-material-stock",
     ),
     # -- Date-range exports (api/export_views.py) -------------------------------
+    # The one export with no date window: the client master, children nested.
+    path("export/clients", ExportClientsView.as_view(), name="export-clients"),
     path("export/orders", ExportOrdersView.as_view(), name="export-orders"),
     path(
         "export/custom-orders",

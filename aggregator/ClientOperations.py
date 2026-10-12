@@ -502,8 +502,29 @@ def order_city_payload(order: Order | CustomOrder) -> dict | None:
     return {"id": city.id, "name": city.name} if city else None
 
 
-def client_payload(client: Client) -> dict:
-    """Frontend-facing dict for a client (identified by public id, never the pk)."""
+def _address_link_payload(link: ClientAddress) -> dict:
+    return {
+        "id": link.id,
+        "label": link.label,
+        "is_primary": link.is_primary,
+        **address_payload(link.address),
+    }
+
+
+def _contact_link_payload(link: ClientContact) -> dict:
+    return {
+        "name": link.contact.name,
+        "phone_number": link.contact.phone_number,
+        "role": link.role,
+        "is_primary": link.is_primary,
+    }
+
+
+def _transport_agency_link_payload(link: ClientTransportAgency) -> dict:
+    return {"name": link.transport_agency.name, "is_primary": link.is_primary, "id": link.id}
+
+
+def _client_core_payload(client: Client) -> dict:
     return {
         "public_id": client.public_id,
         "company_name": client.company_name,
@@ -514,13 +535,15 @@ def client_payload(client: Client) -> dict:
         "verified_at": client.verified_at,
         "verified_by": client.verified_by.name if client.verified_by else None,
         "created_by": client.created_by.name if client.created_by else None,
+    }
+
+
+def client_payload(client: Client) -> dict:
+    """Frontend-facing dict for a client (identified by public id, never the pk)."""
+    return {
+        **_client_core_payload(client),
         "addresses": [
-            {
-                "id": link.id,
-                "label": link.label,
-                "is_primary": link.is_primary,
-                **address_payload(link.address),
-            }
+            _address_link_payload(link)
             for link in client.client_addresses.select_related(
                 "address",
                 "address__pincode",
@@ -530,19 +553,39 @@ def client_payload(client: Client) -> dict:
             ).all()
         ],
         "contacts": [
-            {
-                "name": link.contact.name,
-                "phone_number": link.contact.phone_number,
-                "role": link.role,
-                "is_primary": link.is_primary,
-            }
+            _contact_link_payload(link)
             for link in client.client_contacts.select_related("contact").all()
         ],
         "transport_agencies": [
-            {"name": link.transport_agency.name, "is_primary": link.is_primary, "id": link.id}
+            _transport_agency_link_payload(link)
             for link in client.client_transport_agencies.select_related(
                 "transport_agency"
             ).all()
+        ],
+    }
+
+
+def client_export_payload(client: Client) -> dict:
+    """A client in full plus its child orgs, for the client export.
+
+    Same fields as :func:`client_payload` and ``created_at``, but the link rows
+    and ``child_orgs`` are read off the instance so a ``prefetch_related`` in
+    the view keeps this query-free across the whole export.
+    """
+    from .ClientChildOrgOperations import child_org_payload
+
+    return {
+        **_client_core_payload(client),
+        "created_at": client.created_at,
+        "addresses": [_address_link_payload(link) for link in client.client_addresses.all()],
+        "contacts": [_contact_link_payload(link) for link in client.client_contacts.all()],
+        "transport_agencies": [
+            _transport_agency_link_payload(link)
+            for link in client.client_transport_agencies.all()
+        ],
+        "child_orgs": [
+            {**child_org_payload(child), "created_at": child.created_at}
+            for child in client.child_orgs.all()
         ],
     }
 

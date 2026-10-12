@@ -2022,6 +2022,10 @@ CREATE TABLE IF NOT EXISTS public.aggregator_packedrecipelayer (
 	recipe_id int8 NULL,
 	packets int8 NOT NULL,
 	opened_at timestamptz NOT NULL,
+	-- True = the packets were discarded (a count lowered with reuse_other_material
+	-- false): they are gone but their packing material stays spent. Production
+	-- (Neon) needs: ALTER TABLE public.aggregator_packedrecipelayer ADD COLUMN is_discarded bool NOT NULL DEFAULT false;
+	is_discarded bool NOT NULL DEFAULT false,
 	CONSTRAINT aggregator_packedrecipelayer_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_packedrecipelayer_inventory_snapshot_id_fk FOREIGN KEY (inventory_snapshot_id) REFERENCES public.aggregator_inventorysnapshot(id) DEFERRABLE INITIALLY DEFERRED,
 	CONSTRAINT aggregator_packedrecipelayer_loose_stock_snapshot_id_fk FOREIGN KEY (loose_stock_snapshot_id) REFERENCES public.aggregator_loosestocksnapshot(id) DEFERRABLE INITIALLY DEFERRED,

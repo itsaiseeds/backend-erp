@@ -10,7 +10,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from api.client_serializers import ChildOrgPayloadSerializer
+from api.client_serializers import (
+    ChildOrgAddressPayloadSerializer,
+    ChildOrgPayloadSerializer,
+    ClientPayloadSerializer,
+)
 from api.field_trip_serializers import (
     FarmerVisitPayloadSerializer,
     IdNameSerializer,
@@ -47,6 +51,28 @@ class ExportCitySerializer(serializers.Serializer):
 
     id = serializers.IntegerField()
     name = serializers.CharField()
+
+
+# -- clients -----------------------------------------------------------------
+
+
+class ExportChildOrgSerializer(serializers.Serializer):
+    """A child org of a client (``child_org_payload`` plus ``created_at``)."""
+
+    id = serializers.IntegerField()
+    party_name = serializers.CharField()
+    village_name = serializers.CharField()
+    transport_name = serializers.CharField(allow_blank=True)
+    contact_number = serializers.CharField(allow_null=True)
+    address = ChildOrgAddressPayloadSerializer()
+    created_at = serializers.DateTimeField()
+
+
+class ExportClientDetailSerializer(ClientPayloadSerializer):
+    """One row of ``export/clients`` (``ClientOperations.client_export_payload``)."""
+
+    created_at = serializers.DateTimeField()
+    child_orgs = ExportChildOrgSerializer(many=True)
 
 
 # -- orders ------------------------------------------------------------------

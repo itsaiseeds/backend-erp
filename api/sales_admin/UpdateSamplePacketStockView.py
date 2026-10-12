@@ -53,6 +53,18 @@ class UpdateLooseStockSerializer(serializers.Serializer):
         error_messages={"required": "Loose stock counts are required."},
         help_text="Loose lines, one per (product, packet_weight) pair.",
     )
+    reuse_other_material = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text=(
+            "``true`` (default): counts may go up or down, and packets taken off "
+            "the count give their packing material (leaflets, covers) back. "
+            "``false``: counts may only go down -- a line above the packets on hand "
+            "now is a 400 -- and the packing material of the packets taken off is "
+            "discarded, not given back. The seed of those packets returns to raw "
+            "material either way."
+        ),
+    )
 
 
 class LooseStockProductRefSerializer(serializers.Serializer):
@@ -201,7 +213,10 @@ class UpdateLooseStockView(AdminApiView):
             # Pairs of an unusable product cannot be counted; their last figure is
             # carried forward so freezing a product never moves its stock.
             snapshots = InventoryOperations.record_loose_stocks(
-                counts=full_counts, actor=request.user, carry_frozen=True
+                counts=full_counts,
+                actor=request.user,
+                carry_frozen=True,
+                reuse_other_material=serializer.validated_data["reuse_other_material"],
             )
         except ValueError as exc:
             raise serializers.ValidationError({"counts": str(exc)}) from None
@@ -237,7 +252,10 @@ class UpdateLooseStockView(AdminApiView):
         counts = self._resolve_counts(serializer)
         try:
             snapshots = InventoryOperations.record_loose_stocks(
-                counts=counts, actor=request.user, carry_forward=True
+                counts=counts,
+                actor=request.user,
+                carry_forward=True,
+                reuse_other_material=serializer.validated_data["reuse_other_material"],
             )
         except ValueError as exc:
             raise serializers.ValidationError({"counts": str(exc)}) from None
