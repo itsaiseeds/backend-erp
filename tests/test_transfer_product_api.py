@@ -115,10 +115,14 @@ class TransferProductApiTest(WebApiTestCase):
     def _lots(self, product, *quantities):
         return [book_raw_material(product, Decimal(q), actor=self.admin_user) for q in quantities]
 
-    def _transfer(self, quantity="55", source="tx-33", target="tx-balwan"):
+    def _transfer(self, quantity="55", source=None, target=None):
         return self.client.post(
             URL,
-            {"source_product": source, "target_product": target, "quantity_kg": quantity},
+            {
+                "source_product": (source or self.source).public_id,
+                "target_product": (target or self.target).public_id,
+                "quantity_kg": quantity,
+            },
             format="json",
         )
 
@@ -202,15 +206,6 @@ class TransferProductApiTest(WebApiTestCase):
         self.assertEqual(source_line.d_incoming, Decimal("-55"))
         self.assertEqual(target_line.d_incoming, Decimal("55"))
 
-    def test_a_product_can_be_named_by_public_id(self):
-        """tests/test_transfer_product_api.py::TransferProductApiTest::test_a_product_can_be_named_by_public_id"""
-        self._lots(self.source, "10")
-
-        response = self._transfer("4", source=self.source.public_id, target="TX-BALWAN")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(inv.raw_available_kg(self.target), Decimal("4"))
-
     # -- what is refused ------------------------------------------------------
 
     def test_more_than_the_source_has_is_refused(self):
@@ -245,10 +240,10 @@ class TransferProductApiTest(WebApiTestCase):
 
     def test_the_products_must_share_a_crop(self):
         """tests/test_transfer_product_api.py::TransferProductApiTest::test_the_products_must_share_a_crop"""
-        self._product("tx-rice", self.other_crop)
+        rice = self._product("tx-rice", self.other_crop)
         self._lots(self.source, "100")
 
-        response = self._transfer("10", target="tx-rice")
+        response = self._transfer("10", target=rice)
 
         self._refused(response, "within one crop")
         self.assertEqual(inv.raw_available_kg(self.source), Decimal("100"))
@@ -257,7 +252,7 @@ class TransferProductApiTest(WebApiTestCase):
         """tests/test_transfer_product_api.py::TransferProductApiTest::test_a_product_cannot_be_transferred_to_itself"""
         self._lots(self.source, "100")
 
-        response = self._transfer("10", target="tx-33")
+        response = self._transfer("10", target=self.source)
 
         self._refused(response, "must be different")
 
@@ -316,8 +311,24 @@ class TransferProductApiTest(WebApiTestCase):
         """tests/test_transfer_product_api.py::TransferProductApiTest::test_validation_of_the_request"""
         self._lots(self.source, "100")
         cases = {
-            "unknown source": self._transfer("10", source="nope"),
-            "unknown target": self._transfer("10", target="nope"),
+            "unknown source": self.client.post(
+                URL,
+                {"source_product": "P-NOPE", "target_product": self.target.public_id,
+                 "quantity_kg": "10"},
+                format="json",
+            ),
+            "unknown target": self.client.post(
+                URL,
+                {"source_product": self.source.public_id, "target_product": "P-NOPE",
+                 "quantity_kg": "10"},
+                format="json",
+            ),
+            "a name instead of an id": self.client.post(
+                URL,
+                {"source_product": "tx-33", "target_product": self.target.public_id,
+                 "quantity_kg": "10"},
+                format="json",
+            ),
             "zero kg": self._transfer("0"),
             "negative kg": self._transfer("-5"),
             "four decimals": self._transfer("1.0001"),
@@ -327,17 +338,17 @@ class TransferProductApiTest(WebApiTestCase):
             with self.subTest(case=label):
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
 
-    def test_a_name_shared_by_two_crops_must_be_given_as_a_public_id(self):
-        """tests/test_transfer_product_api.py::TransferProductApiTest::test_a_name_shared_by_two_crops_must_be_given_as_a_public_id"""
+    def test_two_products_with_one_name_are_told_apart_by_id(self):
+        """tests/test_transfer_product_api.py::TransferProductApiTest::test_two_products_with_one_name_are_told_apart_by_id"""
         twin = self._product("tx-33", self.other_crop)
         self._lots(self.source, "100")
 
-        response = self._transfer("10")
+        response = self._transfer("10", source=self.source)
 
-        self._refused(response, "send its public id")
-        self.assertIn(twin.public_id, str(response.data))
-        by_id = self._transfer("10", source=self.source.public_id)
-        self.assertEqual(by_id.status_code, status.HTTP_200_OK, by_id.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["source"]["public_id"], self.source.public_id)
+        self.assertNotEqual(self.source.public_id, twin.public_id)
+        self.assertEqual(inv.raw_available_kg(twin), Decimal("0"))
 
     # -- who may ----------------------------------------------------------------
 

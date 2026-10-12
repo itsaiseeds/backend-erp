@@ -1735,6 +1735,7 @@ paths:
                   counts:
                     PP-A1B2C3D4E0F1: 12
                     PP-A1B2C3D4E0F2: 0
+                  reuse_other_material: true
                 summary: Whole-day bag count
           application/x-www-form-urlencoded:
             schema:
@@ -1772,7 +1773,16 @@ paths:
                 value:
                   counts:
                     PP-A1B2C3D4E0F1: 12
+                  reuse_other_material: true
                 summary: Partial bag count
+              End-of-seasonClear-out(reuseOtherMaterialFalse):
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 2
+                  reuse_other_material: false
+                summary: End-of-season clear-out (reuse_other_material false)
+                description: Counts may only go down; the packing material of the
+                  bags taken off is not given back. The seed returns to raw material.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
@@ -1814,6 +1824,7 @@ paths:
                   - product: P-A1B2C3D4E0F1
                     packet_weight: '0.500'
                     packets: 0
+                  reuse_other_material: true
                 summary: Whole-day loose count
           application/x-www-form-urlencoded:
             schema:
@@ -1852,7 +1863,18 @@ paths:
                   - product: P-A1B2C3D4E0F1
                     packet_weight: '1.000'
                     packets: 12
+                  reuse_other_material: true
                 summary: Partial loose count
+              End-of-seasonClear-out(reuseOtherMaterialFalse):
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 2
+                  reuse_other_material: false
+                summary: End-of-season clear-out (reuse_other_material false)
+                description: Counts may only go down; the packing material of the
+                  packets taken off is not given back. The seed returns to raw material.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
@@ -4406,6 +4428,7 @@ paths:
                   counts:
                     PP-A1B2C3D4E0F1: 12
                     PP-A1B2C3D4E0F2: 0
+                  reuse_other_material: true
                 summary: Whole-day bag count
           application/x-www-form-urlencoded:
             schema:
@@ -4443,7 +4466,16 @@ paths:
                 value:
                   counts:
                     PP-A1B2C3D4E0F1: 12
+                  reuse_other_material: true
                 summary: Partial bag count
+              End-of-seasonClear-out(reuseOtherMaterialFalse):
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 2
+                  reuse_other_material: false
+                summary: End-of-season clear-out (reuse_other_material false)
+                description: Counts may only go down; the packing material of the
+                  bags taken off is not given back. The seed returns to raw material.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
@@ -4485,6 +4517,7 @@ paths:
                   - product: P-A1B2C3D4E0F1
                     packet_weight: '0.500'
                     packets: 0
+                  reuse_other_material: true
                 summary: Whole-day loose count
           application/x-www-form-urlencoded:
             schema:
@@ -4523,7 +4556,18 @@ paths:
                   - product: P-A1B2C3D4E0F1
                     packet_weight: '1.000'
                     packets: 12
+                  reuse_other_material: true
                 summary: Partial loose count
+              End-of-seasonClear-out(reuseOtherMaterialFalse):
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 2
+                  reuse_other_material: false
+                summary: End-of-season clear-out (reuse_other_material false)
+                description: Counts may only go down; the packing material of the
+                  packets taken off is not given back. The seed returns to raw material.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
@@ -9323,6 +9367,7 @@ paths:
                   counts:
                     PP-A1B2C3D4E0F1: 12
                     PP-A1B2C3D4E0F2: 0
+                  reuse_other_material: true
                 summary: Whole-day bag count
           application/x-www-form-urlencoded:
             schema:
@@ -9360,7 +9405,16 @@ paths:
                 value:
                   counts:
                     PP-A1B2C3D4E0F1: 12
+                  reuse_other_material: true
                 summary: Partial bag count
+              End-of-seasonClear-out(reuseOtherMaterialFalse):
+                value:
+                  counts:
+                    PP-A1B2C3D4E0F1: 2
+                  reuse_other_material: false
+                summary: End-of-season clear-out (reuse_other_material false)
+                description: Counts may only go down; the packing material of the
+                  bags taken off is not given back. The seed returns to raw material.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
@@ -9430,6 +9484,7 @@ paths:
                   - product: P-A1B2C3D4E0F1
                     packet_weight: '0.500'
                     packets: 0
+                  reuse_other_material: true
                 summary: Whole-day loose count
           application/x-www-form-urlencoded:
             schema:
@@ -9468,7 +9523,18 @@ paths:
                   - product: P-A1B2C3D4E0F1
                     packet_weight: '1.000'
                     packets: 12
+                  reuse_other_material: true
                 summary: Partial loose count
+              End-of-seasonClear-out(reuseOtherMaterialFalse):
+                value:
+                  counts:
+                  - product: P-A1B2C3D4E0F1
+                    packet_weight: '1.000'
+                    packets: 2
+                  reuse_other_material: false
+                summary: End-of-season clear-out (reuse_other_material false)
+                description: Counts may only go down; the packing material of the
+                  packets taken off is not given back. The seed returns to raw material.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
@@ -17136,19 +17202,18 @@ components:
       description: |-
         Request validation for moving raw material from one product to another.
 
-        Both products are named by ``name`` (or public id, to tell apart two
-        products that share a name); the rules that need stock figures are in
-        ``InwardOperations.transfer_raw_material``.
+        Both products are named by ``public_id`` (``P-...``), as everywhere else in
+        the API: a name is neither unique across crops nor stable. The rules that
+        need stock figures are in ``InwardOperations.transfer_raw_material``.
       properties:
         source_product:
           type: string
           minLength: 1
-          description: Name (or public id) of the product the kilograms leave.
+          description: Public id of the product the kilograms leave.
         target_product:
           type: string
           minLength: 1
-          description: Name (or public id) of the product that receives them; same
-            crop.
+          description: Public id of the product that receives them; same crop.
         quantity_kg:
           type: string
           format: decimal
