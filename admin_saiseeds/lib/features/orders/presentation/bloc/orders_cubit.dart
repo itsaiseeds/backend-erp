@@ -165,6 +165,9 @@ class OrdersCubit extends SafeCubit<OrdersState> {
   Future<bool> rejectOrder(String publicId) =>
       _mutate(() => _repository.rejectOrder(publicId));
 
+  Future<bool> markDelivered(String publicId) =>
+      _mutate(() => _repository.markOrderDelivered(publicId));
+
   Future<bool> revertDispatch(String publicId) =>
       _mutate(() => _repository.revertDispatch(publicId));
 

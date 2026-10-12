@@ -28,4 +28,7 @@ class OrdersEndpoints {
 
   static String uploadLrNumber(String publicId) =>
       '$_base/upload-lr-number/$publicId';
+
+  static String markDelivered(String publicId) =>
+      '$_base/mark-order-delivered/$publicId';
 }

@@ -173,6 +173,9 @@ class WasteOrdersCubit extends SafeCubit<WasteOrdersState> {
   Future<bool> revertDispatch(String publicId) =>
       _mutate(() => _repository.revertDispatch(publicId));
 
+  Future<bool> markDelivered(String publicId) =>
+      _mutate(() => _repository.markDelivered(publicId));
+
   Future<bool> _mutate(Future<void> Function() action) async {
     emit(state.copyWith(isMutating: true, clearError: true));
 

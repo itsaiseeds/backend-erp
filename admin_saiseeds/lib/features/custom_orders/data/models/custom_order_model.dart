@@ -294,6 +294,11 @@ class CustomOrderModel {
 
   bool get canRevertDispatch => OrderStatusX.canRevertDispatch(statusValue);
 
+  /// A custom/waste order always goes out on its own vehicle, so there is
+  /// never an LR to wait for -- status alone gates this, unlike the normal
+  /// orders' `canMarkDelivered`, which also checks dispatch mode.
+  bool get canMarkDelivered => OrderStatusX.canMarkDelivered(statusValue);
+
   /// Only an order that has not gone out may be removed; once dispatched the
   /// API refuses the delete.
   bool get canDelete => !OrderStatusX.canRevertDispatch(statusValue);

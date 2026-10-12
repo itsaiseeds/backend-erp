@@ -48,6 +48,7 @@ class OrdersTable extends StatefulWidget {
   final void Function(OrderModel order)? onDispatch;
   final void Function(OrderModel order)? onRevertDispatch;
   final void Function(OrderModel order)? onUploadLr;
+  final void Function(OrderModel order)? onMarkDelivered;
   final bool hasMore;
   final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
@@ -75,6 +76,7 @@ class OrdersTable extends StatefulWidget {
     this.onDispatch,
     this.onRevertDispatch,
     this.onUploadLr,
+    this.onMarkDelivered,
     this.hasMore = false,
     this.onLoadMore,
     this.searchBarActions = const [],
@@ -346,6 +348,18 @@ class OrdersTableState extends State<OrdersTable> {
                 !order.canUploadLr || isBusy || widget.onUploadLr == null
                 ? null
                 : () => widget.onUploadLr!(order),
+          ),
+          RowAction(
+            label: AppStrings.ORDER_MARK_DELIVERED,
+            icon: Icons.task_alt_outlined,
+            tone: RowActionTone.success,
+            blockedHint: AppStrings.ORDER_MARK_DELIVERED_BLOCKED,
+            onSelected:
+                !order.canMarkDelivered ||
+                    isBusy ||
+                    widget.onMarkDelivered == null
+                ? null
+                : () => widget.onMarkDelivered!(order),
           ),
           RowAction(
             label: AppStrings.ORDER_REJECT,

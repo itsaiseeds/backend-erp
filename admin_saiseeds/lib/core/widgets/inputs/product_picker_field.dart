@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_strings.dart';
+import '../../services/products_service.dart';
 import '../../../features/products/data/models/product_model.dart';
 import 'searchable_field.dart';
 
@@ -46,6 +47,11 @@ class ProductPickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool stillLoading = products.isEmpty && !ProductsService.instance.isLoaded;
+    final String emptyHint = stillLoading
+        ? AppStrings.PRODUCTS_LOADING
+        : AppStrings.PRODUCTS_UNAVAILABLE;
+
     return SearchableField<ProductModel>(
       label: AppStrings.FIELD_PRODUCT,
       hintText: AppStrings.FIELD_PRODUCT_HINT,
@@ -56,10 +62,10 @@ class ProductPickerField extends StatelessWidget {
       isSame: (a, b) => a.publicId == b.publicId,
       onSelected: onSelected,
       errorText: errorText,
-      enabled: enabled,
+      enabled: enabled && !stillLoading,
       onBlockedTap: onBlockedTap,
       helperText: isUnavailable ? AppStrings.PRODUCTS_UNAVAILABLE : null,
-      emptyHint: AppStrings.PRODUCTS_UNAVAILABLE,
+      emptyHint: emptyHint,
     );
   }
 }

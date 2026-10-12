@@ -53,9 +53,7 @@ class _ExportRangeDialogState extends State<ExportRangeDialog> {
 
   DateTime? _start;
   DateTime? _end;
-  late ExportFormat _format = widget.kind.isPdfOnly
-      ? ExportFormat.pdfReport
-      : ExportFormat.spreadsheet;
+  late ExportFormat _format = ExportFormat.spreadsheet;
   bool _isSubmitting = false;
   String? _error;
 
@@ -188,12 +186,24 @@ class _ExportRangeDialogState extends State<ExportRangeDialog> {
               ],
             ),
           ),
-          if (widget.kind.supportsReceipts) ...[
+          if (widget.kind.hasFormatChoice) ...[
             const SizedBox(height: AppSpacing.md),
             Text(AppStrings.EXPORT_FORMAT_LABEL, style: AppTypography.label),
             const SizedBox(height: AppSpacing.xs),
             _FormatChoice(
               value: _format,
+              secondFormat: widget.kind.supportsReceipts
+                  ? ExportFormat.receipts
+                  : ExportFormat.pdfReport,
+              secondIcon: widget.kind.supportsReceipts
+                  ? Icons.picture_as_pdf_outlined
+                  : Icons.description_outlined,
+              secondLabel: widget.kind.supportsReceipts
+                  ? AppStrings.EXPORT_FORMAT_RECEIPTS
+                  : AppStrings.EXPORT_FORMAT_PDF_REPORT,
+              secondCaption: widget.kind.supportsReceipts
+                  ? AppStrings.EXPORT_FORMAT_RECEIPTS_BODY
+                  : AppStrings.EXPORT_FORMAT_PDF_REPORT_BODY,
               enabled: !_isSubmitting,
               onChanged: (next) => setState(() {
                 _format = next;
@@ -232,15 +242,24 @@ class _ExportRangeDialogState extends State<ExportRangeDialog> {
   }
 }
 
-/// Spreadsheet or a zip of challans. Two options, so both stay visible
-/// rather than hiding behind a dropdown.
+/// Spreadsheet plus one other format -- a zip of challans for dispatch
+/// receipts, or the lab tester's PDF report for lab testings. Two options,
+/// so both stay visible rather than hiding behind a dropdown.
 class _FormatChoice extends StatelessWidget {
   final ExportFormat value;
+  final ExportFormat secondFormat;
+  final IconData secondIcon;
+  final String secondLabel;
+  final String secondCaption;
   final bool enabled;
   final ValueChanged<ExportFormat> onChanged;
 
   const _FormatChoice({
     required this.value,
+    required this.secondFormat,
+    required this.secondIcon,
+    required this.secondLabel,
+    required this.secondCaption,
     required this.enabled,
     required this.onChanged,
   });
@@ -262,12 +281,12 @@ class _FormatChoice extends StatelessWidget {
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: _FormatTile(
-            icon: Icons.picture_as_pdf_outlined,
-            label: AppStrings.EXPORT_FORMAT_RECEIPTS,
-            caption: AppStrings.EXPORT_FORMAT_RECEIPTS_BODY,
-            isSelected: value == ExportFormat.receipts,
+            icon: secondIcon,
+            label: secondLabel,
+            caption: secondCaption,
+            isSelected: value == secondFormat,
             enabled: enabled,
-            onTap: () => onChanged(ExportFormat.receipts),
+            onTap: () => onChanged(secondFormat),
           ),
         ),
       ],

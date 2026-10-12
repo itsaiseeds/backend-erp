@@ -111,8 +111,10 @@ extension ExportKindX on ExportKind {
   /// only they can be downloaded as challan PDFs instead of a sheet.
   bool get supportsReceipts => this == ExportKind.dispatchReceipts;
 
-  /// Lab testing reports are only ever one PDF document -- the same report
-  /// the lab tester's own app previews/shares -- never a spreadsheet, so the
-  /// dialog skips the format choice entirely for this kind.
-  bool get isPdfOnly => this == ExportKind.labTestings;
+  /// Lab testings can also be downloaded as the same PDF report the lab
+  /// tester's own app previews/shares, alongside the usual spreadsheet.
+  bool get supportsPdfReport => this == ExportKind.labTestings;
+
+  /// Whether the export dialog needs to ask for a format at all.
+  bool get hasFormatChoice => supportsReceipts || supportsPdfReport;
 }

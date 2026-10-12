@@ -52,6 +52,9 @@ class OrdersRepository {
   Future<void> rejectOrder(String publicId) =>
       _apiClient.post(OrdersEndpoints.reject(publicId));
 
+  Future<void> markOrderDelivered(String publicId) =>
+      _apiClient.post(OrdersEndpoints.markDelivered(publicId));
+
   Future<void> revertDispatch(String publicId) =>
       _apiClient.post(OrdersEndpoints.revertDispatch(publicId));
 

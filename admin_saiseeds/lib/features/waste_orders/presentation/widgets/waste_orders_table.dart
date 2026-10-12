@@ -46,6 +46,7 @@ class WasteOrdersTable extends StatefulWidget {
   final void Function(CustomOrderModel order)? onDelete;
   final void Function(CustomOrderModel order)? onDispatch;
   final void Function(CustomOrderModel order)? onRevertDispatch;
+  final void Function(CustomOrderModel order)? onMarkDelivered;
   final bool hasMore;
   final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
@@ -68,6 +69,7 @@ class WasteOrdersTable extends StatefulWidget {
     this.onDelete,
     this.onDispatch,
     this.onRevertDispatch,
+    this.onMarkDelivered,
     this.hasMore = false,
     this.onLoadMore,
     this.searchBarActions = const [],
@@ -316,6 +318,18 @@ class WasteOrdersTableState extends State<WasteOrdersTable> {
                     widget.onRevertDispatch == null
                 ? null
                 : () => widget.onRevertDispatch!(order),
+          ),
+          RowAction(
+            label: AppStrings.ORDER_MARK_DELIVERED,
+            icon: Icons.task_alt_outlined,
+            tone: RowActionTone.success,
+            blockedHint: AppStrings.ORDER_MARK_DELIVERED_BLOCKED,
+            onSelected:
+                !order.canMarkDelivered ||
+                    isBusy ||
+                    widget.onMarkDelivered == null
+                ? null
+                : () => widget.onMarkDelivered!(order),
           ),
           RowAction(
             label: AppStrings.DELETE,

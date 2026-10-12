@@ -182,6 +182,18 @@ class _OrdersContentState extends State<_OrdersContent> {
     );
   }
 
+  Future<void> _onMarkDelivered(OrderModel order) {
+    final OrdersCubit cubit = context.read<OrdersCubit>();
+    return _runAction(
+      order: order,
+      title: AppStrings.ORDER_MARK_DELIVERED_TITLE,
+      message: AppStrings.ORDER_MARK_DELIVERED_BODY,
+      confirmLabel: AppStrings.ORDER_MARK_DELIVERED,
+      successMessage: AppStrings.ORDER_MARK_DELIVERED_DONE,
+      action: cubit.markDelivered,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<OrdersCubit, OrdersState>(
@@ -224,6 +236,7 @@ class _OrdersContentState extends State<_OrdersContent> {
             onDispatch: _onDispatch,
             onRevertDispatch: _onRevertDispatch,
             onUploadLr: _onUploadLr,
+            onMarkDelivered: _onMarkDelivered,
             searchBarActions: [
               StockStatusChip(isComplete: state.isTodaysStockComplete),
               IconActionButton(

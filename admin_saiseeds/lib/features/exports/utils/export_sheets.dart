@@ -93,10 +93,7 @@ class ExportSheets {
       case ExportKind.inventorySnapshots:
         return _inventorySnapshots(results);
       case ExportKind.labTestings:
-        throw UnsupportedError(
-          'Lab testing reports are a PDF document, not a spreadsheet -- see '
-          'ExportsCubit.export, which never reaches this branch for them.',
-        );
+        return _labTestings(results);
     }
   }
 
@@ -448,6 +445,57 @@ class ExportSheets {
         isBag ? _text(row['bags']) : '',
         _text(isBag ? row['total_packets'] : row['packets']),
         _text(row['total_weight']),
+      ]);
+    }
+
+    return ExportSheet(headers: headers, rows: rows);
+  }
+
+  // ─────────────────────────── lab testings ──────────────────────
+
+  static ExportSheet _labTestings(List<Map<String, dynamic>> results) {
+    const List<String> headers = [
+      'Test ID',
+      'Tested At',
+      'Tested By',
+      'Product',
+      'Party',
+      'Lot Number',
+      'Lot Quantity (kg)',
+      'Lot Status',
+      'No. of Plants',
+      'Female Count',
+      'OT Count',
+      'Genetical Impurity',
+      'Grow Out Test',
+      'Result',
+      'Comment',
+    ];
+
+    final List<List<String>> rows = [];
+
+    for (final Map<String, dynamic> test in results) {
+      final Map<String, dynamic> testedBy = _mapOf(test['tested_by']);
+      final Map<String, dynamic> lot = _mapOf(test['inward_raw_material']);
+      final Map<String, dynamic> product = _mapOf(lot['product']);
+      final Map<String, dynamic> party = _mapOf(lot['party']);
+
+      rows.add([
+        _text(test['public_id']),
+        _date(test['tested_at']),
+        _text(testedBy['name']),
+        _text(product['name']),
+        _text(party['name']),
+        _text(lot['lot_no']),
+        _text(lot['quantity_kg']),
+        _text(lot['status']),
+        _text(test['number_of_plants']),
+        _text(test['female_count']),
+        _text(test['ot_count']),
+        _text(test['genetical_impurity']),
+        _text(test['grow_out_test']),
+        _text(test['result']),
+        _text(test['comment']),
       ]);
     }
 

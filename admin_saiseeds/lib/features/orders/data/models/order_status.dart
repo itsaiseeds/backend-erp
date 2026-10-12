@@ -55,6 +55,11 @@ class OrderStatusX {
   // Revert undoes a dispatch, so it only applies once already dispatched.
   static const Set<OrderStatus> REVERTABLE_DISPATCH = {OrderStatus.dispatched};
 
+  // Marking delivered without an LR closes a dispatch directly, so it only
+  // applies once already dispatched -- same precondition as revert, the
+  // other dispatched-only action.
+  static const Set<OrderStatus> DELIVERABLE = {OrderStatus.dispatched};
+
   static const Set<OrderStatus> EDITABLE = {
     OrderStatus.booked,
     OrderStatus.underReview,
@@ -138,6 +143,9 @@ class OrderStatusX {
 
   static bool canRevertDispatch(OrderStatus status) =>
       REVERTABLE_DISPATCH.contains(status);
+
+  static bool canMarkDelivered(OrderStatus status) =>
+      DELIVERABLE.contains(status);
 
   static bool canUploadLr(OrderStatus status) =>
       DISPATCH_REQUIRED.contains(status);

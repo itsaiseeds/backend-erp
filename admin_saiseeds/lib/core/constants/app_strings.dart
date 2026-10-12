@@ -604,6 +604,7 @@ class AppStrings {
 
   static const String PRODUCTS_UNAVAILABLE =
       'Product list is unavailable. Refresh the page and try again.';
+  static const String PRODUCTS_LOADING = 'Loading products…';
   static const String SELECTED_PRODUCT_SUMMARY_TITLE = 'Selected product';
   static const String SELECTED_PRODUCT_SUMMARY_HINT =
       'Read-only details of the product this packaging belongs to.';
@@ -663,6 +664,12 @@ class AppStrings {
       'Rejection is permanent. No action moves an order out of Rejected, and any reserved bags are released.';
   static const String ORDER_REJECT_DONE = 'Order rejected';
 
+  static const String ORDER_MARK_DELIVERED = 'Mark Delivered';
+  static const String ORDER_MARK_DELIVERED_TITLE = 'Mark this order delivered?';
+  static const String ORDER_MARK_DELIVERED_BODY =
+      'This closes the order on today\'s date. It cannot be undone.';
+  static const String ORDER_MARK_DELIVERED_DONE = 'Order marked delivered';
+
   static const String ORDER_VERIFY_BLOCKED =
       'Only a booked, under-review or held order can be verified.';
   static const String ORDER_UNVERIFY_BLOCKED =
@@ -673,6 +680,8 @@ class AppStrings {
       'A dispatched or delivered order cannot be rejected.';
   static const String ORDER_EDIT_BLOCKED =
       'A dispatched or delivered order can no longer be edited.';
+  static const String ORDER_MARK_DELIVERED_BLOCKED =
+      'Only a dispatched, own-vehicle order can be marked delivered.';
 
   // -- Return orders --------------------------------------------------------
 
@@ -1019,6 +1028,8 @@ class AppStrings {
   static const String EXPORT_FORMAT_SHEET_BODY = 'One row per line item';
   static const String EXPORT_FORMAT_RECEIPTS = 'Delivery challans';
   static const String EXPORT_FORMAT_RECEIPTS_BODY = 'A PDF each, in a zip';
+  static const String EXPORT_FORMAT_PDF_REPORT = 'PDF report';
+  static const String EXPORT_FORMAT_PDF_REPORT_BODY = 'One document, every test';
   static const String EXPORT_RECEIPTS_DONE = 'Challans downloaded';
   static const String EXPORT_RANGE_LABEL = 'Date range';
   static const String EXPORT_RANGE_HINT = 'Choose the days to include';
