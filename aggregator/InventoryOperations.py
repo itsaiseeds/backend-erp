@@ -213,6 +213,7 @@ def record_stock_counts(
     snapshot_date: date | None = None,
     carry_forward: bool = False,
     carry_frozen: bool = False,
+    reuse_other_material: bool = True,
 ) -> list[InventorySnapshot]:
     """Upload a whole day's bag count in one transaction.
 
@@ -243,6 +244,12 @@ def record_stock_counts(
     net kilograms per product must fit its raw pool. The packing-material
     check works the same way, per material type. Any shortfall rolls the
     whole upload back.
+
+    ``reuse_other_material=False`` is the end-of-season clear-out: no line may
+    raise its bag count above what is on the floor now (``ValueError``, so the
+    whole upload is refused), and bags taken off the count are discarded -- their
+    seed goes back to raw as ever, but the packing material used on them is
+    not given back (see :func:`remove_packed_packets`).
     """
     from . import StockLedgerOperations
 
@@ -255,11 +262,14 @@ def record_stock_counts(
         product_ids,
         actor=actor,
         new_bag_date=snapshot_date,
+        discard_other_material=not reuse_other_material,
     ) as rec:
         assert_products_usable(product_ids, field="counts", action="have its stock counted")
         lock_raw_pools(product_ids)
         # All up front and in pk order; _write_stock_count re-takes each as a no-op.
         lock_bag_pools(counts)
+        if not reuse_other_material:
+            _assert_bag_counts_not_raised(counts)
         materials_before = _material_guard(product_ids)
         bags_before = _bag_availability(counts)
         if carry_forward or carry_frozen:
@@ -391,13 +401,26 @@ def _layer_field(row: CountRow) -> str:
     )
 
 
-def recipe_layers(row: CountRow):
-    """``row``'s layers, oldest first."""
+def all_recipe_layers(row: CountRow):
+    """Every layer of ``row`` -- live and discarded -- oldest first."""
     return PackedRecipeLayer.objects.filter(**{_layer_field(row): row})
 
 
+def recipe_layers(row: CountRow):
+    """``row``'s live layers, oldest first: the packets still packed.
+
+    Discarded layers (see :func:`remove_packed_packets`) are left out, so
+    packing, unpacking and trimming never touch them.
+    """
+    return all_recipe_layers(row).filter(is_discarded=False)
+
+
 def copy_recipe_layers(source: CountRow, target: CountRow) -> None:
-    """Give a new count row its predecessor's layers, ``opened_at`` preserved."""
+    """Give a new count row its predecessor's layers, ``opened_at`` preserved.
+
+    Discarded layers come along too: the material they spent stays spent on
+    every later count.
+    """
     field = _layer_field(target)
     PackedRecipeLayer.objects.bulk_create(
         PackedRecipeLayer(
@@ -406,8 +429,9 @@ def copy_recipe_layers(source: CountRow, target: CountRow) -> None:
             recipe_id=layer.recipe_id,
             packets=layer.packets,
             opened_at=layer.opened_at,
+            is_discarded=layer.is_discarded,
         )
-        for layer in recipe_layers(source)
+        for layer in all_recipe_layers(source)
     )
 
 
@@ -454,18 +478,22 @@ def add_packed_packets(row: CountRow, product_id: int, packet_weight, packets: i
         _add_layer(row, material_type_id, None, packets)
 
 
-def remove_packed_packets(row: CountRow, packets: int) -> None:
+def remove_packed_packets(row: CountRow, packets: int, *, discard: bool = False) -> None:
     """Unpack ``packets`` from ``row``, newest layer first, per material type.
 
     Whatever a type's layers cannot cover comes off the implicit "unlayered"
     packets at the bottom -- those packed before the type's first recipe.
+
+    With ``discard`` the packets are thrown away rather than taken apart: their
+    layers are kept, marked discarded, so the packing material they used is not
+    given back (see :func:`other_material_used`).
     """
     if packets <= 0:
         return
     for material_type_id in set(
         recipe_layers(row).values_list("material_type_id", flat=True)
     ):
-        _unpack_type(row, material_type_id, packets)
+        _unpack_type(row, material_type_id, packets, discard=discard)
 
 
 def clamp_recipe_layers(row: CountRow, packed_packets: int) -> bool:
@@ -496,7 +524,7 @@ def seed_recipe_layers() -> int:
     if bag_date is not None:
         bag_rows = InventorySnapshot.objects.filter(snapshot_date=bag_date)
         for bag_row in bag_rows.select_related("product_packaging"):
-            if recipe_layers(bag_row).exists():
+            if all_recipe_layers(bag_row).exists():
                 continue
             packaging = bag_row.product_packaging
             packed = (
@@ -509,7 +537,7 @@ def seed_recipe_layers() -> int:
     if loose_snapshot_date is not None:
         loose_rows = LooseStockSnapshot.objects.filter(snapshot_date=loose_snapshot_date)
         for loose_row in loose_rows:
-            if recipe_layers(loose_row).exists():
+            if all_recipe_layers(loose_row).exists():
                 continue
             packed = loose_row.packets + _loose_dispatched_before(
                 loose_row.product, loose_row.packet_weight, loose_snapshot_date
@@ -539,16 +567,31 @@ def _seed_row(row: CountRow, product_id: int, packet_weight, packed: int) -> int
     return len(recipes)
 
 
-def _unpack_type(row: CountRow, material_type_id: int, packets: int) -> None:
+def _unpack_type(
+    row: CountRow, material_type_id: int, packets: int, *, discard: bool = False
+) -> None:
     remaining = packets
     layers = recipe_layers(row).filter(material_type_id=material_type_id)
     for layer in layers.order_by("-opened_at", "-id"):
         take = min(layer.packets, remaining)
         if take == layer.packets:
-            layer.delete()
+            if discard:
+                layer.is_discarded = True
+                layer.save(update_fields=["is_discarded"])
+            else:
+                layer.delete()
         else:
             layer.packets -= take
             layer.save(update_fields=["packets"])
+            if discard:
+                PackedRecipeLayer.objects.create(
+                    **{_layer_field(row): row},
+                    material_type_id=layer.material_type_id,
+                    recipe_id=layer.recipe_id,
+                    packets=take,
+                    opened_at=layer.opened_at,
+                    is_discarded=True,
+                )
         remaining -= take
         if remaining == 0:
             break
@@ -563,6 +606,45 @@ def _unpack_type(row: CountRow, material_type_id: int, packets: int) -> None:
 # pool that was already short, and a count that keeps or raises it, are never
 # blocked. They run after the write, inside the same transaction, so a refusal
 # rolls the whole upload back (and the ledger with it).
+
+
+def _assert_bag_counts_not_raised(counts: Mapping[ProductPackaging, int]) -> None:
+    """Raise ``ValueError`` if any line would raise its bags above what is on the floor.
+
+    "On the floor" is the latest count less what was dispatched since (what the
+    stock screen calls on hand), and 0 for a packaging not counted yet. Used for
+    a count with ``reuse_other_material`` false, where the count may only go down.
+    """
+    latest = latest_snapshot_date()
+    raised = []
+    for packaging, bags in counts.items():
+        current = max(on_hand_bags(packaging, latest) - consumed_bags(packaging, latest), 0)
+        if bags > current:
+            raised.append(f"'{packaging}' is {current}, not {bags}")
+    if raised:
+        raise ValueError(
+            "Counts can only be lowered while other material is not being reused; "
+            "cannot raise: " + "; ".join(raised) + "."
+        )
+
+
+def _assert_loose_counts_not_raised(counts: Mapping[tuple[Product, Decimal], int]) -> None:
+    """The loose-pool counterpart of :func:`_assert_bag_counts_not_raised`."""
+    latest = latest_loose_snapshot_date()
+    raised = []
+    for (product, weight), packets in counts.items():
+        current = max(
+            on_hand_loose_packets(product, weight, latest)
+            - consumed_loose_packets(product, weight, latest),
+            0,
+        )
+        if packets > current:
+            raised.append(f"'{product.name}' loose {weight}kg packets is {current}, not {packets}")
+    if raised:
+        raise ValueError(
+            "Counts can only be lowered while other material is not being reused; "
+            "cannot raise: " + "; ".join(raised) + "."
+        )
 
 
 def _bag_availability(packagings: Iterable[ProductPackaging]) -> dict[ProductPackaging, int]:
@@ -983,6 +1065,7 @@ def record_loose_stocks(
     snapshot_date: date | None = None,
     carry_forward: bool = False,
     carry_frozen: bool = False,
+    reuse_other_material: bool = True,
 ) -> list[LooseStockSnapshot]:
     """Upload a whole loose count in one transaction.
 
@@ -999,6 +1082,10 @@ def record_loose_stocks(
     onto a newly opened date, exactly as :func:`record_stock_counts` does.
     ``carry_frozen=True`` carries only the pools of unusable products (the full-upload
     case), as there.
+
+    ``reuse_other_material=False`` works as it does for :func:`record_stock_counts`:
+    no pool may be raised above its packets on the floor now, and packets taken off
+    the count are discarded with their packing material.
     """
     from . import StockLedgerOperations
 
@@ -1011,11 +1098,14 @@ def record_loose_stocks(
         product_ids,
         actor=actor,
         new_loose_date=snapshot_date,
+        discard_other_material=not reuse_other_material,
     ) as rec:
         assert_products_usable(product_ids, field="counts", action="have its stock counted")
         lock_raw_pools(product_ids)
         # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
         lock_loose_pools(product_ids)
+        if not reuse_other_material:
+            _assert_loose_counts_not_raised(counts)
         materials_before = _material_guard(product_ids)
         loose_before = _loose_availability(counts)
         if carry_forward or carry_frozen:
@@ -1706,6 +1796,10 @@ def other_material_used(
     live when those packets were packed, to that recipe's configuration. A
     NULL-recipe layer spends nothing. ``product`` narrows it to one product's
     own usage.
+
+    Discarded layers count too: packets thrown away when a count was lowered
+    with ``reuse_other_material`` false no longer exist, but the material they
+    used is not given back.
     """
     layers = PackedRecipeLayer.objects.filter(recipe__isnull=False)
     layers = _narrow_keys(layers, "recipe__", keys, material_type_ids)

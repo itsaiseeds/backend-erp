@@ -11,11 +11,14 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework import serializers, status
 
 from aggregator import FieldTripOperations as ft_ops
 from aggregator import InventoryOperations as inv
+from aggregator.ClientChildOrgOperations import resolve_child_org
 from aggregator.ClientOperations import create_client_with_details
 from aggregator.CustomOrderOperations import create_custom_order
 from aggregator.models import (
@@ -36,6 +39,7 @@ from aggregator.models import (
 )
 from aggregator.OrderOperations import create_order
 from api.export_views import MAX_EXPORT_RANGE_DAYS
+from api.sales_admin.ExportClientsView import ExportClientsResponseSerializer
 from api.sales_admin.ExportCustomOrdersView import ExportCustomOrdersResponseSerializer
 from api.sales_admin.ExportFarmerVisitsView import ExportFarmerVisitsResponseSerializer
 from api.sales_admin.ExportInventorySnapshotsView import (
@@ -49,6 +53,7 @@ from tests.common import WebApiTestCase, book_raw_material_for_every_product
 User = get_user_model()
 
 SUPERUSER_PHONE = "9999999999"
+CLIENTS_URL = "/api/sales-admin/export/clients"
 ORDERS_URL = "/api/sales-admin/export/orders"
 CUSTOM_ORDERS_URL = "/api/sales-admin/export/custom-orders"
 FARMER_VISITS_URL = "/api/sales-admin/export/farmer-visits"
@@ -278,6 +283,114 @@ class ExportApiTest(WebApiTestCase):
             {order.public_id for order in inside},
         )
         self.assertEqual(resp.data["count"], 2)
+
+    # -- clients --------------------------------------------------------------
+
+    def test_clients_export_nests_links_and_child_orgs_and_skips_deleted(self):
+        """tests/test_export_api.py::ExportApiTest::test_clients_export_nests_links_and_child_orgs_and_skips_deleted"""
+        link_id = self.client_row.client_addresses.first().id
+        kept = resolve_child_org(
+            self.client_row,
+            {"party_name": "Shree Krishna", "village_name": "Kamrej", "client_address_id": link_id},
+            self.sales_person,
+        )
+        gone = resolve_child_org(
+            self.client_row,
+            {"party_name": "Old Traders", "village_name": "Bardoli", "client_address_id": link_id},
+            self.sales_person,
+        )
+        gone.mark_deleted(self.admin_user)
+        other = create_client_with_details(
+            company_name="Beta Agro",
+            company_phone="9876543211",
+            gst_number="",
+            addresses=[
+                {
+                    "line_1": "2 Mill Road",
+                    "line_2": "",
+                    "pincode": "395007",
+                    "city": self.city,
+                    "state": self.city.state,
+                    "country": self.city.state.country,
+                    "label": "Office",
+                    "is_primary": True,
+                }
+            ],
+            contacts=[{"name": "Suresh", "phone_number": "9876500003"}],
+            transport_agencies=[{"name": "Beta Transport"}],
+            actor=self.sales_person,
+        )
+        deleted_client = create_client_with_details(
+            company_name="Deleted Co",
+            company_phone="9876543212",
+            gst_number="",
+            addresses=[
+                {
+                    "line_1": "3 Mill Road",
+                    "line_2": "",
+                    "pincode": "395007",
+                    "city": self.city,
+                    "state": self.city.state,
+                    "country": self.city.state.country,
+                    "label": "",
+                    "is_primary": True,
+                }
+            ],
+            contacts=[{"name": "Dev", "phone_number": "9876500004"}],
+            transport_agencies=[{"name": "Del Transport"}],
+            actor=self.sales_person,
+        )
+        deleted_client.mark_deleted(self.admin_user)
+
+        resp = self.client.get(CLIENTS_URL)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual(resp.data["count"], 2)
+        by_id = {row["public_id"]: row for row in resp.data["results"]}
+        self.assertEqual(set(by_id), {self.client_row.public_id, other.public_id})
+
+        acme = by_id[self.client_row.public_id]
+        self.assertEqual(acme["company_name"], "Acme Seeds")
+        self.assertEqual(acme["gst_number"], "27AAPFU0939F1ZV")
+        self.assertEqual(acme["created_by"], "Export Sales")
+        self.assertEqual([a["label"] for a in acme["addresses"]], ["Warehouse"])
+        self.assertEqual(acme["addresses"][0]["city"], "Surat")
+        self.assertEqual([c["name"] for c in acme["contacts"]], ["Ramesh"])
+        self.assertEqual([t["name"] for t in acme["transport_agencies"]], ["Acme Transport"])
+        self.assertEqual([c["id"] for c in acme["child_orgs"]], [kept.id])
+        child = acme["child_orgs"][0]
+        self.assertEqual(child["party_name"], "Shree Krishna")
+        self.assertEqual(child["address"]["line_1"], "1 Ring Road")
+        self.assertEqual(by_id[other.public_id]["child_orgs"], [])
+        self.assertEqual(
+            _documented_keys_mismatches(ExportClientsResponseSerializer(), resp.data), []
+        )
+
+    def test_clients_export_query_count_does_not_grow_with_clients(self):
+        """tests/test_export_api.py::ExportApiTest::test_clients_export_query_count_does_not_grow_with_clients"""
+        link_id = self.client_row.client_addresses.first().id
+
+        def add_child(index):
+            resolve_child_org(
+                self.client_row,
+                {
+                    "party_name": f"Party {index}",
+                    "village_name": "Kamrej",
+                    "client_address_id": link_id,
+                },
+                self.sales_person,
+            )
+
+        # One child first: with none, the nested child prefetches are skipped
+        # altogether, which would make the baseline cheaper than any real export.
+        add_child(0)
+        with CaptureQueriesContext(connection) as one:
+            self.client.get(CLIENTS_URL)
+        for index in range(1, 4):
+            add_child(index)
+        with CaptureQueriesContext(connection) as many:
+            self.client.get(CLIENTS_URL)
+        self.assertEqual(len(one), len(many))
 
     # -- orders ---------------------------------------------------------------
 

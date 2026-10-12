@@ -281,6 +281,51 @@ class GodownStockCountApiTest(AndroidApiTestCase):
 
     # -- export -----------------------------------------------------------------
 
+    def test_without_reuse_other_material_the_count_can_only_go_down(self):
+        """Bags and loose packets both honour ``reuse_other_material: false``: a line
+        above the figure on the floor is a 400, one at or below it is written.
+
+        tests/android/test_godown_stock_count.py::GodownStockCountApiTest::test_without_reuse_other_material_the_count_can_only_go_down
+        """
+        self._patch_bags({self.one_kg.public_id: 10})
+        self.client.patch(
+            LOOSE_URL, {"counts": self._loose_lines(**{"0.500": 30})}, format="json"
+        )
+
+        raised_bags = self.client.patch(
+            BAGS_URL,
+            {"counts": {self.one_kg.public_id: 11}, "reuse_other_material": False},
+            format="json",
+        )
+        raised_loose = self.client.patch(
+            LOOSE_URL,
+            {"counts": self._loose_lines(**{"0.500": 31}), "reuse_other_material": False},
+            format="json",
+        )
+        lowered_bags = self.client.patch(
+            BAGS_URL,
+            {"counts": {self.one_kg.public_id: 4}, "reuse_other_material": False},
+            format="json",
+        )
+        lowered_loose = self.client.patch(
+            LOOSE_URL,
+            {"counts": self._loose_lines(**{"0.500": 12}), "reuse_other_material": False},
+            format="json",
+        )
+        full_upload = self.client.post(
+            BAGS_URL,
+            {"counts": {self.one_kg.public_id: 9}, "reuse_other_material": False},
+            format="json",
+        )
+
+        self.assertEqual(raised_bags.status_code, status.HTTP_400_BAD_REQUEST, raised_bags.data)
+        self.assertEqual(raised_loose.status_code, status.HTTP_400_BAD_REQUEST, raised_loose.data)
+        self.assertEqual(lowered_bags.status_code, status.HTTP_200_OK, lowered_bags.data)
+        self.assertEqual(lowered_loose.status_code, status.HTTP_200_OK, lowered_loose.data)
+        self.assertEqual(
+            full_upload.status_code, status.HTTP_400_BAD_REQUEST, "9 is above the 4 left"
+        )
+
     def test_the_export_interleaves_both_pools_and_rejects_a_half_window(self):
         """Both pools come back in one flat page; a half-given window is a 400.
 

@@ -41,12 +41,16 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q, QuerySet, Sum
 from django.http import Http404
 
+from common.models import indian_now
+
 from . import InventoryOperations
 from .InventoryOperations import lock_raw_pools, today
 from .models import (
+    CustomOrderItem,
     InwardOtherMaterial,
     InwardRawMaterial,
     InwardRawMaterialStatus,
+    OrderItem,
     OtherMaterialRecipe,
     OtherMaterialType,
     PartyType,
@@ -56,10 +60,11 @@ from .models import (
     StatusIds,
     StockEventDetail,
     StockEventType,
+    StockPoolKind,
 )
 from .NotificationOperations import notify_lab_test_requested
 from .ProductOperations import assert_products_usable
-from .StockLedgerOperations import recording
+from .StockLedgerOperations import read_positions, recording
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -749,3 +754,181 @@ def create_other_lot(
             )
         rec.source = entry
     return entry
+
+
+# -- Product-to-product transfer -----------------------------------------------
+
+# Order statuses in which an order still has a claim on its products: it may be
+# booked, under review, confirmed (bags reserved) or on hold. A dispatched,
+# delivered or rejected order is finished with them.
+OPEN_ORDER_STATUS_IDS = (
+    StatusIds.BOOKED,
+    StatusIds.UNDER_REVIEW,
+    StatusIds.CONFIRMED,
+    StatusIds.ON_HOLD,
+)
+
+
+def _idle_problems(product: Product) -> list[str]:
+    """Why ``product`` is still holding bags, packets or orders; empty when idle.
+
+    Read with the same figures the stock screens and the ledger use
+    (:func:`StockLedgerOperations.read_positions`): counted bags and loose
+    packets, and what orders have reserved. Open order lines are checked on top,
+    because an order still being reviewed reserves nothing yet but is about to.
+    """
+    position = read_positions([product.id])[product.id]
+    counted = {StockPoolKind.BAG: 0, StockPoolKind.LOOSE: 0}
+    reserved = {StockPoolKind.BAG: 0, StockPoolKind.LOOSE: 0}
+    for (kind, _), figures in position.items():
+        if kind in counted:
+            counted[kind] += int(figures["on_hand"])
+            reserved[kind] += int(figures["reserved"])
+    problems = []
+    if counted[StockPoolKind.BAG]:
+        problems.append(f"{counted[StockPoolKind.BAG]} bag(s) in stock")
+    if counted[StockPoolKind.LOOSE]:
+        problems.append(f"{counted[StockPoolKind.LOOSE]} loose packet(s) in stock")
+    if reserved[StockPoolKind.BAG] or reserved[StockPoolKind.LOOSE]:
+        problems.append("bags or packets reserved for orders")
+    if (
+        OrderItem.objects.filter(
+            product_packaging__product=product,
+            order__is_deleted=False,
+            order__status_id__in=OPEN_ORDER_STATUS_IDS,
+        ).exists()
+        or CustomOrderItem.objects.filter(
+            product=product,
+            custom_order__is_deleted=False,
+            custom_order__status_id__in=OPEN_ORDER_STATUS_IDS,
+        ).exists()
+    ):
+        problems.append("open orders")
+    return problems
+
+
+def transfer_raw_material(
+    *, source: Product, target: Product, quantity_kg: Decimal, actor: User
+) -> list[InwardRawMaterial]:
+    """Move ``quantity_kg`` of ``source``'s inward raw material to ``target``.
+
+    For a product bought under the wrong name or left over from a cancelled
+    plan: the kilograms are not wasted but re-homed. Stock is derived from
+    ``In Use`` lots, so the move is made on the lots themselves -- the
+    source's oldest counted lots are reduced (a lot emptied is soft-deleted)
+    and each reduction is re-booked as a new ``In Use`` lot of ``target``,
+    effective today, copying the party, supplier lot number and sampling date.
+    The new lot's ``farmer_name`` says where it came from, and it has no lab
+    test of its own. A lot booked by an accepted return is never touched: only
+    reverting that return may change it.
+
+    Refused (400, ``ValidationError`` keyed by field) unless:
+
+    * the two products differ and share a crop;
+    * both are usable;
+    * ``source`` is idle -- no bag or loose packet in stock or reserved and no
+      open order line (see :func:`_idle_problems`);
+    * ``source`` has ``quantity_kg`` of unpacked raw material to give, in
+      lots that are movable.
+
+    Recorded in the stock ledger as ``RAW_LOT_TRANSFERRED``, one event per
+    product. Returns the new ``target`` lots, oldest source lot first.
+    """
+    if source.pk == target.pk:
+        raise ValidationError({"target_product": "Source and target must be different products."})
+    if source.crop_id != target.crop_id:
+        raise ValidationError(
+            {
+                "target_product": (
+                    f"'{source.name}' is a {source.crop.name} product and "
+                    f"'{target.name}' a {target.crop.name} one: "
+                    "a transfer must stay within one crop."
+                )
+            }
+        )
+    with recording(
+        StockEventType.INWARD_OPERATIONS,
+        StockEventDetail.RAW_LOT_TRANSFERRED,
+        [source.id, target.id],
+        actor=actor,
+    ) as rec:
+        assert_products_usable([source, target], action="take part in a transfer")
+        lock_raw_pools([source.id, target.id])
+        problems = _idle_problems(source)
+        if problems:
+            raise ValidationError(
+                {
+                    "source_product": (
+                        f"'{source.name}' cannot be transferred while it has "
+                        f"{', '.join(problems)}."
+                    )
+                }
+            )
+        available = InventoryOperations.raw_available_kg(source)
+        if quantity_kg > available:
+            raise ValidationError(
+                {
+                    "quantity_kg": (
+                        f"Not enough raw material in '{source.name}': "
+                        f"{max(available, Decimal('0'))} kg available, {quantity_kg} kg requested."
+                    )
+                }
+            )
+        lots = list(
+            InwardRawMaterial.objects.select_for_update(of=("self",))
+            .select_related("party")
+            .filter(
+                product=source,
+                status_id=StatusIds.IN_USE.value,
+                effective_date__isnull=False,
+                effective_date__lte=today(),
+                return_order__isnull=True,
+            )
+            .order_by("effective_date", "pk")
+        )
+        movable = sum((lot.quantity_kg for lot in lots), Decimal("0"))
+        if quantity_kg > movable:
+            raise ValidationError(
+                {
+                    "quantity_kg": (
+                        f"Only {movable} kg of '{source.name}' can be moved: the rest "
+                        "came back on a return order and stays with that return."
+                    )
+                }
+            )
+
+        moved: list[InwardRawMaterial] = []
+        touched: list[InwardRawMaterial] = []
+        remaining = quantity_kg
+        for lot in lots:
+            if remaining <= 0:
+                break
+            take = min(lot.quantity_kg, remaining)
+            moved.append(
+                InwardRawMaterial.objects.create(
+                    product=target,
+                    party=lot.party,
+                    lot_no=lot.lot_no,
+                    farmer_name=f"{lot.farmer_name} (transferred from {source.name})"[:255],
+                    quantity_kg=take,
+                    lab_sampling_date=lot.lab_sampling_date,
+                    status_id=StatusIds.IN_USE.value,
+                    effective_date=today(),
+                    created_by=actor,
+                )
+            )
+            lot.quantity_kg -= take
+            fields = ["quantity_kg", "updated_at"]
+            if lot.quantity_kg == 0:
+                # Emptied: retire it directly (as ``ProductOperations`` does for a
+                # description bullet) -- the soft-delete guard would re-enter the
+                # ledger recording this transfer already holds.
+                lot.is_deleted = True
+                lot.deleted_at = indian_now()
+                lot.deleted_by = actor
+                fields += ["is_deleted", "deleted_at", "deleted_by"]
+            lot.save(update_fields=fields)
+            touched.append(lot)
+            remaining -= take
+        rec.sources = {source.id: touched[0], target.id: moved[0]}
+    return moved

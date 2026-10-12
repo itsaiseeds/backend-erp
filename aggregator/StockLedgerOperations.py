@@ -265,6 +265,8 @@ class Recording:
     # Pools a count write carried forward rather than counted (PRD section 3.5).
     # Keyed by product too: two products can share a packet weight.
     carried: set[tuple[int, PoolKey]] = field(default_factory=set)
+    # Packets a count takes off are discarded: their packing material stays spent.
+    discard_other_material: bool = False
     events: list[StockEvent] = field(default_factory=list)
     # Guards that need the packing-material figures *after* the write: material
     # usage is read from the recipe layers, which are only brought up to date
@@ -308,6 +310,7 @@ def recording(
     actor: User | None = None,
     new_bag_date: date | None = None,
     new_loose_date: date | None = None,
+    discard_other_material: bool = False,
 ) -> Iterator[Recording]:
     """Run a stock write and record what it moved.
 
@@ -340,10 +343,18 @@ def recording(
             tracked |= products_with_pools()
         _lock_products(tracked)
         before = read_positions(tracked)
-        handle = Recording(event_type, detail, source, actor=actor)
+        handle = Recording(
+            event_type,
+            detail,
+            source,
+            actor=actor,
+            discard_other_material=discard_other_material,
+        )
         yield handle
         after = read_positions(tracked)
-        if _sync_recipe_layers(tracked, before, after):
+        if _sync_recipe_layers(
+            tracked, before, after, discard=handle.discard_other_material
+        ):
             # Packing-material usage is read from the layers, so re-read.
             after = read_positions(tracked)
         for check in handle.after_sync_checks:
@@ -375,6 +386,8 @@ def _sync_recipe_layers(
     tracked: Iterable[int],
     before: dict[int, Position],
     after: dict[int, Position],
+    *,
+    discard: bool = False,
 ) -> bool:
     """Keep every pool's recipe layers in step with its packed packets.
 
@@ -411,7 +424,7 @@ def _sync_recipe_layers(
                 )
                 InventoryOperations.add_packed_packets(row, product_id, weight, delta)
             elif delta < 0:
-                InventoryOperations.remove_packed_packets(row, -delta)
+                InventoryOperations.remove_packed_packets(row, -delta, discard=discard)
             trimmed = InventoryOperations.clamp_recipe_layers(row, packed_after)
             changed = changed or delta != 0 or trimmed
     return changed

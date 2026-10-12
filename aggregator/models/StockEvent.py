@@ -43,6 +43,7 @@ class StockEventDetail(models.IntegerChoices):
     OTHER_MATERIAL_RECEIVED = 14
     OTHER_MATERIAL_EDITED = 15
     OTHER_MATERIAL_DELETED = 16
+    RAW_LOT_TRANSFERRED = 17
 
     WASTE_RECORDED = 20
     WASTE_EDITED = 21
@@ -79,6 +80,7 @@ VALID_DETAILS: dict[int, frozenset[int]] = {
             StockEventDetail.RAW_LOT_REJECTED,
             StockEventDetail.RAW_LOT_BACK_TO_LAB,
             StockEventDetail.RAW_LOT_DELETED,
+            StockEventDetail.RAW_LOT_TRANSFERRED,
             StockEventDetail.OTHER_MATERIAL_RECEIVED,
             StockEventDetail.OTHER_MATERIAL_EDITED,
             StockEventDetail.OTHER_MATERIAL_DELETED,

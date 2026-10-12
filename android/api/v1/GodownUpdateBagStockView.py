@@ -102,7 +102,10 @@ class GodownUpdateBagStockView(AndroidGodownBaseView):
             # Packagings of an unusable product cannot be counted; carry their last
             # figure forward so freezing a product never moves its stock.
             snapshots = InventoryOperations.record_stock_counts(
-                counts=full_counts, actor=request.user, carry_frozen=True
+                counts=full_counts,
+                actor=request.user,
+                carry_frozen=True,
+                reuse_other_material=serializer.validated_data["reuse_other_material"],
             )
         except ValueError as exc:
             raise serializers.ValidationError({"counts": str(exc)}) from None
@@ -136,7 +139,10 @@ class GodownUpdateBagStockView(AndroidGodownBaseView):
         counts = self._resolve_counts(serializer)
         try:
             snapshots = InventoryOperations.record_stock_counts(
-                counts=counts, actor=request.user, carry_forward=True
+                counts=counts,
+                actor=request.user,
+                carry_forward=True,
+                reuse_other_material=serializer.validated_data["reuse_other_material"],
             )
         except ValueError as exc:
             raise serializers.ValidationError({"counts": str(exc)}) from None

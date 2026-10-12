@@ -63,7 +63,7 @@ response and never stored. Every stored event has an `event_type` and a `detail`
 | event_type | detail codes | Written by |
 |---|---|---|
 | `LEDGER_START` | `SEED` | `seed_stock_ledger` command (once) |
-| `INWARD_OPERATIONS` | `RAW_LOT_IN_USE`, `RAW_LOT_REJECTED`, `RAW_LOT_BACK_TO_LAB`, `RAW_LOT_DELETED`, `OTHER_MATERIAL_RECEIVED`, `OTHER_MATERIAL_EDITED`, `OTHER_MATERIAL_DELETED` | Inward raw / other-material write paths (sales-admin + Android) |
+| `INWARD_OPERATIONS` | `RAW_LOT_IN_USE`, `RAW_LOT_REJECTED`, `RAW_LOT_BACK_TO_LAB`, `RAW_LOT_DELETED`, `RAW_LOT_TRANSFERRED`, `OTHER_MATERIAL_RECEIVED`, `OTHER_MATERIAL_EDITED`, `OTHER_MATERIAL_DELETED` | Inward raw / other-material write paths (sales-admin + Android); `RAW_LOT_TRANSFERRED` is `transfer_raw_material` (one event per product: negative `incoming` on the source, positive on the target) |
 | `RAW_WASTED` | `WASTE_RECORDED`, `WASTE_EDITED`, `WASTE_DELETED` | `record_raw_waste`, waste update / delete |
 | `PACKED` | `BAG_COUNT`, `LOOSE_COUNT` | Count writes where packed packets went **up** |
 | `STOCK_ADJUSTED` | `BAG_COUNT`, `LOOSE_COUNT`, `COUNT_DELETED` | Count writes where packed packets went **down**, or a count row was deleted |
