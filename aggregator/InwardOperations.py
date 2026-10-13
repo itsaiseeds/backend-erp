@@ -439,7 +439,9 @@ def raw_incoming_stock(
     (``InventoryOperations.waste_available_kg``): they do not change
     ``available_kg``, since waste is already written off from raw. Rejected
     kilograms are never counted there -- a rejected lot is
-    invisible to the packing check regardless of its date. A product is
+    invisible to the packing check regardless of its date. ``rejected_kg`` is
+    net of what rejected orders have sold (display only; the stock ledger keeps
+    the whole lot total). A product is
     listed whenever it has incoming or rejected kilograms, so a product whose
     entire intake was rejected still appears. The list is ready for display:
     each entry carries the product's public id / name and Decimal kilogram
@@ -452,12 +454,16 @@ def raw_incoming_stock(
         StatusIds.RAW_MATERIAL_REJECTED.value, as_of, product_public_ids
     )
     product_ids = sorted(set(incoming) | set(rejected))
+    sold = InventoryOperations.rejected_sold_kg_by_product(product_ids)
     products = Product.objects.in_bulk(product_ids)
     lines = []
     for product_id in product_ids:
         product = products[product_id]
         incoming_kg = incoming.get(product_id, {}).get("kg", Decimal("0.000"))
-        rejected_kg = rejected.get(product_id, {}).get("kg", Decimal("0.000"))
+        # Rejected kg already sold on a rejected order is no longer in stock.
+        rejected_kg = rejected.get(product_id, {}).get("kg", Decimal("0.000")) - sold.get(
+            product_id, Decimal("0.000")
+        )
         packed_kg = InventoryOperations.raw_bagged_kg(
             product
         ) + InventoryOperations.raw_loose_kg(product)

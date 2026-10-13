@@ -307,6 +307,28 @@ class RejectedOrderApiTest(WebApiTestCase):
         self.assertEqual(twice.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(no_driver.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_raw_material_stock_rejected_kg_goes_down_when_sold_and_back_on_delete(self):
+        """tests/test_rejected_orders.py::RejectedOrderApiTest::test_raw_material_stock_rejected_kg_goes_down_when_sold_and_back_on_delete"""
+        lot = self._lot("100")
+
+        def rejected_kg():
+            response = self.client.get("/api/sales-admin/raw-material-stock")
+            line = next(
+                row for row in response.data["lines"] if row["product"] == self.cotton.public_id
+            )
+            return line["rejected_kg"]
+
+        self.assertEqual(rejected_kg(), "100.000")
+        order = self._book(self._line(lot, "40"))
+        self.assertEqual(rejected_kg(), "60.000")
+        self.client.post(MARK_CUSTOM_URL.format(public_id=order.public_id))
+        self.assertEqual(rejected_kg(), "60.000")
+        deletable = self._book(self._line(lot, "10"))
+        self.assertEqual(rejected_kg(), "50.000")
+        self.client.delete(DELETE_URL.format(public_id=deletable.public_id))
+        self.assertEqual(rejected_kg(), "60.000")
+        self._assert_ledger()
+
     # -- listing / detail / export -------------------------------------------
 
     def test_lists_are_split_by_kind(self):
