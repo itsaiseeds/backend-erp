@@ -291,8 +291,8 @@ class TransferProductApiTest(WebApiTestCase):
 
         self._refused(response, "not usable")
 
-    def test_bags_in_stock_block_the_transfer(self):
-        """tests/test_transfer_product_api.py::TransferProductApiTest::test_bags_in_stock_block_the_transfer"""
+    def test_bags_in_stock_do_not_block_only_available_kg_limits(self):
+        """tests/test_transfer_product_api.py::TransferProductApiTest::test_bags_in_stock_do_not_block_only_available_kg_limits"""
         bag = ProductPackaging.objects.create(
             product=self.source,
             packet_weight=Decimal("1.000"),
@@ -307,12 +307,17 @@ class TransferProductApiTest(WebApiTestCase):
             actor=self.admin_user,
         )
 
-        response = self._transfer("10")
+        available = inv.raw_available_kg(self.source)  # less the 10 kg packed
 
-        self._refused(response, "1 bag(s) in stock")
+        self._refused(self._transfer(str(available + Decimal("0.001"))), "Not enough raw material")
+        response = self._transfer(str(available))
 
-    def test_an_open_order_blocks_the_transfer(self):
-        """tests/test_transfer_product_api.py::TransferProductApiTest::test_an_open_order_blocks_the_transfer"""
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(inv.raw_available_kg(self.source), Decimal("0"))
+        self.assertEqual(inv.on_hand_bags(bag, inv.latest_snapshot_date()), 1, "the bag stays")
+
+    def test_an_open_order_does_not_block_the_transfer(self):
+        """tests/test_transfer_product_api.py::TransferProductApiTest::test_an_open_order_does_not_block_the_transfer"""
         bag = ProductPackaging.objects.create(
             product=self.source,
             packet_weight=Decimal("1.000"),
@@ -330,8 +335,8 @@ class TransferProductApiTest(WebApiTestCase):
 
         response = self._transfer("10")
 
-        self._refused(response, "open orders")
-        self.assertEqual(inv.raw_available_kg(self.source), Decimal("100"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(inv.raw_available_kg(self.source), Decimal("90"))
 
     def test_validation_of_the_request(self):
         """tests/test_transfer_product_api.py::TransferProductApiTest::test_validation_of_the_request"""

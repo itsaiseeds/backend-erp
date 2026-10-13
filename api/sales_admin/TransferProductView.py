@@ -7,10 +7,11 @@ same crop, so leftover kilograms are re-homed instead of written off: send
 and arrive on the target.
 
 Only an application Admin may call it, and only one allowed to change inward
-material (the same gate as booking or deleting a lot). The source must be idle
--- no bag or loose packet in stock or reserved, no open order -- and must hold
-the kilograms unpacked; any of those failing is a 400, as is a crop mismatch or
-a frozen product. How the lots are moved, and what is refused, is in
+material (the same gate as booking or deleting a lot). The only stock check is
+``quantity_kg <= available_kg`` of the source (the raw-material stock screen's
+figure); bags or packets in stock, reservations and open orders never block it.
+More than is available is a 400, as is a crop mismatch or a frozen product.
+How the lots are moved, and what is refused, is in
 ``InwardOperations.transfer_raw_material``.
 """
 
