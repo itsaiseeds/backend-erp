@@ -3,7 +3,7 @@
 The Android counterpart of ``api.sales_admin.TransferProductView``: same request
 (``{"source_product": "P-...", "target_product": "P-...", "quantity_kg": "5"}``),
 response and rules (``InwardOperations.transfer_raw_material``) -- raw material
-already in stock moves from an idle source product to another of the same crop.
+available on the source moves to another product of the same crop.
 Godown-manager token only; like the godown inward endpoints it is not gated by
 the admin's ``can_update_stock_count``.
 """
