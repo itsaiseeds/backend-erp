@@ -281,11 +281,11 @@ class GodownStockCountApiTest(AndroidApiTestCase):
 
     # -- export -----------------------------------------------------------------
 
-    def test_without_reuse_other_material_the_count_can_only_go_down(self):
-        """Bags and loose packets both honour ``reuse_other_material: false``: a line
-        above the figure on the floor is a 400, one at or below it is written.
+    def test_without_reuse_other_material_a_raise_ignores_the_flag(self):
+        """Bags and loose packets both take ``reuse_other_material: false``: a line
+        above the figure on the floor ignores the flag, and every upload is written.
 
-        tests/android/test_godown_stock_count.py::GodownStockCountApiTest::test_without_reuse_other_material_the_count_can_only_go_down
+        tests/android/test_godown_stock_count.py::GodownStockCountApiTest::test_without_reuse_other_material_a_raise_ignores_the_flag
         """
         self._patch_bags({self.one_kg.public_id: 10})
         self.client.patch(
@@ -318,12 +318,12 @@ class GodownStockCountApiTest(AndroidApiTestCase):
             format="json",
         )
 
-        self.assertEqual(raised_bags.status_code, status.HTTP_400_BAD_REQUEST, raised_bags.data)
-        self.assertEqual(raised_loose.status_code, status.HTTP_400_BAD_REQUEST, raised_loose.data)
+        self.assertEqual(raised_bags.status_code, status.HTTP_200_OK, raised_bags.data)
+        self.assertEqual(raised_loose.status_code, status.HTTP_200_OK, raised_loose.data)
         self.assertEqual(lowered_bags.status_code, status.HTTP_200_OK, lowered_bags.data)
         self.assertEqual(lowered_loose.status_code, status.HTTP_200_OK, lowered_loose.data)
         self.assertEqual(
-            full_upload.status_code, status.HTTP_400_BAD_REQUEST, "9 is above the 4 left"
+            full_upload.status_code, status.HTTP_200_OK, "9 is above the 4 left: a raise"
         )
 
     def test_the_export_interleaves_both_pools_and_rejects_a_half_window(self):

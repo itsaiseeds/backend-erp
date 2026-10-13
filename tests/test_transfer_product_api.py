@@ -206,6 +206,32 @@ class TransferProductApiTest(WebApiTestCase):
         self.assertEqual(source_line.d_incoming, Decimal("-55"))
         self.assertEqual(target_line.d_incoming, Decimal("55"))
 
+    def test_a_fully_transferred_source_leaves_the_stock_and_inward_lists(self):
+        """tests/test_transfer_product_api.py::TransferProductApiTest::test_a_fully_transferred_source_leaves_the_stock_and_inward_lists"""
+        [lot] = self._lots(self.source, "100")
+        before = StockEvent.objects.order_by("-id").values_list("id", flat=True).first() or 0
+
+        self.assertEqual(self._transfer("100").status_code, status.HTTP_200_OK)
+
+        stock = self.client.get("/api/sales-admin/raw-material-stock").data["lines"]
+        listed = {line["product"]: line["available_kg"] for line in stock}
+        self.assertNotIn(self.source.public_id, listed, "an emptied source is not listed")
+        self.assertEqual(listed[self.target.public_id], "100.000")
+        inward = self.client.get(
+            "/api/sales-admin/inward-raw-materials", {"product": self.source.public_id}
+        ).data
+        self.assertEqual(inward["results"], [], "its emptied lot is retired")
+        retired = InwardRawMaterial.all_objects.get(pk=lot.pk)
+        self.assertTrue(retired.is_deleted)
+        self.assertEqual(retired.quantity_kg, Decimal("0"))
+        # The ledger carries the whole move: -100 on the source, +100 on the target.
+        lines = {
+            event.product_id: event.lines.get()
+            for event in StockEvent.objects.filter(id__gt=before)
+        }
+        self.assertEqual(lines[self.source.id].d_incoming, Decimal("-100"))
+        self.assertEqual(lines[self.target.id].d_incoming, Decimal("100"))
+
     # -- what is refused ------------------------------------------------------
 
     def test_more_than_the_source_has_is_refused(self):

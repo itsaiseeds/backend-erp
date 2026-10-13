@@ -166,8 +166,8 @@ class GodownUpdateSamplePacketStockView(AndroidGodownBaseView):
             OpenApiExample(
                 "End-of-season clear-out (reuse_other_material false)",
                 description=(
-                    "Counts may only go down; the packing material of the packets "
-                    "taken off is not given back. The seed returns to raw material."
+                    "The packing material of the packets taken off is not given back; the "
+                    "seed returns to raw material. A raised line ignores the flag."
                 ),
                 value={
                     "counts": [

@@ -7,7 +7,8 @@ A lot counts toward ``incoming_kg`` only once it is **dated and usable** --
 both an ``effective_date`` that has come ("tomorrow is not incoming yet") and
 ``status='In Use'`` (a ``Lab Testing`` lot is held back until the lab signs
 off). ``rejected_kg`` is the same dated-and-reached gate applied to
-``status='Rejected'`` lots instead. Soft-deleted lots never count.
+``status='Rejected'`` lots instead, **less the kg already sold on rejected
+orders**. Soft-deleted lots never count.
 
 ``incoming_kg`` is everything that has come in. ``packed_kg`` is what has
 since been packed into bags or sample packets via ``update-bag-stock`` /
