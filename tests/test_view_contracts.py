@@ -278,6 +278,14 @@ EXPECTED_CONTRACTS = {
         SESSION_ADMIN,
     ),
     "api/sales-admin/rejected-orders/": ("GetRejectedOrdersView", SESSION_ADMIN),
+    "api/sales-admin/rejected-orders/<int:party_id>": (
+        "GetRejectedFarmersView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/rejected-orders/<int:party_id>/<path:farmer_name>": (
+        "GetRejectedFarmerLotsView",
+        SESSION_ADMIN,
+    ),
     "api/sales-admin/create-rejected-order": ("CreateRejectedOrderView", SESSION_ADMIN),
     "api/sales-admin/rejected-order/<str:public_id>": (
         "DeleteRejectedOrderView",
