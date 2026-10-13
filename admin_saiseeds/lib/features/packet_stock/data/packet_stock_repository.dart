@@ -53,21 +53,31 @@ class PacketStockRepository {
     );
   }
 
-  Future<void> replacePacketStock(List<PacketStockCountEntry> counts) async {
+  Future<void> replacePacketStock(
+    List<PacketStockCountEntry> counts, {
+    bool reuseOtherMaterial = false,
+  }) async {
     await _apiClient.post(
       InventoryEndpoints.updateSamplePacketStock,
-      body: _body(counts),
+      body: _body(counts, reuseOtherMaterial),
     );
   }
 
-  Future<void> patchPacketStock(List<PacketStockCountEntry> counts) async {
+  Future<void> patchPacketStock(
+    List<PacketStockCountEntry> counts, {
+    bool reuseOtherMaterial = false,
+  }) async {
     await _apiClient.patch(
       InventoryEndpoints.updateSamplePacketStock,
-      body: _body(counts),
+      body: _body(counts, reuseOtherMaterial),
     );
   }
 
-  static Map<String, dynamic> _body(List<PacketStockCountEntry> counts) => {
+  static Map<String, dynamic> _body(
+    List<PacketStockCountEntry> counts,
+    bool reuseOtherMaterial,
+  ) => {
     'counts': counts.map((entry) => entry.toJson()).toList(),
+    'reuse_other_material': reuseOtherMaterial,
   };
 }

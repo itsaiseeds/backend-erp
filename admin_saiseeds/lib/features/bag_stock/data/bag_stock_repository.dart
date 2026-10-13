@@ -31,17 +31,23 @@ class BagStockRepository {
     return BagStockSnapshotModel.fromJson(Map<String, dynamic>.from(response));
   }
 
-  Future<void> replaceBagStock(Map<String, int> counts) async {
+  Future<void> replaceBagStock(
+    Map<String, int> counts, {
+    bool reuseOtherMaterial = false,
+  }) async {
     await _apiClient.post(
       InventoryEndpoints.updateBagStock,
-      body: {'counts': counts},
+      body: {'counts': counts, 'reuse_other_material': reuseOtherMaterial},
     );
   }
 
-  Future<void> patchBagStock(Map<String, int> counts) async {
+  Future<void> patchBagStock(
+    Map<String, int> counts, {
+    bool reuseOtherMaterial = false,
+  }) async {
     await _apiClient.patch(
       InventoryEndpoints.updateBagStock,
-      body: {'counts': counts},
+      body: {'counts': counts, 'reuse_other_material': reuseOtherMaterial},
     );
   }
 }

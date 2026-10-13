@@ -56,6 +56,33 @@ class CustomOrderProductRef {
   }
 }
 
+/// Only present on a rejected order's line -- names the rejected lot the line
+/// was booked against. A custom/waste order's item payload carries no `lot`
+/// key at all, so this stays null for those.
+class CustomOrderItemLotRef {
+  final String publicId;
+  final String lotNo;
+  final String farmerName;
+  final String partyName;
+
+  const CustomOrderItemLotRef({
+    this.publicId = '',
+    this.lotNo = '',
+    this.farmerName = '',
+    this.partyName = '',
+  });
+
+  factory CustomOrderItemLotRef.fromJson(Map<String, dynamic> json) {
+    final dynamic party = json['party'];
+    return CustomOrderItemLotRef(
+      publicId: '${json['public_id'] ?? ''}',
+      lotNo: json['lot_no'] as String? ?? '',
+      farmerName: json['farmer_name'] as String? ?? '',
+      partyName: party is Map ? (party['name'] as String? ?? '') : '',
+    );
+  }
+}
+
 class CustomOrderItemModel {
   final CustomOrderProductRef? product;
   final String packetWeight;
@@ -69,6 +96,8 @@ class CustomOrderItemModel {
   /// [negotiatedSellingPrice] are what a waste line is actually priced on.
   final String quantityKg;
 
+  final CustomOrderItemLotRef? lot;
+
   const CustomOrderItemModel({
     this.product,
     this.packetWeight = '',
@@ -76,10 +105,12 @@ class CustomOrderItemModel {
     this.packets = 0,
     this.lineTotal = '',
     this.quantityKg = '',
+    this.lot,
   });
 
   factory CustomOrderItemModel.fromJson(Map<String, dynamic> json) {
     final dynamic product = json['product'];
+    final dynamic lot = json['lot'];
 
     return CustomOrderItemModel(
       product: product is Map
@@ -90,6 +121,9 @@ class CustomOrderItemModel {
       packets: _asInt(json['packets']),
       lineTotal: _decimalOf(json['line_total']),
       quantityKg: _decimalOf(json['quantity_kg']),
+      lot: lot is Map
+          ? CustomOrderItemLotRef.fromJson(Map<String, dynamic>.from(lot))
+          : null,
     );
   }
 
@@ -302,6 +336,26 @@ class CustomOrderModel {
   /// Only an order that has not gone out may be removed; once dispatched the
   /// API refuses the delete.
   bool get canDelete => !OrderStatusX.canRevertDispatch(statusValue);
+
+  /// A rejected order is born DISPATCHED (booking is dispatch), so it has no
+  /// CONFIRMED-only delete window like [canDelete] -- instead the server
+  /// allows removal only while still DISPATCHED and only on the day it was
+  /// dispatched (IST). `createdAt` is that dispatch moment for this order
+  /// kind, since creation and dispatch happen in the same transaction.
+  bool get canDeleteRejectedOrder {
+    if (statusValue != OrderStatus.dispatched) return false;
+    final DateTime? created = createdAtDateTime;
+    if (created == null) return false;
+    final DateTime istNow = DateTime.now().toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
+    final DateTime istCreated = created.toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
+    return istCreated.year == istNow.year &&
+        istCreated.month == istNow.month &&
+        istCreated.day == istNow.day;
+  }
 
   DateTime? get createdAtDateTime => DateTime.tryParse(createdAt);
 

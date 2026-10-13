@@ -1154,6 +1154,65 @@ class AppStrings {
   static const String WASTE_ORDER_FIELD_HSN_CODE = 'HSN Code';
   static const String WASTE_ORDER_FIELD_HSN_CODE_HINT =
       'Optional, for the whole order';
+  static const String REJECTED_LOT_ORDERS = 'Rejected Lot Orders';
+  static const String REJECTED_LOT_ORDERS_SEARCH_HINT =
+      'Search rejected lot orders...';
+  static const String REJECTED_LOT_ORDERS_EMPTY_TITLE =
+      'No rejected lot orders found';
+  static const String REJECTED_LOT_ORDERS_EMPTY_BODY =
+      'Orders booked against rejected raw-material lots will appear here.';
+  static const String REJECTED_LOT_ORDER_ADD = 'Book rejected lot order';
+  static const String REJECTED_LOT_ORDER_ADD_SUBTITLE =
+      'Sell a rejected raw-material lot to a client.';
+  static const String REJECTED_LOT_ORDER_STEP_CLIENT = 'Client';
+  static const String REJECTED_LOT_ORDER_STEP_CLIENT_CAPTION = 'Who it is for';
+  static const String REJECTED_LOT_ORDER_STEP_SOURCE = 'Source lots';
+  static const String REJECTED_LOT_ORDER_STEP_SOURCE_CAPTION =
+      'Which rejected lots are being sold';
+  static const String REJECTED_LOT_ORDER_STEP_SHIPMENT = 'Shipment';
+  static const String REJECTED_LOT_ORDER_STEP_SHIPMENT_CAPTION =
+      'Vehicle, driver and dispatch details';
+  static const String REJECTED_LOT_ORDER_STEP_SUMMARY = 'Summary';
+  static const String REJECTED_LOT_ORDER_STEP_SUMMARY_CAPTION =
+      'Check the details, then book.';
+  static const String REJECTED_LOT_ORDER_CREATED = 'Rejected lot order booked';
+  static const String REJECTED_LOT_ORDER_LOAD_FAILED =
+      'Could not load rejected lot orders';
+  static const String REJECTED_LOT_ORDER_DELETE_TITLE =
+      'Delete this rejected lot order?';
+  static const String REJECTED_LOT_ORDER_DELETE_BODY =
+      'The order and all of its lines are removed. This cannot be undone.';
+  static const String REJECTED_LOT_ORDER_DELETE_BLOCKED =
+      'Only a rejected lot order dispatched today can be deleted.';
+  static const String REJECTED_LOT_ORDER_DELETED = 'Rejected lot order deleted';
+  static const String REJECTED_LOT_ORDER_NO_LOTS =
+      'Add at least one rejected lot.';
+  static const String REJECTED_LOT_ORDER_LOT_INVALID =
+      'Every lot needs a quantity and a price.';
+  static const String REJECTED_LOT_ORDER_ADD_LOT = 'Add lot';
+  static const String REJECTED_LOT_ORDER_REMOVE_LOT = 'Remove lot';
+  static const String REJECTED_LOT_ORDER_PER_KG = 'per kg';
+  static const String FIELD_FARMER = 'Farmer';
+  static const String FIELD_FARMER_HINT = 'Select a farmer';
+  static const String FARMERS_UNAVAILABLE =
+      'This party has no rejected lots to sell.';
+  static const String FIELD_REJECTED_LOT = 'Rejected lot';
+  static const String FIELD_REJECTED_LOT_HINT = 'Select a lot';
+  static const String REJECTED_LOTS_UNAVAILABLE =
+      'This farmer has no rejected lots left to sell.';
+  static const String FIELD_LOT_NUMBER_OVERRIDE = 'Lot number';
+  static const String FIELD_LOT_NUMBER_OVERRIDE_HINT =
+      'Defaults to the lot\'s own number';
+  static const String FIELD_HSN_CODE = 'HSN Code';
+  static const String FIELD_HSN_CODE_HINT = 'Optional, for the whole order';
+  static const String REJECTED_LOT_REMAINING_SUFFIX = 'kg left';
+  static const String REJECTED_LOT_ORDER_SUMMARY_LOTS = 'Lots';
+  static const String REJECTED_LOT_PICKER_SUBTITLE = 'Tap to select one or more';
+  static const String REJECTED_LOT_PICKER_SELECTED_COUNT = '%n selected';
+  static const String REJECTED_LOT_PICKER_ADD_COUNT = 'Add %n lot(s)';
+  static const String REJECTED_LOT_PICKER_SEARCH_HINT =
+      'Search by product or lot number';
+
   static const String FIELD_NEGOTIATED_PRICE = 'Negotiated price';
   static const String FIELD_NEGOTIATED_PRICE_HINT = 'Price per packet';
   static const String FIELD_SPECIAL_COMMENTS = 'Special comments';
@@ -1426,6 +1485,7 @@ class AppStrings {
   static const String RECIPE_LOAD_FAILED_TITLE = 'Could not load recipes';
 
   static const String VALIDATION_PARTY_REQUIRED = 'Party is required.';
+  static const String VALIDATION_FARMER_REQUIRED = 'Farmer is required.';
   static const String VALIDATION_MATERIAL_TYPE_REQUIRED =
       'Material type is required.';
   static const String VALIDATION_LAB_DATE_REQUIRED =
@@ -1443,6 +1503,11 @@ class AppStrings {
   static const String STOCK_NOTHING_ENTERED_BODY =
       'Enter at least one count before updating.';
   static const String STOCK_COUNT_HINT = '0';
+  static const String STOCK_CONFIRM_DECREASE_HINT =
+      'If any product\'s count is decreasing, please uncheck the flag below. '
+      'It is checked by default and sends true to the backend, so be '
+      'careful while doing this.';
+  static const String STOCK_REUSE_OTHER_MATERIAL = 'Reuse other material';
 
   static const String COLUMN_STOCK_ON_HAND = 'On Hand';
   static const String COLUMN_STOCK_RESERVED = 'Reserved';
@@ -1674,6 +1739,46 @@ class AppStrings {
   static const String LAB_TESTING_REPORT_FIELD_FEMALE_COUNT = 'Female Count';
   static const String LAB_TESTING_REPORT_FIELD_OT_COUNT = 'OT Count';
   static const String LAB_TESTING_REPORT_FIELD_COMMENT = 'Comment';
+
+  static const String PRODUCT_STOCK_TRANSFER = 'Product Stock Transfer';
+  static const String PRODUCT_STOCK_TRANSFER_SUBTITLE =
+      'Move raw-material stock from one product to another of the same crop.';
+  static const String TRANSFER_FIELD_SOURCE = 'From product';
+  static const String TRANSFER_FIELD_SOURCE_HINT = 'Select a product';
+  static const String TRANSFER_FIELD_TARGET = 'To product';
+  static const String TRANSFER_FIELD_TARGET_HINT = 'Select a product';
+  static const String TRANSFER_FIELD_TARGET_PICK_SOURCE_FIRST =
+      'Select the source product first';
+  static const String TRANSFER_FIELD_TARGET_NONE_IN_CROP =
+      'No other product shares this crop';
+  static const String TRANSFER_FIELD_QUANTITY_KG = 'Quantity (kg)';
+  static const String TRANSFER_FIELD_QUANTITY_KG_HINT = 'e.g. 200.000';
+  static const String TRANSFER_AVAILABLE_KG_LABEL = 'kg available';
+  static const String TRANSFER_VALIDATION_SOURCE = 'Select the source product.';
+  static const String TRANSFER_VALIDATION_TARGET = 'Select the target product.';
+  static const String TRANSFER_VALIDATION_SAME_PRODUCT =
+      'Source and target must be different products.';
+  static const String TRANSFER_VALIDATION_QUANTITY = 'Enter a quantity.';
+  static const String TRANSFER_VALIDATION_QUANTITY_POSITIVE =
+      'Quantity must be greater than zero.';
+  static const String TRANSFER_OVERDRAWN_HINT =
+      'This is more than the source currently has available -- the server '
+      'will refuse it.';
+  static const String TRANSFER_ACTION = 'Transfer stock';
+  static const String TRANSFER_DONE = 'Stock transferred';
+  static const String TRANSFER_INFO_TITLE = 'How this works';
+  static const String TRANSFER_INFO_SAME_CROP =
+      'Target must share the source product\'s crop -- the picker only '
+      'offers matching ones.';
+  static const String TRANSFER_INFO_KG_ONLY =
+      'Transfers move raw material in kilograms only, never packed bags or '
+      'packets.';
+  static const String TRANSFER_INFO_IDLE_ONLY =
+      'The source kilograms must be unpacked and unreserved -- nothing '
+      'already booked or packed can move.';
+  static const String TRANSFER_INFO_LEDGER =
+      'Recorded on the stock ledger as a transfer for both products -- '
+      'nothing is wasted or written off.';
 
   static const String COLUMN_REASON = 'Reason';
   static const String COLUMN_REFERENCE = 'Reference';

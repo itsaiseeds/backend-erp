@@ -16,4 +16,6 @@ class InventoryEndpoints {
 
   static const String rawMaterialStock = '$_base/raw-material-stock';
   static const String otherMaterialStock = '$_base/other-material-stock';
+
+  static const String transferProduct = '$_base/transfer-product';
 }

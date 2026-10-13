@@ -9,6 +9,7 @@ import '../../../orders/presentation/views/orders_view.dart';
 import '../../../return_orders/presentation/views/return_orders_view.dart';
 import '../../../custom_orders/presentation/views/custom_orders_view.dart';
 import '../../../waste_orders/presentation/views/waste_orders_view.dart';
+import '../../../rejected_lot_orders/presentation/views/rejected_lot_orders_view.dart';
 import '../../../exports/presentation/views/exports_view.dart';
 import '../../../dispatch_challans/presentation/views/dispatch_challans_view.dart';
 import '../../../parties/presentation/views/parties_view.dart';
@@ -19,6 +20,7 @@ import '../../../other_raw_materials/presentation/views/other_raw_materials_view
 import '../../../other_material_inward/presentation/views/other_material_inward_view.dart';
 import '../../../purchase_tracking/presentation/views/purchase_tracking_view.dart';
 import '../../../lab_testing_report/presentation/views/lab_testing_report_view.dart';
+import '../../../product_stock_transfer/presentation/views/product_stock_transfer_view.dart';
 import '../../../waste_management/presentation/views/waste_management_view.dart';
 import '../../../product_stock/presentation/views/product_stock_view.dart';
 import '../../../raw_material_stock/presentation/views/raw_material_stock_view.dart';
@@ -52,6 +54,8 @@ class DashboardContentSwitcher {
         return const CustomOrdersView();
       case TabIds.WASTE_ORDERS:
         return const WasteOrdersView();
+      case TabIds.REJECTED_LOT_ORDERS:
+        return const RejectedLotOrdersView();
       case TabIds.DISPATCH_CHALLANS:
         return const DispatchChallansView();
       case TabIds.SALES_PEOPLE:
@@ -82,6 +86,8 @@ class DashboardContentSwitcher {
         return const PurchaseTrackingView();
       case TabIds.LAB_TESTING_REPORT:
         return const LabTestingReportView();
+      case TabIds.PRODUCT_STOCK_TRANSFER:
+        return const ProductStockTransferView();
       case TabIds.WASTE_MANAGEMENT:
         return const WasteManagementView();
       case TabIds.PRODUCT_STOCK:
