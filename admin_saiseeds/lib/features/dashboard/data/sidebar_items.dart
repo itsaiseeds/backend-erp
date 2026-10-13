@@ -65,6 +65,11 @@ class SidebarItems {
       icon: Icons.recycling_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.REJECTED_LOT_ORDERS,
+      label: AppStrings.REJECTED_LOT_ORDERS,
+      icon: Icons.remove_shopping_cart_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.EXPORTS,
       label: AppStrings.EXPORTS,
       icon: Icons.download_outlined,
@@ -125,6 +130,11 @@ class SidebarItems {
       icon: Icons.biotech_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.PRODUCT_STOCK_TRANSFER,
+      label: AppStrings.PRODUCT_STOCK_TRANSFER,
+      icon: Icons.swap_horiz_rounded,
+    ),
+    SidebarItemModel(
       id: TabIds.WASTE_MANAGEMENT,
       label: AppStrings.WASTE_MANAGEMENT,
       icon: Icons.delete_sweep_outlined,
@@ -171,6 +181,7 @@ class SidebarItems {
           TabIds.RETURN_ORDERS,
           TabIds.CUSTOM_ORDERS,
           TabIds.WASTE_ORDERS,
+          TabIds.REJECTED_LOT_ORDERS,
           TabIds.DISPATCH_CHALLANS,
         ],
       ),
@@ -196,6 +207,7 @@ class SidebarItems {
           TabIds.OTHER_MATERIAL_INWARD,
           TabIds.PURCHASE_TRACKING,
           TabIds.LAB_TESTING_REPORT,
+          TabIds.PRODUCT_STOCK_TRANSFER,
         ],
       ),
       SidebarGroupModel(

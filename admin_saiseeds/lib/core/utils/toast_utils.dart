@@ -86,7 +86,12 @@ class ToastUtils {
       animationDuration: _animation,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       showProgressBar: true,
-      pauseOnHover: true,
+      // Hovering a toast just as it auto-closes races toastification's own
+      // pause-on-hover handler against its disposal, throwing "ValueNotifier
+      // used after being disposed" (a known upstream issue in the package,
+      // not something a call site can guard against). Off entirely avoids
+      // the race at the cost of the pause-while-reading convenience.
+      pauseOnHover: false,
       dragToClose: true,
       applyBlurEffect: false,
     );

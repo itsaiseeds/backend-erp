@@ -12,6 +12,7 @@ class TabIds {
   static const String DISPATCH_CHALLANS = 'dispatch-challans';
   static const String CUSTOM_ORDERS = 'custom-orders';
   static const String WASTE_ORDERS = 'waste-orders';
+  static const String REJECTED_LOT_ORDERS = 'rejected-lot-orders';
   static const String EXPORTS = 'exports';
   static const String PRODUCTS = 'products';
   static const String PRODUCT_PACKAGINGS = 'product-packagings';
@@ -24,6 +25,7 @@ class TabIds {
   static const String OTHER_MATERIAL_INWARD = 'other-material-inward';
   static const String PURCHASE_TRACKING = 'purchase-tracking';
   static const String LAB_TESTING_REPORT = 'lab-testing-report';
+  static const String PRODUCT_STOCK_TRANSFER = 'product-stock-transfer';
   static const String WASTE_MANAGEMENT = 'waste-management';
   static const String PRODUCT_STOCK = 'product-stock';
   static const String RAW_MATERIAL_STOCK = 'raw-material-stock';

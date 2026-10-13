@@ -180,7 +180,7 @@ class BagStockCubit extends SafeCubit<BagStockState> {
 
   void clearDraft() => emit(state.copyWith(draftCounts: const {}));
 
-  Future<bool> submitDraft() async {
+  Future<bool> submitDraft({bool reuseOtherMaterial = false}) async {
     final Map<String, int> draft = Map<String, int>.from(state.draftCounts);
     if (draft.isEmpty) return false;
 
@@ -190,9 +190,15 @@ class BagStockCubit extends SafeCubit<BagStockState> {
       final bool alreadyRecorded = await _repository.fetchTodaysStockComplete();
 
       if (alreadyRecorded) {
-        await _repository.patchBagStock(draft);
+        await _repository.patchBagStock(
+          draft,
+          reuseOtherMaterial: reuseOtherMaterial,
+        );
       } else {
-        await _repository.replaceBagStock(draft);
+        await _repository.replaceBagStock(
+          draft,
+          reuseOtherMaterial: reuseOtherMaterial,
+        );
       }
       emit(state.copyWith(isSubmitting: false, draftCounts: const {}));
       await loadBagStock();
