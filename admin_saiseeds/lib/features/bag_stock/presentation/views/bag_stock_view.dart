@@ -6,8 +6,8 @@ import '../../../../core/services/packagings_service.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/widgets/buttons/icon_action_button.dart';
-import '../../../../core/widgets/feedback/confirmation_dialog.dart';
 import '../../../../core/widgets/feedback/stock_update_bar.dart';
+import '../../../../core/widgets/feedback/stock_update_confirm_dialog.dart';
 import '../../../product_packagings/data/product_packagings_repository.dart';
 import '../../data/bag_stock_repository.dart';
 import '../bloc/bag_stock_cubit.dart';
@@ -92,15 +92,14 @@ class _BagStockContentState extends State<_BagStockContent> {
       return;
     }
 
-    final bool confirmed = await ConfirmationDialog.show(
+    final bool? reuseOtherMaterial = await StockUpdateConfirmDialog.show(
       context,
-      title: AppStrings.STOCK_CONFIRM_TITLE,
-      message: AppStrings.STOCK_CONFIRM_BODY,
-      confirmLabel: AppStrings.STOCK_CONFIRM_ACTION,
     );
-    if (!confirmed) return;
+    if (reuseOtherMaterial == null) return;
 
-    final bool succeeded = await cubit.submitDraft();
+    final bool succeeded = await cubit.submitDraft(
+      reuseOtherMaterial: reuseOtherMaterial,
+    );
     if (!mounted) return;
 
     if (succeeded) {

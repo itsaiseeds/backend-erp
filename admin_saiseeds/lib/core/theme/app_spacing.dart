@@ -156,6 +156,8 @@ class AppSizes {
   static const double tableColumnWidthWide = 260.0;
 
   static const double confirmDialogWidth = 420.0;
+  static const double rejectedLotPickerWidth = 520.0;
+  static const double rejectedLotPickerHeight = 440.0;
   static const double dialogHeaderIconBox = 36.0;
   static const double formDialogWidth = 900.0;
   // For dialogs holding a single field, where the full width reads empty.
