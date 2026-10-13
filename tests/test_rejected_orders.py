@@ -457,6 +457,46 @@ class RejectedOrderApiTest(WebApiTestCase):
         self.assertEqual(row["lab_test"]["comment"], "bad germination")
         self.assertEqual(row["product"]["name"], "Rejected Cotton")
 
+    def test_farmer_picker_lists_farmers_with_a_rejected_lot_then_their_lots(self):
+        """tests/test_rejected_orders.py::RejectedOrderApiTest::test_farmer_picker_lists_farmers_with_a_rejected_lot_then_their_lots"""
+        joe_one = self._lot("100", lot_no="J-1")
+        self._lot("50", lot_no="J-2")
+        ann = self._lot("40", lot_no="A-1")
+        InwardRawMaterial.objects.filter(pk=ann.pk).update(farmer_name="Ann & Co/Sons")
+        self._lot("100", lot_no="PASSED", verdict="Pass")  # no rejected lot -> not a farmer row
+        self._lot("100", lot_no="THEIRS", party=self.other_party)
+        self._book(self._line(joe_one, "30"))
+
+        farmers = self.client.get(f"/api/sales-admin/rejected-orders/{self.party.id}")
+        joe = self.client.get(f"/api/sales-admin/rejected-orders/{self.party.id}/Farmer%20Joe")
+        ann_lots = self.client.get(
+            f"/api/sales-admin/rejected-orders/{self.party.id}/Ann%20%26%20Co%2FSons"
+        )
+        nobody = self.client.get(f"/api/sales-admin/rejected-orders/{self.party.id}/Nobody")
+
+        self.assertEqual(farmers.status_code, status.HTTP_200_OK, farmers.data)
+        self.assertEqual(
+            farmers.data,
+            [
+                {"farmer_name": "Ann & Co/Sons", "lot_count": 1,
+                 "quantity_kg": "40.000", "remaining_kg": "40.000"},
+                {"farmer_name": "Farmer Joe", "lot_count": 2,
+                 "quantity_kg": "150.000", "remaining_kg": "120.000"},
+            ],
+        )
+        self.assertEqual(joe.status_code, status.HTTP_200_OK, joe.data)
+        self.assertEqual({row["lot_no"] for row in joe.data}, {"J-1", "J-2"})
+        first = next(row for row in joe.data if row["lot_no"] == "J-1")
+        self.assertEqual(first["inward_raw_material_public_id"], joe_one.public_id)
+        self.assertEqual(first["remaining_kg"], "70.000")
+        self.assertEqual([row["lot_no"] for row in ann_lots.data], ["A-1"])
+        self.assertEqual(nobody.data, [])
+        for url in (
+            "/api/sales-admin/rejected-orders/999999",
+            "/api/sales-admin/rejected-orders/999999/Farmer%20Joe",
+        ):
+            self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
+
     def test_unknown_party_is_404(self):
         """tests/test_rejected_orders.py::RejectedOrderApiTest::test_unknown_party_is_404"""
         response = self.client.get(PARTY_LOTS_URL.format(party_id=999999))

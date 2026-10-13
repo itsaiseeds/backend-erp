@@ -42,6 +42,7 @@ from .GetFieldTripsView import GetFieldTripsView
 from .GetOrdersView import GetOrdersView
 from .GetOrderView import GetOrderView
 from .GetPartyRejectedLotsView import GetPartyRejectedLotsView
+from .GetRejectedFarmersView import GetRejectedFarmerLotsView, GetRejectedFarmersView
 from .GetRejectedOrdersView import GetRejectedOrdersView
 from .GetReturnOrdersView import GetReturnOrdersView
 from .GetWasteOrdersView import GetWasteOrdersView
@@ -328,6 +329,17 @@ urlpatterns = [
     # booking. They share ``custom-order/<public_id>`` (GET) with the other
     # kinds; create, list, delete and the lot picker have their own routes.
     path("rejected-orders/", GetRejectedOrdersView.as_view(), name="rejected-orders"),
+    # The booking picker: party -> farmers with a rejected lot -> that farmer's lots.
+    path(
+        "rejected-orders/<int:party_id>",
+        GetRejectedFarmersView.as_view(),
+        name="rejected-order-farmers",
+    ),
+    path(
+        "rejected-orders/<int:party_id>/<path:farmer_name>",
+        GetRejectedFarmerLotsView.as_view(),
+        name="rejected-order-farmer-lots",
+    ),
     path(
         "create-rejected-order",
         CreateRejectedOrderView.as_view(),

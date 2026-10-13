@@ -54,6 +54,43 @@ class PartyRejectedLotSerializer(serializers.Serializer):
     lab_test = _LabTestSerializer(allow_null=True)
 
 
+def rejected_lot_rows(party: Party, lots: list) -> list[dict]:
+    """Picker rows for ``lots`` (a party's bookable rejected lots), with booked/remaining kg."""
+    booked = InventoryOperations.rejected_lot_booked_kg(lot.pk for lot in lots)
+    rows = []
+    for lot in lots:
+        booked_kg = booked.get(lot.pk, 0)
+        test = lot.lab_testing
+        rows.append(
+            {
+                "inward_raw_material_public_id": lot.public_id,
+                "party": {"id": party.id, "name": party.name},
+                "farmer_name": lot.farmer_name,
+                "product": {"public_id": lot.product.public_id, "name": lot.product.name},
+                "lot_no": lot.lot_no,
+                "quantity_kg": str(lot.quantity_kg),
+                "booked_kg": str(booked_kg),
+                "remaining_kg": str(lot.quantity_kg - booked_kg),
+                "inward_date": lot.created_at.isoformat(),
+                "rejected_on": lot.effective_date.isoformat(),
+                "lab_sampling_date": (
+                    lot.lab_sampling_date.isoformat() if lot.lab_sampling_date else None
+                ),
+                "lab_test": (
+                    {
+                        "public_id": test.public_id,
+                        "result": test.result,
+                        "comment": test.comment,
+                        "tested_at": test.tested_at.isoformat() if test.tested_at else None,
+                    }
+                    if test
+                    else None
+                ),
+            }
+        )
+    return rows
+
+
 class GetPartyRejectedLotsView(AdminApiView):
     """List a party's rejected lots (app admin only)."""
 
@@ -72,36 +109,5 @@ class GetPartyRejectedLotsView(AdminApiView):
             .select_related("party", "product", "lab_testing")
             .order_by("-effective_date", "-id")
         )
-        booked = InventoryOperations.rejected_lot_booked_kg(lot.pk for lot in lots)
-        rows = []
-        for lot in lots:
-            booked_kg = booked.get(lot.pk, 0)
-            test = lot.lab_testing
-            rows.append(
-                {
-                    "inward_raw_material_public_id": lot.public_id,
-                    "party": {"id": party.id, "name": party.name},
-                    "farmer_name": lot.farmer_name,
-                    "product": {"public_id": lot.product.public_id, "name": lot.product.name},
-                    "lot_no": lot.lot_no,
-                    "quantity_kg": str(lot.quantity_kg),
-                    "booked_kg": str(booked_kg),
-                    "remaining_kg": str(lot.quantity_kg - booked_kg),
-                    "inward_date": lot.created_at.isoformat(),
-                    "rejected_on": lot.effective_date.isoformat(),
-                    "lab_sampling_date": (
-                        lot.lab_sampling_date.isoformat() if lot.lab_sampling_date else None
-                    ),
-                    "lab_test": (
-                        {
-                            "public_id": test.public_id,
-                            "result": test.result,
-                            "comment": test.comment,
-                            "tested_at": test.tested_at.isoformat() if test.tested_at else None,
-                        }
-                        if test
-                        else None
-                    ),
-                }
-            )
+        rows = rejected_lot_rows(party, lots)
         return Response(rows)

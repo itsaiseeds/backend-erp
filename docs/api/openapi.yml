@@ -8938,6 +8938,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomOrderListPage'
           description: ''
+  /api/sales-admin/rejected-orders/{party_id}:
+    get:
+      operationId: api_sales_admin_rejected_orders_list
+      description: Farmers of a party with at least one rejected lot (app admin only).
+      summary: List a party's farmers who have a rejected lot
+      parameters:
+      - in: path
+        name: party_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RejectedFarmer'
+          description: ''
+  /api/sales-admin/rejected-orders/{party_id}/{farmer_name}:
+    get:
+      operationId: api_sales_admin_rejected_orders_list_2
+      description: One farmer's rejected lots within a party (app admin only).
+      summary: List a farmer's rejected lots (lot numbers) within a party
+      parameters:
+      - in: path
+        name: farmer_name
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: party_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin · Orders
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartyRejectedLot'
+          description: ''
   /api/sales-admin/return-order-recipes/{public_id}:
     get:
       operationId: api_sales_admin_return_order_recipes_retrieve
@@ -16501,6 +16554,23 @@ components:
           maxLength: 32
       required:
       - fcm_token
+    RejectedFarmer:
+      type: object
+      description: Output shape for one farmer of a party.
+      properties:
+        farmer_name:
+          type: string
+        lot_count:
+          type: integer
+        quantity_kg:
+          type: string
+        remaining_kg:
+          type: string
+      required:
+      - farmer_name
+      - lot_count
+      - quantity_kg
+      - remaining_kg
     RejectedLotParty:
       type: object
       properties:
