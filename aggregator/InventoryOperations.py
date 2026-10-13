@@ -1527,6 +1527,26 @@ def rejected_lot_booked_kg(lot_ids: Iterable[int]) -> dict[int, Decimal]:
     return {row["inward_raw_material_id"]: row["total"] for row in rows}
 
 
+def rejected_sold_kg_by_product(product_ids: Iterable[int]) -> dict[int, Decimal]:
+    """Kg of each product's rejected lots sold on live rejected orders (DISPATCHED / DELIVERED).
+
+    What the stock screens subtract from ``rejected_kg``. Display only: the
+    stock ledger's RAW ``rejected`` figure stays the whole lot total.
+    """
+    rows = (
+        CustomOrderItem.objects.filter(
+            product_id__in=list(product_ids),
+            inward_raw_material__isnull=False,
+            custom_order__is_deleted=False,
+            custom_order__status_id__in=CONSUMING_STATUS_IDS,
+            **kind_lookup("rejected", "custom_order__"),
+        )
+        .values("product_id")
+        .annotate(total=Sum("quantity_kg"))
+    )
+    return {row["product_id"]: row["total"] for row in rows}
+
+
 def rejected_lot_remaining_kg(lot: InwardRawMaterial) -> Decimal:
     """``lot.quantity_kg`` less what live rejected orders already hold."""
     booked = rejected_lot_booked_kg([lot.pk]).get(lot.pk, Decimal("0.000"))
