@@ -245,11 +245,13 @@ def record_stock_counts(
     check works the same way, per material type. Any shortfall rolls the
     whole upload back.
 
-    ``reuse_other_material=False`` is the end-of-season clear-out: no line may
-    raise its bag count above what is on the floor now (``ValueError``, so the
-    whole upload is refused), and bags taken off the count are discarded -- their
-    seed goes back to raw as ever, but the packing material used on them is
-    not given back (see :func:`write_off_other_material`).
+    ``reuse_other_material`` only matters for a line that **lowers** its count;
+    a raised line packs at the live recipes either way. ``True`` (default) gives
+    the packing material of the bags taken off back to stock; ``False`` (the
+    end-of-season clear-out) discards it -- it is written off the inward lots
+    (see :func:`write_off_other_material`). Each lowered line is judged on its
+    own, whatever the other lines of the upload do, and the seed of the bags
+    taken off goes back to raw either way.
     """
     from . import StockLedgerOperations
 
@@ -268,8 +270,6 @@ def record_stock_counts(
         lock_raw_pools(product_ids)
         # All up front and in pk order; _write_stock_count re-takes each as a no-op.
         lock_bag_pools(counts)
-        if not reuse_other_material:
-            _assert_bag_counts_not_raised(counts)
         materials_before = _material_guard(product_ids)
         bags_before = _bag_availability(counts)
         if carry_forward or carry_frozen:
@@ -404,6 +404,20 @@ def _layer_field(row: CountRow) -> str:
 def recipe_layers(row: CountRow):
     """``row``'s layers, oldest first."""
     return PackedRecipeLayer.objects.filter(**{_layer_field(row): row})
+
+
+def row_material_used(row: CountRow) -> dict[MaterialKey, Decimal]:
+    """Units per configuration spent on ``row``'s layers (NULL-recipe layers spend nothing)."""
+    rows = (
+        recipe_layers(row)
+        .filter(recipe__isnull=False)
+        .values("recipe__product_id", "recipe__packet_weight", "recipe__material_type_id")
+        .annotate(total=Sum(F("recipe__quantity") * F("packets")))
+        .values_list(
+            "recipe__product_id", "recipe__packet_weight", "recipe__material_type_id", "total"
+        )
+    )
+    return {(product_id, weight, type_id): total for product_id, weight, type_id, total in rows}
 
 
 def copy_recipe_layers(source: CountRow, target: CountRow) -> None:
@@ -573,45 +587,6 @@ def _unpack_type(row: CountRow, material_type_id: int, packets: int) -> None:
 # pool that was already short, and a count that keeps or raises it, are never
 # blocked. They run after the write, inside the same transaction, so a refusal
 # rolls the whole upload back (and the ledger with it).
-
-
-def _assert_bag_counts_not_raised(counts: Mapping[ProductPackaging, int]) -> None:
-    """Raise ``ValueError`` if any line would raise its bags above what is on the floor.
-
-    "On the floor" is the latest count less what was dispatched since (what the
-    stock screen calls on hand), and 0 for a packaging not counted yet. Used for
-    a count with ``reuse_other_material`` false, where the count may only go down.
-    """
-    latest = latest_snapshot_date()
-    raised = []
-    for packaging, bags in counts.items():
-        current = max(on_hand_bags(packaging, latest) - consumed_bags(packaging, latest), 0)
-        if bags > current:
-            raised.append(f"'{packaging}' is {current}, not {bags}")
-    if raised:
-        raise ValueError(
-            "Counts can only be lowered while other material is not being reused; "
-            "cannot raise: " + "; ".join(raised) + "."
-        )
-
-
-def _assert_loose_counts_not_raised(counts: Mapping[tuple[Product, Decimal], int]) -> None:
-    """The loose-pool counterpart of :func:`_assert_bag_counts_not_raised`."""
-    latest = latest_loose_snapshot_date()
-    raised = []
-    for (product, weight), packets in counts.items():
-        current = max(
-            on_hand_loose_packets(product, weight, latest)
-            - consumed_loose_packets(product, weight, latest),
-            0,
-        )
-        if packets > current:
-            raised.append(f"'{product.name}' loose {weight}kg packets is {current}, not {packets}")
-    if raised:
-        raise ValueError(
-            "Counts can only be lowered while other material is not being reused; "
-            "cannot raise: " + "; ".join(raised) + "."
-        )
 
 
 def _bag_availability(packagings: Iterable[ProductPackaging]) -> dict[ProductPackaging, int]:
@@ -1051,8 +1026,8 @@ def record_loose_stocks(
     case), as there.
 
     ``reuse_other_material=False`` works as it does for :func:`record_stock_counts`:
-    no pool may be raised above its packets on the floor now, and packets taken off
-    the count are discarded with their packing material.
+    a lowered pool's packets taken off are discarded with their packing material;
+    a raised pool ignores the flag.
     """
     from . import StockLedgerOperations
 
@@ -1071,8 +1046,6 @@ def record_loose_stocks(
         lock_raw_pools(product_ids)
         # All up front and in pk order; _write_loose_stock re-takes each as a no-op.
         lock_loose_pools(product_ids)
-        if not reuse_other_material:
-            _assert_loose_counts_not_raised(counts)
         materials_before = _material_guard(product_ids)
         loose_before = _loose_availability(counts)
         if carry_forward or carry_frozen:

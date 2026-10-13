@@ -52,11 +52,11 @@ class UpdateTodaysInventorySerializer(serializers.Serializer):
         required=False,
         default=True,
         help_text=(
-            "``true`` (default): counts may go up or down, and bags taken off the "
-            "count give their packing material (leaflets, covers) back. ``false``: "
-            "counts may only go down -- a line above the bags on hand now is a 400 "
-            "-- and the packing material of the bags taken off is discarded, not "
-            "given back. The seed of those bags returns to raw material either way."
+            "Only applies to lines whose bag count goes down; a line that goes up "
+            "ignores it. ``true`` (default): the bags taken off give their packing "
+            "material (leaflets, covers) back. ``false``: their packing material is "
+            "discarded, not given back. The seed of those bags returns to raw "
+            "material either way."
         ),
     )
 
@@ -198,8 +198,8 @@ class UpdateTodaysInventoryView(AdminApiView):
             OpenApiExample(
                 "End-of-season clear-out (reuse_other_material false)",
                 description=(
-                    "Counts may only go down; the packing material of the bags "
-                    "taken off is not given back. The seed returns to raw material."
+                    "The packing material of the bags taken off is not given back; the "
+                    "seed returns to raw material. A raised line ignores the flag."
                 ),
                 value={"counts": {"PP-A1B2C3D4E0F1": 2}, "reuse_other_material": False},
                 request_only=True,

@@ -1,9 +1,10 @@
 """``reuse_other_material`` on the bag and loose count writers.
 
-With it ``false`` a count may only go down, and what comes off is discarded:
-the seed returns to raw as ever, but the packing material (leaflets, covers) used
-on those packets is not given back -- it is written off the inward lots, so the
-available material does not go up. No column records it. These tests drive the
+With it ``false`` what comes off a lowered line is discarded (a raised line
+ignores the flag, and never offsets a lowered one): the seed returns to raw,
+but the packing material (leaflets, covers) used on those packets is not given
+back -- it is written off the inward lots, so the available material does not
+go up. No column records it. These tests drive the
 real writers and read the figures the stock screens read; the ledger drift guard
 of ``DMLTestCase`` also runs after each one.
 
@@ -21,6 +22,7 @@ from rest_framework.test import APIClient
 
 from aggregator import InventoryOperations as inv
 from aggregator.models import InwardOtherMaterial
+from aggregator.ProductOperations import add_packaging
 from authentication.models import Admin
 from tests.stock_ledger_support import TODAY, W1, LedgerWorldTestCase
 
@@ -95,44 +97,59 @@ class ReuseOtherMaterialTest(_AvailableLeaflets, LedgerWorldTestCase):
 
         self.assertEqual(self._available(), Decimal("99880"))
 
-    def test_without_reuse_a_count_can_only_go_down(self):
-        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_without_reuse_a_count_can_only_go_down"""
+    def test_without_reuse_a_raise_ignores_the_flag(self):
+        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_without_reuse_a_raise_ignores_the_flag"""
         self.count_bags({self.pp1: 5})
 
-        with self.assertRaises(ValueError) as caught:
-            self.count_bags({self.pp1: 6}, reuse_other_material=False)
-        self.assertIn("cannot raise", str(caught.exception))
-        self.assertEqual(inv.on_hand_bags(self.pp1, inv.latest_snapshot_date()), 5)
-        self.assertEqual(self._available(), Decimal("99900"))
+        self.count_bags({self.pp1: 6}, reuse_other_material=False)  # +20 packets, as usual
+        self.assertEqual(inv.on_hand_bags(self.pp1, inv.latest_snapshot_date()), 6)
+        self.assertEqual(self._available(), Decimal("99880"))
+        self.assertEqual(self._booked(), Decimal("100000"), "nothing written off")
 
-        self.count_bags({self.pp1: 5}, reuse_other_material=False)  # the same is fine
-        self.assertEqual(self._available(), Decimal("99900"))
+        self.count_bags({self.pp1: 6}, reuse_other_material=False)  # the same is no raise
         self.assertEqual(self._booked(), Decimal("100000"), "nothing came off, nothing written off")
 
-    def test_without_reuse_one_raised_line_refuses_the_whole_upload(self):
-        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_without_reuse_one_raised_line_refuses_the_whole_upload"""
+    def test_each_lowered_line_honours_the_flag_beside_a_raised_one(self):
+        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_each_lowered_line_honours_the_flag_beside_a_raised_one"""
         self.count_everything({self.pp1: 5, self.qq1: 4})
 
-        with self.assertRaises(ValueError):
-            self.count_bags({self.pp1: 1, self.qq1: 9}, reuse_other_material=False)
+        self.count_bags({self.pp1: 1, self.qq1: 9}, reuse_other_material=False)
 
-        self.assertEqual(inv.on_hand_bags(self.pp1, inv.latest_snapshot_date()), 5)
+        self.assertEqual(inv.on_hand_bags(self.pp1, inv.latest_snapshot_date()), 1)
+        self.assertEqual(self._available(), Decimal("99900"), "pp1's 80 leaflets are lost")
+        self.assertEqual(self._booked(), Decimal("99920"))
+
+    def test_a_raise_does_not_offset_a_discard_in_the_same_material_pool(self):
+        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_a_raise_does_not_offset_a_discard_in_the_same_material_pool"""
+        # Ten 1 kg packets a bag: the same leaflet pool as pp1's twenty.
+        pp2 = add_packaging(self.product, packet_weight=W1, packets=10, actor=self.su)
+        self.count_bags({self.pp1: 5, pp2: 0})  # 100 leaflets used
+
+        # pp1 drops 40 packets, pp2 packs 40: the pool's net usage is unchanged.
+        self.count_bags({self.pp1: 3, pp2: 4}, reuse_other_material=False)
+
+        self.assertEqual(self._booked(), Decimal("99960"), "pp1's 40 leaflets are written off")
+        self.assertEqual(self._available(), Decimal("99860"))
+
+        self.count_bags({self.pp1: 2, pp2: 6}, reuse_other_material=True)
+        self.assertEqual(self._booked(), Decimal("99960"), "reuse writes nothing off")
+        self.assertEqual(self._available(), Decimal("99860"), "-20 +20 leaflets")
+
+    def test_a_packaging_at_zero_can_be_raised(self):
+        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_a_packaging_at_zero_can_be_raised"""
+        self.count_bags({self.pp1: 1}, reuse_other_material=False)
         self.assertEqual(self._booked(), Decimal("100000"))
 
-    def test_a_packaging_never_counted_cannot_be_raised(self):
-        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_a_packaging_never_counted_cannot_be_raised"""
-        with self.assertRaises(ValueError):
-            self.count_bags({self.pp1: 1}, reuse_other_material=False)
         self.count_bags({self.pp1: 0}, reuse_other_material=False)  # zero is not a raise
+        self.assertEqual(self._booked(), Decimal("99980"), "the 20 leaflets are written off")
 
-    def test_the_ceiling_is_what_is_on_the_floor_after_dispatches(self):
-        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_the_ceiling_is_what_is_on_the_floor_after_dispatches"""
+    def test_the_floor_after_dispatches_decides_a_raise(self):
+        """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_the_floor_after_dispatches_decides_a_raise"""
         self.count_everything({self.pp1: 5, self.qq1: 0})
         self.dispatch(self.order(self.pp1, 2), self.pp1)  # 3 bags left on the floor
 
-        with self.assertRaises(ValueError):
-            self.count_bags({self.pp1: 4}, reuse_other_material=False)
-        self.count_bags({self.pp1: 3}, reuse_other_material=False)
+        self.count_bags({self.pp1: 4}, reuse_other_material=False)  # above 3: a raise
+        self.assertEqual(self._booked(), Decimal("100000"), "the flag was ignored")
 
     def test_the_flag_defaults_to_reuse(self):
         """tests/test_reuse_other_material.py::ReuseOtherMaterialTest::test_the_flag_defaults_to_reuse"""
@@ -147,14 +164,14 @@ class ReuseOtherMaterialTest(_AvailableLeaflets, LedgerWorldTestCase):
         self.count_loose(self.product, 50)
         self.assertEqual(self._available(), Decimal("99950"))
 
-        with self.assertRaises(ValueError):
-            self.count_loose(self.product, 51, reuse_other_material=False)
+        self.count_loose(self.product, 51, reuse_other_material=False)  # a raise: flag ignored
+        self.assertEqual(self._available(), Decimal("99949"))
 
         self.count_loose(self.product, 20, reuse_other_material=False)
-        self.assertEqual(self._available(), Decimal("99950"), "30 packets' leaflets are lost")
+        self.assertEqual(self._available(), Decimal("99949"), "31 packets' leaflets are lost")
 
         self.count_loose(self.product, 10)  # reuse: these 10 packets' leaflets come back
-        self.assertEqual(self._available(), Decimal("99960"))
+        self.assertEqual(self._available(), Decimal("99959"))
 
 
 class DiscardedMaterialStaysSpentTest(_AvailableLeaflets, LedgerWorldTestCase):
@@ -216,15 +233,15 @@ class ReuseOtherMaterialApiTest(_AvailableLeaflets, LedgerWorldTestCase):
         self.api.force_login(self.admin_user)
         self.count_bags({self.pp1: 5})
 
-    def test_bag_patch_without_reuse_discards_and_refuses_a_raise(self):
-        """tests/test_reuse_other_material.py::ReuseOtherMaterialApiTest::test_bag_patch_without_reuse_discards_and_refuses_a_raise"""
+    def test_bag_patch_without_reuse_discards_and_ignores_the_flag_on_a_raise(self):
+        """tests/test_reuse_other_material.py::ReuseOtherMaterialApiTest::test_bag_patch_without_reuse_discards_and_ignores_the_flag_on_a_raise"""
         raised = self.api.patch(
             BAG_URL,
             {"counts": {self.pp1.public_id: 6}, "reuse_other_material": False},
             format="json",
         )
-        self.assertEqual(raised.status_code, status.HTTP_400_BAD_REQUEST, raised.data)
-        self.assertIn("cannot raise", str(raised.data))
+        self.assertEqual(raised.status_code, status.HTTP_200_OK, raised.data)
+        self.assertEqual(self._available(), Decimal("99880"))
 
         lowered = self.api.patch(
             BAG_URL,
@@ -232,7 +249,7 @@ class ReuseOtherMaterialApiTest(_AvailableLeaflets, LedgerWorldTestCase):
             format="json",
         )
         self.assertEqual(lowered.status_code, status.HTTP_200_OK, lowered.data)
-        self.assertEqual(self._available(), Decimal("99900"))
+        self.assertEqual(self._available(), Decimal("99880"))
 
     def test_bag_patch_defaults_to_reuse(self):
         """tests/test_reuse_other_material.py::ReuseOtherMaterialApiTest::test_bag_patch_defaults_to_reuse"""
@@ -261,7 +278,7 @@ class ReuseOtherMaterialApiTest(_AvailableLeaflets, LedgerWorldTestCase):
             {"counts": [{**line, "packets": 41}], "reuse_other_material": False},
             format="json",
         )
-        self.assertEqual(raised.status_code, status.HTTP_400_BAD_REQUEST, raised.data)
+        self.assertEqual(raised.status_code, status.HTTP_200_OK, raised.data)
 
         lowered = self.api.patch(
             LOOSE_URL,
@@ -269,7 +286,7 @@ class ReuseOtherMaterialApiTest(_AvailableLeaflets, LedgerWorldTestCase):
             format="json",
         )
         self.assertEqual(lowered.status_code, status.HTTP_200_OK, lowered.data)
-        self.assertEqual(self._available(), Decimal("99860"), "100 in bags + 40 loose, kept spent")
+        self.assertEqual(self._available(), Decimal("99859"), "100 in bags + 41 loose, kept spent")
 
     def test_a_non_boolean_flag_is_refused(self):
         """tests/test_reuse_other_material.py::ReuseOtherMaterialApiTest::test_a_non_boolean_flag_is_refused"""

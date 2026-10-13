@@ -53,26 +53,33 @@ class TransferProductView(AdminApiView):
     )
     def post(self, request: Request):
         assert_can_change_inward(request.user)
-        serializer = TransferProductSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        source, target = data["source_product"], data["target_product"]
-        lots = transfer_raw_material(
-            source=source,
-            target=target,
-            quantity_kg=data["quantity_kg"],
-            actor=request.user,
-        )
-        booked = InwardRawMaterial.objects.select_related(
-            "product", "party", "status", "created_by", "return_order__order", "lab_testing"
-        ).filter(pk__in=[lot.pk for lot in lots])
-        return Response(
-            {
-                "transferred_kg": str(data["quantity_kg"]),
-                "source": _side(source),
-                "target": _side(target),
-                "target_lots": [
-                    inward_raw_material_payload(lot) for lot in booked.order_by("pk")
-                ],
-            }
-        )
+        return transfer_product(request)
+
+
+def transfer_product(request: Request) -> Response:
+    """Validate the body, run the transfer and build the response.
+
+    Shared by this view and the godown manager's
+    ``android.api.v1.GodownTransferProductView``.
+    """
+    serializer = TransferProductSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+    source, target = data["source_product"], data["target_product"]
+    lots = transfer_raw_material(
+        source=source,
+        target=target,
+        quantity_kg=data["quantity_kg"],
+        actor=request.user,
+    )
+    booked = InwardRawMaterial.objects.select_related(
+        "product", "party", "status", "created_by", "return_order__order", "lab_testing"
+    ).filter(pk__in=[lot.pk for lot in lots])
+    return Response(
+        {
+            "transferred_kg": str(data["quantity_kg"]),
+            "source": _side(source),
+            "target": _side(target),
+            "target_lots": [inward_raw_material_payload(lot) for lot in booked.order_by("pk")],
+        }
+    )

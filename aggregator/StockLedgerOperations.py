@@ -353,12 +353,13 @@ def recording(
         )
         yield handle
         after = read_positions(tracked)
-        if _sync_recipe_layers(tracked, before, after):
+        freed: dict[InventoryOperations.MaterialKey, Decimal] | None = (
+            {} if handle.discard_other_material else None
+        )
+        if _sync_recipe_layers(tracked, before, after, freed):
             # Packing-material usage is read from the layers, so re-read.
             after = read_positions(tracked)
-        if handle.discard_other_material and _write_off_discarded(
-            tracked, before, after, handle.actor
-        ):
+        if freed and _write_off_discarded(freed, handle.actor):
             after = read_positions(tracked)
         for check in handle.after_sync_checks:
             check()
@@ -389,6 +390,7 @@ def _sync_recipe_layers(
     tracked: Iterable[int],
     before: dict[int, Position],
     after: dict[int, Position],
+    freed: dict[InventoryOperations.MaterialKey, Decimal] | None = None,
 ) -> bool:
     """Keep every pool's recipe layers in step with its packed packets.
 
@@ -397,6 +399,11 @@ def _sync_recipe_layers(
     the new packets at the live recipes, unpacking (delta < 0) removes them
     newest-first, and the sum of layers is finally clamped to the packed
     figure. Returns whether any pool changed.
+
+    ``freed``, when given, collects the packing material each *unpacking* pool
+    gave up, per configuration -- measured on that pool's own layers, so a
+    pool raised in the same write (even one sharing the configuration) never
+    offsets it. :func:`_write_off_discarded` writes that much off.
     """
     changed = False
     for product_id in tracked:
@@ -417,6 +424,7 @@ def _sync_recipe_layers(
             row_date_after = new.get(key, {}).get("row_date", ZERO)
             if row_date_before and row_date_after < row_date_before:
                 delta = 0
+            used_before = None
             if delta > 0:
                 weight = (
                     row.product_packaging.packet_weight
@@ -425,41 +433,38 @@ def _sync_recipe_layers(
                 )
                 InventoryOperations.add_packed_packets(row, product_id, weight, delta)
             elif delta < 0:
+                if freed is not None:
+                    used_before = InventoryOperations.row_material_used(row)
                 InventoryOperations.remove_packed_packets(row, -delta)
             trimmed = InventoryOperations.clamp_recipe_layers(row, packed_after)
+            if used_before is not None:
+                used_after = InventoryOperations.row_material_used(row)
+                for material_key, units in used_before.items():
+                    drop = units - used_after.get(material_key, ZERO)
+                    if drop > 0:
+                        freed[material_key] = freed.get(material_key, ZERO) + drop
             changed = changed or delta != 0 or trimmed
     return changed
 
 
 def _write_off_discarded(
-    tracked: Iterable[int],
-    before: dict[int, Position],
-    after: dict[int, Position],
+    freed: dict[InventoryOperations.MaterialKey, Decimal],
     actor: User | None,
 ) -> bool:
     """Keep the packing material of discarded packets spent.
 
     A count lowered with ``reuse_other_material`` false removes the packets'
-    layers like any other, which lowers each ``OTHER`` pool's ``packed``. That
-    much is written off the pool's inward lots
+    layers like any other, which frees their material. ``freed`` -- what the
+    lowered pools gave up, from :func:`_sync_recipe_layers` -- is written off
+    each configuration's inward lots
     (``InventoryOperations.write_off_other_material``), so the material does
-    not return to stock. Returns whether anything was written off.
+    not return to stock. Raised pools are not in ``freed``: the flag does
+    nothing for them. Returns whether anything was written off.
     """
     changed = False
-    for product_id in tracked:
-        old = before.get(product_id, {})
-        new = after.get(product_id, {})
-        for key, figures in old.items():
-            if key[0] != OTHER:
-                continue
-            freed = figures["packed"] - new.get(key, {}).get("packed", ZERO)
-            if freed <= 0:
-                continue
-            weight, material_type_id = cast(tuple[Decimal, int], key[1])
-            written = InventoryOperations.write_off_other_material(
-                (product_id, weight, material_type_id), freed, actor
-            )
-            changed = changed or written > 0
+    for key, units in sorted(freed.items()):
+        written = InventoryOperations.write_off_other_material(key, units, actor)
+        changed = changed or written > 0
     return changed
 
 
