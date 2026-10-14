@@ -7,6 +7,7 @@ import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/widgets/feedback/stock_as_of_chip.dart';
 import '../../data/raw_material_stock_repository.dart';
+import '../../utils/raw_material_stock_export.dart';
 import '../bloc/raw_material_stock_cubit.dart';
 import '../widgets/raw_material_stock_table.dart';
 
@@ -37,6 +38,26 @@ class _RawMaterialStockContent extends StatefulWidget {
 class _RawMaterialStockContentState extends State<_RawMaterialStockContent> {
   final GlobalKey<RawMaterialStockTableState> _tableKey =
       GlobalKey<RawMaterialStockTableState>();
+  bool _isExporting = false;
+
+  Future<void> _onExport(RawMaterialStockState state) async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    final bool downloaded = await RawMaterialStockExport.download(
+      lines: state.allLines,
+      asOf: state.asOf,
+    );
+
+    if (!mounted) return;
+    setState(() => _isExporting = false);
+
+    if (downloaded) {
+      ToastUtils.showSuccess(context, AppStrings.RAW_MATERIAL_STOCK_EXPORT_DONE);
+    } else {
+      ToastUtils.showInfo(context, AppStrings.RAW_MATERIAL_STOCK_EXPORT_EMPTY);
+    }
+  }
 
   void _onFetchData({
     required int page,
@@ -94,6 +115,12 @@ class _RawMaterialStockContentState extends State<_RawMaterialStockContent> {
                 : AppStrings.TABLE_EMPTY_BODY,
             searchBarTrailing: StockAsOfChip(isoDate: state.asOf),
             searchBarActions: [
+              IconActionButton(
+                expand: true,
+                icon: Icons.file_download_outlined,
+                tooltip: AppStrings.EXPORT,
+                onPressed: _isExporting ? null : () => _onExport(state),
+              ),
               IconActionButton(
                 expand: true,
                 icon: Icons.refresh_rounded,

@@ -1360,6 +1360,9 @@ class AppStrings {
       'Record an inward raw-material lot to start tracking stock.';
   static const String RAW_MATERIAL_STOCK_LOAD_FAILED_TITLE =
       'Could not load raw material stock';
+  static const String RAW_MATERIAL_STOCK_EXPORT_EMPTY =
+      'Nothing to export yet.';
+  static const String RAW_MATERIAL_STOCK_EXPORT_DONE = 'Export downloaded';
   static const String STOCK_AS_OF_PREFIX = 'As of';
 
   static const String INWARD_RAW_MATERIALS = 'Raw Material';
