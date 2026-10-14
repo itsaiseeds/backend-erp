@@ -46,11 +46,9 @@ from common.models import indian_now
 from . import InventoryOperations
 from .InventoryOperations import lock_raw_pools, today
 from .models import (
-    CustomOrderItem,
     InwardOtherMaterial,
     InwardRawMaterial,
     InwardRawMaterialStatus,
-    OrderItem,
     OtherMaterialRecipe,
     OtherMaterialType,
     PartyType,
@@ -60,11 +58,10 @@ from .models import (
     StatusIds,
     StockEventDetail,
     StockEventType,
-    StockPoolKind,
 )
 from .NotificationOperations import notify_lab_test_requested
 from .ProductOperations import assert_products_usable
-from .StockLedgerOperations import read_positions, recording
+from .StockLedgerOperations import recording
 
 if TYPE_CHECKING:
     from authentication.models import User
@@ -764,54 +761,6 @@ def create_other_lot(
 
 # -- Product-to-product transfer -----------------------------------------------
 
-# Order statuses in which an order still has a claim on its products: it may be
-# booked, under review, confirmed (bags reserved) or on hold. A dispatched,
-# delivered or rejected order is finished with them.
-OPEN_ORDER_STATUS_IDS = (
-    StatusIds.BOOKED,
-    StatusIds.UNDER_REVIEW,
-    StatusIds.CONFIRMED,
-    StatusIds.ON_HOLD,
-)
-
-
-def _idle_problems(product: Product) -> list[str]:
-    """Why ``product`` is still holding bags, packets or orders; empty when idle.
-
-    Read with the same figures the stock screens and the ledger use
-    (:func:`StockLedgerOperations.read_positions`): counted bags and loose
-    packets, and what orders have reserved. Open order lines are checked on top,
-    because an order still being reviewed reserves nothing yet but is about to.
-    """
-    position = read_positions([product.id])[product.id]
-    counted = {StockPoolKind.BAG: 0, StockPoolKind.LOOSE: 0}
-    reserved = {StockPoolKind.BAG: 0, StockPoolKind.LOOSE: 0}
-    for (kind, _), figures in position.items():
-        if kind in counted:
-            counted[kind] += int(figures["on_hand"])
-            reserved[kind] += int(figures["reserved"])
-    problems = []
-    if counted[StockPoolKind.BAG]:
-        problems.append(f"{counted[StockPoolKind.BAG]} bag(s) in stock")
-    if counted[StockPoolKind.LOOSE]:
-        problems.append(f"{counted[StockPoolKind.LOOSE]} loose packet(s) in stock")
-    if reserved[StockPoolKind.BAG] or reserved[StockPoolKind.LOOSE]:
-        problems.append("bags or packets reserved for orders")
-    if (
-        OrderItem.objects.filter(
-            product_packaging__product=product,
-            order__is_deleted=False,
-            order__status_id__in=OPEN_ORDER_STATUS_IDS,
-        ).exists()
-        or CustomOrderItem.objects.filter(
-            product=product,
-            custom_order__is_deleted=False,
-            custom_order__status_id__in=OPEN_ORDER_STATUS_IDS,
-        ).exists()
-    ):
-        problems.append("open orders")
-    return problems
-
 
 def transfer_raw_material(
     *, source: Product, target: Product, quantity_kg: Decimal, actor: User
@@ -832,10 +781,12 @@ def transfer_raw_material(
 
     * the two products differ and share a crop;
     * both are usable;
-    * ``source`` is idle -- no bag or loose packet in stock or reserved and no
-      open order line (see :func:`_idle_problems`);
-    * ``source`` has ``quantity_kg`` of unpacked raw material to give, in
-      lots that are movable.
+    * ``source`` has ``quantity_kg`` of available raw material to give
+      (:func:`InventoryOperations.raw_available_kg`: inward less what is
+      packed into bags or loose packets and wasted), in lots that are movable.
+
+    The source's bags, loose packets and orders are not looked at: what is
+    packed or reserved is already outside the available kilograms.
 
     Recorded in the stock ledger as ``RAW_LOT_TRANSFERRED``, one event per
     product. Returns the new ``target`` lots, oldest source lot first.
@@ -860,16 +811,6 @@ def transfer_raw_material(
     ) as rec:
         assert_products_usable([source, target], action="take part in a transfer")
         lock_raw_pools([source.id, target.id])
-        problems = _idle_problems(source)
-        if problems:
-            raise ValidationError(
-                {
-                    "source_product": (
-                        f"'{source.name}' cannot be transferred while it has "
-                        f"{', '.join(problems)}."
-                    )
-                }
-            )
         available = InventoryOperations.raw_available_kg(source)
         if quantity_kg > available:
             raise ValidationError(
