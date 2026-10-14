@@ -291,8 +291,10 @@ class TransferProductApiTest(WebApiTestCase):
 
         self._refused(response, "not usable")
 
-    def test_bags_in_stock_block_the_transfer(self):
-        """tests/test_transfer_product_api.py::TransferProductApiTest::test_bags_in_stock_block_the_transfer"""
+    # -- bags and orders do not matter -----------------------------------------
+
+    def test_bags_in_stock_leave_only_the_available_kg_to_move(self):
+        """tests/test_transfer_product_api.py::TransferProductApiTest::test_bags_in_stock_leave_only_the_available_kg_to_move"""
         bag = ProductPackaging.objects.create(
             product=self.source,
             packet_weight=Decimal("1.000"),
@@ -306,13 +308,19 @@ class TransferProductApiTest(WebApiTestCase):
             counts=dict.fromkeys(ProductPackaging.objects.all(), 0) | {bag: 1},
             actor=self.admin_user,
         )
+        available = inv.raw_available_kg(self.source)
+        target_before = inv.raw_available_kg(self.target)
 
-        response = self._transfer("10")
+        self._refused(self._transfer(str(available + Decimal("0.001"))), "Not enough raw material")
+        response = self._transfer(str(available))
 
-        self._refused(response, "1 bag(s) in stock")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["source"]["available_kg"], "0.000")
+        self.assertEqual(inv.raw_available_kg(self.target), target_before + available)
+        self.assertEqual(inv.raw_bagged_kg(self.source), Decimal("10"), "the bag stays packed")
 
-    def test_an_open_order_blocks_the_transfer(self):
-        """tests/test_transfer_product_api.py::TransferProductApiTest::test_an_open_order_blocks_the_transfer"""
+    def test_an_open_order_does_not_block_the_transfer(self):
+        """tests/test_transfer_product_api.py::TransferProductApiTest::test_an_open_order_does_not_block_the_transfer"""
         bag = ProductPackaging.objects.create(
             product=self.source,
             packet_weight=Decimal("1.000"),
@@ -330,8 +338,9 @@ class TransferProductApiTest(WebApiTestCase):
 
         response = self._transfer("10")
 
-        self._refused(response, "open orders")
-        self.assertEqual(inv.raw_available_kg(self.source), Decimal("100"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(inv.raw_available_kg(self.source), Decimal("90"))
+        self.assertEqual(inv.raw_available_kg(self.target), Decimal("10"))
 
     def test_validation_of_the_request(self):
         """tests/test_transfer_product_api.py::TransferProductApiTest::test_validation_of_the_request"""
