@@ -10,6 +10,7 @@ from .AcceptReturnOrderView import AcceptReturnOrderView
 from .AdminsView import AdminsView
 from .ApproveFieldTripView import ApproveFieldTripView
 from .BagStockView import BagStockView
+from .ChangeTransportAgencyView import ChangeTransportAgencyView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
 from .ConvertRejectedLotToWasteView import ConvertRejectedLotToWasteView
 from .CreateCustomOrderView import CreateCustomOrderView
@@ -211,6 +212,11 @@ urlpatterns = [
         "upload-lr-number/<str:public_id>",
         UploadLRNumberView.as_view(),
         name="upload-lr-number",
+    ),
+    path(
+        "change-transport-agency/<str:public_id>",
+        ChangeTransportAgencyView.as_view(),
+        name="change-transport-agency",
     ),
     path(
         "revert-dispatch/<str:public_id>",

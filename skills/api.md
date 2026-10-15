@@ -355,6 +355,17 @@ consignment note on the order's `DispatchDetails`. **A private dispatch is a
 on our own vehicle there is no third party to issue one. The challan reads it
 through `DispatchEntry.lr_number` rather than storing a second copy.
 
+`PATCH /api/sales-admin/change-transport-agency/<public_id>` (body
+`{"transport_agency_id": <id>}`) moves a dispatched order to another of its
+client's agencies, for when the goods went with a different transporter than the
+one planned at booking. **DISPATCHED agency dispatches only**: any other status is
+a 400 (a DELIVERED order's LR was issued by the old agency, and an earlier order
+is changed through `edit-order`), and so is an own-vehicle dispatch, which has no
+transporter to replace. The agency must be one of the order's client's and differ
+from the current one. `Order.transport_agency` is the only place an order's
+agency is stored -- `DispatchDetails` and `DispatchEntry` hold none -- so the
+order payloads, exports and the challan all follow from that one column.
+
 `GET /api/sales-admin/dispatch-challans/` lists dispatched orders whose challan
 is complete, each row being the printable challan itself: our consignor block
 (`aggregator/CompanyDetails.py` � placeholder values until the real registration
