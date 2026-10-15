@@ -327,6 +327,8 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
 
 def waste_ref(entry: InwardRawMaterial) -> dict | None:
     """The ``waste`` block of a lot payload; null unless the lot is converted to waste."""
+    if entry.status_id != StatusIds.RAW_MATERIAL_REJECTED.value:
+        return None  # only a rejected lot can be converted; skips a query per row
     waste = next(iter(entry.waste_entries.all()), None)
     return {"public_id": waste.public_id} if waste is not None else None
 
