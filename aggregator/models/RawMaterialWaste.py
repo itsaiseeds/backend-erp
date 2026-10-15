@@ -48,6 +48,19 @@ class RawMaterialWaste(
         help_text="Why it was wasted (free text).",
     )
 
+    inward_raw_material = models.ForeignKey(
+        "aggregator.InwardRawMaterial",
+        verbose_name="source rejected lot",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="waste_entries",
+        help_text=(
+            "Set when this row writes off a whole lab-rejected lot "
+            "(``InventoryOperations.convert_rejected_lot_to_waste``)."
+        ),
+    )
+
     class Meta:
         verbose_name = "raw material waste"
         verbose_name_plural = "raw material wastes"
@@ -57,12 +70,34 @@ class RawMaterialWaste(
                 condition=models.Q(quantity_kg__gt=0),
                 name="ck_rawmaterialwaste_quantity_kg_positive",
             ),
+            models.UniqueConstraint(
+                fields=["inward_raw_material"],
+                condition=models.Q(is_deleted=False, inward_raw_material__isnull=False),
+                name="uq_rawmaterialwaste_live_lot",
+            ),
         ]
 
     def guard_soft_delete(self, perform):
-        """Delete the waste row, recording the kilograms it gives back to raw."""
+        """Delete the waste row, recording the kilograms it gives back."""
         from aggregator import InventoryOperations, StockLedgerOperations
         from aggregator.ProductOperations import assert_products_usable
+
+        if self.inward_raw_material_id is not None:
+            with StockLedgerOperations.recording(
+                StockEventType.WASTE_TO_REJECTED,
+                StockEventDetail.NONE,
+                [self.product_id],
+                source=self,
+            ) as rec:
+                assert_products_usable(
+                    [self.product_id], action="restore this lot to rejected"
+                )
+                InventoryOperations.lock_rejected_lots([self.inward_raw_material_id])
+                InventoryOperations.lock_waste_pools([self.product_id])
+                perform()
+                InventoryOperations.assert_waste_available([self.product_id])
+                rec.actor = self.deleted_by
+            return
 
         with StockLedgerOperations.recording(
             StockEventType.RAW_WASTED,

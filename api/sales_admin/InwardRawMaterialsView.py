@@ -67,7 +67,7 @@ class InwardRawMaterialsView(AdminPaginatedDateRangeListView):
     def get_queryset(self, request: Request) -> QuerySet:
         return InwardRawMaterial.objects.filter(product__is_usable=True).select_related(
             "product", "party", "status", "created_by", "return_order__order", "lab_testing"
-        )
+        ).prefetch_related("waste_entries")
 
     def serialize_page(self, page_items, request: Request) -> list[dict]:
         return [inward_raw_material_payload(entry) for entry in page_items]

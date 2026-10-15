@@ -85,6 +85,14 @@ class InwardLabTestingRefSerializer(serializers.Serializer):
     grow_out_test = serializers.CharField(help_text="100 - genetical impurity, in percent.")
 
 
+class InwardRawMaterialWasteRefSerializer(serializers.Serializer):
+    """The waste row a converted rejected lot is written off by."""
+
+    public_id = serializers.CharField(
+        help_text="The waste row's public id (WS-...). DELETE it to restore the lot to rejected."
+    )
+
+
 class InwardRawMaterialPayloadSerializer(serializers.Serializer):
     """Output shape for one raw-material lot."""
 
@@ -106,6 +114,10 @@ class InwardRawMaterialPayloadSerializer(serializers.Serializer):
     lab_testing = InwardLabTestingRefSerializer(
         allow_null=True,
         help_text="The lot's lab test; null until a lab tester has tested it.",
+    )
+    waste = InwardRawMaterialWasteRefSerializer(
+        allow_null=True,
+        help_text="The live waste row when this rejected lot is converted to waste; else null.",
     )
     created_by = InwardCreatedByRefSerializer(allow_null=True, help_text="Who booked the lot.")
 
@@ -254,6 +266,14 @@ RAW_LOT_SORT_OPTIONS = (
 )
 
 
+class RawMaterialWasteLotRefSerializer(serializers.Serializer):
+    """The rejected lot a waste row was converted from."""
+
+    public_id = serializers.CharField()
+    lot_no = serializers.CharField()
+    farmer_name = serializers.CharField()
+
+
 class RawMaterialWastePayloadSerializer(serializers.Serializer):
     """Output shape for one raw-material waste row."""
 
@@ -261,6 +281,13 @@ class RawMaterialWastePayloadSerializer(serializers.Serializer):
     product = InwardRawMaterialProductRefSerializer()
     quantity_kg = serializers.CharField(help_text="Kilograms wasted.")
     reason = serializers.CharField(allow_blank=True)
+    inward_raw_material = RawMaterialWasteLotRefSerializer(
+        allow_null=True,
+        help_text=(
+            "The rejected lot this row converted to waste; null for ordinary waste. "
+            "Its quantity cannot be edited; DELETE restores the lot to rejected."
+        ),
+    )
     created_at = serializers.DateTimeField(help_text="When the waste was recorded.")
     created_by = InwardCreatedByRefSerializer(allow_null=True)
 
@@ -294,6 +321,18 @@ class CreateRawMaterialWasteSerializer(serializers.Serializer):
                 {"quantity_kg": "Quantity must be greater than zero."}
             )
         return attrs
+
+
+class ConvertRejectedLotToWasteSerializer(serializers.Serializer):
+    """Request validation for converting a whole rejected lot to waste."""
+
+    reason = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Why it was written off; defaults to 'Rejected lot <lot_no> (<farmer>)'.",
+    )
 
 
 class TransferProductSerializer(serializers.Serializer):
@@ -1055,9 +1094,16 @@ class RawMaterialStockLineSerializer(serializers.Serializer):
     packed_kg = serializers.CharField(
         help_text="KG already packed into bags or sample packets."
     )
-    wasted_kg = serializers.CharField(help_text="KG written off as waste (undated).")
+    wasted_kg = serializers.CharField(
+        help_text=(
+            "KG written off as waste (undated), including rejected lots converted to waste."
+        )
+    )
     available_kg = serializers.CharField(
-        help_text="KG left to pack: incoming_kg minus packed_kg minus wasted_kg."
+        help_text=(
+            "KG left to pack: incoming_kg minus packed_kg minus the waste taken from "
+            "In Use stock (wasted_kg less rejected lots converted to waste)."
+        )
     )
     rejected_kg = serializers.CharField(
         help_text="Rejected KG with a reached effective date. Reported only, never spendable."

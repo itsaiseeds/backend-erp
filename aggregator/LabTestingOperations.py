@@ -250,6 +250,9 @@ def update_lab_test(
                 InventoryOperations.assert_rejected_lot_not_booked(
                     lot, "change this lab result"
                 )
+                InventoryOperations.assert_rejected_lot_not_wasted(
+                    lot, "change this lab result"
+                )
             except ValidationError as exc:
                 raise ValidationError({"result": exc.messages[0]}) from None
         test.result = new_result

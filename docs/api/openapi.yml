@@ -1350,6 +1350,39 @@ paths:
       responses:
         '204':
           description: No response body
+  /android/api/v1/godown/inward-raw-material/{public_id}/convert-to-waste:
+    post:
+      operationId: android_api_v1_godown_convert_rejected_lot_to_waste
+      description: Write a whole rejected lot off as waste (godown manager only).
+      summary: Convert a rejected lot to waste
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialWastePayload'
+          description: ''
   /android/api/v1/godown/inward-raw-materials:
     get:
       operationId: android_api_v1_godown_inward_raw_materials_list
@@ -1811,7 +1844,8 @@ paths:
                   reuse_other_material: false
                 summary: End-of-season clear-out (reuse_other_material false)
                 description: The packing material of the bags taken off is not given
-                  back; the seed returns to raw material. Ignored if any line is raised.
+                  back; the seed returns to raw material. A raised line ignores the
+                  flag.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
@@ -1903,8 +1937,8 @@ paths:
                   reuse_other_material: false
                 summary: End-of-season clear-out (reuse_other_material false)
                 description: The packing material of the packets taken off is not
-                  given back; the seed returns to raw material. Ignored if any line
-                  is raised.
+                  given back; the seed returns to raw material. A raised line ignores
+                  the flag.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
@@ -4064,6 +4098,39 @@ paths:
       responses:
         '204':
           description: No response body
+  /android/api/v2/godown/inward-raw-material/{public_id}/convert-to-waste:
+    post:
+      operationId: android_api_v2_godown_convert_rejected_lot_to_waste
+      description: Write a whole rejected lot off as waste (godown manager only).
+      summary: Convert a rejected lot to waste
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Android · Godown
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialWastePayload'
+          description: ''
   /android/api/v2/godown/inward-raw-materials:
     get:
       operationId: android_api_v2_godown_inward_raw_materials_list
@@ -4534,7 +4601,8 @@ paths:
                   reuse_other_material: false
                 summary: End-of-season clear-out (reuse_other_material false)
                 description: The packing material of the bags taken off is not given
-                  back; the seed returns to raw material. Ignored if any line is raised.
+                  back; the seed returns to raw material. A raised line ignores the
+                  flag.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
@@ -4626,8 +4694,8 @@ paths:
                   reuse_other_material: false
                 summary: End-of-season clear-out (reuse_other_material false)
                 description: The packing material of the packets taken off is not
-                  given back; the seed returns to raw material. Ignored if any line
-                  is raised.
+                  given back; the seed returns to raw material. A raised line ignores
+                  the flag.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
@@ -7486,6 +7554,39 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/sales-admin/inward-raw-material/{public_id}/convert-to-waste:
+    post:
+      operationId: sales_admin_convert_rejected_lot_to_waste
+      description: Write a whole rejected lot off as waste (app admin only).
+      summary: Convert a rejected lot to waste
+      parameters:
+      - in: path
+        name: public_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin · Inward
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConvertRejectedLotToWasteRequest'
+      security:
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawMaterialWastePayload'
+          description: ''
   /api/sales-admin/inward-raw-materials:
     get:
       operationId: sales_admin_inward_raw_materials_list
@@ -9527,7 +9628,8 @@ paths:
                   reuse_other_material: false
                 summary: End-of-season clear-out (reuse_other_material false)
                 description: The packing material of the bags taken off is not given
-                  back; the seed returns to raw material. Ignored if any line is raised.
+                  back; the seed returns to raw material. A raised line ignores the
+                  flag.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateTodaysInventoryRequest'
@@ -9647,8 +9749,8 @@ paths:
                   reuse_other_material: false
                 summary: End-of-season clear-out (reuse_other_material false)
                 description: The packing material of the packets taken off is not
-                  given back; the seed returns to raw material. Ignored if any line
-                  is raised.
+                  given back; the seed returns to raw material. A raised line ignores
+                  the flag.
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedUpdateLooseStockRequest'
@@ -11206,6 +11308,16 @@ components:
           default: false
       required:
       - name
+    ConvertRejectedLotToWasteRequest:
+      type: object
+      description: Request validation for converting a whole rejected lot to waste.
+      properties:
+        reason:
+          type: string
+          default: ''
+          description: Why it was written off; defaults to 'Rejected lot <lot_no>
+            (<farmer>)'.
+          maxLength: 255
     Country:
       type: object
       description: Output shape for one country row (schema only; responses are built
@@ -13283,6 +13395,12 @@ components:
           - $ref: '#/components/schemas/InwardLabTestingRef'
           nullable: true
           description: The lot's lab test; null until a lab tester has tested it.
+        waste:
+          allOf:
+          - $ref: '#/components/schemas/InwardRawMaterialWasteRef'
+          nullable: true
+          description: The live waste row when this rejected lot is converted to waste;
+            else null.
         created_at:
           type: string
           format: date-time
@@ -13299,6 +13417,7 @@ components:
       - quantity_kg
       - return_order
       - status
+      - waste
     ExportLabTestingsResponse:
       type: object
       description: Fields every export response carries around its ``results`` (schema
@@ -14172,6 +14291,12 @@ components:
           - $ref: '#/components/schemas/InwardLabTestingRef'
           nullable: true
           description: The lot's lab test; null until a lab tester has tested it.
+        waste:
+          allOf:
+          - $ref: '#/components/schemas/InwardRawMaterialWasteRef'
+          nullable: true
+          description: The live waste row when this rejected lot is converted to waste;
+            else null.
         created_by:
           allOf:
           - $ref: '#/components/schemas/InwardCreatedByRef'
@@ -14190,6 +14315,7 @@ components:
       - quantity_kg
       - return_order
       - status
+      - waste
     InwardRawMaterialProductRef:
       type: object
       description: Output shape for the ``product`` reference on a lot.
@@ -14200,6 +14326,16 @@ components:
           type: string
       required:
       - name
+      - public_id
+    InwardRawMaterialWasteRef:
+      type: object
+      description: The waste row a converted rejected lot is written off by.
+      properties:
+        public_id:
+          type: string
+          description: The waste row's public id (WS-...). DELETE it to restore the
+            lot to rejected.
+      required:
       - public_id
     InwardReturnOrderRef:
       type: object
@@ -15926,11 +16062,11 @@ components:
         reuse_other_material:
           type: boolean
           default: true
-          description: '``true`` (default): packets taken off the count give their
-            packing material (leaflets, covers) back. ``false``: the packing material
-            of the packets taken off is discarded, not given back. The flag is ignored
-            (treated as ``true``) when any line is above the packets on hand now.
-            The seed of those packets returns to raw material either way.'
+          description: 'Only applies to lines whose packet count goes down; a line
+            that goes up ignores it. ``true`` (default): the packets taken off give
+            their packing material (leaflets, covers) back. ``false``: their packing
+            material is discarded, not given back. The seed of those packets returns
+            to raw material either way.'
     PatchedUpdateNonStockInwardRequest:
       type: object
       description: Request validation for a partial edit (every field optional, at
@@ -16149,11 +16285,11 @@ components:
         reuse_other_material:
           type: boolean
           default: true
-          description: '``true`` (default): bags taken off the count give their packing
-            material (leaflets, covers) back. ``false``: the packing material of the
-            bags taken off is discarded, not given back. The flag is ignored (treated
-            as ``true``) when any line is above the bags on hand now. The seed of
-            those bags returns to raw material either way.'
+          description: 'Only applies to lines whose bag count goes down; a line that
+            goes up ignores it. ``true`` (default): the bags taken off give their
+            packing material (leaflets, covers) back. ``false``: their packing material
+            is discarded, not given back. The seed of those bags returns to raw material
+            either way.'
     PatchedUpdateWasteOrderRequest:
       type: object
       description: Request validation for a waste-order update -- every field optional.
@@ -16387,10 +16523,12 @@ components:
           description: KG already packed into bags or sample packets.
         wasted_kg:
           type: string
-          description: KG written off as waste (undated).
+          description: KG written off as waste (undated), including rejected lots
+            converted to waste.
         available_kg:
           type: string
-          description: 'KG left to pack: incoming_kg minus packed_kg minus wasted_kg.'
+          description: 'KG left to pack: incoming_kg minus packed_kg minus the waste
+            taken from In Use stock (wasted_kg less rejected lots converted to waste).'
         rejected_kg:
           type: string
           description: Rejected KG with a reached effective date. Reported only, never
@@ -16451,6 +16589,20 @@ components:
       - results
       - total_count
       - total_pages
+    RawMaterialWasteLotRef:
+      type: object
+      description: The rejected lot a waste row was converted from.
+      properties:
+        public_id:
+          type: string
+        lot_no:
+          type: string
+        farmer_name:
+          type: string
+      required:
+      - farmer_name
+      - lot_no
+      - public_id
     RawMaterialWastePayload:
       type: object
       description: Output shape for one raw-material waste row.
@@ -16464,6 +16616,12 @@ components:
           description: Kilograms wasted.
         reason:
           type: string
+        inward_raw_material:
+          allOf:
+          - $ref: '#/components/schemas/RawMaterialWasteLotRef'
+          nullable: true
+          description: The rejected lot this row converted to waste; null for ordinary
+            waste. Its quantity cannot be edited; DELETE restores the lot to rejected.
         created_at:
           type: string
           format: date-time
@@ -16475,6 +16633,7 @@ components:
       required:
       - created_at
       - created_by
+      - inward_raw_material
       - product
       - public_id
       - quantity_kg
@@ -17482,11 +17641,11 @@ components:
         reuse_other_material:
           type: boolean
           default: true
-          description: '``true`` (default): packets taken off the count give their
-            packing material (leaflets, covers) back. ``false``: the packing material
-            of the packets taken off is discarded, not given back. The flag is ignored
-            (treated as ``true``) when any line is above the packets on hand now.
-            The seed of those packets returns to raw material either way.'
+          description: 'Only applies to lines whose packet count goes down; a line
+            that goes up ignores it. ``true`` (default): the packets taken off give
+            their packing material (leaflets, covers) back. ``false``: their packing
+            material is discarded, not given back. The seed of those packets returns
+            to raw material either way.'
       required:
       - counts
     UpdateTodaysInventoryRequest:
@@ -17507,11 +17666,11 @@ components:
         reuse_other_material:
           type: boolean
           default: true
-          description: '``true`` (default): bags taken off the count give their packing
-            material (leaflets, covers) back. ``false``: the packing material of the
-            bags taken off is discarded, not given back. The flag is ignored (treated
-            as ``true``) when any line is above the bags on hand now. The seed of
-            those bags returns to raw material either way.'
+          description: 'Only applies to lines whose bag count goes down; a line that
+            goes up ignores it. ``true`` (default): the bags taken off give their
+            packing material (leaflets, covers) back. ``false``: their packing material
+            is discarded, not given back. The seed of those bags returns to raw material
+            either way.'
       required:
       - counts
     UploadLRNumberRequest:

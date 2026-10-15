@@ -82,6 +82,20 @@ class _State:
         default_factory=lambda: dict.fromkeys(LINE_FIELDS[RAW], ZERO)
     )
     other: dict[OtherKey, dict[str, Decimal]] = field(default_factory=dict)
+    # RAW ``wasted`` kg that came from converted rejected lots, tallied from the
+    # REJECTED_TO_WASTE / WASTE_TO_REJECTED events (in memory only). Those kg
+    # never came out of usable stock, so ``_available`` leaves them out.
+    rejected_wasted: Decimal = ZERO
+
+    def apply_event(self, event: StockEvent) -> None:
+        """Add every line of ``event``, plus its share of ``rejected_wasted``."""
+        for line in event.lines.all():
+            self.apply(line)
+            if (
+                event.event_type in _REJECTED_WASTE_EVENTS
+                and line.pool_kind == RAW
+            ):
+                self.rejected_wasted += line.d_wasted or ZERO
 
     def apply(self, line: StockEventLine) -> None:
         """Add one line of the product's own event."""
@@ -108,11 +122,23 @@ class _State:
             figures[name] += getattr(line, f"d_{name}") or ZERO
 
 
-def _available(figures: dict[str, Decimal], kind: int) -> Decimal:
+_REJECTED_WASTE_EVENTS = (
+    StockEventType.REJECTED_TO_WASTE,
+    StockEventType.WASTE_TO_REJECTED,
+)
+
+
+def _available(
+    figures: dict[str, Decimal], kind: int, rejected_wasted: Decimal = ZERO
+) -> Decimal:
     if kind in (BAG, LOOSE):
         return figures["on_hand"] - figures["reserved"] - figures["consumed"]
     if kind == RAW:
-        return figures["incoming"] - figures["packed"] - figures["wasted"]
+        return (
+            figures["incoming"]
+            - figures["packed"]
+            - (figures["wasted"] - rejected_wasted)
+        )
     return figures["incoming"] - figures["packed"]
 
 
@@ -167,10 +193,10 @@ def _pool_payloads(
     ]
     raw_material = {
         **{name: _fmt(state.raw[name]) for name in LINE_FIELDS[RAW]},
-        "available": _fmt(_available(state.raw, RAW)),
+        "available": _fmt(_available(state.raw, RAW, state.rejected_wasted)),
         "change": {
             **{name: _fmt(change.raw[name]) for name in LINE_FIELDS[RAW]},
-            "available": _fmt(_available(change.raw, RAW)),
+            "available": _fmt(_available(change.raw, RAW, change.rejected_wasted)),
         },
     }
     other_materials = []
@@ -237,7 +263,19 @@ def _source_payload(event: StockEvent, product: Product) -> dict[str, object] | 
         return {"kind": "inward_other_material", "public_id": lot.public_id, "label": label}
     if event.raw_material_waste_id:
         waste = event.raw_material_waste
-        return {"kind": "raw_material_waste", "public_id": waste.public_id, "label": waste.reason}
+        payload: dict[str, object] = {
+            "kind": "raw_material_waste",
+            "public_id": waste.public_id,
+            "label": waste.reason,
+        }
+        if waste.inward_raw_material_id:
+            lot = waste.inward_raw_material
+            payload["inward_raw_material"] = {
+                "public_id": lot.public_id,
+                "lot_no": lot.lot_no,
+                "farmer_name": lot.farmer_name,
+            }
+        return payload
     if event.inventory_snapshot_id:
         snapshot = event.inventory_snapshot
         return {
@@ -272,7 +310,7 @@ def _window_events(product: Product, window_end: datetime) -> list[StockEvent]:
             "custom_order__client",
             "inward_raw_material",
             "inward_other_material__recipe__material_type",
-            "raw_material_waste",
+            "raw_material_waste__inward_raw_material",
             "inventory_snapshot",
             "loose_stock_snapshot",
         )
@@ -358,9 +396,8 @@ def product_ledger_rows(
         if in_window and opening is None:
             opening = row("OPENING_BALANCE", None, window_start, _State())
         change = _State()
-        for line in event.lines.all():
-            state.apply(line)
-            change.apply(line)
+        state.apply_event(event)
+        change.apply_event(event)
         if not in_window:
             continue
         detail = StockEventDetail(event.detail)

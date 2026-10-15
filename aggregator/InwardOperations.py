@@ -137,10 +137,10 @@ def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
     come is counted in ``InventoryOperations.raw_available_kg`` at all --
     removing anything else (still ``Lab Testing``, dated in the future, or
     ``Rejected``) is always safe -- except that a rejected lot with kg on a
-    rejected order cannot leave Rejected. A rejected lot was never packable in
-    the first place, so nothing else refuses it. Removing a counted lot must
-    not strand bags or sample packets that were packed from its kilograms
-    with no raw material behind them.
+    rejected order, or converted to waste, cannot leave Rejected. A rejected
+    lot was never packable in the first place, so nothing else refuses it.
+    Removing a counted lot must not strand bags or sample packets that were
+    packed from its kilograms with no raw material behind them.
 
     Raises ``ValueError`` with a message an API renders as a 400, the same
     convention as ``assert_raw_status_transition``.
@@ -148,6 +148,7 @@ def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
     if raw_status_of(entry) == InwardRawMaterialStatus.RAW_MATERIAL_REJECTED:
         try:
             InventoryOperations.assert_rejected_lot_not_booked(entry, "remove this lot")
+            InventoryOperations.assert_rejected_lot_not_wasted(entry, "remove this lot")
         except ValidationError as exc:
             raise ValueError(exc.messages[0]) from None
         return
@@ -315,12 +316,19 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
             entry.effective_date.isoformat() if entry.effective_date is not None else None
         ),
         "lab_testing": lab_testing_ref(entry),
+        "waste": waste_ref(entry),
         "created_by": (
             {"id": entry.created_by_id, "name": entry.created_by.display_name}
             if entry.created_by_id is not None
             else None
         ),
     }
+
+
+def waste_ref(entry: InwardRawMaterial) -> dict | None:
+    """The ``waste`` block of a lot payload; null unless the lot is converted to waste."""
+    waste = next(iter(entry.waste_entries.all()), None)
+    return {"public_id": waste.public_id} if waste is not None else None
 
 
 def lab_testing_ref(entry: InwardRawMaterial) -> dict | None:
@@ -348,6 +356,15 @@ def raw_waste_payload(entry: RawMaterialWaste) -> dict:
         },
         "quantity_kg": str(entry.quantity_kg),
         "reason": entry.reason,
+        "inward_raw_material": (
+            {
+                "public_id": entry.inward_raw_material.public_id,
+                "lot_no": entry.inward_raw_material.lot_no,
+                "farmer_name": entry.inward_raw_material.farmer_name,
+            }
+            if entry.inward_raw_material_id is not None
+            else None
+        ),
         "created_at": entry.created_at.isoformat(),
         "created_by": (
             {"id": entry.created_by_id, "name": entry.created_by.display_name}
@@ -403,6 +420,9 @@ def _dated_raw_kg_by_product(
         effective_date__lte=as_of,
         status_id=status_id,
     )
+    if status_id == StatusIds.RAW_MATERIAL_REJECTED.value:
+        # A rejected lot converted to waste is counted as wasted, not rejected.
+        query = query.exclude(InventoryOperations.wasted_lot_filter())
     if product_public_ids:
         query = query.filter(product__public_id__in=product_public_ids)
     rows = (
@@ -431,8 +451,10 @@ def raw_incoming_stock(
     since been packed into bags or sample packets
     (``InventoryOperations.raw_bagged_kg`` + ``raw_loose_kg``, read as of now
     -- a count has no "as of" of its own), ``wasted_kg`` is what was written
-    off (``raw_wasted_kg``, undated) and ``available_kg`` is what is left to
-    pack. The ``waste_*_kg`` figures are the waste pool waste orders draw on
+    off (``raw_wasted_kg``, undated, including rejected lots converted to
+    waste) and ``available_kg`` is what is left to pack (it only subtracts the
+    waste taken from In Use stock, ``raw_only_wasted_kg``). The ``waste_*_kg``
+    figures are the waste pool waste orders draw on
     (``InventoryOperations.waste_available_kg``): they do not change
     ``available_kg``, since waste is already written off from raw. Rejected
     kilograms are never counted there -- a rejected lot is
@@ -450,7 +472,13 @@ def raw_incoming_stock(
     rejected = _dated_raw_kg_by_product(
         StatusIds.RAW_MATERIAL_REJECTED.value, as_of, product_public_ids
     )
-    product_ids = sorted(set(incoming) | set(rejected))
+    converted = RawMaterialWaste.objects.filter(inward_raw_material__isnull=False)
+    if product_public_ids:
+        converted = converted.filter(product__public_id__in=product_public_ids)
+    # A product whose only rejected lots were converted to waste still has a line.
+    product_ids = sorted(
+        set(incoming) | set(rejected) | set(converted.values_list("product_id", flat=True))
+    )
     sold = InventoryOperations.rejected_sold_kg_by_product(product_ids)
     products = Product.objects.in_bulk(product_ids)
     lines = []
@@ -465,17 +493,18 @@ def raw_incoming_stock(
             product
         ) + InventoryOperations.raw_loose_kg(product)
         wasted_kg = InventoryOperations.raw_wasted_kg(product)
-        row = incoming[product_id] if product_id in incoming else rejected[product_id]
         lines.append(
             {
                 "product_id": product_id,
-                "public_id": row["public_id"],
-                "name": row["name"],
+                "public_id": product.public_id,
+                "name": product.name,
                 "is_usable": product.is_usable,
                 "incoming_kg": incoming_kg,
                 "packed_kg": packed_kg,
                 "wasted_kg": wasted_kg,
-                "available_kg": incoming_kg - packed_kg - wasted_kg,
+                "available_kg": incoming_kg
+                - packed_kg
+                - InventoryOperations.raw_only_wasted_kg(product),
                 "rejected_kg": rejected_kg,
                 "waste_reserved_kg": InventoryOperations.waste_reserved_kg(product),
                 "waste_consumed_kg": InventoryOperations.waste_consumed_kg(product),

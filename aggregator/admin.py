@@ -1164,6 +1164,15 @@ class RawMaterialWasteAdmin(
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
 
+    readonly_fields = ("inward_raw_material",)
+
+    def has_change_permission(self, request, obj=None):
+        # A row converted from a rejected lot is never edited: restoring the lot
+        # must give back exactly the lot's kg.
+        if obj is not None and obj.inward_raw_material_id is not None:
+            return False
+        return super().has_change_permission(request, obj)
+
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         # Waste already sold on a waste order cannot be lowered away.

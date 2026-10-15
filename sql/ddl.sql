@@ -1400,6 +1400,8 @@ CREATE INDEX IF NOT EXISTS aggregator_inwardrawmaterial_deleted_by_id_idx ON pub
 -- Raw material of a product written off as wasted. Each live row takes
 -- quantity_kg out of the product's unpacked raw pool. Deliberately undated:
 -- waste is a standing deduction. A wrong entry is soft-deleted.
+-- inward_raw_material_id is set when the row writes off a whole lab-rejected
+-- lot; at most one live row per lot (partial unique index below).
 CREATE TABLE IF NOT EXISTS public.aggregator_rawmaterialwaste (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1412,6 +1414,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_rawmaterialwaste (
 	product_id int8 NOT NULL,
 	quantity_kg numeric(10, 3) NOT NULL,
 	reason varchar(255) NOT NULL DEFAULT '',
+	inward_raw_material_id int8 NULL,
 	CONSTRAINT aggregator_rawmaterialwaste_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_rawmaterialwaste_public_id_key UNIQUE (public_id),
 	CONSTRAINT ck_rawmaterialwaste_quantity_kg_positive CHECK (quantity_kg > 0)
@@ -1421,6 +1424,8 @@ CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_product_id_idx ON public.
 CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_is_deleted_idx ON public.aggregator_rawmaterialwaste USING btree (is_deleted);
 CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_created_by_id_idx ON public.aggregator_rawmaterialwaste USING btree (created_by_id);
 CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_deleted_by_id_idx ON public.aggregator_rawmaterialwaste USING btree (deleted_by_id);
+CREATE INDEX IF NOT EXISTS aggregator_rawmaterialwaste_inward_raw_material_id_idx ON public.aggregator_rawmaterialwaste USING btree (inward_raw_material_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_rawmaterialwaste_live_lot ON public.aggregator_rawmaterialwaste USING btree (inward_raw_material_id) WHERE is_deleted = false AND inward_raw_material_id IS NOT NULL;
 
 -- aggregator_nonstockinward ---------------------------------------------------
 -- Incoming consumables that are not seed stock (pesticides, insecticides,
@@ -1846,6 +1851,7 @@ ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inward
 ALTER TABLE public.aggregator_inwardrawmaterial ADD CONSTRAINT aggregator_inwardrawmaterial_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_product_id_fk FOREIGN KEY (product_id) REFERENCES public.aggregator_product(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_inward_raw_material_id_fk FOREIGN KEY (inward_raw_material_id) REFERENCES public.aggregator_inwardrawmaterial(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_rawmaterialwaste ADD CONSTRAINT aggregator_rawmaterialwaste_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_nonstockinward ADD CONSTRAINT aggregator_nonstockinward_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
