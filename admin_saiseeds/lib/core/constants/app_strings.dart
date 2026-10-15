@@ -683,6 +683,21 @@ class AppStrings {
   static const String ORDER_MARK_DELIVERED_BLOCKED =
       'Only a dispatched, own-vehicle order can be marked delivered.';
 
+  static const String ORDER_CHANGE_TRANSPORT_AGENCY = 'Change Transport Agency';
+  static const String ORDER_CHANGE_TRANSPORT_AGENCY_BLOCKED =
+      'Only a dispatched, agency order has a transport agency to change.';
+  static const String ORDER_CHANGE_TRANSPORT_AGENCY_SUBTITLE =
+      'Pick one of this client\'s transport agencies.';
+  static const String ORDER_CHANGE_TRANSPORT_AGENCY_CURRENT = 'Currently via';
+  static const String ORDER_CHANGE_TRANSPORT_AGENCY_DONE =
+      'Transport agency changed';
+  static const String ORDER_CHANGE_TRANSPORT_AGENCY_NONE =
+      'This client has no transport agencies on file.';
+  static const String FIELD_TRANSPORT_AGENCY = 'Transport agency';
+  static const String FIELD_TRANSPORT_AGENCY_HINT = 'Select a transport agency';
+  static const String VALIDATION_TRANSPORT_AGENCY_REQUIRED =
+      'Select a transport agency.';
+
   // -- Return orders --------------------------------------------------------
 
   static const String RETURN_ORDERS = 'Return Orders';
@@ -1464,6 +1479,16 @@ class AppStrings {
   static const String INWARD_REVERT_DONE = 'Lot sent to Lab Testing';
   static const String INWARD_STATUS_CHANGE_LABEL = 'Change status';
   static const String INWARD_STATUS_KEEP = 'Leave unchanged';
+  static const String INWARD_CONVERT_TO_WASTE = 'Reject To Waste';
+  static const String INWARD_CONVERT_TO_WASTE_ACTION = 'Write off as waste';
+  static const String INWARD_CONVERT_TO_WASTE_BODY =
+      'The whole lot is written off as waste and leaves the rejected pool. '
+      'To undo this, delete the resulting row from Waste Management.';
+  static const String INWARD_CONVERT_TO_WASTE_REASON_HINT =
+      'Defaults to naming the lot and farmer';
+  static const String INWARD_CONVERT_TO_WASTE_BLOCKED =
+      'Only a rejected lot can be written off as waste.';
+  static const String INWARD_CONVERTED_TO_WASTE = 'Lot written off as waste';
   static const String COLUMN_LOT_NO = 'Lot No.';
   static const String FIELD_LOT_NO = 'Lot number';
   static const String FIELD_LOT_NO_HINT = 'e.g. SUP-LOT-A1';
@@ -1674,6 +1699,8 @@ class AppStrings {
 
   static const String WASTE_EDIT = 'Edit entry';
   static const String WASTE_REASON_MISSING = 'No reason given';
+  static const String WASTE_FROM_REJECTED_LOT_LABEL = 'From lot %s';
+  static const String WASTE_FROM_REJECTED_LOT_FIELD = 'From rejected lot';
 
   static const String PURCHASE_TRACKING = 'Purchase Tracking';
   static const String PURCHASE_TRACKING_DETAIL_TITLE = 'Purchase entry';

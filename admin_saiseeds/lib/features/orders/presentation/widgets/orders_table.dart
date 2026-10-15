@@ -49,6 +49,7 @@ class OrdersTable extends StatefulWidget {
   final void Function(OrderModel order)? onRevertDispatch;
   final void Function(OrderModel order)? onUploadLr;
   final void Function(OrderModel order)? onMarkDelivered;
+  final void Function(OrderModel order)? onChangeTransportAgency;
   final bool hasMore;
   final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
@@ -77,6 +78,7 @@ class OrdersTable extends StatefulWidget {
     this.onRevertDispatch,
     this.onUploadLr,
     this.onMarkDelivered,
+    this.onChangeTransportAgency,
     this.hasMore = false,
     this.onLoadMore,
     this.searchBarActions = const [],
@@ -360,6 +362,17 @@ class OrdersTableState extends State<OrdersTable> {
                     widget.onMarkDelivered == null
                 ? null
                 : () => widget.onMarkDelivered!(order),
+          ),
+          RowAction(
+            label: AppStrings.ORDER_CHANGE_TRANSPORT_AGENCY,
+            icon: Icons.sync_alt_outlined,
+            blockedHint: AppStrings.ORDER_CHANGE_TRANSPORT_AGENCY_BLOCKED,
+            onSelected:
+                !order.canChangeTransportAgency ||
+                    isBusy ||
+                    widget.onChangeTransportAgency == null
+                ? null
+                : () => widget.onChangeTransportAgency!(order),
           ),
           RowAction(
             label: AppStrings.ORDER_REJECT,

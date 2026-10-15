@@ -31,4 +31,7 @@ class OrdersEndpoints {
 
   static String markDelivered(String publicId) =>
       '$_base/mark-order-delivered/$publicId';
+
+  static String changeTransportAgency(String publicId) =>
+      '$_base/change-transport-agency/$publicId';
 }

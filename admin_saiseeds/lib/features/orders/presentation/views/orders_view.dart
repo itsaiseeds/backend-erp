@@ -11,6 +11,7 @@ import '../../data/models/order_model.dart';
 import '../../data/orders_repository.dart';
 import '../../../product_packagings/data/product_packagings_repository.dart';
 import '../bloc/orders_cubit.dart';
+import '../widgets/order_change_transport_agency_dialog.dart';
 import '../widgets/order_detail_dialog.dart';
 import '../widgets/order_dispatch_dialog.dart';
 import '../widgets/order_lr_dialog.dart';
@@ -162,6 +163,14 @@ class _OrdersContentState extends State<_OrdersContent> {
     OrderLrDialog.show(context, order, cubit: context.read<OrdersCubit>());
   }
 
+  void _onChangeTransportAgency(OrderModel order) {
+    OrderChangeTransportAgencyDialog.show(
+      context,
+      order,
+      cubit: context.read<OrdersCubit>(),
+    );
+  }
+
   void _onDispatch(OrderModel order) {
     OrderDispatchDialog.show(
       context,
@@ -237,6 +246,7 @@ class _OrdersContentState extends State<_OrdersContent> {
             onRevertDispatch: _onRevertDispatch,
             onUploadLr: _onUploadLr,
             onMarkDelivered: _onMarkDelivered,
+            onChangeTransportAgency: _onChangeTransportAgency,
             searchBarActions: [
               StockStatusChip(isComplete: state.isTodaysStockComplete),
               IconActionButton(

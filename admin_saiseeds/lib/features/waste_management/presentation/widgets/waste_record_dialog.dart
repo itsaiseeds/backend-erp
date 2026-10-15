@@ -202,6 +202,16 @@ class _WasteRecordDialogState extends State<WasteRecordDialog> {
             isEditable: false,
             isLocked: true,
           ),
+          right: _waste.isFromRejectedLot
+              ? RecordField(
+                  controller: TextEditingController(
+                    text: _waste.inwardRawMaterial!.lotNo,
+                  ),
+                  label: AppStrings.WASTE_FROM_REJECTED_LOT_FIELD,
+                  isEditable: false,
+                  isLocked: true,
+                )
+              : null,
         ),
       ],
     );
