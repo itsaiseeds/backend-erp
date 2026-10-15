@@ -394,6 +394,12 @@ class OrderModel {
 
   bool get canEdit => OrderStatusX.canEdit(status);
 
+  /// Only a dispatched order already going out by agency has a transport
+  /// agency to change -- an own-vehicle dispatch has none, and any other
+  /// status is too early or too late for it to matter.
+  bool get canChangeTransportAgency =>
+      OrderStatusX.canChangeTransportAgency(status) && isAgencyDispatch;
+
   static DateTime? _parseInstant(dynamic value) {
     final String raw = value == null ? '' : '$value'.trim();
     if (raw.isEmpty) return null;

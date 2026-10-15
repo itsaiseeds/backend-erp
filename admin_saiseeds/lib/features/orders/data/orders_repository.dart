@@ -93,4 +93,18 @@ class OrdersRepository {
   }) async {
     await _apiClient.patch(OrdersEndpoints.edit(publicId), body: changes);
   }
+
+  /// [transportAgencyId] is a `ClientTransportAgency` link id, scoped to the
+  /// order's own client -- the same id space `TransportAgencyModel.id` and
+  /// `edit-order`'s `client_transport_agency_id` already use, not the
+  /// underlying `TransportAgency`'s own id.
+  Future<void> changeTransportAgency({
+    required String publicId,
+    required int transportAgencyId,
+  }) async {
+    await _apiClient.patch(
+      OrdersEndpoints.changeTransportAgency(publicId),
+      body: {'transport_agency_id': transportAgencyId},
+    );
+  }
 }

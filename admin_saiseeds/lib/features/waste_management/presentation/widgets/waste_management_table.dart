@@ -191,7 +191,7 @@ class WasteManagementTableState extends State<WasteManagementTable> {
   Widget _buildCell(BuildContext context, WasteModel waste, AppDataColumn col) {
     switch (col.id) {
       case WasteManagementTable.COLUMN_PRODUCT:
-        return _textCell(waste.productName, isStrong: true);
+        return _productCell(waste);
       case WasteManagementTable.COLUMN_QUANTITY:
         return _textCell(waste.quantityKg);
       case WasteManagementTable.COLUMN_REASON:
@@ -230,6 +230,38 @@ class WasteManagementTableState extends State<WasteManagementTable> {
       default:
         return _textCell(AppStrings.TABLE_VALUE_UNAVAILABLE);
     }
+  }
+
+  Widget _productCell(WasteModel waste) {
+    final String name = waste.productName.trim().isEmpty
+        ? AppStrings.TABLE_VALUE_UNAVAILABLE
+        : waste.productName;
+
+    if (!waste.isFromRejectedLot) {
+      return Text(
+        name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTypography.tableCellStrong,
+      );
+    }
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: name, style: AppTypography.tableCellStrong),
+          TextSpan(
+            text:
+                ' (${AppStrings.WASTE_FROM_REJECTED_LOT_LABEL.replaceAll('%s', waste.inwardRawMaterial!.lotNo)})',
+            style: AppTypography.tableCell.copyWith(
+              color: AppColors.TEXT_SECONDARY,
+            ),
+          ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 
   Widget _textCell(String value, {bool isStrong = false}) {

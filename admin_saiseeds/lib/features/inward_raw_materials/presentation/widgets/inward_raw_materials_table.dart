@@ -37,6 +37,7 @@ class InwardRawMaterialsTable extends StatefulWidget {
   final List<ClientSortModel> availableSorts;
   final void Function(InwardRawMaterialModel lot)? onView;
   final void Function(InwardRawMaterialModel lot)? onDelete;
+  final void Function(InwardRawMaterialModel lot)? onConvertToWaste;
   final void Function(InwardRawMaterialModel lot, String nextStatus)?
   onChangeStatus;
   final bool isMutating;
@@ -61,6 +62,7 @@ class InwardRawMaterialsTable extends StatefulWidget {
     this.availableSorts = const [],
     this.onView,
     this.onDelete,
+    this.onConvertToWaste,
     this.onChangeStatus,
     this.isMutating = false,
     this.hasMore = false,
@@ -265,6 +267,17 @@ class InwardRawMaterialsTableState extends State<InwardRawMaterialsTable> {
                   onSelected: widget.isMutating || widget.onChangeStatus == null
                       ? null
                       : () => widget.onChangeStatus!(lot, next),
+                ),
+              if (lot.isRejected)
+                RowAction(
+                  label: AppStrings.INWARD_CONVERT_TO_WASTE,
+                  icon: Icons.delete_sweep_outlined,
+                  tone: RowActionTone.warning,
+                  blockedHint: AppStrings.INWARD_CONVERT_TO_WASTE_BLOCKED,
+                  onSelected:
+                      widget.isMutating || widget.onConvertToWaste == null
+                      ? null
+                      : () => widget.onConvertToWaste!(lot),
                 ),
               RowAction(
                 label: AppStrings.DELETE,

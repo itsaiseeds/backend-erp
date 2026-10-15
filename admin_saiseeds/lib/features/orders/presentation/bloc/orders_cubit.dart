@@ -180,6 +180,18 @@ class OrdersCubit extends SafeCubit<OrdersState> {
     );
   }
 
+  Future<bool> changeTransportAgency({
+    required String publicId,
+    required int transportAgencyId,
+  }) {
+    return _mutate(
+      () => _repository.changeTransportAgency(
+        publicId: publicId,
+        transportAgencyId: transportAgencyId,
+      ),
+    );
+  }
+
   Future<bool> dispatchOrder({
     required String publicId,
     required DispatchRequestModel request,
