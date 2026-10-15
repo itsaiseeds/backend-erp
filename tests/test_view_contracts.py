@@ -182,6 +182,10 @@ EXPECTED_CONTRACTS = {
         "UpdateGodownInwardRawMaterialView",
         TOKEN_GODOWN,
     ),
+    "android/api/v1/godown/inward-raw-material/<public_id>/convert-to-waste": (
+        "ConvertGodownRejectedLotToWasteView",
+        TOKEN_GODOWN,
+    ),
     "android/api/v1/godown/inward-other-materials": (
         "GodownInwardOtherMaterialsView",
         TOKEN_GODOWN,
@@ -382,6 +386,10 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/inward-other-materials": ("InwardOtherMaterialsView", SESSION_ADMIN),
     "api/sales-admin/inward-raw-material/<str:public_id>": (
         "UpdateInwardRawMaterialView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/inward-raw-material/<str:public_id>/convert-to-waste": (
+        "ConvertRejectedLotToWasteView",
         SESSION_ADMIN,
     ),
     "api/sales-admin/inward-raw-materials": ("InwardRawMaterialsView", SESSION_ADMIN),

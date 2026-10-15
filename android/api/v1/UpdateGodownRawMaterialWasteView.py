@@ -38,7 +38,7 @@ class UpdateGodownRawMaterialWasteView(AndroidGodownBaseView):
     )
     def patch(self, request: Request, public_id: str) -> Response:
         entry = get_object_or_404(
-            RawMaterialWaste.objects.select_related("product", "created_by"),
+            RawMaterialWaste.objects.select_related("product", "created_by", "inward_raw_material"),
             public_id=public_id,
         )
         serializer = UpdateRawMaterialWasteSerializer(data=request.data, partial=True)
@@ -49,7 +49,9 @@ class UpdateGodownRawMaterialWasteView(AndroidGodownBaseView):
             )
         except ValueError as exc:
             raise serializers.ValidationError({"quantity_kg": str(exc)}) from None
-        entry = RawMaterialWaste.objects.select_related("product", "created_by").get(pk=entry.pk)
+        entry = RawMaterialWaste.objects.select_related(
+            "product", "created_by", "inward_raw_material"
+        ).get(pk=entry.pk)
         return Response(raw_waste_payload(entry))
 
     @extend_schema(summary="Delete a raw-material waste row", responses={204: None})

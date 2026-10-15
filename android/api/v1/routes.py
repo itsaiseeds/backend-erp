@@ -12,6 +12,7 @@ from .CitiesView import CitiesView
 from .ClientAddressesView import ClientAddressesView
 from .ClientChildOrgsView import ClientChildOrgsView
 from .ClientTransportAgenciesView import ClientTransportAgenciesView
+from .ConvertGodownRejectedLotToWasteView import ConvertGodownRejectedLotToWasteView
 from .CountriesView import CountriesView
 from .CreateClientView import CreateClientView
 from .CreateFarmerVisitView import CreateFarmerVisitView
@@ -122,6 +123,7 @@ ROUTES: dict[str, type] = {
     "godown/other-material-stock": GodownOtherMaterialStockView,
     "godown/inward-raw-materials": GodownInwardRawMaterialsView,
     "godown/inward-raw-material/<public_id>": UpdateGodownInwardRawMaterialView,
+    "godown/inward-raw-material/<public_id>/convert-to-waste": ConvertGodownRejectedLotToWasteView,
     "godown/inward-other-materials": GodownInwardOtherMaterialsView,
     "godown/inward-other-material/<public_id>": UpdateGodownInwardOtherMaterialView,
     "godown/other-material-recipes": GodownOtherMaterialRecipesView,

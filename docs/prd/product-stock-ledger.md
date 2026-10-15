@@ -99,7 +99,7 @@ figures are read at `loose_date()`.
 | raw `packed` | `raw_bagged_kg + raw_loose_kg` (count + dispatched before the count, × weight) |
 | raw `rejected` | kg of Rejected lots (`InwardOperations._dated_raw_kg_by_product`) |
 | raw `wasted` | `raw_wasted_kg` |
-| raw `available` | `incoming − packed − wasted` (rejected is never available) |
+| raw `available` | `incoming − packed − (wasted − rejected-sourced wasted)` (rejected is never available; see below) |
 | other `incoming` | `other_material_inward` for the material type (**pool-wide**) |
 | other `packed` | Material used by **this product's** packed packets (§3.4) |
 | other `used_by_other_products` | Material used by every other product's packed packets |
@@ -506,3 +506,15 @@ Where the build differs from, or adds to, the sections above:
   reports them as a mismatch.
 - **Known limitation:** `recording` widens to every product with a pool whenever a
   count opens a new date, which is the expensive case (once a day).
+
+## Rejected lot converted to waste
+
+See `rejected-lot-to-waste.md`. `REJECTED_TO_WASTE` (13) and `WASTE_TO_REJECTED` (14)
+write RAW `rejected −X` / `wasted +X` (and the opposite), so `available` does not move.
+The report tallies the rejected-sourced part of `wasted` from those two events
+(in memory only) and subtracts it in `available`.
+
+Seed caveat: `seed_ledger` (`LEDGER_START`) cannot record a rejected-sourced split.
+That is fine while the ledger was seeded before any lot-linked waste row existed.
+If the ledger is ever re-seeded with converted lots present, the report's
+`available` would be understated by their kg.

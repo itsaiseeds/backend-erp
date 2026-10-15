@@ -55,6 +55,7 @@ class ExportInwardEntriesView(AdminDateRangeExportView):
         raw_entries = (
             window.created_between(InwardRawMaterial.objects.all())
             .select_related("product", "party", "status", "return_order__order", "lab_testing")
+            .prefetch_related("waste_entries")
             .order_by("created_at", "id")
         )
         for raw in raw_entries:

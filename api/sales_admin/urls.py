@@ -11,6 +11,7 @@ from .AdminsView import AdminsView
 from .ApproveFieldTripView import ApproveFieldTripView
 from .BagStockView import BagStockView
 from .CheckTodaysInventoryView import CheckTodaysInventoryView
+from .ConvertRejectedLotToWasteView import ConvertRejectedLotToWasteView
 from .CreateCustomOrderView import CreateCustomOrderView
 from .CreateRejectedOrderView import CreateRejectedOrderView
 from .CreateWasteOrderView import CreateWasteOrderView
@@ -428,6 +429,11 @@ urlpatterns = [
         "inward-raw-material/<str:public_id>",
         UpdateInwardRawMaterialView.as_view(),
         name="update-inward-raw-material",
+    ),
+    path(
+        "inward-raw-material/<str:public_id>/convert-to-waste",
+        ConvertRejectedLotToWasteView.as_view(),
+        name="convert-rejected-lot-to-waste",
     ),
     path(
         "inward-other-materials",

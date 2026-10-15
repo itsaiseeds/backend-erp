@@ -58,7 +58,7 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
-from django.db.models import F, Q, Sum
+from django.db.models import Exists, F, OuterRef, Q, Sum
 
 from common.models import indian_now
 
@@ -1361,19 +1361,39 @@ def raw_wasted_kg(product: Product) -> Decimal:
     return total or Decimal("0.000")
 
 
+def rejected_wasted_kg(product: Product) -> Decimal:
+    """Kilograms of ``raw_wasted_kg`` that came from converted rejected lots.
+
+    Live waste rows linked to a lot (``RawMaterialWaste.inward_raw_material``).
+    These kg never came out of In Use stock, so ``raw_available_kg`` leaves them
+    out.
+    """
+    total = RawMaterialWaste.objects.filter(
+        product=product, inward_raw_material__isnull=False
+    ).aggregate(total=Sum("quantity_kg"))["total"]
+    return total or Decimal("0.000")
+
+
+def raw_only_wasted_kg(product: Product) -> Decimal:
+    """Waste written off of In Use raw stock: ``raw_wasted_kg`` less lot-sourced kg."""
+    return raw_wasted_kg(product) - rejected_wasted_kg(product)
+
+
 def raw_available_kg(product: Product) -> Decimal:
     """Raw kilograms of ``product`` not yet packed into a bag or loose packet.
 
-    ``inward - bagged - loose - wasted``. Writing a bag or loose count, or a
-    waste entry, is rejected when it would push this negative -- see
-    ``_assert_raw_available``. Only ``In Use`` lots feed ``inward``, so a
-    ``Rejected`` lot never makes waste or packing possible.
+    ``inward - bagged - loose - wasted``, where ``wasted`` is the raw-sourced
+    part only (``raw_only_wasted_kg``): a converted rejected lot never fed
+    ``inward``. Writing a bag or loose count, or a waste entry, is rejected when
+    it would push this negative -- see ``_assert_raw_available``. Only ``In Use``
+    lots feed ``inward``, so a ``Rejected`` lot never makes waste or packing
+    possible.
     """
     return (
         raw_inward_kg(product)
         - raw_bagged_kg(product)
         - raw_loose_kg(product)
-        - raw_wasted_kg(product)
+        - raw_only_wasted_kg(product)
     )
 
 
@@ -1458,13 +1478,25 @@ def assert_waste_available(product_ids) -> None:
 # ``CONSUMING_STATUS_IDS``.
 
 
+def wasted_lot_filter() -> Exists:
+    """``Exists`` of a live waste row linked to the outer ``InwardRawMaterial``.
+
+    The one definition of a converted ("wasted") rejected lot. The default
+    manager already hides soft-deleted waste rows.
+    """
+    return Exists(RawMaterialWaste.objects.filter(inward_raw_material=OuterRef("pk")))
+
+
 def bookable_rejected_lots() -> models.QuerySet:
-    """Live rejected lots whose ``effective_date`` has been reached."""
+    """Live rejected lots whose ``effective_date`` has been reached.
+
+    A lot converted to waste is no longer rejected stock, so it is left out.
+    """
     return InwardRawMaterial.objects.filter(
         status_id=StatusIds.RAW_MATERIAL_REJECTED.value,
         effective_date__isnull=False,
         effective_date__lte=today(),
-    )
+    ).exclude(wasted_lot_filter())
 
 
 def lock_rejected_lots(lot_ids: Iterable[int]) -> None:
@@ -1541,6 +1573,19 @@ def assert_rejected_lot_not_booked(lot: InwardRawMaterial, action: str) -> None:
         )
 
 
+def assert_rejected_lot_not_wasted(lot: InwardRawMaterial, action: str) -> None:
+    """Raise unless ``lot`` has no live waste row (it is not converted to waste).
+
+    Guards every move of a lot out of Rejected. Restore the lot first by deleting
+    its waste row.
+    """
+    if RawMaterialWaste.objects.filter(inward_raw_material=lot).exists():
+        raise ValidationError(
+            f"Cannot {action}: lot '{lot.lot_no}' is converted to waste. "
+            "Restore it to rejected first."
+        )
+
+
 def _assert_raw_available(product_ids) -> None:
     """Raise unless every product in ``product_ids`` still has raw kg >= 0.
 
@@ -1592,6 +1637,47 @@ def record_raw_waste(
 
 
 @transaction.atomic
+def convert_rejected_lot_to_waste(
+    lot: InwardRawMaterial, *, reason: str = "", actor: User
+) -> RawMaterialWaste:
+    """Write the whole of a lab-rejected ``lot`` off as waste.
+
+    Creates a ``RawMaterialWaste`` row linked to the lot, so RAW ``rejected``
+    falls and RAW ``wasted`` rises by the lot's kg while usable stock does not
+    move. The lot keeps its Rejected status. Refused (400) when the lot is not a
+    live, reached, rejected lot, is already converted, or has kg on a rejected
+    order. Reverse it by deleting the returned waste row.
+    """
+    from . import StockLedgerOperations
+
+    with StockLedgerOperations.recording(
+        StockEventType.REJECTED_TO_WASTE,
+        StockEventDetail.NONE,
+        [lot.product_id],
+        actor=actor,
+    ) as rec:
+        assert_products_usable([lot.product_id], action="convert a rejected lot to waste")
+        lock_rejected_lots([lot.pk])
+        lot = bookable_rejected_lots().filter(pk=lot.pk).first()
+        if lot is None:
+            raise ValidationError(
+                "Only a rejected lot that is not already converted to waste, "
+                "with its effective date reached, can be converted."
+            )
+        assert_rejected_lot_not_booked(lot, "convert this lot to waste")
+        waste = RawMaterialWaste.objects.create(
+            product_id=lot.product_id,
+            inward_raw_material=lot,
+            quantity_kg=lot.quantity_kg,
+            reason=(reason or "").strip()
+            or f"Rejected lot {lot.lot_no} ({lot.farmer_name})"[:255],
+            created_by=actor,
+        )
+        rec.source = waste
+    return waste
+
+
+@transaction.atomic
 def update_raw_waste(
     entry: RawMaterialWaste,
     *,
@@ -1621,6 +1707,11 @@ def update_raw_waste(
         assert_products_usable([entry.product_id], action="have its waste entry edited")
         lock_raw_pools([entry.product_id])
         entry = RawMaterialWaste.objects.select_for_update().get(pk=entry.pk)
+        if entry.inward_raw_material_id is not None:
+            raise ValidationError(
+                "This waste entry was converted from a rejected lot and cannot be "
+                "edited. Delete it to restore the lot to rejected."
+            )
         changed = []
         if quantity_kg is not None:
             entry.quantity_kg = quantity_kg

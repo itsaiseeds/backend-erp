@@ -24,6 +24,8 @@ class StockEventType(models.IntegerChoices):
     ORDER_DISPATCHED = 10
     DISPATCH_REVERTED = 11
     RETURN_OPERATIONS = 12
+    REJECTED_TO_WASTE = 13
+    WASTE_TO_REJECTED = 14
 
 
 class StockEventDetail(models.IntegerChoices):
@@ -134,6 +136,8 @@ VALID_DETAILS: dict[int, frozenset[int]] = {
     StockEventType.RETURN_OPERATIONS: frozenset(
         {StockEventDetail.RETURN_ACCEPTED, StockEventDetail.RETURN_ACCEPT_REVERTED}
     ),
+    StockEventType.REJECTED_TO_WASTE: frozenset({StockEventDetail.NONE}),
+    StockEventType.WASTE_TO_REJECTED: frozenset({StockEventDetail.NONE}),
 }
 
 
