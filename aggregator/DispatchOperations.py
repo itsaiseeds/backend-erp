@@ -24,7 +24,14 @@ from django.db import transaction
 from .AddressOperations import address_payload
 from .ClientChildOrgOperations import child_org_payload
 from .CompanyDetails import COMPANY_DETAILS, DEFAULT_HSN_CODE, current_financial_year
-from .models import CustomOrder, DispatchEntry, DispatchEntryItem, Order, StatusIds
+from .models import (
+    ClientTransportAgency,
+    CustomOrder,
+    DispatchEntry,
+    DispatchEntryItem,
+    Order,
+    StatusIds,
+)
 from .ProductOperations import packaging_payload
 
 # Fields re-stamped every time an order is dispatched. The receiver snapshot and
@@ -479,6 +486,61 @@ def set_lr_number(order: Order, *, lr_number: str, actor):
     return dispatch
 
 
+def change_transport_agency(order: Order, *, transport_agency_id: int) -> Order:
+    """Hand a dispatched order over to a different one of its client's agencies.
+
+    For when the goods end up with another transporter than the one planned at
+    booking. ``Order.transport_agency`` is the only place an order's agency is
+    stored: ``DispatchDetails`` and ``DispatchEntry`` hold none, and every
+    payload (order detail, list, export, challan) reads it live, so this one
+    column is "everywhere".
+
+    Only a DISPATCHED order takes it, so no LR number can be left behind from
+    the previous agency. Only an agency dispatch does too: an own-vehicle
+    dispatch has no transporter to replace, and giving it one would flip its
+    dispatch mode, which this call does not do.
+
+    The agency must be one of the order's own client's (``Order.clean`` checks
+    that again on save) and must differ from the current one.
+    """
+    from .OrderOperations import AGENCY_CHANGEABLE_STATUS_CODES, assert_order_status
+
+    assert_order_status(
+        order, AGENCY_CHANGEABLE_STATUS_CODES, "change the transport agency of"
+    )
+
+    if not order.dispatch_details_id:
+        raise ValidationError(
+            {
+                "transport_agency_id": (
+                    "This order went on our own vehicle, so there is no "
+                    "transport agency to change."
+                )
+            }
+        )
+
+    link = (
+        ClientTransportAgency.objects.filter(
+            client=order.client, transport_agency_id=transport_agency_id
+        )
+        .select_related("transport_agency")
+        .first()
+    )
+    if link is None:
+        raise ValidationError(
+            {"transport_agency_id": "No such transport agency for this client."}
+        )
+    if link.transport_agency_id == order.transport_agency_id:
+        raise ValidationError(
+            {"transport_agency_id": "This order is already with that transport agency."}
+        )
+
+    order.transport_agency = link.transport_agency
+    order.full_clean()
+    order.save(update_fields=["transport_agency", "updated_at"])
+    return order
+
+
 def dispatch_entry_payload(entry: DispatchEntry) -> dict:
     """The journey block of a challan: who carried it, in what, when and where."""
     return {
@@ -502,9 +564,11 @@ def dispatch_challan_payload(order: Order) -> dict:
     live client, so a challan reprinted next year still says what went out with
     the goods.
 
-    The transport agency is read off the order: it is chosen at booking, decides
-    the dispatch mode, and cannot be edited once the order has been dispatched.
-    Null on a private dispatch, where there is no carrier.
+    The transport agency is read off the order: it is chosen at booking and decides
+    the dispatch mode. Once the order is dispatched it can only be swapped for
+    another agency of the same client (:func:`change_transport_agency`), and since
+    the challan reads it live that change shows here too. Null on a private
+    dispatch, where there is no carrier.
     """
     entry = order.dispatch_entry
     items = list(entry.items.all())

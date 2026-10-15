@@ -241,6 +241,10 @@ REJECTABLE_STATUS_CODES = HOLDABLE_STATUS_CODES | {StatusIds.ON_HOLD.name}
 LR_RECORDABLE_STATUS_CODES = frozenset(
     {StatusIds.DISPATCHED.name, StatusIds.DELIVERED.name}
 )
+# The carrier can be corrected only while the goods are on the road. DISPATCHED is
+# also the one status where no LR exists yet (recording it delivers the order), so
+# nothing issued by the old agency is left behind.
+AGENCY_CHANGEABLE_STATUS_CODES = frozenset({StatusIds.DISPATCHED.name})
 
 # Only a freshly booked order or a confirmed one may be edited. Every other
 # status is refused: DISPATCHED/DELIVERED because the goods have physically

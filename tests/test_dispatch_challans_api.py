@@ -1,7 +1,9 @@
 """Recording an LR number, and the challan list it fills a field on.
 
-Two endpoints, one story: ``upload-lr-number`` records the consignment note a
-transporter issues after collection, and ``dispatch-challans/`` lists every
+Three endpoints, one story: ``upload-lr-number`` records the consignment note a
+transporter issues after collection, ``change-transport-agency`` corrects which
+transporter that is while the goods are still on the road, and
+``dispatch-challans/`` lists every
 still-dispatched order -- including, deliberately, one whose LR has not arrived
 yet, whose row simply carries a blank ``lr_number`` until it does.
 
@@ -21,7 +23,10 @@ from rest_framework import status
 
 from aggregator import InventoryOperations as inv
 from aggregator import StockLedgerOperations
-from aggregator.ClientOperations import create_client_with_details
+from aggregator.ClientOperations import (
+    add_client_transport_agency,
+    create_client_with_details,
+)
 from aggregator.CompanyDetails import COMPANY_DETAILS, DEFAULT_HSN_CODE
 from aggregator.models import (
     City,
@@ -31,6 +36,7 @@ from aggregator.models import (
     Stage,
     StageIds,
     State,
+    TransportAgency,
 )
 from aggregator.OrderOperations import create_order, mark_delivered
 from authentication.models import Admin, SalesPerson
@@ -44,6 +50,7 @@ VERIFY_URL = "/api/sales-admin/verify-order/{public_id}"
 DISPATCH_URL = "/api/sales-admin/dispatch-order/{public_id}"
 REVERT_URL = "/api/sales-admin/revert-dispatch/{public_id}"
 LR_URL = "/api/sales-admin/upload-lr-number/{public_id}"
+CHANGE_AGENCY_URL = "/api/sales-admin/change-transport-agency/{public_id}"
 MARK_DELIVERED_URL = "/api/sales-admin/mark-order-delivered/{public_id}"
 CHALLANS_URL = "/api/sales-admin/dispatch-challans/"
 
@@ -175,6 +182,21 @@ class DispatchChallansApiTest(WebApiTestCase):
     def _upload_lr(self, order, lr_number="LR-12345"):
         return self._post(LR_URL, order, {"lr_number": lr_number})
 
+    def _change_agency(self, order, transport_agency_id):
+        return self.client.patch(
+            CHANGE_AGENCY_URL.format(public_id=order.public_id),
+            {"transport_agency_id": transport_agency_id},
+            format="json",
+        )
+
+    def _second_agency(self):
+        """A second agency, linked to the same client."""
+        agency = TransportAgency.objects.create(
+            name="Swift Carriers", created_by=self.sales_person
+        )
+        add_client_transport_agency(self.acme, agency, self.sales_person)
+        return agency
+
     @property
     def today_prefix(self):
         """The ``YYYYMMDD-`` today's challan numbers start with."""
@@ -301,6 +323,145 @@ class DispatchChallansApiTest(WebApiTestCase):
         self.assertEqual(order.dispatch_details.lr_number, "LR-99999")
         self.assertEqual(order.status.code, "DELIVERED")
         self.assertEqual(order.actual_delivery_date, delivered_on)
+
+    # -- change-transport-agency ----------------------------------------------
+
+    def test_changing_the_agency_shows_everywhere_the_agency_is_read(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_changing_the_agency_shows_everywhere_the_agency_is_read"""
+        order = self._dispatched_order()
+        swift = self._second_agency()
+
+        response = self._change_agency(order, swift.id)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(
+            response.data["transport_agency"], {"id": swift.id, "name": "Swift Carriers"}
+        )
+        self.assertEqual(response.data["dispatch_mode"], "AGENCY")
+        self.assertEqual(response.data["status"], "DISPATCHED")
+        order.refresh_from_db()
+        self.assertEqual(order.transport_agency_id, swift.id)
+        # The dispatch record is untouched and still waiting for the new agency's LR.
+        self.assertTrue(order.dispatch_details_id)
+        self.assertEqual(order.dispatch_entry.lr_number, "")
+        # The challan list reads the order, so it follows.
+        challan = self._challans().data["results"][0]
+        self.assertEqual(
+            challan["dispatch"]["transport_agency"],
+            {"id": swift.id, "name": "Swift Carriers"},
+        )
+        self.assertEqual(StockLedgerOperations.check_ledger(), [])
+
+    def test_a_delivered_order_keeps_its_agency(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_delivered_order_keeps_its_agency"""
+        order = self._dispatched_order()
+        original = order.transport_agency_id
+        swift = self._second_agency()
+        self._upload_lr(order)
+
+        response = self._change_agency(order, swift.id)
+
+        self.assertEqual(
+            response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+        )
+        self.assertIn(
+            "Cannot change the transport agency of an order that is DELIVERED",
+            response.data["detail"],
+        )
+        order.refresh_from_db()
+        self.assertEqual(order.transport_agency_id, original)
+
+    def test_a_reverted_dispatch_keeps_its_agency(self):
+        """Back at CONFIRMED the order is edited through edit-order, not this.
+
+        tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_reverted_dispatch_keeps_its_agency
+        """
+        order = self._dispatched_order()
+        self._post(REVERT_URL, order)
+        swift = self._second_agency()
+
+        response = self._change_agency(order, swift.id)
+
+        self.assertEqual(
+            response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+        )
+        self.assertIn(
+            "Cannot change the transport agency of an order that is CONFIRMED",
+            response.data["detail"],
+        )
+
+    def test_an_own_vehicle_dispatch_has_no_agency_to_change(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_an_own_vehicle_dispatch_has_no_agency_to_change"""
+        order = self._dispatched_order(by_agency=False)
+        swift = self._second_agency()
+
+        response = self._change_agency(order, swift.id)
+
+        self.assertEqual(
+            response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+        )
+        self.assertIn("our own vehicle", response.data["detail"])
+        order.refresh_from_db()
+        self.assertIsNone(order.transport_agency_id)
+        self.assertTrue(order.private_dispatch_details_id)
+
+    def test_only_one_of_the_clients_own_agencies_is_accepted(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_only_one_of_the_clients_own_agencies_is_accepted"""
+        order = self._dispatched_order()
+        original = order.transport_agency_id
+        stranger = TransportAgency.objects.create(
+            name="Other Client Transport", created_by=self.sales_person
+        )
+
+        for transport_agency_id in (stranger.id, 999_999_999):
+            with self.subTest(transport_agency_id=transport_agency_id):
+                response = self._change_agency(order, transport_agency_id)
+
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+                )
+                self.assertIn(
+                    "No such transport agency for this client.", response.data["detail"]
+                )
+        order.refresh_from_db()
+        self.assertEqual(order.transport_agency_id, original)
+
+    def test_changing_to_the_current_agency_is_refused(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_changing_to_the_current_agency_is_refused"""
+        order = self._dispatched_order()
+
+        response = self._change_agency(order, order.transport_agency_id)
+
+        self.assertEqual(
+            response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+        )
+        self.assertIn("already with that transport agency", response.data["detail"])
+
+    def test_a_missing_or_null_agency_id_is_refused(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_missing_or_null_agency_id_is_refused"""
+        order = self._dispatched_order()
+        url = CHANGE_AGENCY_URL.format(public_id=order.public_id)
+
+        for body in ({}, {"transport_agency_id": None}):
+            with self.subTest(body=body):
+                response = self.client.patch(url, body, format="json")
+
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+                )
+                self.assertIn(
+                    "transport_agency_id is required.", response.data["detail"]
+                )
+
+    def test_an_unknown_order_is_a_404(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_an_unknown_order_is_a_404"""
+        response = self.client.patch(
+            CHANGE_AGENCY_URL.format(public_id="ORD-NOPE"),
+            {"transport_agency_id": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_mark_order_delivered_takes_a_private_order_but_not_an_agency_one(self):
         """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_mark_order_delivered_takes_a_private_order_but_not_an_agency_one"""

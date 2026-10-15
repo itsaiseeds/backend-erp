@@ -358,6 +358,10 @@ EXPECTED_CONTRACTS = {
         "RevertAcceptReturnOrderView",
         SESSION_ADMIN,
     ),
+    "api/sales-admin/change-transport-agency/<str:public_id>": (
+        "ChangeTransportAgencyView",
+        SESSION_ADMIN,
+    ),
     "api/sales-admin/revert-dispatch/<str:public_id>": ("RevertDispatchView", SESSION_ADMIN),
     "api/sales-admin/unverify-order/<str:public_id>": ("UnverifyOrderView", SESSION_ADMIN),
     "api/sales-admin/upload-lr-number/<str:public_id>": ("UploadLRNumberView", SESSION_ADMIN),
