@@ -151,4 +151,10 @@ class OrderStatusX {
       DISPATCH_REQUIRED.contains(status);
 
   static bool canEdit(OrderStatus status) => EDITABLE.contains(status);
+
+  /// Same precondition as [canMarkDelivered]/[canRevertDispatch]: only
+  /// applies once dispatched. `OrderModel.canChangeTransportAgency` adds the
+  /// agency-dispatch check this status-only gate can't see.
+  static bool canChangeTransportAgency(OrderStatus status) =>
+      DELIVERABLE.contains(status);
 }

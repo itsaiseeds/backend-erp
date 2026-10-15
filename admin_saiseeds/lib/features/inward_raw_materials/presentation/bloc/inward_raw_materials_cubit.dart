@@ -5,6 +5,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/widgets/inputs/app_filter_search_bar.dart';
 import '../../../../core/widgets/inputs/date_range_field.dart';
 import '../../../clients/data/models/client_filter_model.dart';
+import '../../../waste_management/data/models/waste_model.dart';
 import '../../data/inward_raw_materials_repository.dart';
 import '../../data/models/inward_raw_material_model.dart';
 import '../../data/models/paginated_inward_raw_materials_model.dart';
@@ -167,6 +168,34 @@ class InwardRawMaterialsCubit extends SafeCubit<InwardRawMaterialsState> {
 
   Future<bool> deleteLot(String publicId) =>
       _mutate(() => _repository.deleteInwardRawMaterial(publicId));
+
+  /// Writes a rejected lot off as waste. Returns the new waste row so the
+  /// caller can name it in a success toast; `null` on failure, with
+  /// [InwardRawMaterialsState.errorMessage] already set.
+  Future<WasteModel?> convertToWaste(String publicId, {String? reason}) async {
+    emit(state.copyWith(isMutating: true, clearError: true));
+
+    try {
+      final WasteModel waste = await _repository.convertToWaste(
+        publicId,
+        reason: reason,
+      );
+      emit(state.copyWith(isMutating: false));
+      await _fetch(page: state.currentPage);
+      return waste;
+    } on ApiException catch (e) {
+      emit(state.copyWith(isMutating: false, errorMessage: e.message));
+      return null;
+    } catch (_) {
+      emit(
+        state.copyWith(
+          isMutating: false,
+          errorMessage: AppStrings.SOMETHING_WENT_WRONG,
+        ),
+      );
+      return null;
+    }
+  }
 
   Future<bool> _mutate(Future<void> Function() action) async {
     emit(state.copyWith(isMutating: true, clearError: true));

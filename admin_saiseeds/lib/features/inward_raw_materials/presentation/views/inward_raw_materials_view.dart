@@ -14,6 +14,7 @@ import '../../../products/data/products_repository.dart';
 import '../../data/inward_raw_materials_repository.dart';
 import '../../data/models/inward_raw_material_model.dart';
 import '../bloc/inward_raw_materials_cubit.dart';
+import '../widgets/convert_to_waste_dialog.dart';
 import '../widgets/inward_form_dialog.dart';
 import '../widgets/inward_raw_materials_table.dart';
 import '../widgets/inward_record_dialog.dart';
@@ -211,6 +212,8 @@ class _InwardRawMaterialsContentState
             onView: (lot) =>
                 InwardRecordDialog.show(context, lot, cubit: cubit),
             onDelete: _onDelete,
+            onConvertToWaste: (lot) =>
+                ConvertToWasteDialog.show(context, cubit: cubit, lot: lot),
             onChangeStatus: _onChangeStatus,
             isMutating: state.isMutating,
             emptyTitle: state.isEmptySource

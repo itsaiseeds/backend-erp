@@ -9,6 +9,9 @@ class RawMaterialsEndpoints {
   static String inwardDetail(String publicId) =>
       '$_base/inward-raw-material/$publicId';
 
+  static String inwardConvertToWaste(String publicId) =>
+      '$_base/inward-raw-material/$publicId/convert-to-waste';
+
   static const String otherMaterialTypes = '$_base/other-material-types';
 
   static const String recipesList = '$_base/other-material-recipes';

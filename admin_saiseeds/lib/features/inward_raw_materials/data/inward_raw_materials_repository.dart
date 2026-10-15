@@ -2,6 +2,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/endpoints/raw_materials_endpoints.dart';
+import '../../waste_management/data/models/waste_model.dart';
 import 'models/paginated_inward_raw_materials_model.dart';
 
 class InwardRawMaterialsRepository {
@@ -66,5 +67,20 @@ class InwardRawMaterialsRepository {
 
   Future<void> deleteInwardRawMaterial(String publicId) async {
     await _apiClient.delete(RawMaterialsEndpoints.inwardDetail(publicId));
+  }
+
+  /// Writes a rejected lot off as waste. `reason` left blank lets the server
+  /// fill in its own default ("Rejected lot {lot_no} ({farmer})").
+  Future<WasteModel> convertToWaste(String publicId, {String? reason}) async {
+    final dynamic response = await _apiClient.post(
+      RawMaterialsEndpoints.inwardConvertToWaste(publicId),
+      body: {'reason': reason?.trim() ?? ''},
+    );
+
+    if (response is! Map) {
+      throw const ApiException(message: AppStrings.SOMETHING_WENT_WRONG);
+    }
+
+    return WasteModel.fromJson(Map<String, dynamic>.from(response));
   }
 }
