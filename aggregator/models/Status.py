@@ -17,8 +17,9 @@ class StatusIds(IntEnum):
     raw-material lot's ``Rejected`` status (not contiguous with 10-11: it was
     added after the field-trip range was already seeded, and its ``code`` must
     differ from the unrelated order-lifecycle ``REJECTED`` at id 7), and ids
-    17-19 the return-order lifecycle. No migrations — keep in sync with the
-    seed rows.
+    17-19 the return-order lifecycle, and id 20 the inward raw-material lot's
+    ``Converted to waste`` status (a rejected lot written off as waste). No
+    migrations — keep in sync with the seed rows.
     """
 
     BOOKED = 1
@@ -40,6 +41,7 @@ class StatusIds(IntEnum):
     RETURN_PENDING = 17
     RETURN_ACCEPTED = 18
     RETURN_REJECTED = 19
+    CONVERTED_TO_WASTE = 20
 
     @classmethod
     def order_statuses(cls) -> list[StatusIds]:
@@ -53,8 +55,13 @@ class StatusIds(IntEnum):
 
     @classmethod
     def raw_material_statuses(cls) -> list[StatusIds]:
-        """The inward raw-material lot lifecycle ids (10–11, plus 16)."""
-        return [cls.LAB_TESTING, cls.IN_USE, cls.RAW_MATERIAL_REJECTED]
+        """The inward raw-material lot lifecycle ids (10–11, plus 16 and 20)."""
+        return [
+            cls.LAB_TESTING,
+            cls.IN_USE,
+            cls.RAW_MATERIAL_REJECTED,
+            cls.CONVERTED_TO_WASTE,
+        ]
 
     @classmethod
     def return_statuses(cls) -> list[StatusIds]:

@@ -232,6 +232,7 @@ def update_lab_test(
         test.save()
         return test
 
+    InventoryOperations.assert_rejected_lot_not_wasted(lot, "change this lab test")
     _assert_lot_matches_result(lot, test)
     new_result = values.get("result", test.result)
     _apply_values(test, values)
@@ -248,9 +249,6 @@ def update_lab_test(
             # Fail -> Pass takes the lot out of Rejected.
             try:
                 InventoryOperations.assert_rejected_lot_not_booked(
-                    lot, "change this lab result"
-                )
-                InventoryOperations.assert_rejected_lot_not_wasted(
                     lot, "change this lab result"
                 )
             except ValidationError as exc:
