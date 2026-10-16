@@ -329,6 +329,7 @@ INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, de
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(17, '2026-10-03 00:00:00.000', '2026-10-03 00:00:00.000', false, NULL, NULL, NULL, 'RETURN_PENDING', 'Return pending', 1);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(18, '2026-10-03 00:00:00.000', '2026-10-03 00:00:00.000', false, NULL, NULL, NULL, 'RETURN_ACCEPTED', 'Return accepted', 2);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(19, '2026-10-03 00:00:00.000', '2026-10-03 00:00:00.000', false, NULL, NULL, NULL, 'RETURN_REJECTED', 'Return rejected', 3);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(20, '2026-10-16 00:00:00.000', '2026-10-16 00:00:00.000', false, NULL, NULL, NULL, 'CONVERTED_TO_WASTE', 'Converted to waste', 4);
 
 -- -------------------------------------------------------------------------
 -- aggregator_stage (seed classification of a product; enum-like, 4 fixed rows)

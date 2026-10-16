@@ -36,6 +36,7 @@ from aggregator.models import (
     Stage,
     StageIds,
     State,
+    StatusIds,
     StockEvent,
     StockEventLine,
     StockEventType,
@@ -191,6 +192,8 @@ class RejectedLotWasteTest(WebApiTestCase):
         self.assertEqual(waste.inward_raw_material, lot)
         self.assertEqual(waste.reason, "Rejected lot SUP-1 (Farmer Joe)")
         self.assertEqual(waste.created_by, self.admin)
+        lot.refresh_from_db()
+        self.assertEqual(lot.status_id, StatusIds.CONVERTED_TO_WASTE.value)
         self.assertEqual(
             self._raw_deltas(StockEventType.REJECTED_TO_WASTE),
             (Decimal("-100"), Decimal("100"), Decimal("0")),
@@ -206,6 +209,8 @@ class RejectedLotWasteTest(WebApiTestCase):
         restored = self._restore(waste)
 
         self.assertEqual(restored.status_code, status.HTTP_204_NO_CONTENT)
+        lot.refresh_from_db()
+        self.assertEqual(lot.status_id, StatusIds.RAW_MATERIAL_REJECTED.value)
         self.assertEqual(
             self._raw_deltas(StockEventType.WASTE_TO_REJECTED),
             (Decimal("100"), Decimal("-100"), Decimal("0")),
@@ -266,11 +271,13 @@ class RejectedLotWasteTest(WebApiTestCase):
         lots = self.client.get(LOTS_URL).data["results"]
         row = next(r for r in lots if r["public_id"] == lot.public_id)
         self.assertEqual(row["waste"], {"public_id": response.data["public_id"]})
+        self.assertEqual(row["status"], "Converted to waste")
 
         self._restore(RawMaterialWaste.objects.get(public_id=response.data["public_id"]))
         lots = self.client.get(LOTS_URL).data["results"]
         row = next(r for r in lots if r["public_id"] == lot.public_id)
         self.assertIsNone(row["waste"])
+        self.assertEqual(row["status"], "Rejected")
 
     # -- refusals ---------------------------------------------------------------
 
@@ -358,6 +365,8 @@ class RejectedLotWasteTest(WebApiTestCase):
         lot.refresh_from_db()
         with self.assertRaises(ValidationError):
             update_lab_test(lot, {"result": "Pass"}, self.admin)
+        with self.assertRaises(ValidationError):
+            update_lab_test(lot, {"comment": "edited"}, self.admin)
 
         # Restored, the lot may leave Rejected again.
         self._restore(waste)

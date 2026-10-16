@@ -91,6 +91,7 @@ ALLOWED_RAW_STATUS_TRANSITIONS = {
 DATED_RAW_STATUSES = (
     InwardRawMaterialStatus.IN_USE,
     InwardRawMaterialStatus.RAW_MATERIAL_REJECTED,
+    InwardRawMaterialStatus.CONVERTED_TO_WASTE,
 )
 
 
@@ -145,10 +146,13 @@ def assert_raw_lot_removable(entry: InwardRawMaterial) -> None:
     Raises ``ValueError`` with a message an API renders as a 400, the same
     convention as ``assert_raw_status_transition``.
     """
-    if raw_status_of(entry) == InwardRawMaterialStatus.RAW_MATERIAL_REJECTED:
+    if raw_status_of(entry) in (
+        InwardRawMaterialStatus.RAW_MATERIAL_REJECTED,
+        InwardRawMaterialStatus.CONVERTED_TO_WASTE,
+    ):
         try:
-            InventoryOperations.assert_rejected_lot_not_booked(entry, "remove this lot")
             InventoryOperations.assert_rejected_lot_not_wasted(entry, "remove this lot")
+            InventoryOperations.assert_rejected_lot_not_booked(entry, "remove this lot")
         except ValidationError as exc:
             raise ValueError(exc.messages[0]) from None
         return
@@ -327,8 +331,8 @@ def inward_raw_material_payload(entry: InwardRawMaterial) -> dict:
 
 def waste_ref(entry: InwardRawMaterial) -> dict | None:
     """The ``waste`` block of a lot payload; null unless the lot is converted to waste."""
-    if entry.status_id != StatusIds.RAW_MATERIAL_REJECTED.value:
-        return None  # only a rejected lot can be converted; skips a query per row
+    if entry.status_id != StatusIds.CONVERTED_TO_WASTE.value:
+        return None  # only a converted lot has a waste row; skips a query per row
     waste = next(iter(entry.waste_entries.all()), None)
     return {"public_id": waste.public_id} if waste is not None else None
 
@@ -422,9 +426,6 @@ def _dated_raw_kg_by_product(
         effective_date__lte=as_of,
         status_id=status_id,
     )
-    if status_id == StatusIds.RAW_MATERIAL_REJECTED.value:
-        # A rejected lot converted to waste is counted as wasted, not rejected.
-        query = query.exclude(InventoryOperations.wasted_lot_filter())
     if product_public_ids:
         query = query.filter(product__public_id__in=product_public_ids)
     rows = (

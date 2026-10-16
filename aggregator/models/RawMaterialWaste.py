@@ -5,6 +5,7 @@ from common.models import (
     PrefixedPublicIdModel,
     SoftDeletedModel,
     TimeStampedModel,
+    indian_now,
 )
 
 from .StockEvent import StockEventDetail, StockEventType
@@ -82,6 +83,9 @@ class RawMaterialWaste(
         from aggregator import InventoryOperations, StockLedgerOperations
         from aggregator.ProductOperations import assert_products_usable
 
+        from .InwardRawMaterial import InwardRawMaterial
+        from .Status import StatusIds
+
         if self.inward_raw_material_id is not None:
             with StockLedgerOperations.recording(
                 StockEventType.WASTE_TO_REJECTED,
@@ -96,6 +100,10 @@ class RawMaterialWaste(
                 InventoryOperations.lock_waste_pools([self.product_id])
                 perform()
                 InventoryOperations.assert_waste_available([self.product_id])
+                # The lot goes back to the rejected stock it was converted from.
+                InwardRawMaterial.all_objects.filter(pk=self.inward_raw_material_id).update(
+                    status_id=StatusIds.RAW_MATERIAL_REJECTED.value, updated_at=indian_now()
+                )
                 rec.actor = self.deleted_by
             return
 

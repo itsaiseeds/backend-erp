@@ -37,6 +37,9 @@ class InwardRawMaterialStatus(models.TextChoices):
     # code 'REJECTED' (StatusIds.REJECTED = 7). The *value* (what the API
     # sends/receives) and the label are still plain "Rejected".
     RAW_MATERIAL_REJECTED = "Rejected", "Rejected"
+    # A rejected lot written off whole as waste (``convert_rejected_lot_to_waste``);
+    # deleting its waste row puts it back to Rejected. Reached from no other status.
+    CONVERTED_TO_WASTE = "Converted to waste", "Converted to waste"
 
 
 class InwardRawMaterial(

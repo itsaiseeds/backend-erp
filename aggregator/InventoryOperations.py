@@ -58,7 +58,7 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
-from django.db.models import Exists, F, OuterRef, Q, Sum
+from django.db.models import F, Q, Sum
 
 from common.models import indian_now
 
@@ -1478,25 +1478,17 @@ def assert_waste_available(product_ids) -> None:
 # ``CONSUMING_STATUS_IDS``.
 
 
-def wasted_lot_filter() -> Exists:
-    """``Exists`` of a live waste row linked to the outer ``InwardRawMaterial``.
-
-    The one definition of a converted ("wasted") rejected lot. The default
-    manager already hides soft-deleted waste rows.
-    """
-    return Exists(RawMaterialWaste.objects.filter(inward_raw_material=OuterRef("pk")))
-
-
 def bookable_rejected_lots() -> models.QuerySet:
     """Live rejected lots whose ``effective_date`` has been reached.
 
-    A lot converted to waste is no longer rejected stock, so it is left out.
+    A lot converted to waste has its own status (``CONVERTED_TO_WASTE``), so it
+    is no longer rejected stock and is left out by the status filter.
     """
     return InwardRawMaterial.objects.filter(
         status_id=StatusIds.RAW_MATERIAL_REJECTED.value,
         effective_date__isnull=False,
         effective_date__lte=today(),
-    ).exclude(wasted_lot_filter())
+    )
 
 
 def lock_rejected_lots(lot_ids: Iterable[int]) -> None:
@@ -1574,12 +1566,12 @@ def assert_rejected_lot_not_booked(lot: InwardRawMaterial, action: str) -> None:
 
 
 def assert_rejected_lot_not_wasted(lot: InwardRawMaterial, action: str) -> None:
-    """Raise unless ``lot`` has no live waste row (it is not converted to waste).
+    """Raise unless ``lot`` is not converted to waste (status ``CONVERTED_TO_WASTE``).
 
-    Guards every move of a lot out of Rejected. Restore the lot first by deleting
-    its waste row.
+    Guards every move of a lot out of its waste conversion. Restore the lot first
+    by deleting its waste row.
     """
-    if RawMaterialWaste.objects.filter(inward_raw_material=lot).exists():
+    if lot.status_id == StatusIds.CONVERTED_TO_WASTE.value:
         raise ValidationError(
             f"Cannot {action}: lot '{lot.lot_no}' is converted to waste. "
             "Restore it to rejected first."
@@ -1644,9 +1636,9 @@ def convert_rejected_lot_to_waste(
 
     Creates a ``RawMaterialWaste`` row linked to the lot, so RAW ``rejected``
     falls and RAW ``wasted`` rises by the lot's kg while usable stock does not
-    move. The lot keeps its Rejected status. Refused (400) when the lot is not a
-    live, reached, rejected lot, is already converted, or has kg on a rejected
-    order. Reverse it by deleting the returned waste row.
+    move. The lot's status becomes ``CONVERTED_TO_WASTE``. Refused (400) when
+    the lot is not a live, reached, rejected lot, is already converted, or has
+    kg on a rejected order. Reverse it by deleting the returned waste row.
     """
     from . import StockLedgerOperations
 
@@ -1672,6 +1664,9 @@ def convert_rejected_lot_to_waste(
             reason=(reason or "").strip()
             or f"Rejected lot {lot.lot_no} ({lot.farmer_name})"[:255],
             created_by=actor,
+        )
+        InwardRawMaterial.objects.filter(pk=lot.pk).update(
+            status_id=StatusIds.CONVERTED_TO_WASTE.value, updated_at=indian_now()
         )
         rec.source = waste
     return waste
