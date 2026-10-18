@@ -95,6 +95,16 @@ class SidebarItems {
       icon: Icons.account_tree_outlined,
     ),
     SidebarItemModel(
+      id: TabIds.OLD_SALES_PEOPLE,
+      label: AppStrings.OLD_SALES_PEOPLE,
+      icon: Icons.person_off_outlined,
+    ),
+    SidebarItemModel(
+      id: TabIds.TRANSFER_CLIENT,
+      label: AppStrings.TRANSFER_CLIENT,
+      icon: Icons.swap_horizontal_circle_outlined,
+    ),
+    SidebarItemModel(
       id: TabIds.BAG_STOCK,
       label: AppStrings.BAG_STOCK,
       icon: Icons.warehouse_outlined,
@@ -237,7 +247,13 @@ class SidebarItems {
       SidebarGroupModel(
         id: 'setup-onboarding',
         label: AppStrings.GROUP_ONBOARDING,
-        itemIds: [TabIds.CLIENTS, TabIds.PARTIES, TabIds.CHILD_CLIENTS],
+        itemIds: [
+          TabIds.CLIENTS,
+          TabIds.PARTIES,
+          TabIds.CHILD_CLIENTS,
+          TabIds.OLD_SALES_PEOPLE,
+          TabIds.TRANSFER_CLIENT,
+        ],
       ),
       SidebarGroupModel(
         id: 'setup-farmer-trips',

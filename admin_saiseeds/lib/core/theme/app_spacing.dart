@@ -111,6 +111,9 @@ class AppSizes {
   static const double tableRowHeight = 44.0;
   static const double tableCompactRowHeight = 38.0;
   static const double tableSearchBarHeight = 52.0;
+  static const double salesPersonDropdownTriggerMinWidth = 160.0;
+  static const double salesPersonDropdownWidth = 280.0;
+  static const double salesPersonDropdownMaxHeight = 320.0;
   static const double tableControlHeight = 36.0;
   static const double tableSortOrderWidth = 38.0;
   static const double tableSelectColumnWidth = 56.0;
