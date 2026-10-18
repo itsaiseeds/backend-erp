@@ -32,6 +32,8 @@ import '../../../sales_people/presentation/views/sales_people_view.dart';
 import '../../../field_trips/presentation/views/field_trips_view.dart';
 import '../../../field_trips/presentation/views/farmers_view.dart';
 import '../../../child_clients/presentation/views/child_clients_view.dart';
+import '../../../sales_people/presentation/views/old_sales_people_view.dart';
+import '../../../transfer_client/presentation/views/transfer_client_view.dart';
 
 class DashboardContentSwitcher {
   DashboardContentSwitcher._();
@@ -72,6 +74,10 @@ class DashboardContentSwitcher {
         return const PartiesView();
       case TabIds.CHILD_CLIENTS:
         return const ChildClientsView();
+      case TabIds.OLD_SALES_PEOPLE:
+        return const OldSalesPeopleView();
+      case TabIds.TRANSFER_CLIENT:
+        return const TransferClientView();
       case TabIds.BAG_STOCK:
         return const BagStockView();
       case TabIds.PACKET_STOCK:

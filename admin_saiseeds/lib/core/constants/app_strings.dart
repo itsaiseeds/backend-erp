@@ -1932,4 +1932,51 @@ class AppStrings {
   static const String STOCK_LEDGER_FIELD_USED_BY_OTHERS = 'Used by others';
 
   static const String STOCK_LEDGER_LOAD_FAILED_TITLE = 'Could not load the ledger';
+
+  // ---- Old Salesperson ----
+  static const String OLD_SALES_PEOPLE = 'Old Salesperson';
+  static const String OLD_SALES_PEOPLE_SUBTITLE =
+      'Removed sales accounts, kept for reference and client reassignment.';
+  static const String OLD_SALES_PEOPLE_TABLE_SEARCH_HINT =
+      'Search old sales people...';
+  static const String OLD_SALES_PEOPLE_LOAD_FAILED_TITLE =
+      'Could not load old sales people';
+  static const String OLD_SALES_PEOPLE_EMPTY_TITLE = 'No removed sales people';
+  static const String OLD_SALES_PEOPLE_EMPTY_BODY =
+      'Sales accounts appear here once removed from the platform.';
+  static const String COLUMN_CLIENT_COUNT = 'Clients';
+  static const String OLD_SALES_PERSON_STATUS_REMOVED = 'Removed';
+
+  // ---- Transfer Client ----
+  static const String TRANSFER_CLIENT = 'Transfer Client';
+  static const String TRANSFER_CLIENT_SUBTITLE =
+      'Move a departed sales person\'s clients to someone still active.';
+  static const String TRANSFER_CLIENT_TABLE_SEARCH_HINT = 'Search clients...';
+  static const String TRANSFER_CLIENT_LOAD_FAILED_TITLE =
+      'Could not load clients';
+  static const String TRANSFER_CLIENT_EMPTY_TITLE_NO_SELECTION =
+      'Pick a sales person';
+  static const String TRANSFER_CLIENT_EMPTY_BODY_NO_SELECTION =
+      'Choose a sales person above to see their clients.';
+  static const String TRANSFER_CLIENT_EMPTY_TITLE = 'No clients found';
+  static const String TRANSFER_CLIENT_EMPTY_BODY =
+      'This sales person has no clients to transfer.';
+  static const String TRANSFER_CLIENT_SOURCE_FIELD = 'Sales person';
+  static const String TRANSFER_CLIENT_SOURCE_HINT =
+      'Select a sales person to view their clients';
+  static const String TRANSFER_CLIENT_SOURCE_DELETED_SUFFIX = '(removed)';
+  static const String TRANSFER_CLIENT_ACTION = 'Transfer';
+  static const String TRANSFER_CLIENT_DIALOG_TITLE = 'Transfer clients';
+  static const String TRANSFER_CLIENT_DIALOG_SUBTITLE =
+      'Move the selected clients to a new sales person.';
+  static const String TRANSFER_CLIENT_DIALOG_SELECTED_COUNT_SINGULAR =
+      'client selected';
+  static const String TRANSFER_CLIENT_DIALOG_SELECTED_COUNT_PLURAL =
+      'clients selected';
+  static const String TRANSFER_CLIENT_TARGET_FIELD = 'New sales person';
+  static const String TRANSFER_CLIENT_TARGET_HINT = 'Select a sales person';
+  static const String TRANSFER_CLIENT_TARGET_NONE = 'No active sales people';
+  static const String VALIDATION_TARGET_SALES_PERSON_REQUIRED =
+      'Select the new sales person.';
+  static const String TRANSFER_CLIENT_DONE = 'Clients transferred';
 }
