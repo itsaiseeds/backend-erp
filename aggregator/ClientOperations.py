@@ -74,6 +74,33 @@ def verify_client(client: Client, admin: User) -> Client:
     return client
 
 
+def transfer_clients(public_ids: list[str], target: User) -> int:
+    """Hand the live clients ``public_ids`` over to the sales person ``target``.
+
+    Used when a sales person leaves: ownership is ``Client.created_by``. Every id
+    must name a live client, or nothing moves and one error names every offender.
+    Returns how many clients changed owner (clients ``target`` already owns are
+    left alone).
+    """
+    if not target.is_salesperson:
+        raise ValidationError("Clients can only be transferred to a sales person.")
+    with transaction.atomic():
+        # Sorted + locked so two overlapping transfers cannot interleave.
+        clients = list(
+            Client.objects.select_for_update()
+            .filter(public_id__in=public_ids)
+            .order_by("pk")
+        )
+        missing = sorted(set(public_ids) - {client.public_id for client in clients})
+        if missing:
+            raise ValidationError(f"Unknown clients: {', '.join(missing)}.")
+        moving = [client.pk for client in clients if client.created_by_id != target.pk]
+        # ``update()`` skips ``save()``, so ``updated_at`` is set by hand.
+        return Client.objects.filter(pk__in=moving).update(
+            created_by=target, updated_at=indian_now()
+        )
+
+
 def add_client_address(
     client: Client,
     address: Address,

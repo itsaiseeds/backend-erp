@@ -310,6 +310,12 @@ EXPECTED_CONTRACTS = {
     ),
     "api/sales-admin/export/rejected-orders": ("ExportRejectedOrdersView", SESSION_ADMIN),
     "api/sales-admin/get-clients/": ("GetClientsView", SESSION_ADMIN),
+    "api/sales-admin/all-sales-person/": ("GetAllSalesPeopleView", SESSION_ADMIN),
+    "api/sales-admin/client/by-sales-person/<int:id>": (
+        "GetClientsBySalesPersonView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/client/transfer-client/": ("TransferClientsView", SESSION_ADMIN),
     "api/sales-admin/dispatch-order/<str:public_id>": ("DispatchOrderView", SESSION_ADMIN),
     "api/sales-admin/dispatch-challans/": ("GetDispatchChallansView", SESSION_ADMIN),
     "api/sales-admin/dispatch-lot-numbers/": ("GetDispatchLotNumbersView", SESSION_ADMIN),

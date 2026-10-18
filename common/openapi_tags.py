@@ -126,7 +126,12 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     # -- sales-admin website ------------------------------------------------
     (_route(_ADMIN, "auth"), (ADMIN_AUTH,)),
     (_route(_ADMIN_UTILITIES, "reauthenticate"), (ADMIN_AUTH,)),
-    (_route(_ADMIN, "admins", "sales-people", "godown-managers", "lab-testers"), (ADMIN_USERS,)),
+    (
+        _route(
+            _ADMIN, "admins", "sales-people", "all-sales-person", "godown-managers", "lab-testers"
+        ),
+        (ADMIN_USERS,),
+    ),
     (
         _route(_ADMIN, "client", "get-clients", "update-client", "verify-client"),
         (ADMIN_CLIENTS,),
