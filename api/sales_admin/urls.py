@@ -33,6 +33,8 @@ from .ExportLabTestingsView import ExportLabTestingsView
 from .ExportOrdersView import ExportOrdersView
 from .ExportRejectedOrdersView import ExportRejectedOrdersView
 from .FieldTripView import FieldTripView
+from .GetAllSalesPeopleView import GetAllSalesPeopleView
+from .GetClientsBySalesPersonView import GetClientsBySalesPersonView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetCustomOrdersView import GetCustomOrdersView
@@ -80,6 +82,7 @@ from .RotateSalesPersonQrView import RotateSalesPersonQrView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
 from .StockView import StockView
+from .TransferClientsView import TransferClientsView
 from .TransferProductView import TransferProductView
 from .UnapproveFieldTripView import UnapproveFieldTripView
 from .UnrejectReturnOrderView import UnrejectReturnOrderView
@@ -190,6 +193,17 @@ urlpatterns = [
     path("verify-client/", VerifyClientView.as_view(), name="verify-client"),
     path("update-client/", UpdateClientView.as_view(), name="update-client"),
     path("get-clients/", GetClientsView.as_view(), name="get-clients"),
+    path(
+        "client/by-sales-person/<int:id>",
+        GetClientsBySalesPersonView.as_view(),
+        name="clients-by-sales-person",
+    ),
+    path(
+        "client/transfer-client/",
+        TransferClientsView.as_view(),
+        name="transfer-client",
+    ),
+    path("all-sales-person/", GetAllSalesPeopleView.as_view(), name="all-sales-person"),
     path("client/<str:public_id>", GetClientView.as_view(), name="client-detail"),
     # Order routes follow the same convention: ``orders/`` is a collection and
     # ``order/<public_id>`` a collection item, while the lifecycle verbs carry
