@@ -1,6 +1,6 @@
 """Sales-admin client transfer endpoints.
 
-``client/by-sales-person/<id>``, ``client/transfer-client/`` and ``all-clients/``:
+``client/by-sales-person/<id>``, ``client/transfer-client/`` and ``all-sales-person/``:
 what an admin uses to re-home a departed sales person's clients.
 """
 
@@ -9,9 +9,9 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import status
 
+from aggregator.ClientOperations import create_client_with_details
 from aggregator.models import City, Client, Country, FieldTrip, Order, State
 from authentication.models import Admin, SalesPerson
-from tests import test_client_api
 from tests.common import WebApiTestCase
 
 User = get_user_model()
@@ -24,7 +24,7 @@ ALL_SALES_PERSON_URL = "/api/sales-admin/all-sales-person/"
 
 
 class ClientTransferApiTest(WebApiTestCase):
-    """Per-sales-person list, transfer and the all-clients directory.
+    """Per-sales-person list, transfer and the all-sales-person directory.
 
     tests/test_client_transfer_api.py::ClientTransferApiTest
     """
@@ -62,20 +62,32 @@ class ClientTransferApiTest(WebApiTestCase):
 
     def setUp(self):
         super().setUp()
-        # Reuse the sibling suite's client builder (GSTs must stay distinct).
-        # Imported as a module so pytest does not collect the sibling class here.
-        builder = test_client_api.SalesAdminClientApiTest
-        builder.country, builder.state, builder.city = self.country, self.state, self.city
-        self.first = builder._make_client(
-            self, company_name="Alpha", gst_index=0, actor=self.leaver_user
-        )
-        self.second = builder._make_client(
-            self, company_name="Beta", gst_index=1, actor=self.leaver_user
-        )
-        self.heirs = builder._make_client(
-            self, company_name="Gamma", gst_index=2, actor=self.heir_user
-        )
+        self.first = self._make_client("Alpha", 0, self.leaver_user)
+        self.second = self._make_client("Beta", 1, self.leaver_user)
+        self.heirs = self._make_client("Gamma", 2, self.heir_user)
         self.login_as(self.admin_user)
+
+    # 15-char GSTINs differing only in the final char (see validate_gst_number).
+    _GST_SUFFIXES = "013456789ACDEFGHIJKLMNOPQRSTUWXY"
+
+    def _make_client(self, company_name, gst_index, actor):
+        return create_client_with_details(
+            company_name=company_name,
+            company_phone="9876543210",
+            gst_number=f"27AAPFU0939F1Z{self._GST_SUFFIXES[gst_index]}",
+            addresses=[
+                {
+                    "line_1": "1 Ring Road",
+                    "pincode": "395007",
+                    "city": self.city,
+                    "state": self.state,
+                    "country": self.country,
+                }
+            ],
+            contacts=[{"name": "Ramesh", "phone_number": "9876500001"}],
+            transport_agencies=[{"name": "ABC Transport"}],
+            actor=actor,
+        )
 
     def test_list_by_sales_person_includes_removed_sales_person(self):
         """tests/test_client_transfer_api.py::ClientTransferApiTest::test_list_by_sales_person_includes_removed_sales_person"""
