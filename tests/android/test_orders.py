@@ -220,7 +220,10 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
             },
         )
         self.assertEqual(data["clients"]["total"], 2)  # the rival's client is not ours
-        self.assertEqual(data["clients"]["by_status"], {"VERIFICATION_PENDING": 2, "VERIFIED": 0})
+        self.assertEqual(
+            data["clients"]["by_status"],
+            {"VERIFICATION_PENDING": 2, "VERIFIED": 0, "CLIENT_REJECTED": 0},
+        )
 
         # Kilograms grouped by product, heaviest first. Alpha is a 10kg bag and
         # beta a 5kg one. Alpha: 1 bag on ``first`` + 2 on ``third`` = 30kg,
@@ -558,3 +561,27 @@ class AndroidOrderListApiTest(AndroidApiTestCase):
         self.assertEqual(images["Alpha Seed"], "/media/products/alpha.jpg")
         # Beta Seed has no picture: an empty string, never null.
         self.assertEqual(images["Beta Seed"], "")
+
+    def test_a_packagings_own_image_wins_over_the_products_on_the_card(self):
+        """tests/android/test_orders.py::AndroidOrderListApiTest::test_a_packagings_own_image_wins_over_the_products_on_the_card"""
+        self._seed_orders()
+        ProductPackaging.objects.filter(product__name="Alpha Seed").update(
+            image_url="/media/product-packagings/alpha-bag.jpg"
+        )
+        ProductPackaging.objects.filter(product__name="Beta Seed").update(
+            image_url="/media/product-packagings/beta-bag.jpg"
+        )
+
+        response = self.client.get(GET_ORDERS_URL)
+
+        card = next(
+            row
+            for row in response.data["results"]
+            if row["public_id"] == self.third.public_id
+        )
+        images = {
+            p["product"]["name"]: p["product"]["image_url"]
+            for p in card["packagings"]
+        }
+        self.assertEqual(images["Alpha Seed"], "/media/product-packagings/alpha-bag.jpg")
+        self.assertEqual(images["Beta Seed"], "/media/product-packagings/beta-bag.jpg")

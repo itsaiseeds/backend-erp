@@ -460,6 +460,8 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/update-sample-packet-stock": ("UpdateLooseStockView", SESSION_ADMIN),
     "api/sales-admin/update-bag-stock": ("UpdateTodaysInventoryView", SESSION_ADMIN),
     "api/sales-admin/verify-client/": ("VerifyClientView", SESSION_ADMIN),
+    "api/sales-admin/reject-client/": ("RejectClientView", SESSION_ADMIN),
+    "api/sales-admin/reopen-client/": ("ReopenClientView", SESSION_ADMIN),
     # Superuser *and* REQUIRED_PERMISSIONS below (and off unless enabled).
     "api/execute-code/": ("ExecuteCodeView", SESSION_SUPERUSER),
     "api/test-sentry/": ("TestSentryView", SESSION_SUPERUSER),

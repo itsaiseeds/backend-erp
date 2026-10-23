@@ -18,8 +18,10 @@ class StatusIds(IntEnum):
     added after the field-trip range was already seeded, and its ``code`` must
     differ from the unrelated order-lifecycle ``REJECTED`` at id 7), and ids
     17-19 the return-order lifecycle, and id 20 the inward raw-material lot's
-    ``Converted to waste`` status (a rejected lot written off as waste). No
-    migrations — keep in sync with the seed rows.
+    ``Converted to waste`` status (a rejected lot written off as waste), and id
+    21 the client's ``Rejected`` verification state (``CLIENT_REJECTED``, since
+    ``REJECTED`` is the order id 7). No migrations — keep in sync with the seed
+    rows.
     """
 
     BOOKED = 1
@@ -42,6 +44,7 @@ class StatusIds(IntEnum):
     RETURN_ACCEPTED = 18
     RETURN_REJECTED = 19
     CONVERTED_TO_WASTE = 20
+    CLIENT_REJECTED = 21
 
     @classmethod
     def order_statuses(cls) -> list[StatusIds]:
@@ -50,8 +53,8 @@ class StatusIds(IntEnum):
 
     @classmethod
     def client_statuses(cls) -> list[StatusIds]:
-        """The client verification ids (8–9)."""
-        return [cls(value) for value in range(cls.VERIFICATION_PENDING, cls.VERIFIED + 1)]
+        """The client verification ids (8–9, plus 21)."""
+        return [cls.VERIFICATION_PENDING, cls.VERIFIED, cls.CLIENT_REJECTED]
 
     @classmethod
     def raw_material_statuses(cls) -> list[StatusIds]:

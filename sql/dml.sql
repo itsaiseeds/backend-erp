@@ -330,6 +330,9 @@ INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, de
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(18, '2026-10-03 00:00:00.000', '2026-10-03 00:00:00.000', false, NULL, NULL, NULL, 'RETURN_ACCEPTED', 'Return accepted', 2);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(19, '2026-10-03 00:00:00.000', '2026-10-03 00:00:00.000', false, NULL, NULL, NULL, 'RETURN_REJECTED', 'Return rejected', 3);
 INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(20, '2026-10-16 00:00:00.000', '2026-10-16 00:00:00.000', false, NULL, NULL, NULL, 'CONVERTED_TO_WASTE', 'Converted to waste', 4);
+-- CLIENT_REJECTED (client verification state; the code REJECTED is taken by order id 7).
+-- Production (Neon) needs: INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(21, '2026-10-23 00:00:00.000', '2026-10-23 00:00:00.000', false, NULL, NULL, NULL, 'CLIENT_REJECTED', 'Rejected', 3);
+INSERT INTO public.aggregator_status (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, code, "name", "sequence") VALUES(21, '2026-10-23 00:00:00.000', '2026-10-23 00:00:00.000', false, NULL, NULL, NULL, 'CLIENT_REJECTED', 'Rejected', 3);
 
 -- -------------------------------------------------------------------------
 -- aggregator_stage (seed classification of a product; enum-like, 4 fixed rows)
@@ -372,8 +375,8 @@ INSERT INTO public.aggregator_crop (id, created_at, updated_at, is_deleted, dele
 INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, stage_id, selling_price, image_url) VALUES(1, '2026-09-07 00:28:02.358', '2026-09-07 00:28:12.045', false, NULL, NULL, 1, 'P-I34V7RI1JPUH', 'SAI-33', 1, 1, 120.00, '');
 INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, stage_id, selling_price, image_url) VALUES(2, '2026-09-07 00:28:40.714', '2026-09-07 00:28:40.718', false, NULL, NULL, 1, 'P-NQ8N4LF7MJYQ', 'SAI-3353', 2, 1, 250.00, '');
 
-INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(1, '2026-09-07 00:29:08.487', '2026-09-07 00:29:15.227', false, NULL, NULL, 1, 'PP-U4UYPFOF08NZ', 1, 1.000, 40, 4800.00);
-INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(2, '2026-09-07 00:29:29.899', '2026-09-07 00:29:29.904', false, NULL, NULL, 1, 'PP-5SVE39LY2XEI', 2, 1.500, 20, 5000.00);
+INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price, image_url) VALUES(1, '2026-09-07 00:29:08.487', '2026-09-07 00:29:15.227', false, NULL, NULL, 1, 'PP-U4UYPFOF08NZ', 1, 1.000, 40, 4800.00, '');
+INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price, image_url) VALUES(2, '2026-09-07 00:29:29.899', '2026-09-07 00:29:29.904', false, NULL, NULL, 1, 'PP-5SVE39LY2XEI', 2, 1.500, 20, 5000.00, '');
 
 INSERT INTO public.aggregator_othermaterialtype (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name", unit_type) VALUES(1, '2026-09-07 00:30:00.000', '2026-09-07 00:30:00.002', false, NULL, NULL, 1, 'bag_outer_cover', 'kg');
 INSERT INTO public.aggregator_othermaterialtype (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, "name", unit_type) VALUES(2, '2026-09-07 00:30:00.100', '2026-09-07 00:30:00.102', false, NULL, NULL, 1, 'packet_outer_cover', 'kg');
@@ -435,7 +438,7 @@ $$ SELECT (now() AT TIME ZONE 'Asia/Kolkata')::date $$;
 -- for it is refused until it is switched back on.
 -- -------------------------------------------------------------------------
 INSERT INTO public.aggregator_product (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, "name", crop_id, stage_id, selling_price, image_url, is_usable) VALUES(3, now(), now(), false, NULL, NULL, 1, 'P-DUMMY0000003', 'SAI-99', 1, 1, 110.00, '', false);
-INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price) VALUES(3, now(), now(), false, NULL, NULL, 1, 'PP-DUMMY000003', 3, 1.000, 20, 2200.00);
+INSERT INTO public.aggregator_productpackaging (id, created_at, updated_at, is_deleted, deleted_at, deleted_by_id, created_by_id, public_id, product_id, packet_weight, packets, selling_price, image_url) VALUES(3, now(), now(), false, NULL, NULL, 1, 'PP-DUMMY000003', 3, 1.000, 20, 2200.00, '');
 SELECT setval(pg_get_serial_sequence('public.aggregator_product', 'id'),          (SELECT MAX(id) FROM public.aggregator_product));
 SELECT setval(pg_get_serial_sequence('public.aggregator_productpackaging', 'id'), (SELECT MAX(id) FROM public.aggregator_productpackaging));
 

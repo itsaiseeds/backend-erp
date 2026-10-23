@@ -842,7 +842,7 @@ def order_list_payload(order: Order) -> dict:
                 "product": {
                     "public_id": item.product_packaging.product.public_id,
                     "name": item.product_packaging.product.name,
-                    "image_url": item.product_packaging.product.image_url,
+                    "image_url": item.product_packaging.display_image_url,
                 },
                 "quantity": item.quantity,
             }

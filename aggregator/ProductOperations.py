@@ -328,6 +328,7 @@ def catalogue_packaging_payload(packaging: ProductPackaging) -> dict:
         "packet_weight": str(packaging.packet_weight),
         "total_weight": str(packaging.total_weight),
         "selling_price": str(packaging.selling_price),
+        "image_url": packaging.display_image_url,
         "product": {
             "public_id": product.public_id,
             "name": product.name,
@@ -337,7 +338,7 @@ def catalogue_packaging_payload(packaging: ProductPackaging) -> dict:
                 "name": product.stage.name,
                 "sequence": product.stage.sequence,
             },
-            "image_url": product.image_url,
+            "image_url": packaging.display_image_url,
             "description_items": description_items_payload(product),
         },
     }

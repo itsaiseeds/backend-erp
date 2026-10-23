@@ -2,8 +2,9 @@
 
 The approval step for a client a sales person onboarded from the Android app.
 Marks the client ``VERIFIED`` and records the acting sales admin in
-``verified_by`` / ``verified_at``. This is the only endpoint that may change a
-client's status.
+``verified_by`` / ``verified_at``. Together with ``reject-client`` and
+``reopen-client`` it is the only way to change a client's status. A rejected
+client must be re-opened before it can be verified.
 """
 
 from __future__ import annotations
@@ -52,6 +53,10 @@ class VerifyClientView(AdminApiView):
         )
         if client.is_verified:
             raise serializers.ValidationError("This client is already verified.")
+        if client.is_rejected:
+            raise serializers.ValidationError(
+                "Re-open the client before verifying it."
+            )
 
         verify_client(client, request.user)
         return Response(client_payload(client))

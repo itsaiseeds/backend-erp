@@ -10,7 +10,7 @@ Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
   those cities. The ``available_filters`` entry lists the eligible
   ``{value, label}`` cities (exactly the ones this sales person has clients in),
   so the picker needs no second call.
-* ``?status=<code,...>`` -- ``VERIFICATION_PENDING`` / ``VERIFIED``; the entry
+* ``?status=<code,...>`` -- ``VERIFICATION_PENDING`` / ``VERIFIED`` / ``CLIENT_REJECTED``; the entry
   carries both as options.
 * ``?company_name=<term>`` -- case-insensitive substring of the company name.
 * ``?address=<term>`` -- case-insensitive substring of the *primary* address

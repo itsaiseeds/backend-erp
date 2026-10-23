@@ -19,7 +19,7 @@ Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
 * ``?city_id=<id1,id2,...>`` -- clients whose *primary* address is in one of
   those cities; the entry lists every city some client's primary address sits
   in.
-* ``?status=<code,...>`` -- ``VERIFICATION_PENDING`` / ``VERIFIED``.
+* ``?status=<code,...>`` -- ``VERIFICATION_PENDING`` / ``VERIFIED`` / ``CLIENT_REJECTED``.
 * ``?company_name=<term>`` -- case-insensitive substring of the company name.
 * ``?address=<term>`` -- case-insensitive substring of the *primary* address
   (line 1/2, pincode or city name).

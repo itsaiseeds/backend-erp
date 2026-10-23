@@ -499,7 +499,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
         )
         self.assertEqual(
             [o["value"] for o in verified.data["available_filters"][2]["options"]],
-            ["VERIFICATION_PENDING", "VERIFIED"],
+            ["VERIFICATION_PENDING", "VERIFIED", "CLIENT_REJECTED"],
         )
 
         # A code outside the catalogue is a 400, not an empty page.

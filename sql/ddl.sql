@@ -831,6 +831,9 @@ CREATE TABLE IF NOT EXISTS public.aggregator_productpackaging (
 	packet_weight numeric(8, 3) NOT NULL,
 	packets int8 NOT NULL,
 	selling_price numeric(12, 2) NOT NULL,
+	-- Optional own picture; empty falls back to the product's image. Production
+	-- (Neon) needs: ALTER TABLE public.aggregator_productpackaging ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
+	image_url varchar(500) NOT NULL DEFAULT '',
 	CONSTRAINT aggregator_productpackaging_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_productpackaging_public_id_key UNIQUE (public_id),
 	CONSTRAINT uniq_productpackaging_product_weight_packets UNIQUE (product_id, packet_weight, packets),

@@ -70,8 +70,10 @@ from .ProductStockLedgerView import ProductStockLedgerView
 from .ProductsView import ProductsView
 from .RawMaterialStockView import RawMaterialStockView
 from .RawMaterialWastesView import RawMaterialWastesView
+from .RejectClientView import RejectClientView
 from .RejectOrderView import RejectOrderView
 from .RejectReturnOrderView import RejectReturnOrderView
+from .ReopenClientView import ReopenClientView
 from .ReturnOrderRecipesView import ReturnOrderRecipesView
 from .RevertAcceptReturnOrderView import RevertAcceptReturnOrderView
 from .RevertCustomOrderDispatchView import RevertCustomOrderDispatchView
@@ -191,6 +193,8 @@ urlpatterns = [
     # The client *verb* routes keep a trailing slash; ``client/<public_id>`` is
     # a collection item, named like ``products/<public_id>`` above.
     path("verify-client/", VerifyClientView.as_view(), name="verify-client"),
+    path("reject-client/", RejectClientView.as_view(), name="reject-client"),
+    path("reopen-client/", ReopenClientView.as_view(), name="reopen-client"),
     path("update-client/", UpdateClientView.as_view(), name="update-client"),
     path("get-clients/", GetClientsView.as_view(), name="get-clients"),
     path(

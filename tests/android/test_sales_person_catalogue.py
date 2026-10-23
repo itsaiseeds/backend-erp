@@ -130,6 +130,7 @@ class AndroidCatalogueApiTest(AndroidApiTestCase):
         self.assertEqual(row["packet_weight"], "1.000")
         self.assertEqual(row["total_weight"], "10.000")
         self.assertEqual(row["selling_price"], "3000.00")
+        self.assertEqual(row["image_url"], "")
         self.assertEqual(
             row["product"],
             {
@@ -145,6 +146,24 @@ class AndroidCatalogueApiTest(AndroidApiTestCase):
                 ],
             },
         )
+
+    def test_the_image_is_the_packagings_own_else_the_products(self):
+        self.breeder.image_url = "/media/products/breeder.jpg"
+        self.breeder.save(update_fields=["image_url"])
+        self.dear.image_url = "/media/product-packagings/dear.jpg"
+        self.dear.save(update_fields=["image_url"])
+        self.mid.product.image_url = "/media/products/foundation.jpg"
+        self.mid.product.save(update_fields=["image_url"])
+
+        rows = {row["public_id"]: row for row in self._get()["results"]}
+
+        own = rows[self.dear.public_id]
+        self.assertEqual(own["image_url"], "/media/product-packagings/dear.jpg")
+        self.assertEqual(own["product"]["image_url"], "/media/product-packagings/dear.jpg")
+        fallback = rows[self.mid.public_id]
+        self.assertEqual(fallback["image_url"], "/media/products/foundation.jpg")
+        self.assertEqual(fallback["product"]["image_url"], "/media/products/foundation.jpg")
+        self.assertEqual(rows[self.cheap.public_id]["image_url"], "")
 
     def test_a_product_without_bullets_reports_an_empty_list(self):
         row = next(
