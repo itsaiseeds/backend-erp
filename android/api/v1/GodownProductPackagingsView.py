@@ -3,8 +3,9 @@
 The Android counterpart of ``api.sales_admin.ProductPackagingsView`` -- the same
 rows and the same ``?is_usable=`` filter, but **read-only** (packagings are
 created from the web dashboard, never from the godown floor) and carrying one
-extra field: the product's ``image_url``, so the app can label a packaging with
-the seed bag it counts without a second lookup. Godown-manager token only.
+extra field: ``product.image_url``, resolved to the packaging's own image and
+falling back to the product's, so the app can label a packaging with the seed
+bag it counts without a second lookup. Godown-manager token only.
 
 The counter needs this list: ``godown/update-bag-stock`` is keyed by packaging
 ``public_id``, and the default (usable products only) is exactly the set of
@@ -35,7 +36,10 @@ class GodownPackagingProductRefSerializer(PackagingProductRefSerializer):
 
     image_url = serializers.CharField(
         allow_blank=True,
-        help_text="Product picture; empty when the product has no image set.",
+        help_text=(
+            "Packaging picture, else the product picture; empty when neither has "
+            "an image set."
+        ),
     )
 
 
@@ -50,7 +54,7 @@ def godown_packaging_payload(packaging) -> dict:
     row = packaging_payload(packaging)
     return {
         **row,
-        "product": {**row["product"], "image_url": packaging.product.image_url},
+        "product": {**row["product"], "image_url": packaging.display_image_url},
     }
 
 
@@ -64,8 +68,9 @@ class GodownProductPackagingsView(AndroidGodownBaseView):
             "Packagings of usable products only by default, so this list is the "
             "set of packagings ``update-bag-stock`` will accept. "
             "``?is_usable=all`` (or ``false``) also returns the packagings of "
-            "frozen products, which cannot be counted. Each row carries its "
-            "product's ``image_url`` so the app needs no second lookup."
+            "frozen products, which cannot be counted. Each row carries "
+            "``product.image_url`` (the packaging's image, else the product's) so "
+            "the app needs no second lookup."
         ),
         parameters=[
             OpenApiParameter(

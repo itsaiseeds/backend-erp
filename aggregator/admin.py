@@ -509,11 +509,48 @@ class ProductPackagingAdminForm(forms.ModelForm):
     ``ModelForm._post_clean`` sees a valid value and the model's ``full_clean``
     passes. This fallback is intentionally scoped to the admin: programmatic
     callers (``ProductOperations.add_packaging``) already handle the default.
+
+    The optional ``image`` upload mirrors ``ProductAdminForm``; ``image_url`` is
+    read-only on the admin.
     """
+
+    image = forms.ImageField(
+        required=False,
+        label="image",
+        help_text=(
+            "Upload to set or replace the packaging's own picture (JPEG, PNG or "
+            "WebP, 5 MB max). Leave blank to keep the current one; with none, "
+            "the product's image is shown."
+        ),
+    )
 
     class Meta:
         model = ProductPackaging
         fields = "__all__"
+
+    def clean_image(self):
+        """Validate and upload, so a rejected file is a form error, not a 500."""
+        image = self.cleaned_data.get("image")
+        if not image:
+            return image
+        try:
+            self._uploaded_image_url = upload_image(image, folder="product-packagings")
+        except DRFValidationError as exc:
+            raise forms.ValidationError(exc.detail) from exc
+        return image
+
+    def save(self, commit=True):
+        packaging = super().save(commit=False)
+        uploaded = getattr(self, "_uploaded_image_url", "")
+        replaced = ""
+        if uploaded:
+            replaced = packaging.image_url
+            packaging.image_url = uploaded
+        if commit:
+            packaging.save()
+            if replaced:
+                delete_image(replaced)
+        return packaging
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -552,6 +589,7 @@ class ProductPackagingAdmin(UnusableProductAdminMixin, SoftDeleteModelAdmin):
     list_filter = ("product__crop",)
     autocomplete_fields = ("product",)
     list_select_related = ("product",)
+    readonly_fields = ("image_url",)
 
 
 @admin.register(DispatchDetails)

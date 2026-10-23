@@ -8,7 +8,11 @@ logged-in session, since these are session-only web endpoints.
 
 from __future__ import annotations
 
+import io
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 
 from aggregator.models import Crop, Product, ProductPackaging, Stage, StageIds
@@ -209,6 +213,103 @@ class ProductPackagingApiTest(WebApiTestCase):
             ).status_code,
             status.HTTP_200_OK,
         )
+
+    # -- image ----------------------------------------------------------------
+
+    @staticmethod
+    def _png(name="pic.png"):
+        """A real 1x1 PNG -- ``serializers.ImageField`` verifies content with Pillow."""
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (1, 1)).save(buffer, format="PNG")
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+    def test_a_json_create_without_an_image_falls_back_to_the_product_image(self):
+        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_a_json_create_without_an_image_falls_back_to_the_product_image"""
+        self.product.image_url = "https://cdn.example/product.png"
+        self.product.save(update_fields=["image_url", "updated_at"])
+        self.login_as(self.seed_admin)
+
+        response = self.client.post(
+            PACKAGINGS_URL, self._payload(weight=10, packets=3), format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        self.assertEqual(response.data["image_url"], "")
+        self.assertEqual(
+            response.data["display_image_url"], "https://cdn.example/product.png"
+        )
+
+    def test_a_multipart_create_stores_the_uploaded_image(self):
+        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_a_multipart_create_stores_the_uploaded_image"""
+        self.login_as(self.seed_admin)
+        payload = {**self._payload(weight=10, packets=3), "image": self._png()}
+        with patch(
+            "api.sales_admin.ProductPackagingsView.upload_image",
+            return_value="https://cdn.example/pack.png",
+        ) as upload:
+            response = self.client.post(PACKAGINGS_URL, payload, format="multipart")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        self.assertEqual(upload.call_args.kwargs["folder"], "product-packagings")
+        self.assertEqual(response.data["image_url"], "https://cdn.example/pack.png")
+        self.assertEqual(response.data["display_image_url"], "https://cdn.example/pack.png")
+        created = ProductPackaging.objects.get(public_id=response.data["public_id"])
+        self.assertEqual(created.image_url, "https://cdn.example/pack.png")
+
+    def test_patching_an_image_replaces_it_and_deletes_the_old_one(self):
+        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_patching_an_image_replaces_it_and_deletes_the_old_one"""
+        self.packaging.image_url = "https://cdn.example/old.png"
+        self.packaging.save(update_fields=["image_url", "updated_at"])
+        self.login_as(self.seed_admin)
+        with (
+            patch(
+                "api.sales_admin.UpdateProductPackagingView.upload_image",
+                return_value="https://cdn.example/new.png",
+            ),
+            patch("api.sales_admin.UpdateProductPackagingView.delete_image") as delete,
+        ):
+            response = self.client.patch(
+                self._url(self.packaging), {"image": self._png()}, format="multipart"
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["image_url"], "https://cdn.example/new.png")
+        delete.assert_called_once_with("https://cdn.example/old.png")
+        self.packaging.refresh_from_db()
+        self.assertEqual(self.packaging.image_url, "https://cdn.example/new.png")
+
+    def test_remove_image_clears_it_and_restores_the_product_fallback(self):
+        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_remove_image_clears_it_and_restores_the_product_fallback"""
+        self.product.image_url = "https://cdn.example/product.png"
+        self.product.save(update_fields=["image_url", "updated_at"])
+        self.packaging.image_url = "https://cdn.example/old.png"
+        self.packaging.save(update_fields=["image_url", "updated_at"])
+        self.login_as(self.seed_admin)
+        with patch("api.sales_admin.UpdateProductPackagingView.delete_image") as delete:
+            response = self.client.patch(
+                self._url(self.packaging), {"remove_image": True}, format="json"
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.data["image_url"], "")
+        self.assertEqual(
+            response.data["display_image_url"], "https://cdn.example/product.png"
+        )
+        delete.assert_called_once_with("https://cdn.example/old.png")
+
+    def test_sending_both_image_and_remove_image_is_rejected(self):
+        """tests/test_product_packaging_api.py::ProductPackagingApiTest::test_sending_both_image_and_remove_image_is_rejected"""
+        self.login_as(self.seed_admin)
+
+        response = self.client.patch(
+            self._url(self.packaging),
+            {"image": self._png(), "remove_image": "true"},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_the_shape_of_a_packaging_cannot_be_edited(self):
         """Product, weight and packets are ignored; only the price is applied.

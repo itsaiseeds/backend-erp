@@ -133,7 +133,15 @@ ROUTE_TAGS: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
         (ADMIN_USERS,),
     ),
     (
-        _route(_ADMIN, "client", "get-clients", "update-client", "verify-client"),
+        _route(
+            _ADMIN,
+            "client",
+            "get-clients",
+            "update-client",
+            "verify-client",
+            "reject-client",
+            "reopen-client",
+        ),
         (ADMIN_CLIENTS,),
     ),
     (

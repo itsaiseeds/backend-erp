@@ -44,6 +44,16 @@ class ProductPackaging(
             "here -- it does not track later changes to the product's per-kilogram rate."
         ),
     )
+    image_url = models.CharField(
+        "image URL",
+        max_length=500,
+        blank=True,
+        default="",
+        help_text=(
+            "Optional picture of this packaging. Empty means unset: apps then show "
+            "the product's image (see ``display_image_url``)."
+        ),
+    )
 
     class Meta:
         verbose_name = "product packaging"
@@ -79,6 +89,11 @@ class ProductPackaging(
         if self.product_id:
             return f"{self.product.name}: {self.packets} × {self.packet_weight}kg"
         return "product packaging"
+
+    @property
+    def display_image_url(self):
+        """The packaging's own image, else the product's."""
+        return self.image_url or self.product.image_url
 
     @property
     def total_weight(self):

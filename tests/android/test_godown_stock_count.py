@@ -147,6 +147,19 @@ class GodownStockCountApiTest(AndroidApiTestCase):
         self.assertEqual(float(row["total_weight"]), 25.0)
         self.assertNotIn("id", row)
 
+        # A packaging's own picture wins over the product's, per row.
+        self.one_kg.image_url = "/media/product-packagings/one-kg.jpg"
+        self.one_kg.save(update_fields=["image_url"])
+        refreshed = {r["public_id"]: r for r in self.client.get(PACKAGINGS_URL).data}
+        self.assertEqual(
+            refreshed[self.one_kg.public_id]["product"]["image_url"],
+            "/media/product-packagings/one-kg.jpg",
+        )
+        self.assertEqual(
+            refreshed[self.half_kg.public_id]["product"]["image_url"],
+            "/media/products/godown-pbw-725.jpg",
+        )
+
         # The public_ids handed out are the keys the count takes.
         counted = self._patch_bags({self.half_kg.public_id: 3})
         self.assertEqual(counted.status_code, status.HTTP_200_OK, counted.data)

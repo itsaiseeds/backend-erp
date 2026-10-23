@@ -34,6 +34,8 @@ User = get_user_model()
 SUPERUSER_PHONE = "9999999999"
 
 VERIFY_CLIENT_URL = "/api/sales-admin/verify-client/"
+REJECT_CLIENT_URL = "/api/sales-admin/reject-client/"
+REOPEN_CLIENT_URL = "/api/sales-admin/reopen-client/"
 UPDATE_CLIENT_URL = "/api/sales-admin/update-client/"
 GET_CLIENTS_URL = "/api/sales-admin/get-clients/"
 CLIENT_URL = "/api/sales-admin/client/{public_id}"
@@ -183,6 +185,111 @@ class SalesAdminClientApiTest(WebApiTestCase):
 
         repeat = self.client.post(VERIFY_CLIENT_URL, body, format="json")
         self.assertEqual(repeat.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # -- rejection ------------------------------------------------------------
+
+    def test_rejecting_a_pending_client_changes_only_the_status_and_notifies(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_rejecting_a_pending_client_changes_only_the_status_and_notifies"""
+        self.login_as(self.admin_user)
+        with (
+            mock.patch(
+                "aggregator.NotificationOperations.fire_and_forget",
+                side_effect=lambda func: func(),
+            ),
+            mock.patch("aggregator.NotificationOperations.send_push", return_value=[]),
+        ):
+            response = self.client.post(
+                REJECT_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "CLIENT_REJECTED")
+        self.assertFalse(response.data["is_verified"])
+        self.assertIsNone(response.data["verified_by"])
+        notification = Notification.objects.get(recipient=self.sales_person)
+        self.assertEqual(notification.event_type, "CLIENT_REJECTED")
+        self.assertEqual(notification.body, "Acme Seeds was rejected by Asha Rao.")
+
+    def test_only_a_pending_client_can_be_rejected(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_only_a_pending_client_can_be_rejected"""
+        self.login_as(self.admin_user)
+        body = {"public_id": self.pending.public_id}
+        self.client.post(REJECT_CLIENT_URL, body, format="json")
+
+        again = self.client.post(REJECT_CLIENT_URL, body, format="json")
+        self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST)
+
+        verified = self._make_client(company_name="Verified Co", gst_index=1)
+        verify_client(verified, self.admin_user)
+        response = self.client.post(
+            REJECT_CLIENT_URL, {"public_id": verified.public_id}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reopening_returns_a_rejected_client_to_pending(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_reopening_returns_a_rejected_client_to_pending"""
+        self.login_as(self.admin_user)
+        body = {"public_id": self.pending.public_id}
+        self.client.post(REJECT_CLIENT_URL, body, format="json")
+
+        response = self.client.post(REOPEN_CLIENT_URL, body, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "VERIFICATION_PENDING")
+
+    def test_only_a_rejected_client_can_be_reopened(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_only_a_rejected_client_can_be_reopened"""
+        self.login_as(self.admin_user)
+        pending = self.client.post(
+            REOPEN_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+        )
+        self.assertEqual(pending.status_code, status.HTTP_400_BAD_REQUEST)
+
+        verified = self._make_client(company_name="Verified Co", gst_index=1)
+        verify_client(verified, self.admin_user)
+        response = self.client.post(
+            REOPEN_CLIENT_URL, {"public_id": verified.public_id}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_rejected_client_must_be_reopened_before_verifying(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_a_rejected_client_must_be_reopened_before_verifying"""
+        self.login_as(self.admin_user)
+        body = {"public_id": self.pending.public_id}
+        self.client.post(REJECT_CLIENT_URL, body, format="json")
+
+        response = self.client.post(VERIFY_CLIENT_URL, body, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Re-open", str(response.data))
+
+        self.client.post(REOPEN_CLIENT_URL, body, format="json")
+        verified = self.client.post(VERIFY_CLIENT_URL, body, format="json")
+        self.assertEqual(verified.status_code, status.HTTP_200_OK)
+        self.assertEqual(verified.data["status"], "VERIFIED")
+
+    def test_reject_and_reopen_are_admin_only(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_reject_and_reopen_are_admin_only"""
+        self.login_as(self.sales_person)
+        body = {"public_id": self.pending.public_id}
+
+        for url in (REJECT_CLIENT_URL, REOPEN_CLIENT_URL):
+            response = self.client.post(url, body, format="json")
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_get_clients_filters_by_the_rejected_status(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_get_clients_filters_by_the_rejected_status"""
+        self.login_as(self.admin_user)
+        self.client.post(
+            REJECT_CLIENT_URL, {"public_id": self.pending.public_id}, format="json"
+        )
+
+        response = self.client.get(GET_CLIENTS_URL, {"status": "CLIENT_REJECTED"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [c["public_id"] for c in response.data["results"]], [self.pending.public_id]
+        )
 
     def test_an_unknown_client_is_not_found(self):
         """Both the verify and the detail endpoint 404 on an unknown public id.

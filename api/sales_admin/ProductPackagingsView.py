@@ -17,6 +17,7 @@ from aggregator.models import Product, ProductPackaging
 from aggregator.ProductOperations import assert_products_usable, usability_filter
 from api.admin import AdminApiView
 from api.order_serializers import ProductRefSerializer
+from common.storage import delete_image, upload_image
 
 
 class PackagingProductRefSerializer(ProductRefSerializer):
@@ -34,6 +35,14 @@ class ProductPackagingPayloadSerializer(serializers.Serializer):
     packets = serializers.IntegerField(min_value=1)
     total_weight = serializers.DecimalField(max_digits=11, decimal_places=3)
     selling_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    image_url = serializers.CharField(
+        allow_blank=True,
+        help_text="The packaging's own image; blank when none was uploaded.",
+    )
+    display_image_url = serializers.CharField(
+        allow_blank=True,
+        help_text="Image to show: the packaging's own, else the product's.",
+    )
 
 
 class CreateProductPackagingSerializer(serializers.Serializer):
@@ -63,6 +72,7 @@ class CreateProductPackagingSerializer(serializers.Serializer):
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, min_value=0
     )
+    image = serializers.ImageField(required=False)
 
     def validate(self, attrs):
         if attrs["packet_weight"] <= 0:
@@ -96,6 +106,8 @@ def packaging_payload(packaging):
         "packets": packaging.packets,
         "total_weight": packaging.total_weight,
         "selling_price": packaging.selling_price,
+        "image_url": packaging.image_url,
+        "display_image_url": packaging.display_image_url,
     }
 
 
@@ -148,13 +160,22 @@ class ProductPackagingsView(AdminApiView):
             "selling_price",
             data["packets"] * data["product"].price_for_weight(data["packet_weight"]),
         )
-        with transaction.atomic():
-            assert_products_usable([data["product"]], action="get a packaging")
-            packaging = ProductPackaging.objects.create(
-                product=data["product"],
-                packet_weight=data["packet_weight"],
-                packets=data["packets"],
-                selling_price=selling_price,
-                created_by=request.user,
-            )
+        # Upload first: a failed upload aborts with a 400 before any row exists.
+        image = data.get("image")
+        image_url = upload_image(image, folder="product-packagings") if image else ""
+        try:
+            with transaction.atomic():
+                assert_products_usable([data["product"]], action="get a packaging")
+                packaging = ProductPackaging.objects.create(
+                    product=data["product"],
+                    packet_weight=data["packet_weight"],
+                    packets=data["packets"],
+                    selling_price=selling_price,
+                    image_url=image_url,
+                    created_by=request.user,
+                )
+        except Exception:
+            if image_url:
+                delete_image(image_url)
+            raise
         return Response(packaging_payload(packaging), status=status.HTTP_201_CREATED)

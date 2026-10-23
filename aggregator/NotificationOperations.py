@@ -58,6 +58,7 @@ class NotificationEvent(StrEnum):
     FIELD_TRIP_APPROVED = "FIELD_TRIP_APPROVED"
     FIELD_TRIP_UNAPPROVED = "FIELD_TRIP_UNAPPROVED"
     CLIENT_VERIFIED = "CLIENT_VERIFIED"
+    CLIENT_REJECTED = "CLIENT_REJECTED"
     RETURN_ACCEPTED = "RETURN_ACCEPTED"
     RETURN_REJECTED = "RETURN_REJECTED"
     LAB_TEST_REQUESTED = "LAB_TEST_REQUESTED"
@@ -109,6 +110,7 @@ _SPECS: dict[NotificationEvent, EventSpec] = {
         Screen.FIELD_TRIP_DETAIL,
     ),
     _E.CLIENT_VERIFIED: EventSpec("Client verified", "was verified", Screen.CLIENT_DETAIL),
+    _E.CLIENT_REJECTED: EventSpec("Client rejected", "was rejected", Screen.CLIENT_DETAIL),
     _E.RETURN_ACCEPTED: EventSpec("Return accepted", "was accepted", Screen.RETURN_ORDER_DETAIL),
     _E.RETURN_REJECTED: EventSpec("Return rejected", "was rejected", Screen.RETURN_ORDER_DETAIL),
     _E.LAB_TEST_REQUESTED: EventSpec(
