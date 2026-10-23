@@ -184,3 +184,24 @@ class OrderAdminTest(DMLTestCase):
         self.assertContains(response, "Cannot delete an order that is CONFIRMED")
         order.refresh_from_db()
         assert not order.is_deleted
+
+
+class FrozenPackagingAdminTest(OrderAdminTest):
+    """A frozen product's packaging opens read-only instead of raising a KeyError."""
+
+    def test_a_frozen_products_packaging_change_page_renders_read_only(self):
+        """tests/test_order_admin.py::FrozenPackagingAdminTest::test_a_frozen_products_packaging_change_page_renders_read_only"""
+        self.product.is_usable = False
+        self.product.save(update_fields=["is_usable", "updated_at"])
+
+        response = self.client.get(f"/admin/aggregator/productpackaging/{self.pack.pk}/change/")
+
+        assert response.status_code == 200
+        assert "selling_price" not in response.context["adminform"].form.fields
+
+    def test_a_usable_products_packaging_still_has_an_editable_price(self):
+        """tests/test_order_admin.py::FrozenPackagingAdminTest::test_a_usable_products_packaging_still_has_an_editable_price"""
+        response = self.client.get(f"/admin/aggregator/productpackaging/{self.pack.pk}/change/")
+
+        assert response.status_code == 200
+        assert "selling_price" in response.context["adminform"].form.fields

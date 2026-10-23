@@ -554,7 +554,11 @@ class ProductPackagingAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        selling_price = self.fields["selling_price"]
+        # A frozen product's packaging is shown read-only (see
+        # UnusableProductAdminMixin), so the form then has no editable fields.
+        selling_price = self.fields.get("selling_price")
+        if selling_price is None:
+            return
         selling_price.required = False
         selling_price.help_text = (
             "Leave blank to default to packets × packet_weight × the "
