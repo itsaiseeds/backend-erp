@@ -288,6 +288,11 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
     setState(() => _lines[index].packets = next);
   }
 
+  void _setPackets(int index, int packets) {
+    if (packets < 1) return;
+    setState(() => _lines[index].packets = packets);
+  }
+
   num get _liveTotalAmount =>
       _lines.fold<num>(0, (sum, line) => sum + line.lineTotal);
 
@@ -501,6 +506,7 @@ class _CustomOrderFormDialogState extends State<CustomOrderFormDialog> {
       onDecrement: !_canEdit || line.packets <= 1
           ? null
           : () => _changePackets(index, -1),
+      onPacketsSet: _canEdit ? (packets) => _setPackets(index, packets) : null,
       onRemove: _canEdit ? () => _removeLine(index) : null,
       onPriceChanged: (_) => setState(() {}),
     );

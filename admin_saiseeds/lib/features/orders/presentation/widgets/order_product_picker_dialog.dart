@@ -9,6 +9,7 @@ import '../../../../core/utils/formatters/currency_formatter.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/widgets/buttons/primary_button.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
+import '../../../../core/widgets/inputs/editable_stepper_count.dart';
 import '../../../../core/widgets/loaders/dots_loader.dart';
 import '../../../product_packagings/data/models/product_packaging_model.dart';
 import '../../../product_packagings/data/product_packagings_repository.dart';
@@ -135,6 +136,16 @@ class _OrderProductPickerDialogState extends State<OrderProductPickerDialog> {
         _quantities.remove(packaging.publicId);
       } else {
         _quantities[packaging.publicId] = next;
+      }
+    });
+  }
+
+  void _set(ProductPackagingModel packaging, int quantity) {
+    setState(() {
+      if (quantity <= 0) {
+        _quantities.remove(packaging.publicId);
+      } else {
+        _quantities[packaging.publicId] = quantity;
       }
     });
   }
@@ -319,6 +330,7 @@ class _OrderProductPickerDialogState extends State<OrderProductPickerDialog> {
               isTaken: isTaken,
               onAdd: isTaken ? _notifyAlreadyAdded : () => _add(packaging),
               onRemove: () => _remove(packaging),
+              onSet: (quantity) => _set(packaging, quantity),
             );
           },
         );
@@ -363,12 +375,14 @@ class _PackagingCard extends StatelessWidget {
   final bool isPerPacket;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
+  final ValueChanged<int> onSet;
 
   const _PackagingCard({
     required this.packaging,
     required this.quantity,
     required this.onAdd,
     required this.onRemove,
+    required this.onSet,
     this.isTaken = false,
     this.isPerPacket = false,
   });
@@ -447,6 +461,7 @@ class _PackagingCard extends StatelessWidget {
                       quantity: quantity,
                       onAdd: onAdd,
                       onRemove: onRemove,
+                      onSet: onSet,
                     ),
             ),
           ),
@@ -586,11 +601,13 @@ class _Stepper extends StatelessWidget {
   final int quantity;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
+  final ValueChanged<int> onSet;
 
   const _Stepper({
     required this.quantity,
     required this.onAdd,
     required this.onRemove,
+    required this.onSet,
   });
 
   @override
@@ -608,6 +625,7 @@ class _Stepper extends StatelessWidget {
                 quantity: quantity,
                 onAdd: onAdd,
                 onRemove: onRemove,
+                onSet: onSet,
               ),
       ),
     );
@@ -646,12 +664,14 @@ class _CountControl extends StatelessWidget {
   final int quantity;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
+  final ValueChanged<int> onSet;
 
   const _CountControl({
     super.key,
     required this.quantity,
     required this.onAdd,
     required this.onRemove,
+    required this.onSet,
   });
 
   @override
@@ -665,11 +685,12 @@ class _CountControl extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _StepIcon(icon: Icons.remove_rounded, onTap: onRemove),
-          Text(
-            '$quantity',
+          EditableStepperCount(
+            value: quantity,
             style: AppTypography.button.copyWith(
               color: AppColors.TEXT_ON_PRIMARY,
             ),
+            onSubmitted: onSet,
           ),
           _StepIcon(icon: Icons.add_rounded, onTap: onAdd),
         ],

@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -8,8 +9,11 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/utils/validators/form_validators.dart';
+import '../../../../core/widgets/buttons/secondary_button.dart';
 import '../../../../core/widgets/dialogs/app_record_dialog.dart';
+import '../../../../core/widgets/feedback/confirmation_dialog.dart';
 import '../../../../core/widgets/feedback/detail_field.dart';
+import '../../../../core/widgets/feedback/image_viewer_dialog.dart';
 import '../../../../core/widgets/inputs/product_picker_field.dart';
 import '../../../../core/widgets/inputs/record_field.dart';
 import '../../../../core/widgets/layout/record_field_row.dart';
@@ -69,6 +73,8 @@ class _ProductPackagingRecordDialogState
 
   List<ProductModel> _products = const [];
   ProductModel? _selectedProduct;
+  ProductPackagingImageUpload? _pickedImage;
+  bool _imageRemoved = false;
   bool _isSubmitting = false;
   bool _areProductsUnavailable = false;
 
@@ -186,6 +192,8 @@ class _ProductPackagingRecordDialogState
 
     setState(() {
       _selectedProduct = _resolveSelectedProduct();
+      _pickedImage = null;
+      _imageRemoved = false;
       _mode = RecordDialogMode.view;
     });
   }
@@ -210,6 +218,8 @@ class _ProductPackagingRecordDialogState
     final bool succeeded = await cubit.updateProductPackaging(
       publicId: _packaging.publicId,
       sellingPrice: _sellingPriceController.text.trim(),
+      image: _pickedImage,
+      removeImage: _pickedImage == null && _imageRemoved,
     );
 
     if (!mounted) return;
@@ -311,6 +321,186 @@ class _ProductPackagingRecordDialogState
             label: AppStrings.COLUMN_TOTAL_WEIGHT,
             isEditable: _canEdit,
             isLocked: true,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _buildImageSection(),
+      ],
+    );
+  }
+
+  Future<void> _pickImage() async {
+    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final PlatformFile file = result.files.first;
+    final List<int>? bytes = file.bytes;
+    if (bytes == null) return;
+
+    setState(() {
+      _pickedImage = ProductPackagingImageUpload(
+        bytes: bytes,
+        filename: file.name,
+      );
+      _imageRemoved = false;
+    });
+  }
+
+  Future<void> _confirmRemoveImage() async {
+    final bool confirmed = await ConfirmationDialog.show(
+      context,
+      title: AppStrings.PACKAGING_REMOVE_IMAGE_TITLE,
+      message: AppStrings.PACKAGING_REMOVE_IMAGE_BODY,
+      confirmLabel: AppStrings.PACKAGING_REMOVE_IMAGE,
+      isDangerous: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() {
+      _pickedImage = null;
+      _imageRemoved = true;
+    });
+  }
+
+  Widget _buildImageSection() {
+    final String existing = _packaging.imageDisplayUrl;
+    final String fallback = _packaging.resolvedDisplayImageUrl;
+    final bool hasPicked = _pickedImage != null;
+    final bool showsOwnImage = hasPicked || (existing.isNotEmpty && !_imageRemoved);
+
+    final Widget preview = Container(
+      height: AppSizes.productImagePreview,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.SURFACE_VARIANT,
+        border: Border.all(color: AppColors.BORDER),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: hasPicked
+          ? Image.memory(
+              Uint8List.fromList(_pickedImage!.bytes),
+              fit: BoxFit.contain,
+            )
+          : (showsOwnImage
+                ? Image.network(
+                    existing,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stack) =>
+                        _buildImagePlaceholder(),
+                  )
+                : (fallback.isNotEmpty
+                      ? Image.network(
+                          fallback,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stack) =>
+                              _buildImagePlaceholder(),
+                        )
+                      : _buildImagePlaceholder())),
+    );
+
+    final String hint = _canEdit
+        ? AppStrings.PACKAGING_IMAGE_OPTIONAL
+        : (showsOwnImage
+              ? AppStrings.IMAGE_VIEW_HINT
+              : (fallback.isNotEmpty
+                    ? AppStrings.PACKAGING_IMAGE_USING_PRODUCT
+                    : AppStrings.PACKAGING_IMAGE_EMPTY));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          AppStrings.PACKAGING_IMAGE_LABEL,
+          style: AppTypography.labelStrong,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        if (!_canEdit && showsOwnImage)
+          MouseRegion(
+            cursor: SystemMouseCursors.zoomIn,
+            child: GestureDetector(
+              onTap: () => ImageViewerDialog.show(
+                context,
+                url: existing,
+                title: _packaging.productName,
+              ),
+              child: preview,
+            ),
+          )
+        else
+          preview,
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          hint,
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.TEXT_SECONDARY,
+          ),
+        ),
+        if (_canEdit) ...[
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: SecondaryButton(
+                  label: hasPicked || (existing.isNotEmpty && !_imageRemoved)
+                      ? AppStrings.PACKAGING_REPLACE_IMAGE
+                      : AppStrings.PACKAGING_PICK_IMAGE,
+                  icon: Icons.image_outlined,
+                  onPressed: _isSubmitting ? null : _pickImage,
+                ),
+              ),
+              if (showsOwnImage) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: SecondaryButton(
+                    label: AppStrings.PACKAGING_REMOVE_IMAGE,
+                    icon: Icons.close_rounded,
+                    onPressed: _isSubmitting
+                        ? null
+                        : (hasPicked
+                              ? () => setState(() => _pickedImage = null)
+                              : _confirmRemoveImage),
+                  ),
+                ),
+              ],
+              if (!showsOwnImage && _imageRemoved && !hasPicked) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: SecondaryButton(
+                    label: AppStrings.PACKAGING_UNDO_REMOVE_IMAGE,
+                    icon: Icons.undo_rounded,
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => setState(() => _imageRemoved = false),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildImagePlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.image_outlined,
+          size: AppSizes.iconXl,
+          color: AppColors.TEXT_DISABLED,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          AppStrings.PACKAGING_IMAGE_EMPTY,
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.TEXT_DISABLED,
           ),
         ),
       ],

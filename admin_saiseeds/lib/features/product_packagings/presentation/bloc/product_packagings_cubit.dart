@@ -157,6 +157,7 @@ class ProductPackagingsCubit extends SafeCubit<ProductPackagingsState> {
     required String packetWeight,
     required String packets,
     required String sellingPrice,
+    ProductPackagingImageUpload? image,
   }) {
     return _mutate(
       () => _repository.createProductPackaging(
@@ -164,6 +165,7 @@ class ProductPackagingsCubit extends SafeCubit<ProductPackagingsState> {
         packetWeight: packetWeight,
         packets: packets,
         sellingPrice: sellingPrice,
+        image: image,
       ),
     );
   }
@@ -171,11 +173,15 @@ class ProductPackagingsCubit extends SafeCubit<ProductPackagingsState> {
   Future<bool> updateProductPackaging({
     required String publicId,
     required String sellingPrice,
+    ProductPackagingImageUpload? image,
+    bool removeImage = false,
   }) {
     return _mutate(
       () => _repository.updateProductPackaging(
         publicId: publicId,
         sellingPrice: sellingPrice,
+        image: image,
+        removeImage: removeImage,
       ),
     );
   }

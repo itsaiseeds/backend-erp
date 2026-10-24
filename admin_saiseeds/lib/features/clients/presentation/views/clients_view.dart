@@ -79,6 +79,57 @@ class _ClientsContentState extends State<_ClientsContent> {
     );
   }
 
+  Future<void> _onReject(ClientModel client) async {
+    final ClientsCubit cubit = context.read<ClientsCubit>();
+
+    final bool confirmed = await ConfirmationDialog.show(
+      context,
+      title: AppStrings.CLIENT_REJECT_TITLE,
+      message: AppStrings.CLIENT_REJECT_BODY,
+      confirmLabel: AppStrings.CLIENT_REJECT,
+      isDangerous: true,
+    );
+    if (!confirmed) return;
+
+    final bool succeeded = await cubit.rejectClient(client.publicId);
+    if (!mounted) return;
+
+    if (succeeded) {
+      ToastUtils.showSuccess(context, AppStrings.CLIENT_REJECTED_TITLE);
+      return;
+    }
+
+    ToastUtils.showError(
+      context,
+      cubit.state.errorMessage ?? AppStrings.SOMETHING_WENT_WRONG,
+    );
+  }
+
+  Future<void> _onReopen(ClientModel client) async {
+    final ClientsCubit cubit = context.read<ClientsCubit>();
+
+    final bool confirmed = await ConfirmationDialog.show(
+      context,
+      title: AppStrings.CLIENT_REOPEN_TITLE,
+      message: AppStrings.CLIENT_REOPEN_BODY,
+      confirmLabel: AppStrings.CLIENT_REOPEN,
+    );
+    if (!confirmed) return;
+
+    final bool succeeded = await cubit.reopenClient(client.publicId);
+    if (!mounted) return;
+
+    if (succeeded) {
+      ToastUtils.showSuccess(context, AppStrings.CLIENT_REOPENED_TITLE);
+      return;
+    }
+
+    ToastUtils.showError(
+      context,
+      cubit.state.errorMessage ?? AppStrings.SOMETHING_WENT_WRONG,
+    );
+  }
+
   Future<void> _onView(ClientModel client) async {
     final ClientsCubit cubit = context.read<ClientsCubit>();
     final ClientModel? detail = await cubit.fetchClient(client.publicId);
@@ -102,7 +153,9 @@ class _ClientsContentState extends State<_ClientsContent> {
       },
       builder: (context, state) {
         final ClientsCubit cubit = context.read<ClientsCubit>();
-        final bool isPending = state.resolvedView == ClientsViewMode.pending;
+        final ClientsViewMode viewMode = state.resolvedView;
+        final bool isPending = viewMode == ClientsViewMode.pending;
+        final bool isRejected = viewMode == ClientsViewMode.rejected;
 
         return Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -114,7 +167,7 @@ class _ClientsContentState extends State<_ClientsContent> {
                   key: _tableKey,
                   clients: state.clients,
                   isLoading: state.status == ClientsStatus.loading,
-                  isPendingView: isPending,
+                  viewMode: viewMode,
                   currentPage: state.currentPage,
                   totalPages: state.totalPages,
                   totalItems: state.totalItems,
@@ -128,11 +181,17 @@ class _ClientsContentState extends State<_ClientsContent> {
                   onLoadMore: cubit.loadMore,
                   onView: _onView,
                   onAccept: isPending ? _onAccept : null,
+                  onReject: isPending ? _onReject : null,
+                  onReopen: isRejected ? _onReopen : null,
                   emptyTitle: isPending
                       ? AppStrings.CLIENTS_PENDING_EMPTY_TITLE
+                      : isRejected
+                      ? AppStrings.CLIENTS_REJECTED_EMPTY_TITLE
                       : AppStrings.CLIENTS_EMPTY_STATE_TITLE,
                   emptyDescription: isPending
                       ? AppStrings.CLIENTS_PENDING_EMPTY_BODY
+                      : isRejected
+                      ? AppStrings.CLIENTS_REJECTED_EMPTY_BODY
                       : AppStrings.CLIENTS_EMPTY_STATE_BODY,
                   searchBarActions: [
                     IconActionButton(

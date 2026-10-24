@@ -14,6 +14,7 @@ import '../../../../core/utils/validators/form_validators.dart';
 import '../../../../core/widgets/dialogs/app_record_dialog.dart';
 import '../../../../core/widgets/feedback/detail_field.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
+import '../../../../core/widgets/inputs/editable_stepper_count.dart';
 import '../../../../core/widgets/inputs/single_date_field.dart';
 import '../../../product_packagings/data/models/product_packaging_model.dart';
 import '../../../product_packagings/data/product_packagings_repository.dart';
@@ -444,6 +445,7 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
             onDecrement: _lines[index].quantity <= 1
                 ? null
                 : () => _changeQuantity(index, -1),
+            onQuantitySet: (next) => _setQuantity(index, next),
             onRemove: _lines.length == 1 ? null : () => _removeLine(index),
           ),
         ],
@@ -459,6 +461,11 @@ class _OrderDetailDialogState extends State<OrderDetailDialog> {
 
   void _changeQuantity(int index, int delta) {
     final int next = _lines[index].quantity + delta;
+    if (next < 1) return;
+    _setQuantity(index, next);
+  }
+
+  void _setQuantity(int index, int next) {
     if (next < 1) return;
 
     setState(() {
@@ -735,6 +742,7 @@ class _ItemRow extends StatelessWidget {
   final ValueChanged<String>? onPriceChanged;
   final VoidCallback? onIncrement;
   final VoidCallback? onDecrement;
+  final ValueChanged<int>? onQuantitySet;
   final VoidCallback? onRemove;
 
   const _ItemRow({
@@ -744,6 +752,7 @@ class _ItemRow extends StatelessWidget {
     this.onPriceChanged,
     this.onIncrement,
     this.onDecrement,
+    this.onQuantitySet,
     this.onRemove,
   });
 
@@ -797,6 +806,7 @@ class _ItemRow extends StatelessWidget {
                 quantity: line.quantity,
                 onIncrement: onIncrement,
                 onDecrement: onDecrement,
+                onSet: onQuantitySet,
               )
             else
               _QuantityPill(quantity: line.quantity),
@@ -867,11 +877,13 @@ class _QuantityStepper extends StatelessWidget {
   final int quantity;
   final VoidCallback? onIncrement;
   final VoidCallback? onDecrement;
+  final ValueChanged<int>? onSet;
 
   const _QuantityStepper({
     required this.quantity,
     required this.onIncrement,
     required this.onDecrement,
+    this.onSet,
   });
 
   @override
@@ -886,16 +898,16 @@ class _QuantityStepper extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _StepIcon(icon: Icons.remove_rounded, onTap: onDecrement),
-          Container(
-            constraints: const BoxConstraints(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+            child: EditableStepperCount(
+              value: quantity,
               minWidth: AppSizes.orderStepperCountWidth,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '$quantity',
+              enabled: onSet != null,
               style: AppTypography.button.copyWith(
                 color: AppColors.TEXT_ON_PRIMARY,
               ),
+              onSubmitted: onSet ?? (_) {},
             ),
           ),
           _StepIcon(icon: Icons.add_rounded, onTap: onIncrement),
