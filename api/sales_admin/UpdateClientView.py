@@ -1,8 +1,8 @@
 """Client update endpoint: ``POST /api/sales-admin/update-client/``.
 
 The admin counterpart of ``/android/api/v1/update-client``: everything a sales
-person may change plus the core company details (name, phone, GST number) they
-may not, on any client rather than only their own.
+person may change plus the core company details (name, phone, GST number,
+district) they may not, on any client rather than only their own.
 
 Status, ``verified_by`` and ``verified_at`` stay out of reach here --
 verification is ``/api/sales-admin/verify-client/``'s job alone. A list left
@@ -37,7 +37,7 @@ from api.client_serializers import (
 )
 from authentication.validators import validate_phone_number
 
-CORE_FIELDS = ("company_name", "company_phone", "gst_number")
+CORE_FIELDS = ("company_name", "company_phone", "gst_number", "district")
 
 
 class AdminUpdateClientSerializer(ClientListsSerializer):
@@ -67,6 +67,7 @@ class AdminUpdateClientSerializer(ClientListsSerializer):
         allow_blank=True,
         validators=[validate_gst_number],
     )
+    district = serializers.CharField(max_length=255, required=False, allow_blank=True)
     addresses = ClientAddressSerializer(many=True, required=False)
     contacts = ClientContactSerializer(many=True, required=False)
     transport_agencies = ClientTransportAgencySerializer(many=True, required=False)

@@ -338,6 +338,28 @@ class SalesAdminClientApiTest(WebApiTestCase):
         self.assertEqual(len(response.data["contacts"]), 1)
         self.assertEqual(len(response.data["transport_agencies"]), 1)
 
+    def test_an_admin_can_set_and_clear_the_optional_district(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_admin_can_set_and_clear_the_optional_district"""
+        self.login_as(self.admin_user)
+        self.assertEqual(
+            self.client.get(CLIENT_URL.format(public_id=self.pending.public_id)).data[
+                "district"
+            ],
+            "",
+        )
+
+        for district in ("Surat", ""):
+            with self.subTest(district=district):
+                response = self.client.post(
+                    UPDATE_CLIENT_URL,
+                    {"public_id": self.pending.public_id, "district": district},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(response.data["district"], district)
+                self.pending.refresh_from_db()
+                self.assertEqual(self.pending.district, district)
+
     def test_a_named_list_is_replaced_wholesale_and_may_not_be_emptied(self):
         """tests/test_client_api.py::SalesAdminClientApiTest::test_a_named_list_is_replaced_wholesale_and_may_not_be_emptied"""
         self.login_as(self.admin_user)

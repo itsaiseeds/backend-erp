@@ -1,8 +1,8 @@
 """Client update endpoint: ``POST /android/api/v1/update-client``.
 
 A sales person may only maintain the client's three lists -- addresses, contact
-people and transport agencies. The core company details (name, phone, GST) and
-everything about verification are a sales admin's to change
+people and transport agencies. The core company details (name, phone, GST,
+district) and everything about verification are a sales admin's to change
 (``/api/sales-admin/update-client/``); sending one of them here is rejected
 rather than silently ignored, so a mistaken app build fails loudly.
 
@@ -31,6 +31,7 @@ ADMIN_ONLY_FIELDS = (
     "company_name",
     "company_phone",
     "gst_number",
+    "district",
     "status",
     "verified_at",
     "verified_by",

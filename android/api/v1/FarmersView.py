@@ -6,11 +6,12 @@ own, latest first, filterable by ``contact_number`` / ``farmer_name`` /
 ``village`` / ``is_lead`` / ``uses_our_products``; ``?all=true`` returns every
 one in a single page. Farmers met on a trip stay on the field-trip endpoints.
 
-``POST`` records one: name, 10-digit contact number, village, land held in
-bigha, the crops they grow (at least one, ids from ``utilities/crops``), our
-products they use (public ids from ``utilities/products``; none means they use
-none) and ``is_lead`` (default false). A contact number the caller already
-recorded is refused (400). 201 with the farmer.
+``POST`` records one: name, 10-digit contact number, village, an optional
+free-text district, land held in bigha, the crops they grow (at least one, ids
+from ``utilities/crops``), our products they use (public ids from
+``utilities/products``; none means they use none) and ``is_lead`` (default
+false). A contact number the caller already recorded is refused (400). 201 with
+the farmer.
 """
 
 from __future__ import annotations
@@ -81,6 +82,7 @@ class FarmersView(AndroidPaginatedDateRangeListView):
             farmer_name=data["farmer_name"],
             contact_number=data["contact_number"],
             village=data["village"],
+            district=data["district"],
             land_area_bigha=data["land_area_bigha"],
             crops=data["crops"],
             products=data.get("products", []),

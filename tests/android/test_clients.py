@@ -175,6 +175,26 @@ class AndroidClientApiTest(AndroidApiTestCase):
         self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
         self.assertEqual(second.status_code, status.HTTP_201_CREATED, second.data)
 
+    def test_district_is_optional_free_text(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_district_is_optional_free_text"""
+        omitted = self._create(gst="")
+        given = self._create(gst=self._gst(0), district=" Surat ")
+
+        self.assertEqual(omitted.status_code, status.HTTP_201_CREATED, omitted.data)
+        self.assertEqual(omitted.data["district"], "")
+        self.assertEqual(given.status_code, status.HTTP_201_CREATED, given.data)
+        self.assertEqual(given.data["district"], "Surat")
+
+        # Like the other core details, only a sales admin may change it later.
+        lists = {key: self._body()[key] for key in ("addresses", "contacts", "transport_agencies")}
+        response = self.client.post(
+            UPDATE_CLIENT_URL,
+            {**lists, "public_id": given.data["public_id"], "district": "Bharuch"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("sales admin", response.data["detail"])
+
     def test_an_invalid_non_blank_gst_is_still_rejected(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_an_invalid_non_blank_gst_is_still_rejected"""
         response = self._create(gst="NOT-A-GSTIN")
