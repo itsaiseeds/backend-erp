@@ -652,12 +652,16 @@ CREATE TABLE IF NOT EXISTS public.aggregator_client (
 	company_name varchar(255) NOT NULL,
 	company_phone varchar(10) NOT NULL,
 	gst_number varchar(15) NOT NULL DEFAULT '',
+	district varchar(255) NOT NULL DEFAULT '',
 	status_id int8 NOT NULL,
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
 	CONSTRAINT aggregator_client_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_client_public_id_key UNIQUE (public_id)
 );
+-- District is optional free text (stored as '').
+-- Idempotent upgrade for databases created before the column existed.
+ALTER TABLE public.aggregator_client ADD COLUMN IF NOT EXISTS district varchar(255) NOT NULL DEFAULT '';
 -- GST is optional (stored as ''); a real GSTIN stays unique.
 -- Idempotent upgrade for databases created with the old UNIQUE (gst_number).
 ALTER TABLE public.aggregator_client ALTER COLUMN gst_number SET DEFAULT '';
@@ -1662,7 +1666,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_fieldtrip_one_in_progress_per_sales_perso
 -- same farmer met on two trips is two rows. field_trip_id is NULL for a farmer a
 -- sales person recorded independently of any trip (unique per created_by +
 -- contact_number while live). is_lead flags a farmer as a sales lead. village is stored resolved (the
--- trip's village when none was given). Crops grown and our products used are
+-- trip's village when none was given). district is optional free text (stored
+-- as ''). Crops grown and our products used are
 -- the two link tables below; no product rows means "doesn't use our products".
 CREATE TABLE IF NOT EXISTS public.aggregator_farmervisit (
 	id bigserial NOT NULL,
@@ -1677,6 +1682,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_farmervisit (
 	farmer_name varchar(255) NOT NULL,
 	contact_number varchar(10) NOT NULL,
 	village varchar(255) NOT NULL,
+	district varchar(255) NOT NULL DEFAULT '',
 	land_area_bigha numeric(12, 4) NOT NULL,
 	is_lead bool NOT NULL DEFAULT false,
 	CONSTRAINT aggregator_farmervisit_pkey PRIMARY KEY (id),
@@ -1684,6 +1690,8 @@ CREATE TABLE IF NOT EXISTS public.aggregator_farmervisit (
 	CONSTRAINT uniq_farmervisit_trip_contact UNIQUE (field_trip_id, contact_number),
 	CONSTRAINT ck_farmervisit_land_area_non_negative CHECK (land_area_bigha >= 0)
 );
+-- Idempotent upgrade for databases created before the district column existed.
+ALTER TABLE public.aggregator_farmervisit ADD COLUMN IF NOT EXISTS district varchar(255) NOT NULL DEFAULT '';
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_farmervisit_independent_contact ON public.aggregator_farmervisit USING btree (created_by_id, contact_number) WHERE field_trip_id IS NULL AND is_deleted = false;
 CREATE INDEX IF NOT EXISTS aggregator_farmervisit_public_id_like ON public.aggregator_farmervisit USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_farmervisit_field_trip_id_idx ON public.aggregator_farmervisit USING btree (field_trip_id);

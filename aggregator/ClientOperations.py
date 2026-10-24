@@ -49,12 +49,14 @@ def create_client(
     actor: User,
     gst_number: str = "",
     company_phone: str = "",
+    district: str = "",
 ) -> Client:
     """Create a client owned by ``actor`` (a sales person), pending verification."""
     client = Client(
         company_name=company_name,
         company_phone=company_phone,
         gst_number=gst_number,
+        district=district,
         status=Status.by_id(StatusIds.VERIFICATION_PENDING),
         created_by=actor,
     )
@@ -509,6 +511,7 @@ def create_client_with_details(
     actor: User,
     gst_number: str = "",
     company_phone: str = "",
+    district: str = "",
 ) -> Client:
     """Create a pending client together with its three mandatory lists."""
     client = create_client(
@@ -516,6 +519,7 @@ def create_client_with_details(
         gst_number=gst_number,
         actor=actor,
         company_phone=company_phone,
+        district=district,
     )
     sync_client_addresses(client, addresses, actor)
     sync_client_contacts(client, contacts, actor)
@@ -530,7 +534,7 @@ def update_client_core(client: Client, **fields: str) -> Client:
     verification goes through :func:`verify_client`, :func:`reject_client` and
     :func:`reopen_client`.
     """
-    for field in ("company_name", "company_phone", "gst_number"):
+    for field in ("company_name", "company_phone", "gst_number", "district"):
         if field in fields:
             setattr(client, field, fields[field])
     client.full_clean()
@@ -590,6 +594,7 @@ def _client_core_payload(client: Client) -> dict:
         "company_name": client.company_name,
         "company_phone": client.company_phone,
         "gst_number": client.gst_number,
+        "district": client.district,
         "status": client.status.code if client.status_id else None,
         "is_verified": client.is_verified,
         "verified_at": client.verified_at,
@@ -662,6 +667,7 @@ def client_list_payload(client: Client) -> dict:
         "public_id": client.public_id,
         "company_name": client.company_name,
         "company_phone": client.company_phone,
+        "district": client.district,
         "status": client.status.code if client.status_id else None,
         "primary_contact": (
             {

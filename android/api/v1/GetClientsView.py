@@ -64,6 +64,7 @@ class ClientListItemSerializer(serializers.Serializer):
     public_id = serializers.CharField()
     company_name = serializers.CharField()
     company_phone = serializers.CharField()
+    district = serializers.CharField(allow_blank=True)
     status = serializers.CharField(allow_null=True)
     primary_contact = ClientContactPayloadSerializer(allow_null=True)
     primary_address = ClientAddressPayloadSerializer(allow_null=True)
