@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
@@ -33,28 +34,45 @@ class ProductPackagingsRepository {
     required String packetWeight,
     required String packets,
     required String sellingPrice,
+    ProductPackagingImageUpload? image,
   }) async {
     await _apiClient.post(
       ProductPackagingsEndpoints.create,
-      body: _body(
+      body: _createBody(
         productPublicId: productPublicId,
         packetWeight: packetWeight,
         packets: packets,
         sellingPrice: sellingPrice,
+        image: image,
       ),
     );
   }
 
-  /// Only the price of an existing packaging can change: its product, packet
-  /// weight and packet count are fixed once created, since orders, challans
-  /// and stock counts all read them live.
+  /// Only the price and image of an existing packaging can change: its
+  /// product, packet weight and packet count are fixed once created, since
+  /// orders, challans and stock counts all read them live.
+  ///
+  /// [image] replaces the packaging's own image; [removeImage] clears it
+  /// back to falling through to the product's. The server 400s if both are
+  /// set, so callers must only ever pass one.
   Future<void> updateProductPackaging({
     required String publicId,
     required String sellingPrice,
+    ProductPackagingImageUpload? image,
+    bool removeImage = false,
   }) async {
+    assert(
+      !(image != null && removeImage),
+      'Pass an image to replace, or removeImage to clear -- never both.',
+    );
+
     await _apiClient.patch(
       ProductPackagingsEndpoints.detail(publicId),
-      body: {'selling_price': sellingPrice},
+      body: _updateBody(
+        sellingPrice: sellingPrice,
+        image: image,
+        removeImage: removeImage,
+      ),
     );
   }
 
@@ -62,17 +80,47 @@ class ProductPackagingsRepository {
     await _apiClient.delete(ProductPackagingsEndpoints.detail(publicId));
   }
 
-  static Map<String, dynamic> _body({
+  static dynamic _createBody({
     required String productPublicId,
     required String packetWeight,
     required String packets,
     required String sellingPrice,
+    required ProductPackagingImageUpload? image,
   }) {
-    return {
+    if (image == null) {
+      return {
+        'product': productPublicId,
+        'packet_weight': packetWeight,
+        'packets': int.tryParse(packets.trim()) ?? 0,
+        'selling_price': sellingPrice,
+      };
+    }
+
+    return FormData.fromMap({
       'product': productPublicId,
       'packet_weight': packetWeight,
-      'packets': int.tryParse(packets.trim()) ?? 0,
+      'packets': packets.trim(),
       'selling_price': sellingPrice,
-    };
+      'image': MultipartFile.fromBytes(image.bytes, filename: image.filename),
+    });
+  }
+
+  static dynamic _updateBody({
+    required String sellingPrice,
+    required ProductPackagingImageUpload? image,
+    required bool removeImage,
+  }) {
+    if (image == null && !removeImage) {
+      return {'selling_price': sellingPrice};
+    }
+
+    if (removeImage) {
+      return {'selling_price': sellingPrice, 'remove_image': true};
+    }
+
+    return FormData.fromMap({
+      'selling_price': sellingPrice,
+      'image': MultipartFile.fromBytes(image!.bytes, filename: image.filename),
+    });
   }
 }

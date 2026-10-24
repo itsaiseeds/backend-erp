@@ -1,12 +1,15 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/services/products_service.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../../../core/utils/validators/form_validators.dart';
+import '../../../../core/widgets/buttons/secondary_button.dart';
 import '../../../../core/widgets/dialogs/app_form_dialog.dart';
 import '../../../../core/widgets/feedback/detail_field.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
@@ -57,6 +60,7 @@ class _ProductPackagingFormDialogState
 
   List<ProductModel> _products = const [];
   ProductModel? _selectedProduct;
+  ProductPackagingImageUpload? _pickedImage;
   bool _isSubmitting = false;
   bool _areProductsUnavailable = false;
   String? _productError;
@@ -162,6 +166,7 @@ class _ProductPackagingFormDialogState
             packetWeight: _packetWeightController.text.trim(),
             packets: _packetsController.text.trim(),
             sellingPrice: _sellingPriceController.text.trim(),
+            image: _pickedImage,
           );
 
     if (!mounted) return;
@@ -195,6 +200,100 @@ class _ProductPackagingFormDialogState
   List<TextInputFormatter> get _countFormatters => [
     FilteringTextInputFormatter.allow(_digitCharacters),
   ];
+
+  Future<void> _pickImage() async {
+    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final PlatformFile file = result.files.first;
+    final List<int>? bytes = file.bytes;
+    if (bytes == null) return;
+
+    setState(
+      () => _pickedImage = ProductPackagingImageUpload(
+        bytes: bytes,
+        filename: file.name,
+      ),
+    );
+  }
+
+  Widget _buildImagePicker() {
+    final bool hasPicked = _pickedImage != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(AppStrings.PACKAGING_IMAGE_LABEL, style: AppTypography.labelStrong),
+        const SizedBox(height: AppSpacing.sm),
+        Container(
+          height: AppSizes.productImagePreview,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.SURFACE_VARIANT,
+            border: Border.all(color: AppColors.BORDER),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: hasPicked
+              ? Image.memory(
+                  Uint8List.fromList(_pickedImage!.bytes),
+                  fit: BoxFit.contain,
+                )
+              : _buildImagePlaceholder(),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          AppStrings.PACKAGING_IMAGE_OPTIONAL,
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.TEXT_SECONDARY,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SecondaryButton(
+          label: hasPicked
+              ? AppStrings.PACKAGING_REPLACE_IMAGE
+              : AppStrings.PACKAGING_PICK_IMAGE,
+          icon: Icons.image_outlined,
+          onPressed: _isSubmitting ? null : _pickImage,
+        ),
+        if (hasPicked) ...[
+          const SizedBox(height: AppSpacing.sm),
+          SecondaryButton(
+            label: AppStrings.PACKAGING_REMOVE_IMAGE,
+            icon: Icons.close_rounded,
+            onPressed: _isSubmitting
+                ? null
+                : () => setState(() => _pickedImage = null),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildImagePlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.image_outlined,
+          size: AppSizes.iconXl,
+          color: AppColors.TEXT_DISABLED,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          AppStrings.PACKAGING_IMAGE_EMPTY,
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.TEXT_DISABLED,
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildProductSummary(ProductModel product) {
     return AppSurfaceCard(
@@ -299,6 +398,8 @@ class _ProductPackagingFormDialogState
               onChanged: _autofill.registerFieldChange,
               validator: FormValidators.nonNegativeAmount,
             ),
+            const SizedBox(height: AppSpacing.md),
+            _buildImagePicker(),
           ],
         ),
       ),

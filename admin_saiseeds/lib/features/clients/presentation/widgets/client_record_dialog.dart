@@ -239,9 +239,7 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
       isBodyFlush: true,
       badge: AppBadge(
         label: ClientStatusX.labelOf(_client.status),
-        variant: _client.status == ClientStatus.verified
-            ? AppBadgeVariant.success
-            : AppBadgeVariant.warning,
+        variant: _statusBadgeVariant(_client.status),
       ),
       onEdit: _enterEditMode,
       showFooterInViewMode: true,
@@ -503,6 +501,18 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
     if (length == 0) return 0;
     if (candidate < 0 || candidate >= length) return 0;
     return candidate;
+  }
+}
+
+AppBadgeVariant _statusBadgeVariant(ClientStatus status) {
+  switch (status) {
+    case ClientStatus.verified:
+      return AppBadgeVariant.success;
+    case ClientStatus.rejected:
+      return AppBadgeVariant.error;
+    case ClientStatus.verificationPending:
+    case ClientStatus.unknown:
+      return AppBadgeVariant.warning;
   }
 }
 

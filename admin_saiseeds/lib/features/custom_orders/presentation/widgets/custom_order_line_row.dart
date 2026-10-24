@@ -8,6 +8,7 @@ import '../../../../core/utils/formatters/currency_formatter.dart';
 import '../../../../core/widgets/buttons/icon_action_button.dart';
 import '../../../../core/widgets/feedback/product_thumbnail.dart';
 import '../../../../core/widgets/inputs/app_text_field.dart';
+import '../../../../core/widgets/inputs/editable_stepper_count.dart';
 import '../../../products/data/models/product_model.dart';
 
 /// One line on a custom order, held as a controller so the row survives
@@ -71,6 +72,7 @@ class CustomOrderLineRow extends StatelessWidget {
   final bool isEditable;
   final VoidCallback? onIncrement;
   final VoidCallback? onDecrement;
+  final ValueChanged<int>? onPacketsSet;
   final VoidCallback? onRemove;
   final ValueChanged<String>? onPriceChanged;
 
@@ -80,6 +82,7 @@ class CustomOrderLineRow extends StatelessWidget {
     this.isEditable = false,
     this.onIncrement,
     this.onDecrement,
+    this.onPacketsSet,
     this.onRemove,
     this.onPriceChanged,
   });
@@ -127,6 +130,7 @@ class CustomOrderLineRow extends StatelessWidget {
                 packets: line.packets,
                 onIncrement: onIncrement,
                 onDecrement: onDecrement,
+                onSet: onPacketsSet,
               )
             else
               _PacketPill(packets: line.packets),
@@ -218,11 +222,13 @@ class _PacketStepper extends StatelessWidget {
   final int packets;
   final VoidCallback? onIncrement;
   final VoidCallback? onDecrement;
+  final ValueChanged<int>? onSet;
 
   const _PacketStepper({
     required this.packets,
     this.onIncrement,
     this.onDecrement,
+    this.onSet,
   });
 
   @override
@@ -233,7 +239,12 @@ class _PacketStepper extends StatelessWidget {
         IconActionButton(icon: Icons.remove_rounded, onPressed: onDecrement),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-          child: Text('$packets', style: AppTypography.labelStrong),
+          child: EditableStepperCount(
+            value: packets,
+            style: AppTypography.labelStrong,
+            enabled: onSet != null,
+            onSubmitted: onSet ?? (_) {},
+          ),
         ),
         IconActionButton(icon: Icons.add_rounded, onPressed: onIncrement),
       ],

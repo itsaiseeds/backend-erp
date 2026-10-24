@@ -158,10 +158,12 @@ class AppStrings {
   static const String CLIENTS = 'Clients';
   static const String CLIENT_STATUS_VERIFIED = 'Verified';
   static const String CLIENT_STATUS_PENDING = 'Pending';
+  static const String CLIENT_STATUS_REJECTED = 'Rejected';
   static const String CLIENTS_VIEW_PENDING = 'Pending requests';
   static const String CLIENTS_VIEW_VERIFIED = 'Verified clients';
   static const String CLIENT_STATUS_OPTION_VERIFIED = 'Accepted clients';
   static const String CLIENT_STATUS_OPTION_PENDING = 'Pending clients';
+  static const String CLIENT_STATUS_OPTION_REJECTED = 'Rejected clients';
   static const String CLIENTS_TABLE_SEARCH_HINT = 'Search clients...';
   static const String CLIENTS_EMPTY_STATE_TITLE = 'No clients yet';
   static const String CLIENTS_EMPTY_STATE_BODY =
@@ -169,6 +171,9 @@ class AppStrings {
   static const String CLIENTS_PENDING_EMPTY_TITLE = 'Nothing to review';
   static const String CLIENTS_PENDING_EMPTY_BODY =
       'New client requests will appear here for approval.';
+  static const String CLIENTS_REJECTED_EMPTY_TITLE = 'No rejected clients';
+  static const String CLIENTS_REJECTED_EMPTY_BODY =
+      'Clients rejected during review will appear here.';
   static const String CLIENTS_LOAD_FAILED_TITLE = 'Could not load clients';
 
   static const String COLUMN_COMPANY_NAME = 'Company';
@@ -179,10 +184,20 @@ class AppStrings {
 
   static const String CLIENT_ACCEPT = 'Accept';
   static const String CLIENT_REJECT = 'Reject';
+  static const String CLIENT_REOPEN = 'Re-open';
   static const String CLIENT_ACCEPT_TITLE = 'Accept this client?';
   static const String CLIENT_ACCEPT_BODY =
       'The client will be verified and moved to the clients list.';
   static const String CLIENT_ACCEPTED_TITLE = 'Client accepted';
+  static const String CLIENT_REJECT_TITLE = 'Reject this client?';
+  static const String CLIENT_REJECT_BODY =
+      'The client is moved to Rejected and cannot book orders until '
+      're-opened.';
+  static const String CLIENT_REJECTED_TITLE = 'Client rejected';
+  static const String CLIENT_REOPEN_TITLE = 'Re-open this client?';
+  static const String CLIENT_REOPEN_BODY =
+      'The client goes back to Pending for another review.';
+  static const String CLIENT_REOPENED_TITLE = 'Client re-opened';
   static const String CLIENT_UPDATED_TITLE = 'Client updated';
   static const String CLIENT_DETAILS_TITLE = 'Client details';
   static const String CLIENT_EDIT_TITLE = 'Edit client';
@@ -572,6 +587,20 @@ class AppStrings {
   static const String PRODUCT_PACKAGING_DETAIL_TITLE = 'Packaging details';
   static const String PRODUCT_PACKAGING_DETAIL_SUBTITLE =
       'Packet configuration and pricing on record.';
+
+  static const String PACKAGING_IMAGE_LABEL = 'Packaging image';
+  static const String PACKAGING_IMAGE_OPTIONAL =
+      'Optional. PNG or JPG. Falls back to the product\'s image when unset.';
+  static const String PACKAGING_IMAGE_EMPTY = 'No image selected';
+  static const String PACKAGING_IMAGE_USING_PRODUCT =
+      'Using the product\'s image';
+  static const String PACKAGING_PICK_IMAGE = 'Choose image';
+  static const String PACKAGING_REPLACE_IMAGE = 'Replace image';
+  static const String PACKAGING_REMOVE_IMAGE = 'Remove image';
+  static const String PACKAGING_UNDO_REMOVE_IMAGE = 'Undo remove';
+  static const String PACKAGING_REMOVE_IMAGE_TITLE = 'Remove packaging image?';
+  static const String PACKAGING_REMOVE_IMAGE_BODY =
+      'The packaging will fall back to showing the product\'s image.';
 
   static const String COLUMN_PRODUCT = 'Product';
   static const String COLUMN_PACKET_WEIGHT = 'Packet Weight (kg)';

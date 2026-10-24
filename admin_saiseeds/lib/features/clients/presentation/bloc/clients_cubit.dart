@@ -12,7 +12,7 @@ import '../../data/models/paginated_clients_model.dart';
 
 enum ClientsStatus { initial, loading, loaded, failure }
 
-enum ClientsViewMode { pending, verified }
+enum ClientsViewMode { pending, verified, rejected }
 
 class ClientsState extends Equatable {
   final ClientsStatus status;
@@ -47,10 +47,16 @@ class ClientsState extends Equatable {
     this.errorMessage,
   });
 
-  ClientsViewMode get resolvedView =>
-      filters[ClientsCubit.STATUS_FILTER] == ClientStatusX.VERIFICATION_PENDING
-      ? ClientsViewMode.pending
-      : ClientsViewMode.verified;
+  ClientsViewMode get resolvedView {
+    switch (filters[ClientsCubit.STATUS_FILTER]) {
+      case ClientStatusX.VERIFICATION_PENDING:
+        return ClientsViewMode.pending;
+      case ClientStatusX.CLIENT_REJECTED:
+        return ClientsViewMode.rejected;
+      default:
+        return ClientsViewMode.verified;
+    }
+  }
 
   ClientsState copyWith({
     ClientsStatus? status,
@@ -158,6 +164,34 @@ class ClientsCubit extends SafeCubit<ClientsState> {
 
     try {
       await _repository.verifyClient(publicId);
+      emit(state.copyWith(isMutating: false));
+      await _fetch(page: state.currentPage);
+      return true;
+    } on ApiException catch (e) {
+      emit(state.copyWith(isMutating: false, errorMessage: e.message));
+      return false;
+    } catch (_) {
+      emit(
+        state.copyWith(
+          isMutating: false,
+          errorMessage: AppStrings.SOMETHING_WENT_WRONG,
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> rejectClient(String publicId) =>
+      _mutateStatus(() => _repository.rejectClient(publicId));
+
+  Future<bool> reopenClient(String publicId) =>
+      _mutateStatus(() => _repository.reopenClient(publicId));
+
+  Future<bool> _mutateStatus(Future<void> Function() action) async {
+    emit(state.copyWith(isMutating: true, clearError: true));
+
+    try {
+      await action();
       emit(state.copyWith(isMutating: false));
       await _fetch(page: state.currentPage);
       return true;

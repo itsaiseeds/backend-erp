@@ -235,6 +235,11 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
     setState(() => _lines[index].packets = next);
   }
 
+  void _setPackets(int index, int packets) {
+    if (packets < 1) return;
+    setState(() => _lines[index].packets = packets);
+  }
+
   num get _liveTotalAmount =>
       _lines.fold<num>(0, (sum, line) => sum + line.lineTotal);
 
@@ -415,6 +420,7 @@ class _CustomOrderDetailDialogState extends State<CustomOrderDetailDialog> {
       onDecrement: !_canEdit || line.packets <= 1
           ? null
           : () => _changePackets(index, -1),
+      onPacketsSet: _canEdit ? (packets) => _setPackets(index, packets) : null,
       onRemove: _canEdit ? () => _removeLine(index) : null,
       onPriceChanged: (_) => setState(() {}),
     );

@@ -12,6 +12,7 @@ import '../../../../core/widgets/tables/app_data_table.dart';
 import '../../data/models/client_filter_model.dart';
 import '../../data/models/client_model.dart';
 import '../../data/models/client_status.dart';
+import '../bloc/clients_cubit.dart' show ClientsViewMode;
 
 class ClientsTable extends StatefulWidget {
   static const String CONFIG_KEY = 'clients';
@@ -25,7 +26,7 @@ class ClientsTable extends StatefulWidget {
 
   final List<ClientModel> clients;
   final bool isLoading;
-  final bool isPendingView;
+  final ClientsViewMode viewMode;
   final int currentPage;
   final int totalPages;
   final int totalItems;
@@ -38,6 +39,7 @@ class ClientsTable extends StatefulWidget {
   final void Function(ClientModel client)? onView;
   final void Function(ClientModel client)? onAccept;
   final void Function(ClientModel client)? onReject;
+  final void Function(ClientModel client)? onReopen;
   final bool hasMore;
   final VoidCallback? onLoadMore;
   final List<Widget> searchBarActions;
@@ -48,7 +50,7 @@ class ClientsTable extends StatefulWidget {
     super.key,
     required this.clients,
     required this.isLoading,
-    required this.isPendingView,
+    required this.viewMode,
     required this.currentPage,
     required this.totalPages,
     required this.totalItems,
@@ -61,6 +63,7 @@ class ClientsTable extends StatefulWidget {
     this.onView,
     this.onAccept,
     this.onReject,
+    this.onReopen,
     this.hasMore = false,
     this.onLoadMore,
     this.searchBarActions = const [],
@@ -77,6 +80,12 @@ class ClientsTableState extends State<ClientsTable> {
       GlobalKey<AppDataTableState<ClientModel>>();
 
   void showColumnSettings() => _tableKey.currentState?.showColumnSettings();
+
+  /// Pending and rejected clients have no verifier yet, so that column is
+  /// replaced with the review action (Accept/Reject or Re-open) instead.
+  bool get _showsReviewColumn =>
+      widget.viewMode == ClientsViewMode.pending ||
+      widget.viewMode == ClientsViewMode.rejected;
 
   List<AppDataColumn> get _columns => [
     const AppDataColumn(
@@ -104,13 +113,13 @@ class ClientsTableState extends State<ClientsTable> {
       label: AppStrings.COLUMN_CREATED_BY,
       width: AppSizes.tableColumnWidthMedium,
     ),
-    if (!widget.isPendingView)
+    if (!_showsReviewColumn)
       const AppDataColumn(
         id: ClientsTable.COLUMN_VERIFIED_BY,
         label: AppStrings.COLUMN_VERIFIED_BY,
         width: AppSizes.tableColumnWidthMedium,
       ),
-    if (widget.isPendingView)
+    if (_showsReviewColumn)
       const AppDataColumn(
         id: ClientsTable.COLUMN_REVIEW,
         label: '',
@@ -123,8 +132,7 @@ class ClientsTableState extends State<ClientsTable> {
       .where((filter) => filter.kind != ClientFilterKind.unsupported)
       .where(
         (filter) =>
-            !widget.isPendingView ||
-            filter.key != AppStrings.FILTER_BY_VERIFIED_BY,
+            !_showsReviewColumn || filter.key != AppStrings.FILTER_BY_VERIFIED_BY,
       )
       .map((filter) => filter.key)
       .toList();
@@ -145,6 +153,8 @@ class ClientsTableState extends State<ClientsTable> {
         return AppStrings.CLIENT_STATUS_OPTION_VERIFIED;
       case ClientStatusX.VERIFICATION_PENDING:
         return AppStrings.CLIENT_STATUS_OPTION_PENDING;
+      case ClientStatusX.CLIENT_REJECTED:
+        return AppStrings.CLIENT_STATUS_OPTION_REJECTED;
       default:
         return fallback;
     }
@@ -275,6 +285,22 @@ class ClientsTableState extends State<ClientsTable> {
   }
 
   Widget _buildReviewActions(ClientModel client) {
+    if (widget.viewMode == ClientsViewMode.rejected) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          OutlinedActionButton(
+            label: AppStrings.CLIENT_REOPEN,
+            icon: Icons.replay_circle_filled_outlined,
+            onPressed: widget.onReopen == null
+                ? null
+                : () => widget.onReopen!(client),
+          ),
+        ],
+      );
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
@@ -319,13 +345,23 @@ class ClientStatusBadge extends StatelessWidget {
 
   const ClientStatusBadge({super.key, required this.status});
 
+  static AppBadgeVariant _variantFor(ClientStatus status) {
+    switch (status) {
+      case ClientStatus.verified:
+        return AppBadgeVariant.success;
+      case ClientStatus.rejected:
+        return AppBadgeVariant.error;
+      case ClientStatus.verificationPending:
+      case ClientStatus.unknown:
+        return AppBadgeVariant.warning;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppBadge(
       label: ClientStatusX.labelOf(status),
-      variant: status == ClientStatus.verified
-          ? AppBadgeVariant.success
-          : AppBadgeVariant.warning,
+      variant: _variantFor(status),
     );
   }
 }

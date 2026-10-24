@@ -63,6 +63,22 @@ class ClientsRepository {
     );
   }
 
+  /// Only works on a pending client -- the server 400s otherwise.
+  Future<void> rejectClient(String publicId) async {
+    await _apiClient.post(
+      ClientsEndpoints.reject,
+      body: {'public_id': publicId},
+    );
+  }
+
+  /// Only works on a rejected client, sending it back to pending.
+  Future<void> reopenClient(String publicId) async {
+    await _apiClient.post(
+      ClientsEndpoints.reopen,
+      body: {'public_id': publicId},
+    );
+  }
+
   Future<void> updateClient(ClientModel client) async {
     await _apiClient.post(ClientsEndpoints.update, body: client.toUpdateJson());
   }
