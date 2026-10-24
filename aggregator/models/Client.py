@@ -112,6 +112,14 @@ class Client(
             self.status.code == StatusIds.VERIFIED.name if self.status_id else False
         )
 
+    @property
+    def is_rejected(self):
+        return (
+            self.status.code == StatusIds.CLIENT_REJECTED.name
+            if self.status_id
+            else False
+        )
+
     def clean(self):
         super().clean()
         errors = {}
@@ -130,12 +138,15 @@ class Client(
                     errors["status"] = (
                         "A verified client must record who verified it and when."
                     )
-            elif (
-                self.status.code == StatusIds.VERIFICATION_PENDING.name
-                and self.verified_by_id
-            ):
+            elif self.verified_by_id:
+                # Pending and rejected clients are both unverified.
+                kind = (
+                    "rejected"
+                    if self.status.code == StatusIds.CLIENT_REJECTED.name
+                    else "pending"
+                )
                 errors["verified_by"] = (
-                    "A pending client cannot have verification details."
+                    f"A {kind} client cannot have verification details."
                 )
 
         if self.verified_by_id and not (

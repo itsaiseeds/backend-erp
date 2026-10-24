@@ -67,7 +67,10 @@ class CatalogueProductSerializer(serializers.Serializer):
     name = serializers.CharField()
     crop = serializers.CharField(allow_null=True)
     stage = CatalogueStageSerializer()
-    image_url = serializers.CharField(allow_blank=True)
+    image_url = serializers.CharField(
+        allow_blank=True,
+        help_text="The packaging's own image, else the product's; empty when neither is set.",
+    )
     description_items = serializers.ListField(child=serializers.CharField())
 
 
@@ -82,6 +85,10 @@ class CatalogueItemSerializer(serializers.Serializer):
     packet_weight = serializers.CharField(help_text="Weight of one packet, in kg.")
     total_weight = serializers.CharField(help_text="Weight of the whole bag, in kg.")
     selling_price = serializers.CharField(help_text="Price of the whole bag.")
+    image_url = serializers.CharField(
+        allow_blank=True,
+        help_text="The packaging's own image, else the product's; empty when neither is set.",
+    )
     product = CatalogueProductSerializer()
 
 

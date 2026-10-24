@@ -105,8 +105,26 @@ class _RowActionsMenuState extends State<RowActionsMenu> {
     return top > below;
   }
 
+  /// Room to grow in the direction the menu opens, minus a small breathing
+  /// margin so it never touches the viewport edge.
+  double _availableHeight(BuildContext overlayContext, bool opensUpward) {
+    final RenderObject? box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) {
+      return MediaQuery.sizeOf(overlayContext).height;
+    }
+
+    final double top = box.localToGlobal(Offset.zero).dy;
+    final double bottom = top + box.size.height;
+    final double viewportHeight = MediaQuery.sizeOf(overlayContext).height;
+    final double margin = AppSpacing.lg;
+
+    return (opensUpward ? top : viewportHeight - bottom) - margin;
+  }
+
   Widget _buildOverlay(BuildContext overlayContext) {
     final bool opensUpward = _opensUpward(overlayContext);
+    final double maxHeight = _availableHeight(overlayContext, opensUpward)
+        .clamp(AppSizes.rowActionItemHeight, double.infinity);
 
     return Stack(
       children: [
@@ -131,19 +149,25 @@ class _RowActionsMenuState extends State<RowActionsMenu> {
             child: Material(
               color: AppColors.TRANSPARENT,
               child: Container(
+                constraints: BoxConstraints(maxHeight: maxHeight),
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: AppColors.SURFACE,
                   border: Border.all(color: AppColors.BORDER),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final action in widget.actions)
-                      _MenuItem(action: action, onTap: () => _select(action)),
-                  ],
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final action in widget.actions)
+                        _MenuItem(
+                          action: action,
+                          onTap: () => _select(action),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

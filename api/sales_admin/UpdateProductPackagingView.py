@@ -7,7 +7,9 @@ Only an application Admin may update or delete a packaging (``admin_required``
 on ``AdminApiView``). Packagings are addressed by their ``public_id``
 (``PP-…``). Soft-deleted packagings are never found (404).
 
-**Only the selling price can be edited.** A packaging's ``product``,
+**Only the selling price and the image can be edited.** ``image`` replaces the
+packaging's own picture and ``remove_image`` clears it (apps then fall back to
+the product's image); sending both is a 400. A packaging's ``product``,
 ``packet_weight`` and ``packets`` are its shape, and nothing that uses the
 packaging keeps a copy of them: order lines, challans, stock counts and the
 raw-material ledger all read them live. Changing one would rewrite every
@@ -30,12 +32,13 @@ from aggregator.models import ProductPackaging
 from aggregator.ProductOperations import assert_products_usable
 from api.admin import AdminApiView
 from common.models.timestamped import indian_now
+from common.storage import delete_image, upload_image
 
 from .ProductPackagingsView import ProductPackagingPayloadSerializer, packaging_payload
 
 
 class UpdateProductPackagingSerializer(serializers.Serializer):
-    """Request validation for updating a ``ProductPackaging``: its selling price only.
+    """Request validation for updating a ``ProductPackaging``: selling price and image.
 
     A packaging's product, packet weight and packet count are fixed once it is
     created; a request carrying them is ignored. To change them, create a new
@@ -45,6 +48,15 @@ class UpdateProductPackagingSerializer(serializers.Serializer):
     selling_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, min_value=0
     )
+    image = serializers.ImageField(required=False)
+    remove_image = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if attrs.get("image") and attrs.get("remove_image"):
+            raise serializers.ValidationError(
+                "Send either image or remove_image, not both."
+            )
+        return attrs
 
 
 class UpdateProductPackagingView(AdminApiView):
@@ -67,11 +79,41 @@ class UpdateProductPackagingView(AdminApiView):
             instance=packaging, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        if "selling_price" in serializer.validated_data:
-            with transaction.atomic():
-                assert_products_usable([packaging.product_id], action="have its packaging changed")
-                packaging.selling_price = serializer.validated_data["selling_price"]
-                packaging.save(update_fields=["selling_price", "updated_at"])
+        data = serializer.validated_data
+        update_fields = []
+        if "selling_price" in data:
+            packaging.selling_price = data["selling_price"]
+            update_fields.append("selling_price")
+
+        # Upload before saving so a failed upload leaves the row untouched; the
+        # object it replaces is only removed once the new URL is committed.
+        image = data.get("image")
+        new_image_url = ""
+        replaced_image_url = ""
+        if image:
+            new_image_url = upload_image(image, folder="product-packagings")
+            replaced_image_url = packaging.image_url
+            packaging.image_url = new_image_url
+            update_fields.append("image_url")
+        elif data.get("remove_image") and packaging.image_url:
+            replaced_image_url = packaging.image_url
+            packaging.image_url = ""
+            update_fields.append("image_url")
+
+        if update_fields:
+            try:
+                with transaction.atomic():
+                    assert_products_usable(
+                        [packaging.product_id], action="have its packaging changed"
+                    )
+                    packaging.save(update_fields=[*update_fields, "updated_at"])
+            except Exception:
+                if new_image_url:
+                    delete_image(new_image_url)
+                raise
+
+        if replaced_image_url:
+            delete_image(replaced_image_url)
 
         return Response(packaging_payload(packaging))
 

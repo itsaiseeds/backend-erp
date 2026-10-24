@@ -33,6 +33,8 @@ from .ExportLabTestingsView import ExportLabTestingsView
 from .ExportOrdersView import ExportOrdersView
 from .ExportRejectedOrdersView import ExportRejectedOrdersView
 from .FieldTripView import FieldTripView
+from .GetAllSalesPeopleView import GetAllSalesPeopleView
+from .GetClientsBySalesPersonView import GetClientsBySalesPersonView
 from .GetClientsView import GetClientsView
 from .GetClientView import GetClientView
 from .GetCustomOrdersView import GetCustomOrdersView
@@ -68,8 +70,10 @@ from .ProductStockLedgerView import ProductStockLedgerView
 from .ProductsView import ProductsView
 from .RawMaterialStockView import RawMaterialStockView
 from .RawMaterialWastesView import RawMaterialWastesView
+from .RejectClientView import RejectClientView
 from .RejectOrderView import RejectOrderView
 from .RejectReturnOrderView import RejectReturnOrderView
+from .ReopenClientView import ReopenClientView
 from .ReturnOrderRecipesView import ReturnOrderRecipesView
 from .RevertAcceptReturnOrderView import RevertAcceptReturnOrderView
 from .RevertCustomOrderDispatchView import RevertCustomOrderDispatchView
@@ -80,6 +84,7 @@ from .RotateSalesPersonQrView import RotateSalesPersonQrView
 from .SalesPeopleView import SalesPeopleView
 from .SamplePacketStockView import LooseStockView
 from .StockView import StockView
+from .TransferClientsView import TransferClientsView
 from .TransferProductView import TransferProductView
 from .UnapproveFieldTripView import UnapproveFieldTripView
 from .UnrejectReturnOrderView import UnrejectReturnOrderView
@@ -188,8 +193,21 @@ urlpatterns = [
     # The client *verb* routes keep a trailing slash; ``client/<public_id>`` is
     # a collection item, named like ``products/<public_id>`` above.
     path("verify-client/", VerifyClientView.as_view(), name="verify-client"),
+    path("reject-client/", RejectClientView.as_view(), name="reject-client"),
+    path("reopen-client/", ReopenClientView.as_view(), name="reopen-client"),
     path("update-client/", UpdateClientView.as_view(), name="update-client"),
     path("get-clients/", GetClientsView.as_view(), name="get-clients"),
+    path(
+        "client/by-sales-person/<int:id>",
+        GetClientsBySalesPersonView.as_view(),
+        name="clients-by-sales-person",
+    ),
+    path(
+        "client/transfer-client/",
+        TransferClientsView.as_view(),
+        name="transfer-client",
+    ),
+    path("all-sales-person/", GetAllSalesPeopleView.as_view(), name="all-sales-person"),
     path("client/<str:public_id>", GetClientView.as_view(), name="client-detail"),
     # Order routes follow the same convention: ``orders/`` is a collection and
     # ``order/<public_id>`` a collection item, while the lifecycle verbs carry

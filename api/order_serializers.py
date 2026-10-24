@@ -53,8 +53,9 @@ class OrderCardProductSerializer(serializers.Serializer):
     image_url = serializers.CharField(
         allow_blank=True,
         help_text=(
-            "The product's picture: an absolute URL when deployed, a "
-            "MEDIA_URL-relative path in development, empty when none is set."
+            "The bag's picture -- the packaging's own image, else the product's: "
+            "an absolute URL when deployed, a MEDIA_URL-relative path in "
+            "development, empty when none is set."
         ),
     )
 

@@ -310,6 +310,12 @@ EXPECTED_CONTRACTS = {
     ),
     "api/sales-admin/export/rejected-orders": ("ExportRejectedOrdersView", SESSION_ADMIN),
     "api/sales-admin/get-clients/": ("GetClientsView", SESSION_ADMIN),
+    "api/sales-admin/all-sales-person/": ("GetAllSalesPeopleView", SESSION_ADMIN),
+    "api/sales-admin/client/by-sales-person/<int:id>": (
+        "GetClientsBySalesPersonView",
+        SESSION_ADMIN,
+    ),
+    "api/sales-admin/client/transfer-client/": ("TransferClientsView", SESSION_ADMIN),
     "api/sales-admin/dispatch-order/<str:public_id>": ("DispatchOrderView", SESSION_ADMIN),
     "api/sales-admin/dispatch-challans/": ("GetDispatchChallansView", SESSION_ADMIN),
     "api/sales-admin/dispatch-lot-numbers/": ("GetDispatchLotNumbersView", SESSION_ADMIN),
@@ -454,6 +460,8 @@ EXPECTED_CONTRACTS = {
     "api/sales-admin/update-sample-packet-stock": ("UpdateLooseStockView", SESSION_ADMIN),
     "api/sales-admin/update-bag-stock": ("UpdateTodaysInventoryView", SESSION_ADMIN),
     "api/sales-admin/verify-client/": ("VerifyClientView", SESSION_ADMIN),
+    "api/sales-admin/reject-client/": ("RejectClientView", SESSION_ADMIN),
+    "api/sales-admin/reopen-client/": ("ReopenClientView", SESSION_ADMIN),
     # Superuser *and* REQUIRED_PERMISSIONS below (and off unless enabled).
     "api/execute-code/": ("ExecuteCodeView", SESSION_SUPERUSER),
     "api/test-sentry/": ("TestSentryView", SESSION_SUPERUSER),

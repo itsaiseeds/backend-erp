@@ -18,6 +18,8 @@ class TabIds {
   static const String PRODUCT_PACKAGINGS = 'product-packagings';
   static const String PARTIES = 'parties';
   static const String CHILD_CLIENTS = 'child-clients';
+  static const String OLD_SALES_PEOPLE = 'old-sales-people';
+  static const String TRANSFER_CLIENT = 'transfer-client';
   static const String BAG_STOCK = 'bag-stock';
   static const String PACKET_STOCK = 'packet-stock';
   static const String INWARD_RAW_MATERIALS = 'inward-raw-materials';

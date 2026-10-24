@@ -14,6 +14,8 @@ from aggregator.ClientOperations import (
     add_client_contact,
     add_client_transport_agency,
     create_client,
+    reject_client,
+    reopen_client,
     set_or_update_primary_address,
     sync_client_addresses,
     verify_client,
@@ -120,6 +122,53 @@ class ClientModelTest(DMLTestCase):
         )
         with self.assertRaises(ValidationError):
             verify_client(client, self.plain_user)
+
+    def test_reject_then_reopen_client(self):
+        """tests/test_client_model.py::ClientModelTest::test_reject_then_reopen_client"""
+        client = create_client(
+            company_name="Acme", gst_number="27AAPFU0939F1ZV", actor=self.sp_user
+        )
+        reject_client(client, self.adm_user)
+        assert client.status.code == "CLIENT_REJECTED"
+        assert client.is_rejected is True
+        assert client.verified_by_id is None
+
+        reopen_client(client, self.adm_user)
+        assert client.status.code == "VERIFICATION_PENDING"
+        assert client.is_rejected is False
+
+    def test_invalid_transitions_are_refused(self):
+        """tests/test_client_model.py::ClientModelTest::test_invalid_transitions_are_refused"""
+        client = create_client(
+            company_name="Acme", gst_number="27AAPFU0939F1ZV", actor=self.sp_user
+        )
+        with self.assertRaises(ValidationError):
+            reopen_client(client, self.adm_user)  # pending -> pending
+
+        reject_client(client, self.adm_user)
+        with self.assertRaises(ValidationError):
+            reject_client(client, self.adm_user)  # rejected -> rejected
+        with self.assertRaises(ValidationError):
+            verify_client(client, self.adm_user)  # rejected -> verified
+
+        reopen_client(client, self.adm_user)
+        verify_client(client, self.adm_user)
+        with self.assertRaises(ValidationError):
+            reject_client(client, self.adm_user)  # verified -> rejected
+        with self.assertRaises(ValidationError):
+            reopen_client(client, self.adm_user)  # verified -> pending
+
+    def test_a_rejected_client_cannot_carry_verification_details(self):
+        """tests/test_client_model.py::ClientModelTest::test_a_rejected_client_cannot_carry_verification_details"""
+        client = Client(
+            company_name="Acme",
+            gst_number="27AAPFU0939F1ZV",
+            status=Status.by_id(StatusIds.CLIENT_REJECTED),
+            verified_by=self.adm_user,
+            created_by=self.sp_user,
+        )
+        with self.assertRaises(ValidationError):
+            client.full_clean()
 
     def test_verified_requires_verifier(self):
         """tests/test_client_model.py::ClientModelTest::test_verified_requires_verifier"""

@@ -63,8 +63,21 @@ def create_client(
     return client
 
 
+def _assert_client_status(
+    client: Client, allowed: set[StatusIds], action: str
+) -> None:
+    """Raise unless ``client`` is in one of the ``allowed`` states.
+
+    ``action`` is the verb phrase for the error ("verified", "rejected", ...).
+    """
+    if client.status_id not in allowed:
+        states = " or ".join(sorted(s.name.replace("_", " ").lower() for s in allowed))
+        raise ValidationError(f"Only a client in state {states} can be {action}.")
+
+
 def verify_client(client: Client, admin: User) -> Client:
-    """Mark ``client`` verified, recording the acting sales admin and time."""
+    """Mark a pending ``client`` verified, recording the acting sales admin and time."""
+    _assert_client_status(client, {StatusIds.VERIFICATION_PENDING}, "verified")
     client.status = Status.by_id(StatusIds.VERIFIED)
     client.verified_by = admin
     client.verified_at = indian_now()
@@ -72,6 +85,52 @@ def verify_client(client: Client, admin: User) -> Client:
     client.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
     notify_client_event(client, NotificationEvent.CLIENT_VERIFIED, actor=admin)
     return client
+
+
+def reject_client(client: Client, admin: User) -> Client:
+    """Move a pending ``client`` to rejected. Only the status changes."""
+    _assert_client_status(client, {StatusIds.VERIFICATION_PENDING}, "rejected")
+    client.status = Status.by_id(StatusIds.CLIENT_REJECTED)
+    client.full_clean()
+    client.save(update_fields=["status", "updated_at"])
+    notify_client_event(client, NotificationEvent.CLIENT_REJECTED, actor=admin)
+    return client
+
+
+def reopen_client(client: Client, admin: User) -> Client:
+    """Send a rejected ``client`` back to verification pending."""
+    _assert_client_status(client, {StatusIds.CLIENT_REJECTED}, "re-opened")
+    client.status = Status.by_id(StatusIds.VERIFICATION_PENDING)
+    client.full_clean()
+    client.save(update_fields=["status", "updated_at"])
+    return client
+
+
+def transfer_clients(public_ids: list[str], target: User) -> int:
+    """Hand the live clients ``public_ids`` over to the sales person ``target``.
+
+    Used when a sales person leaves: ownership is ``Client.created_by``. Every id
+    must name a live client, or nothing moves and one error names every offender.
+    Returns how many clients changed owner (clients ``target`` already owns are
+    left alone).
+    """
+    if not target.is_salesperson:
+        raise ValidationError("Clients can only be transferred to a sales person.")
+    with transaction.atomic():
+        # Sorted + locked so two overlapping transfers cannot interleave.
+        clients = list(
+            Client.objects.select_for_update()
+            .filter(public_id__in=public_ids)
+            .order_by("pk")
+        )
+        missing = sorted(set(public_ids) - {client.public_id for client in clients})
+        if missing:
+            raise ValidationError(f"Unknown clients: {', '.join(missing)}.")
+        moving = [client.pk for client in clients if client.created_by_id != target.pk]
+        # ``update()`` skips ``save()``, so ``updated_at`` is set by hand.
+        return Client.objects.filter(pk__in=moving).update(
+            created_by=target, updated_at=indian_now()
+        )
 
 
 def add_client_address(
@@ -468,7 +527,8 @@ def update_client_core(client: Client, **fields: str) -> Client:
     """Update the core company details -- a sales admin only path.
 
     ``status``, ``verified_by`` and ``verified_at`` are not editable here;
-    verification goes through :func:`verify_client`.
+    verification goes through :func:`verify_client`, :func:`reject_client` and
+    :func:`reopen_client`.
     """
     for field in ("company_name", "company_phone", "gst_number"):
         if field in fields:

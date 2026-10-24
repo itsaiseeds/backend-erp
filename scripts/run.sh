@@ -136,7 +136,8 @@ cmd_flutter() {
 cmd_flutter_prod() {
     find_flutter
     local prod_url
-    prod_url="${API_BASE_URL:-https://sai-seeds.onrender.com/}"
+    prod_url="${API_BASE_URL:-https://sai-seeds-s3ye.onrender.com/}"
+    # prod_url="${API_BASE_URL:-https://sai-seeds.onrender.com/}"
     echo "[flutter-prod] Building Flutter web app for prod API: $prod_url"
     cd "$REPO_ROOT/admin_saiseeds"
     "$FLUTTER_CMD" pub get
