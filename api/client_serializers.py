@@ -259,6 +259,7 @@ class ClientPayloadSerializer(serializers.Serializer):
     company_name = serializers.CharField()
     company_phone = serializers.CharField()
     gst_number = serializers.CharField()
+    district = serializers.CharField(allow_blank=True)
     status = serializers.CharField()
     is_verified = serializers.BooleanField()
     verified_at = serializers.DateTimeField(allow_null=True)

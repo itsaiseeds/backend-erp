@@ -66,17 +66,39 @@
 --   gets id 1 rather than continuing from the old high-water mark.
 --
 -- HOW TO RUN
---     psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/delete_data.sql
+--     1. Edit `expected_db` in the guard block right below BEGIN to the exact
+--        name of the database you mean to wipe.
+--     2. Run it (psql, pgAdmin Query Tool, DBeaver -- no psql-only commands).
+--          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/delete_data.sql
 --
---   Intended for preprod resets and local dev. Take a backup first: this is
---   irreversible, and without the guard nothing stops it being pointed at
---   production. `-v ON_ERROR_STOP=1` is what makes psql abort at the first
---   violation -- the script relies on it rather than on the CASCADE option.
+--   Take a backup first: this is irreversible. The guard raises, and rolls the
+--   transaction back, if the connected database is not the one named in the
+--   file, so a wrong connection deletes nothing. Type the name by hand; that is
+--   the point of the guard.
+--
+--   Every statement runs in one transaction, so any error rolls the whole wipe
+--   back. With psql, `-v ON_ERROR_STOP=1` makes it stop at the first error
+--   instead of carrying on to COMMIT-less statements.
 --
 --   The summary at the very bottom reports what survived.
 -- =============================================================================
 
 BEGIN;
+
+-- Guard: edit the name below to the database you INTEND to wipe. If it does not
+-- match the database you are connected to, this raises and the transaction
+-- aborts before anything is deleted. Plain SQL, so it works in psql, pgAdmin,
+-- DBeaver, etc.
+DO $$
+DECLARE
+    expected_db constant text := 'neondb';
+BEGIN
+    IF current_database() <> expected_db THEN
+        RAISE EXCEPTION 'ABORTED: connected to "%", but the script is set to wipe "%". Nothing was deleted.',
+            current_database(), expected_db;
+    END IF;
+END
+$$;
 
 -- -----------------------------------------------------------------------------
 -- 1. Deepest children -- they only ever point at the tables below them.
@@ -131,6 +153,10 @@ DELETE FROM public.aggregator_notification;
 DELETE FROM public.aggregator_inventorysnapshot;
 DELETE FROM public.aggregator_loosestocksnapshot;
 
+-- Raw material written off as waste. RESTRICT-references the inward lot, so it
+-- has to go before the lots below.
+DELETE FROM public.aggregator_rawmaterialwaste;
+
 -- Inward raw material lots and inward other material.
 DELETE FROM public.aggregator_inwardrawmaterial;
 DELETE FROM public.aggregator_inwardothermaterial;
@@ -139,14 +165,8 @@ DELETE FROM public.aggregator_inwardothermaterial;
 -- so they go right after the lots.
 DELETE FROM public.aggregator_labtesting;
 
--- Raw material written off as waste.
-DELETE FROM public.aggregator_rawmaterialwaste;
-
 -- Non-stock inward (consumables, linked to nothing).
 DELETE FROM public.aggregator_nonstockinward;
-
--- Child orgs orders were booked for; after the orders that point at them.
-DELETE FROM public.aggregator_clientchildorg;
 
 -- The client's own lists, all keyed on aggregator_client.
 DELETE FROM public.aggregator_clientaddress;
@@ -174,6 +194,10 @@ DELETE FROM public.aggregator_returnorder;
 
 DELETE FROM public.aggregator_order;
 DELETE FROM public.aggregator_customorder;
+
+-- Child orgs orders were booked for. Both orders RESTRICT-reference them
+-- (booked_for_id), so they can only go once the orders are gone.
+DELETE FROM public.aggregator_clientchildorg;
 
 -- Field trips (city + status + approver).
 DELETE FROM public.aggregator_fieldtrip;
@@ -367,4 +391,4 @@ UNION ALL SELECT 'KEPT -- geo total',        (SELECT count(*) FROM public.aggreg
                                           + (SELECT count(*) FROM public.aggregator_state)
                                           + (SELECT count(*) FROM public.aggregator_city)
                                           + (SELECT count(*) FROM public.aggregator_pincode)
-UNION ALL SELECT 'WIPED -- business tables', 36;
+UNION ALL SELECT 'WIPED -- business tables', 39;

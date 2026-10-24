@@ -264,6 +264,7 @@ def create_farmer_visit(
     crops: Iterable[Crop],
     products: Iterable[Product] = (),
     village: str = "",
+    district: str = "",
     is_lead: bool = False,
 ) -> FarmerVisit:
     """Record a farmer met on ``trip``, with the crops they grow and our products they use.
@@ -282,6 +283,7 @@ def create_farmer_visit(
         farmer_name=farmer_name,
         contact_number=contact_number,
         village=village.strip() or trip.village,
+        district=district.strip(),
         land_area_bigha=land_area_bigha,
         crops=crops,
         products=products,
@@ -299,6 +301,7 @@ def create_independent_farmer(
     land_area_bigha: Decimal,
     crops: Iterable[Crop],
     products: Iterable[Product] = (),
+    district: str = "",
     is_lead: bool = False,
 ) -> FarmerVisit:
     """Record a farmer the sales person entered on their own, outside any field trip.
@@ -318,6 +321,7 @@ def create_independent_farmer(
         farmer_name=farmer_name,
         contact_number=contact_number,
         village=village.strip(),
+        district=district.strip(),
         land_area_bigha=land_area_bigha,
         crops=crops,
         products=products,
@@ -339,6 +343,7 @@ def _create_visit(
     farmer_name: str,
     contact_number: str,
     village: str,
+    district: str,
     land_area_bigha: Decimal,
     crops: Iterable[Crop],
     products: Iterable[Product],
@@ -355,6 +360,7 @@ def _create_visit(
         farmer_name=farmer_name,
         contact_number=contact_number,
         village=village,
+        district=district,
         land_area_bigha=land_area_bigha,
         is_lead=is_lead,
         created_by=actor,
@@ -404,6 +410,7 @@ def update_farmer_visit(
     farmer_name: str | None = None,
     contact_number: str | None = None,
     village: str | None = None,
+    district: str | None = None,
     land_area_bigha: Decimal | None = None,
     crops: Iterable[Crop] | None = None,
     products: Iterable[Product] | None = None,
@@ -414,7 +421,8 @@ def update_farmer_visit(
     Only while the trip is in progress (an independent farmer has no trip, so
     it is always editable). The name, contact number, village and
     crop list are required on a farmer, so none may be made blank or empty;
-    ``products=[]`` is fine and records that the farmer does not use our products.
+    ``district=""`` clears the optional district, and ``products=[]`` is fine
+    and records that the farmer does not use our products.
     """
     if not visit.is_independent:
         assert_field_trip_status(visit.field_trip, FARMER_VISIT_STATUS_CODES, "edit a farmer on")
@@ -422,6 +430,7 @@ def update_farmer_visit(
         "farmer_name": farmer_name,
         "contact_number": contact_number,
         "village": village,
+        "district": district,
         "land_area_bigha": land_area_bigha,
         "is_lead": is_lead,
     }
@@ -511,6 +520,7 @@ def farmer_visit_payload(visit: FarmerVisit) -> dict:
         "farmer_name": visit.farmer_name,
         "contact_number": visit.contact_number,
         "village": visit.village,
+        "district": visit.district,
         "land_area_bigha": str(visit.land_area_bigha),
         "is_lead": visit.is_lead,
         "field_trip_public_id": visit.field_trip.public_id if visit.field_trip_id else None,
@@ -569,7 +579,7 @@ def farmer_payload(latest: FarmerVisit, visits: Sequence[FarmerVisit]) -> dict:
 
     ``latest`` is the farmer's row from :func:`farmer_queryset` and ``visits``
     every visit of theirs, newest first (see :func:`farmer_visits_by_contact`).
-    The latest visit speaks for the name, village, city and land area -- what we
+    The latest visit speaks for the name, village, district, city and land area -- what we
     were told most recently -- while the crops, products and meeting history are
     the union over all of them, so nothing a farmer was ever recorded as is lost.
     """
@@ -584,6 +594,7 @@ def farmer_payload(latest: FarmerVisit, visits: Sequence[FarmerVisit]) -> dict:
         "contact_number": latest.contact_number,
         "farmer_name": latest.farmer_name,
         "village": latest.village,
+        "district": latest.district,
         "city": (
             {"id": latest.field_trip.city_id, "name": latest.field_trip.city.name}
             if latest.field_trip_id

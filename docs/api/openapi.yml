@@ -10561,6 +10561,9 @@ components:
         gst_number:
           type: string
           maxLength: 15
+        district:
+          type: string
+          maxLength: 255
       required:
       - public_id
     AllSalesPerson:
@@ -11417,6 +11420,8 @@ components:
           type: string
         company_phone:
           type: string
+        district:
+          type: string
         status:
           type: string
           nullable: true
@@ -11431,6 +11436,7 @@ components:
       required:
       - company_name
       - company_phone
+      - district
       - primary_address
       - primary_contact
       - public_id
@@ -11482,6 +11488,8 @@ components:
           type: string
         gst_number:
           type: string
+        district:
+          type: string
         status:
           type: string
         is_verified:
@@ -11514,6 +11522,7 @@ components:
       - company_phone
       - contacts
       - created_by
+      - district
       - gst_number
       - is_verified
       - public_id
@@ -11669,6 +11678,10 @@ components:
           type: string
           default: ''
           maxLength: 15
+        district:
+          type: string
+          default: ''
+          maxLength: 255
       required:
       - addresses
       - company_name
@@ -11736,6 +11749,11 @@ components:
           type: string
           minLength: 1
           maxLength: 255
+        district:
+          type: string
+          default: ''
+          description: Optional.
+          maxLength: 255
         land_area_bigha:
           type: string
           format: decimal
@@ -11788,6 +11806,11 @@ components:
           type: string
           default: ''
           description: Defaults to the field trip's village.
+          maxLength: 255
+        district:
+          type: string
+          default: ''
+          description: Optional.
           maxLength: 255
         land_area_bigha:
           type: string
@@ -13098,6 +13121,8 @@ components:
           type: string
         gst_number:
           type: string
+        district:
+          type: string
         status:
           type: string
         is_verified:
@@ -13139,6 +13164,7 @@ components:
       - contacts
       - created_at
       - created_by
+      - district
       - gst_number
       - is_verified
       - public_id
@@ -13445,6 +13471,8 @@ components:
           type: string
         village:
           type: string
+        district:
+          type: string
         land_area_bigha:
           type: string
         is_lead:
@@ -13477,6 +13505,7 @@ components:
       - contact_number
       - created_at
       - crops
+      - district
       - farmer_name
       - field_trip
       - field_trip_public_id
@@ -13917,6 +13946,9 @@ components:
         village:
           type: string
           description: Village of the latest visit.
+        district:
+          type: string
+          description: District of the latest visit; empty if not given.
         city:
           allOf:
           - $ref: '#/components/schemas/IdName'
@@ -13964,6 +13996,7 @@ components:
       - city
       - contact_number
       - crops
+      - district
       - farmer_name
       - is_lead
       - land_area_bigha
@@ -14020,6 +14053,8 @@ components:
           type: string
         village:
           type: string
+        district:
+          type: string
         land_area_bigha:
           type: string
         is_lead:
@@ -14045,6 +14080,7 @@ components:
       - contact_number
       - created_at
       - crops
+      - district
       - farmer_name
       - field_trip_public_id
       - is_lead
@@ -16078,7 +16114,8 @@ components:
 
         Every field is optional, but one that is sent may not be blank: the name,
         contact number and village must have text and ``crop_ids`` at least one
-        crop. ``product_public_ids`` may be empty -- the farmer does not use our
+        crop. ``district`` is optional, so a blank one clears it.
+        ``product_public_ids`` may be empty -- the farmer does not use our
         products. Anything else sent is ignored.
       properties:
         is_lead:
@@ -16093,6 +16130,9 @@ components:
         village:
           type: string
           minLength: 1
+          maxLength: 255
+        district:
+          type: string
           maxLength: 255
         land_area_bigha:
           type: string

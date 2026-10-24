@@ -44,6 +44,13 @@ class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         help_text="10-digit mobile number, no country code.",
     )
     village = models.CharField("village", max_length=255)
+    district = models.CharField(
+        "district",
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional free text. A missing district is stored as an empty string.",
+    )
     land_area_bigha = models.DecimalField(
         "land area in bigha",
         max_digits=12,

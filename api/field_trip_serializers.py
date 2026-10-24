@@ -62,6 +62,9 @@ class CreateFarmerVisitSerializer(serializers.Serializer):
         default="",
         help_text="Defaults to the field trip's village.",
     )
+    district = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default="", help_text="Optional."
+    )
     land_area_bigha = serializers.DecimalField(
         max_digits=12, decimal_places=4, min_value=0, help_text="Land held, in bigha."
     )
@@ -95,6 +98,9 @@ class CreateFarmerSerializer(serializers.Serializer):
     farmer_name = serializers.CharField(max_length=255)
     contact_number = serializers.CharField(validators=[validate_phone_number])
     village = serializers.CharField(max_length=255)
+    district = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default="", help_text="Optional."
+    )
     land_area_bigha = serializers.DecimalField(
         max_digits=12, decimal_places=4, min_value=0, help_text="Land held, in bigha."
     )
@@ -127,7 +133,8 @@ class EditFarmerVisitSerializer(serializers.Serializer):
 
     Every field is optional, but one that is sent may not be blank: the name,
     contact number and village must have text and ``crop_ids`` at least one
-    crop. ``product_public_ids`` may be empty -- the farmer does not use our
+    crop. ``district`` is optional, so a blank one clears it.
+    ``product_public_ids`` may be empty -- the farmer does not use our
     products. Anything else sent is ignored.
     """
 
@@ -135,6 +142,7 @@ class EditFarmerVisitSerializer(serializers.Serializer):
     farmer_name = serializers.CharField(max_length=255, required=False)
     contact_number = serializers.CharField(required=False, validators=[validate_phone_number])
     village = serializers.CharField(max_length=255, required=False)
+    district = serializers.CharField(max_length=255, required=False, allow_blank=True)
     land_area_bigha = serializers.DecimalField(
         max_digits=12,
         decimal_places=4,
@@ -168,8 +176,8 @@ class EditFarmerVisitSerializer(serializers.Serializer):
     def validate(self, attrs: dict) -> dict:
         if not attrs:
             raise serializers.ValidationError(
-                "Send at least one of farmer_name, contact_number, village, land_area_bigha, "
-                "is_lead, crop_ids, product_public_ids."
+                "Send at least one of farmer_name, contact_number, village, district, "
+                "land_area_bigha, is_lead, crop_ids, product_public_ids."
             )
         return attrs
 
@@ -231,6 +239,7 @@ class FarmerVisitPayloadSerializer(serializers.Serializer):
     farmer_name = serializers.CharField()
     contact_number = serializers.CharField()
     village = serializers.CharField()
+    district = serializers.CharField(allow_blank=True)
     land_area_bigha = serializers.CharField()
     is_lead = serializers.BooleanField()
     field_trip_public_id = serializers.CharField(
@@ -267,6 +276,9 @@ class FarmerPayloadSerializer(serializers.Serializer):
     contact_number = serializers.CharField(help_text="The farmer's identity across trips.")
     farmer_name = serializers.CharField(help_text="Name given at the latest visit.")
     village = serializers.CharField(help_text="Village of the latest visit.")
+    district = serializers.CharField(
+        allow_blank=True, help_text="District of the latest visit; empty if not given."
+    )
     city = IdNameSerializer(
         allow_null=True,
         help_text="City of the latest visit's field trip; null if recorded without a trip.",
