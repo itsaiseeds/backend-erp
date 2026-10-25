@@ -175,25 +175,36 @@ class AndroidClientApiTest(AndroidApiTestCase):
         self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
         self.assertEqual(second.status_code, status.HTTP_201_CREATED, second.data)
 
-    def test_district_is_optional_free_text(self):
-        """tests/android/test_clients.py::AndroidClientApiTest::test_district_is_optional_free_text"""
+    def test_an_address_district_is_optional_free_text_corrected_in_place(self):
+        """tests/android/test_clients.py::AndroidClientApiTest::test_an_address_district_is_optional_free_text_corrected_in_place"""
         omitted = self._create(gst="")
-        given = self._create(gst=self._gst(0), district=" Surat ")
+        given = self._create(gst=self._gst(0), addresses=[self._address(district=" Surat ")])
 
         self.assertEqual(omitted.status_code, status.HTTP_201_CREATED, omitted.data)
-        self.assertEqual(omitted.data["district"], "")
+        self.assertEqual(omitted.data["addresses"][0]["district"], "")
         self.assertEqual(given.status_code, status.HTTP_201_CREATED, given.data)
-        self.assertEqual(given.data["district"], "Surat")
+        self.assertEqual(given.data["addresses"][0]["district"], "Surat")
+        self.assertNotIn("district", given.data)
 
-        # Like the other core details, only a sales admin may change it later.
-        lists = {key: self._body()[key] for key in ("addresses", "contacts", "transport_agencies")}
-        response = self.client.post(
-            UPDATE_CLIENT_URL,
-            {**lists, "public_id": given.data["public_id"], "district": "Bharuch"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("sales admin", response.data["detail"])
+        # District is not part of the address match key, so the same address
+        # row is corrected (and cleared) rather than unlinked and recreated.
+        lists = {key: self._body()[key] for key in ("contacts", "transport_agencies")}
+        for district in ("Bharuch", ""):
+            with self.subTest(district=district):
+                response = self.client.post(
+                    UPDATE_CLIENT_URL,
+                    {
+                        **lists,
+                        "public_id": given.data["public_id"],
+                        "addresses": [self._address(district=district)],
+                    },
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                self.assertEqual(response.data["addresses"][0]["district"], district)
+                self.assertEqual(
+                    response.data["addresses"][0]["id"], given.data["addresses"][0]["id"]
+                )
 
     def test_an_invalid_non_blank_gst_is_still_rejected(self):
         """tests/android/test_clients.py::AndroidClientApiTest::test_an_invalid_non_blank_gst_is_still_rejected"""
@@ -391,6 +402,7 @@ class AndroidClientApiTest(AndroidApiTestCase):
             [
                 ("public_id", "text"),
                 ("city_id", "select"),
+                ("district", "text"),
                 ("status", "select"),
                 ("company_name", "text"),
                 ("address", "text"),
@@ -518,7 +530,12 @@ class AndroidClientApiTest(AndroidApiTestCase):
             [c["company_name"] for c in pending.data["results"]], ["Acme Seeds"]
         )
         self.assertEqual(
-            [o["value"] for o in verified.data["available_filters"][2]["options"]],
+            [
+                o["value"]
+                for f in verified.data["available_filters"]
+                if f["filter"] == "status"
+                for o in f["options"]
+            ],
             ["VERIFICATION_PENDING", "VERIFIED", "CLIENT_REJECTED"],
         )
 
@@ -566,8 +583,8 @@ class AndroidClientApiTest(AndroidApiTestCase):
             CREATE_CLIENT_URL,
             self._body(
                 addresses=[
-                    self._address(line_1="1 Ring Road", is_primary=True),
-                    self._address(line_1="9 Dockside Lane", pincode="395011"),
+                    self._address(line_1="1 Ring Road", is_primary=True, district="Surat"),
+                    self._address(line_1="9 Dockside Lane", pincode="395011", district="Navsari"),
                 ]
             ),
             format="json",
@@ -590,6 +607,8 @@ class AndroidClientApiTest(AndroidApiTestCase):
             ("address pincode", {"address": "3800"}, ["Acme Traders"]),
             # The Dockside address is not primary, so it is never matched.
             ("address ignores non-primary", {"address": "dockside"}, []),
+            ("district substring", {"district": "URA"}, ["Acme Seeds"]),
+            ("district ignores non-primary", {"district": "navsari"}, []),
             # Both filters AND together rather than widening the page.
             (
                 "name and address together",

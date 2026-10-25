@@ -3,9 +3,10 @@
 The caller's own farmer recorded outside any field trip (``FV-…``). Another
 sales person's farmer, or a farmer met on a trip, is a 404.
 
-``PATCH`` corrects any subset of name, contact number, village, district, land,
-``is_lead``, crops and products (a field that is sent may not be blank, except
-the optional district; at least one crop remains). ``DELETE`` soft-deletes the
+``PATCH`` corrects any subset of name, contact number, village, district, city
+(taluka), land, ``is_lead``, crops and products (a field that is sent may not be
+blank, except the optional district and city -- a blank district or a null
+``city_id`` clears it; at least one crop remains). ``DELETE`` soft-deletes the
 farmer (204).
 """
 

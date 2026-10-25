@@ -97,6 +97,7 @@ class FieldTripFixtures:
         crops=None,
         products=(),
         land_area_bigha: str = "2.5",
+        **extra,
     ) -> FarmerVisit:
         return ops.create_farmer_visit(
             trip,
@@ -106,4 +107,5 @@ class FieldTripFixtures:
             land_area_bigha=Decimal(land_area_bigha),
             crops=crops or [self.castor],
             products=products,
+            **extra,
         )

@@ -10,6 +10,8 @@ Paginated, filterable and sortable through ``AndroidPaginatedDateRangeListView``
   those cities. The ``available_filters`` entry lists the eligible
   ``{value, label}`` cities (exactly the ones this sales person has clients in),
   so the picker needs no second call.
+* ``?district=<term>`` -- case-insensitive substring of the *primary* address's
+  district.
 * ``?status=<code,...>`` -- ``VERIFICATION_PENDING`` / ``VERIFIED`` / ``CLIENT_REJECTED``; the entry
   carries both as options.
 * ``?company_name=<term>`` -- case-insensitive substring of the company name.
@@ -64,7 +66,6 @@ class ClientListItemSerializer(serializers.Serializer):
     public_id = serializers.CharField()
     company_name = serializers.CharField()
     company_phone = serializers.CharField()
-    district = serializers.CharField(allow_blank=True)
     status = serializers.CharField(allow_null=True)
     primary_contact = ClientContactPayloadSerializer(allow_null=True)
     primary_address = ClientAddressPayloadSerializer(allow_null=True)
@@ -94,6 +95,15 @@ def _by_primary_address_city(queryset: QuerySet, city_ids: list[int]) -> QuerySe
         client_addresses__is_primary=True,
         client_addresses__is_deleted=False,
         client_addresses__address__city_id__in=city_ids,
+    ).distinct()
+
+
+def _by_primary_address_district(queryset: QuerySet, terms: list[str]) -> QuerySet:
+    """Keep clients whose *primary* address's district contains ``terms[0]``."""
+    return queryset.filter(
+        client_addresses__is_primary=True,
+        client_addresses__is_deleted=False,
+        client_addresses__address__district__icontains=terms[0],
     ).distinct()
 
 
@@ -149,6 +159,14 @@ _QUERYSET_FILTERS = (
         apply=_by_primary_address_city,
         description="City id(s) of the client's primary address (see options).",
         options=_cities_of_my_clients,
+    ),
+    QuerysetFilter(
+        "district",
+        label="District",
+        parse=parse_str,
+        multi=False,
+        apply=_by_primary_address_district,
+        description="Case-insensitive substring of the primary address's district.",
     ),
     QuerysetFilter(
         "status",

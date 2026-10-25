@@ -14,6 +14,13 @@ class Address(TimeStampedModel, SoftDeletedModel, CreatedByModel):
 
     address_line_1 = models.CharField("address line 1", max_length=255)
     address_line_2 = models.CharField("address line 2", max_length=255, blank=True)
+    district = models.CharField(
+        "district",
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional free text. A missing district is stored as an empty string.",
+    )
     pincode = models.ForeignKey(
         "aggregator.Pincode",
         verbose_name="pincode",

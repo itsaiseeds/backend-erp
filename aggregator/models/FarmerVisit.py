@@ -19,8 +19,9 @@ class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
     use are ``FarmerVisitProduct`` rows, and having none is what "doesn't use
     our products" means (:attr:`uses_our_products`).
 
-    ``village`` is stored resolved -- ``FieldTripOperations.create_farmer_visit``
-    copies the trip's village when none is given.
+    ``village`` and ``city`` (the farmer's taluka) are stored resolved --
+    ``FieldTripOperations.create_farmer_visit`` copies the trip's when none is
+    given.
 
     Exposed to the frontend by its ``public_id`` (``FV-…``).
     """
@@ -50,6 +51,15 @@ class FarmerVisit(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel, Cre
         blank=True,
         default="",
         help_text="Optional free text. A missing district is stored as an empty string.",
+    )
+    city = models.ForeignKey(
+        "aggregator.City",
+        verbose_name="city",
+        on_delete=models.PROTECT,
+        related_name="farmer_visits",
+        null=True,
+        blank=True,
+        help_text="The farmer's taluka. Optional; a trip visit defaults to the trip's city.",
     )
     land_area_bigha = models.DecimalField(
         "land area in bigha",

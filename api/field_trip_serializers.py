@@ -65,6 +65,16 @@ class CreateFarmerVisitSerializer(serializers.Serializer):
     district = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default="", help_text="Optional."
     )
+    city_id = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        source="city",
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Optional. The farmer's city / taluka, from utilities/cities. "
+            "Omitted or null: the trip's city."
+        ),
+    )
     land_area_bigha = serializers.DecimalField(
         max_digits=12, decimal_places=4, min_value=0, help_text="Land held, in bigha."
     )
@@ -101,6 +111,13 @@ class CreateFarmerSerializer(serializers.Serializer):
     district = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default="", help_text="Optional."
     )
+    city_id = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        source="city",
+        required=False,
+        allow_null=True,
+        help_text="Optional. The farmer's city / taluka, from utilities/cities.",
+    )
     land_area_bigha = serializers.DecimalField(
         max_digits=12, decimal_places=4, min_value=0, help_text="Land held, in bigha."
     )
@@ -133,9 +150,9 @@ class EditFarmerVisitSerializer(serializers.Serializer):
 
     Every field is optional, but one that is sent may not be blank: the name,
     contact number and village must have text and ``crop_ids`` at least one
-    crop. ``district`` is optional, so a blank one clears it.
-    ``product_public_ids`` may be empty -- the farmer does not use our
-    products. Anything else sent is ignored.
+    crop. ``district`` and ``city_id`` are optional, so a blank district or a
+    null city clears it. ``product_public_ids`` may be empty -- the farmer
+    does not use our products. Anything else sent is ignored.
     """
 
     is_lead = serializers.BooleanField(required=False)
@@ -143,6 +160,13 @@ class EditFarmerVisitSerializer(serializers.Serializer):
     contact_number = serializers.CharField(required=False, validators=[validate_phone_number])
     village = serializers.CharField(max_length=255, required=False)
     district = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    city_id = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        source="city",
+        required=False,
+        allow_null=True,
+        help_text="The farmer's city / taluka, from utilities/cities; null clears it.",
+    )
     land_area_bigha = serializers.DecimalField(
         max_digits=12,
         decimal_places=4,
@@ -177,7 +201,7 @@ class EditFarmerVisitSerializer(serializers.Serializer):
         if not attrs:
             raise serializers.ValidationError(
                 "Send at least one of farmer_name, contact_number, village, district, "
-                "land_area_bigha, is_lead, crop_ids, product_public_ids."
+                "city_id, land_area_bigha, is_lead, crop_ids, product_public_ids."
             )
         return attrs
 
@@ -240,6 +264,10 @@ class FarmerVisitPayloadSerializer(serializers.Serializer):
     contact_number = serializers.CharField()
     village = serializers.CharField()
     district = serializers.CharField(allow_blank=True)
+    city = IdNameSerializer(
+        allow_null=True,
+        help_text="The farmer's city / taluka; null if none was given or it was cleared.",
+    )
     land_area_bigha = serializers.CharField()
     is_lead = serializers.BooleanField()
     field_trip_public_id = serializers.CharField(
@@ -281,7 +309,7 @@ class FarmerPayloadSerializer(serializers.Serializer):
     )
     city = IdNameSerializer(
         allow_null=True,
-        help_text="City of the latest visit's field trip; null if recorded without a trip.",
+        help_text="City / taluka of the latest visit; null if it gave none.",
     )
     land_area_bigha = serializers.CharField(help_text="Land held at the latest visit, in bigha.")
     is_lead = serializers.BooleanField(help_text="Lead flag of the latest record.")

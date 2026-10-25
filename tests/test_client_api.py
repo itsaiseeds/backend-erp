@@ -97,6 +97,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
         city=None,
         line_1="1 Ring Road",
         pincode="395007",
+        district="",
     ):
         city = city or self.city
         return create_client_with_details(
@@ -110,6 +111,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
                     "city": city,
                     "state": self.state,
                     "country": self.country,
+                    "district": district,
                 }
             ],
             contacts=[{"name": "Ramesh", "phone_number": "9876500001"}],
@@ -338,27 +340,22 @@ class SalesAdminClientApiTest(WebApiTestCase):
         self.assertEqual(len(response.data["contacts"]), 1)
         self.assertEqual(len(response.data["transport_agencies"]), 1)
 
-    def test_an_admin_can_set_and_clear_the_optional_district(self):
-        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_admin_can_set_and_clear_the_optional_district"""
+    def test_an_admin_can_set_and_clear_an_address_district(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_admin_can_set_and_clear_an_address_district"""
         self.login_as(self.admin_user)
-        self.assertEqual(
-            self.client.get(CLIENT_URL.format(public_id=self.pending.public_id)).data[
-                "district"
-            ],
-            "",
-        )
+        detail = self.client.get(CLIENT_URL.format(public_id=self.pending.public_id)).data
+        self.assertEqual(detail["addresses"][0]["district"], "")
+        self.assertNotIn("district", detail)
+        address = self.pending.client_addresses.get().address
 
         for district in ("Surat", ""):
             with self.subTest(district=district):
-                response = self.client.post(
-                    UPDATE_CLIENT_URL,
-                    {"public_id": self.pending.public_id, "district": district},
-                    format="json",
+                data = self._update_lists(
+                    addresses=[{**self._address_item("1 Ring Road"), "district": district}]
                 )
-                self.assertEqual(response.status_code, status.HTTP_200_OK)
-                self.assertEqual(response.data["district"], district)
-                self.pending.refresh_from_db()
-                self.assertEqual(self.pending.district, district)
+                self.assertEqual(data["addresses"][0]["district"], district)
+                address.refresh_from_db()
+                self.assertEqual(address.district, district)
 
     def test_a_named_list_is_replaced_wholesale_and_may_not_be_emptied(self):
         """tests/test_client_api.py::SalesAdminClientApiTest::test_a_named_list_is_replaced_wholesale_and_may_not_be_emptied"""
@@ -510,6 +507,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
                 ("created_by", "Created By", "select"),
                 ("verified_by", "Verified By", "select"),
                 ("city_id", "City", "select"),
+                ("district", "District", "text"),
                 ("status", "Status", "select"),
                 ("company_name", "Company Name", "text"),
                 ("address", "Address", "text"),
@@ -578,6 +576,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
             actor=self.other_sales_person,
             city=self.other_city,
             pincode="380001",
+            district="Ahmedabad",
         )
         verify_client(beta, self.admin_user)
         self.login_as(self.admin_user)
@@ -586,6 +585,7 @@ class SalesAdminClientApiTest(WebApiTestCase):
             ("created_by", {"created_by": str(self.other_sales_person.id)}, ["Beta Traders"]),
             ("verified_by", {"verified_by": str(self.admin_user.id)}, ["Beta Traders"]),
             ("city_id", {"city_id": str(self.other_city.id)}, ["Beta Traders"]),
+            ("district", {"district": "medab"}, ["Beta Traders"]),
             ("status", {"status": "VERIFIED"}, ["Beta Traders"]),
             ("company_name substring", {"company_name": "cme se"}, ["Acme Seeds"]),
         ]

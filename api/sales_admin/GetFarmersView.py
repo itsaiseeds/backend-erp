@@ -4,13 +4,13 @@ Every farmer recorded on **any** field trip, by any sales person -- the list a
 sales admin reads to know the farmers behind the trips. A farmer is one
 ``contact_number``: a visit is a meeting, so the same farmer met on three trips
 is three ``FarmerVisit`` rows and one row here, carrying their latest visit's
-name / village / city / land area and their crops, products, sales people and
-meeting history merged over all of them
+name / village / district / city (taluka) / land area and their crops, products,
+sales people and meeting history merged over all of them
 (``aggregator.FieldTripOperations.farmer_payload``).
 
 Paginated (``?all=true`` for every farmer in one page), newest visit first.
 Filterable by ``?contact_number=`` / ``?farmer_name=`` / ``?village=`` /
-``?city_id=`` / ``?created_by=`` / ``?crop=`` / ``?product=`` /
+``?district=`` / ``?city_id=`` / ``?created_by=`` / ``?crop=`` / ``?product=`` /
 ``?uses_our_products=`` and sortable by ``farmer_name`` / ``last_visited_at`` /
 ``visit_count`` / ``land_area`` -- see ``api.field_trip_lists``. Every filter
 matches a farmer on *any* of their visits, not only the latest.
