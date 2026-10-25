@@ -1,8 +1,9 @@
 """Farmer-visit edit endpoint: ``PATCH /android/api/v1/edit-farmer-visit/<public_id>``.
 
 The sales person corrects a farmer they recorded -- the name, contact number,
-village, district, land, crops and products, any subset (a field that is sent
-may not be blank, except the optional district) -- and only while the trip the
+village, district, city (taluka), land, crops and products, any subset (a field that is sent
+may not be blank, except the optional district and city -- a blank district or a
+null ``city_id`` clears it) -- and only while the trip the
 farmer was recorded on is IN_PROGRESS. A farmer on someone else's trip is a
 404; on a trip in any other status, a 400.
 """

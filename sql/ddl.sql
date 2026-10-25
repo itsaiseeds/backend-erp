@@ -284,6 +284,7 @@ CREATE TABLE public.aggregator_address (
 	deleted_at timestamptz NULL,
 	address_line_1 varchar(255) NOT NULL,
 	address_line_2 varchar(255) NOT NULL,
+	district varchar(255) NOT NULL DEFAULT '',
 	created_by_id int8 NULL,
 	deleted_by_id int8 NULL,
 	city_id int8 NOT NULL,
@@ -302,6 +303,9 @@ CREATE TABLE public.aggregator_address (
 	CONSTRAINT aggregator_address_state_id_not_null NOT NULL state_id,
 	CONSTRAINT aggregator_address_updated_at_not_null NOT NULL updated_at
 );
+-- District is optional free text (stored as '').
+-- Idempotent upgrade for databases created before the column existed.
+ALTER TABLE public.aggregator_address ADD COLUMN IF NOT EXISTS district varchar(255) NOT NULL DEFAULT '';
 CREATE INDEX aggregator_address_city_id_96970770 ON public.aggregator_address USING btree (city_id);
 CREATE INDEX aggregator_address_country_id_2f36b787 ON public.aggregator_address USING btree (country_id);
 CREATE INDEX aggregator_address_created_by_id_58fd480f ON public.aggregator_address USING btree (created_by_id);
@@ -652,16 +656,15 @@ CREATE TABLE IF NOT EXISTS public.aggregator_client (
 	company_name varchar(255) NOT NULL,
 	company_phone varchar(10) NOT NULL,
 	gst_number varchar(15) NOT NULL DEFAULT '',
-	district varchar(255) NOT NULL DEFAULT '',
 	status_id int8 NOT NULL,
 	verified_by_id int8 NULL,
 	verified_at timestamptz NULL,
 	CONSTRAINT aggregator_client_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_client_public_id_key UNIQUE (public_id)
 );
--- District is optional free text (stored as '').
--- Idempotent upgrade for databases created before the column existed.
-ALTER TABLE public.aggregator_client ADD COLUMN IF NOT EXISTS district varchar(255) NOT NULL DEFAULT '';
+-- District moved to each address (aggregator_address.district); its old values are not carried over.
+-- Idempotent upgrade for databases created while the client carried it. Apply after the code is deployed.
+ALTER TABLE public.aggregator_client DROP COLUMN IF EXISTS district;
 -- GST is optional (stored as ''); a real GSTIN stays unique.
 -- Idempotent upgrade for databases created with the old UNIQUE (gst_number).
 ALTER TABLE public.aggregator_client ALTER COLUMN gst_number SET DEFAULT '';
@@ -1667,7 +1670,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_fieldtrip_one_in_progress_per_sales_perso
 -- sales person recorded independently of any trip (unique per created_by +
 -- contact_number while live). is_lead flags a farmer as a sales lead. village is stored resolved (the
 -- trip's village when none was given). district is optional free text (stored
--- as ''). Crops grown and our products used are
+-- as ''). city_id is the farmer's taluka: the trip's city when none was given,
+-- optional (NULL, and can be cleared later). Crops grown and our products used are
 -- the two link tables below; no product rows means "doesn't use our products".
 CREATE TABLE IF NOT EXISTS public.aggregator_farmervisit (
 	id bigserial NOT NULL,
@@ -1683,6 +1687,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_farmervisit (
 	contact_number varchar(10) NOT NULL,
 	village varchar(255) NOT NULL,
 	district varchar(255) NOT NULL DEFAULT '',
+	city_id int8 NULL,
 	land_area_bigha numeric(12, 4) NOT NULL,
 	is_lead bool NOT NULL DEFAULT false,
 	CONSTRAINT aggregator_farmervisit_pkey PRIMARY KEY (id),
@@ -1692,6 +1697,11 @@ CREATE TABLE IF NOT EXISTS public.aggregator_farmervisit (
 );
 -- Idempotent upgrade for databases created before the district column existed.
 ALTER TABLE public.aggregator_farmervisit ADD COLUMN IF NOT EXISTS district varchar(255) NOT NULL DEFAULT '';
+-- Idempotent upgrade for databases created before the city_id column existed:
+-- add it, then fill trip visits from their trip's city (the FK is added below).
+ALTER TABLE public.aggregator_farmervisit ADD COLUMN IF NOT EXISTS city_id int8 NULL;
+UPDATE public.aggregator_farmervisit fv SET city_id = ft.city_id FROM public.aggregator_fieldtrip ft WHERE fv.field_trip_id = ft.id AND fv.city_id IS NULL;
+CREATE INDEX IF NOT EXISTS aggregator_farmervisit_city_id_idx ON public.aggregator_farmervisit USING btree (city_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_farmervisit_independent_contact ON public.aggregator_farmervisit USING btree (created_by_id, contact_number) WHERE field_trip_id IS NULL AND is_deleted = false;
 CREATE INDEX IF NOT EXISTS aggregator_farmervisit_public_id_like ON public.aggregator_farmervisit USING btree (public_id varchar_pattern_ops);
 CREATE INDEX IF NOT EXISTS aggregator_farmervisit_field_trip_id_idx ON public.aggregator_farmervisit USING btree (field_trip_id);
@@ -1903,6 +1913,7 @@ ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_crea
 ALTER TABLE public.aggregator_fieldtrip ADD CONSTRAINT aggregator_fieldtrip_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE public.aggregator_farmervisit ADD CONSTRAINT aggregator_farmervisit_field_trip_id_fk FOREIGN KEY (field_trip_id) REFERENCES public.aggregator_fieldtrip(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.aggregator_farmervisit ADD CONSTRAINT aggregator_farmervisit_city_id_fk FOREIGN KEY (city_id) REFERENCES public.aggregator_city(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_farmervisit ADD CONSTRAINT aggregator_farmervisit_created_by_id_fk FOREIGN KEY (created_by_id) REFERENCES public.authentication_user(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE public.aggregator_farmervisit ADD CONSTRAINT aggregator_farmervisit_deleted_by_id_fk FOREIGN KEY (deleted_by_id) REFERENCES public.authentication_user(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 

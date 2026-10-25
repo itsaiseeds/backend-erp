@@ -120,7 +120,12 @@ class SalesAdminFieldTripApiTest(FieldTripFixtures, WebApiTestCase):
         """tests/test_admin_field_trip_api.py::SalesAdminFieldTripApiTest::test_farmer_visits_are_listed_and_filtered_per_trip"""
         trip = self.make_trip(status=StatusIds.IN_PROGRESS)
         grower = self.make_visit(
-            trip, contact_number="9876500001", crops=[self.bajari], products=[self.bajari_seed]
+            trip,
+            contact_number="9876500001",
+            crops=[self.bajari],
+            products=[self.bajari_seed],
+            district="Navsari",
+            city=self.other_city,
         )
         non_user = self.make_visit(trip, contact_number="9876500002", land_area_bigha="0.75")
         other_trip = self.make_trip(owner=self.other_sales_person, status=StatusIds.IN_PROGRESS)
@@ -133,11 +138,23 @@ class SalesAdminFieldTripApiTest(FieldTripFixtures, WebApiTestCase):
         row = response.json()["results"][1]
         self.assertEqual(row["crops"], [{"id": self.bajari.id, "name": "Bajari"}])
         self.assertTrue(row["uses_our_products"])
+        # A visit's city defaults to the trip's unless one is given.
+        self.assertEqual(row["city"], {"id": self.other_city.id, "name": self.other_city.name})
+        self.assertEqual(
+            response.json()["results"][0]["city"], {"id": self.city.id, "name": self.city.name}
+        )
+        filters = {entry["filter"]: entry for entry in response.json()["available_filters"]}
+        self.assertEqual(
+            {option["value"] for option in filters["city_id"]["options"]},
+            {self.city.id, self.other_city.id},
+        )
 
         cases = {
             f"crop={self.bajari.id}": [grower.public_id],
             f"product={self.bajari_seed.public_id}": [grower.public_id],
             "uses_our_products=false": [non_user.public_id],
+            "district=NAVS": [grower.public_id],
+            f"city_id={self.other_city.id}": [grower.public_id],
             "sort=land_area": [non_user.public_id, grower.public_id],
         }
         for query, expected in cases.items():
@@ -359,7 +376,11 @@ class SalesAdminFieldTripApiTest(FieldTripFixtures, WebApiTestCase):
             village="Olpad",
         )
         second = self.make_visit(
-            other_trip, contact_number="9876500002", crops=[self.bajari], land_area_bigha="4"
+            other_trip,
+            contact_number="9876500002",
+            crops=[self.bajari],
+            land_area_bigha="4",
+            district="Valsad",
         )
         second.farmer_name = "Anil Desai"
         second.save(update_fields=["farmer_name", "updated_at"])
@@ -371,6 +392,7 @@ class SalesAdminFieldTripApiTest(FieldTripFixtures, WebApiTestCase):
             "uses_our_products=true": ["9876500001"],
             "uses_our_products=false": ["9876500002"],
             "village=olp": ["9876500002"],
+            "district=lsa": ["9876500002"],
             f"city_id={self.other_city.id}": ["9876500002"],
             f"created_by={self.sales_person.id}": ["9876500001"],
             "contact_number=76500001": ["9876500001"],

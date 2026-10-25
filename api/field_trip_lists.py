@@ -177,6 +177,51 @@ def _trip_products(request: Request) -> list[dict]:
     return [{"value": public_id, "label": name} for public_id, name in rows]
 
 
+def _city_options(visits: QuerySet[FarmerVisit]) -> list[dict]:
+    """The distinct cities (talukas) recorded on ``visits``, by name."""
+    rows = (
+        visits.filter(city__isnull=False)
+        .values_list("city_id", "city__name")
+        .distinct()
+        .order_by("city__name")
+    )
+    return [{"value": city_id, "label": name} for city_id, name in rows]
+
+
+def _trip_cities(request: Request) -> list[dict]:
+    return _city_options(
+        FarmerVisit.objects.filter(field_trip__public_id=_path_trip_public_id(request))
+    )
+
+
+def _own_independent_cities(request: Request) -> list[dict]:
+    return _city_options(
+        FarmerVisit.objects.filter(field_trip__isnull=True, created_by=request.user)
+    )
+
+
+def _district_filter(description: str) -> QuerysetFilter:
+    return QuerysetFilter(
+        "district",
+        label="District",
+        lookup="district__icontains",
+        parse=parse_str,
+        multi=False,
+        description=description,
+    )
+
+
+def _city_filter(options: Callable[[Request], list[dict]]) -> QuerysetFilter:
+    return QuerysetFilter(
+        "city_id",
+        label="City",
+        lookup="city_id__in",
+        parse=parse_int,
+        description="City (taluka) id(s) of the farmer (see options).",
+        options=options,
+    )
+
+
 def _by_crop(queryset: QuerySet, crop_ids: list[int]) -> QuerySet:
     return queryset.filter(
         Exists(FarmerVisitCrop.objects.filter(farmer_visit=OuterRef("pk"), crop_id__in=crop_ids))
@@ -200,6 +245,8 @@ def _by_product_use(queryset: QuerySet, values: list[bool]) -> QuerySet:
 
 FARMER_VISIT_FILTERS: tuple[ListFilter, ...] = (
     public_id_filter("FV-"),
+    _district_filter("Case-insensitive substring of the farmer's district."),
+    _city_filter(_trip_cities),
     QuerysetFilter(
         "crop",
         label="Crop",
@@ -254,6 +301,8 @@ INDEPENDENT_FARMER_FILTERS: tuple[ListFilter, ...] = (
         multi=False,
         description="Case-insensitive substring of the village.",
     ),
+    _district_filter("Case-insensitive substring of the farmer's district."),
+    _city_filter(_own_independent_cities),
     QuerysetFilter(
         "is_lead",
         label="Is Lead",
@@ -326,7 +375,11 @@ def _farmer_by_product_use(queryset: QuerySet, values: list[bool]) -> QuerySet:
 
 
 def _farmer_by_city(queryset: QuerySet, city_ids: list[int]) -> QuerySet:
-    return queryset.filter(contact_number__in=_visit_contacts(field_trip__city_id__in=city_ids))
+    return queryset.filter(contact_number__in=_visit_contacts(city_id__in=city_ids))
+
+
+def _farmer_by_district(queryset: QuerySet, terms: list[str]) -> QuerySet:
+    return queryset.filter(contact_number__in=_visit_contacts(district__icontains=terms[0]))
 
 
 def _farmer_by_recorder(queryset: QuerySet, user_ids: list[int]) -> QuerySet:
@@ -362,13 +415,7 @@ def _farmer_products(request: Request) -> list[dict]:
 
 
 def _farmer_cities(request: Request) -> list[dict]:
-    rows = (
-        _all_visits()
-        .values_list("field_trip__city_id", "field_trip__city__name")
-        .distinct()
-        .order_by("field_trip__city__name")
-    )
-    return [{"value": city_id, "label": name} for city_id, name in rows]
+    return _city_options(_all_visits())
 
 
 def _farmer_recorders(request: Request) -> list[dict]:
@@ -416,11 +463,19 @@ ALL_FARMER_FILTERS: tuple[ListFilter, ...] = (
         description="Farmers with a visit in a village whose name contains this.",
     ),
     QuerysetFilter(
+        "district",
+        label="District",
+        parse=parse_str,
+        multi=False,
+        apply=_farmer_by_district,
+        description="Farmers with a visit in a district whose name contains this.",
+    ),
+    QuerysetFilter(
         "city_id",
         label="City",
         parse=parse_int,
         apply=_farmer_by_city,
-        description="Farmers met on a trip to any of these cities (see options).",
+        description="Farmers with a visit in any of these cities / talukas (see options).",
         options=_farmer_cities,
     ),
     QuerysetFilter(

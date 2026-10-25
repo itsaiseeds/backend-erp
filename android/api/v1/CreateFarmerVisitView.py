@@ -2,7 +2,8 @@
 
 The sales person records a farmer they met on one of their own trips, while it
 is IN_PROGRESS: name, 10-digit contact number, village (defaults to the trip's),
-an optional free-text district, land held in bigha, the crops they grow (at least one, ids from
+an optional free-text district, the city / taluka (defaults to the trip's), land
+held in bigha, the crops they grow (at least one, ids from
 ``utilities/crops``) and our products they use (public ids from
 ``utilities/products``; an empty list means they use none).
 
@@ -48,6 +49,7 @@ class CreateFarmerVisitView(AndroidBaseView):
             contact_number=data["contact_number"],
             village=data["village"],
             district=data["district"],
+            city=data.get("city"),
             land_area_bigha=data["land_area_bigha"],
             crops=data["crops"],
             products=data.get("products", []),

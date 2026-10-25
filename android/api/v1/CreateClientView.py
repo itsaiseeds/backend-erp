@@ -47,13 +47,6 @@ class CreateClientSerializer(ClientListsSerializer):
         default="",
         validators=[validate_gst_number],
     )
-    district = serializers.CharField(
-        max_length=255,
-        required=False,
-        allow_blank=True,
-        default="",
-    )
-
     def validate_gst_number(self, value):
         value = value.strip().upper()
         if value and Client.all_objects.filter(gst_number=value).exists():
@@ -82,7 +75,6 @@ class CreateClientView(AndroidBaseView):
             company_name=data["company_name"].strip(),
             company_phone=data["company_phone"],
             gst_number=data["gst_number"],
-            district=data["district"],
             addresses=data["addresses"],
             contacts=data["contacts"],
             transport_agencies=data["transport_agencies"],
