@@ -18,11 +18,11 @@ against ``PrivateDispatchDetails``. That is the same rule ``dispatch_mode``
 reports on every order payload, so what was planned at booking time is what gets
 recorded -- and the caller cannot contradict it.
 
-Two fields are derived rather than accepted: the dispatch **date** is today,
-because the dispatch is being recorded as it happens, and the **destination**
-city is the order's own delivery address, which is where the goods are going by
-definition. ``from_city_id`` is still an input until there is a warehouse to
-default it from.
+The dispatch **date** is derived rather than accepted: it is today, because the
+dispatch is being recorded as it happens. The **destination** city defaults to
+the order's own delivery address, which is where the goods are going by
+definition, but an optional ``to_city_id`` overrides it. ``from_city_id`` is
+still an input until there is a warehouse to default it from.
 
 The transporter's ``lr_number`` is not accepted here -- it is issued after
 collection, so every agency dispatch starts with it blank. It is recorded later
@@ -105,6 +105,16 @@ class DispatchOrderSerializer(serializers.Serializer):
         error_messages={"required": "from_city_id is required."},
         help_text="Where the goods left from. An input until a warehouse can default it.",
     )
+    to_city_id = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text=(
+            "Where the goods are dropped, if not the order's delivery city. "
+            "Omit to use the delivery address's city."
+        ),
+    )
     driver_name = serializers.CharField(
         max_length=255,
         required=False,
@@ -181,6 +191,7 @@ class DispatchOrderView(OrderTransitionView):
             order,
             actor=request.user,
             from_city=data["from_city_id"],
+            to_city=data["to_city_id"],
             driver_name=data["driver_name"],
             driver_number=data["driver_number"],
             vehicle_number=data["vehicle_number"],
