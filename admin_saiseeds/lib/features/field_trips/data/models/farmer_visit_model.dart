@@ -1,4 +1,5 @@
 import '../../../../core/models/crop_model.dart';
+import 'field_trip_model.dart';
 
 class FarmerVisitProductRef {
   final String publicId;
@@ -19,6 +20,10 @@ class FarmerVisitModel {
   final String farmerName;
   final String contactNumber;
   final String village;
+  final String district;
+
+  /// Labelled "Taluka" in the UI; the key stays `city` on the wire.
+  final FieldTripCityRef? city;
   final String landAreaBigha;
   final List<CropModel> crops;
   final bool usesOurProducts;
@@ -30,6 +35,8 @@ class FarmerVisitModel {
     this.farmerName = '',
     this.contactNumber = '',
     this.village = '',
+    this.district = '',
+    this.city,
     this.landAreaBigha = '',
     this.crops = const [],
     this.usesOurProducts = false,
@@ -38,11 +45,17 @@ class FarmerVisitModel {
   });
 
   factory FarmerVisitModel.fromJson(Map<String, dynamic> json) {
+    final dynamic city = json['city'];
+
     return FarmerVisitModel(
       publicId: '${json['public_id'] ?? ''}',
       farmerName: '${json['farmer_name'] ?? ''}',
       contactNumber: '${json['contact_number'] ?? ''}',
       village: '${json['village'] ?? ''}',
+      district: '${json['district'] ?? ''}',
+      city: city is Map
+          ? FieldTripCityRef.fromJson(Map<String, dynamic>.from(city))
+          : null,
       landAreaBigha: _decimalOf(json['land_area_bigha']),
       crops: _listOf(json['crops'], CropModel.fromJson),
       usesOurProducts: json['uses_our_products'] == true,
@@ -54,6 +67,8 @@ class FarmerVisitModel {
   String get cropNames => crops.map((crop) => crop.name).join(', ');
 
   String get productNames => products.map((product) => product.name).join(', ');
+
+  String get cityName => city?.name ?? '';
 
   num? get landAreaValue => num.tryParse(landAreaBigha);
 

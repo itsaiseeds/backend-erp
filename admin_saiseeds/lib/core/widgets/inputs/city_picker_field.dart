@@ -12,8 +12,11 @@ class CityPickerField extends StatelessWidget {
   final VoidCallback? onBlockedTap;
 
   /// Overrides the default "City" label where the field names a direction,
-  /// such as the origin on a dispatch.
+  /// such as the origin on a dispatch, or where the app calls this concept
+  /// something else to the user (client/order addresses show it as
+  /// "Taluka" -- the underlying `city`/`city_id` key never changes).
   final String? fieldLabel;
+  final String? fieldHint;
 
   const CityPickerField({
     super.key,
@@ -23,6 +26,7 @@ class CityPickerField extends StatelessWidget {
     this.enabled = true,
     this.onBlockedTap,
     this.fieldLabel,
+    this.fieldHint,
   });
 
   static String label(CityModel city) =>
@@ -34,7 +38,7 @@ class CityPickerField extends StatelessWidget {
 
     return SearchableField<CityModel>(
       label: fieldLabel ?? AppStrings.FIELD_CITY,
-      hintText: AppStrings.FIELD_CITY_HINT,
+      hintText: fieldHint ?? AppStrings.FIELD_CITY_HINT,
       value: value,
       items: cities,
       itemToString: label,

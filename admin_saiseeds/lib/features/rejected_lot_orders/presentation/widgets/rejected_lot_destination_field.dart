@@ -57,6 +57,9 @@ class RejectedLotDestinationFieldState
   late final TextEditingController _line2Controller = TextEditingController(
     text: widget.initial.newAddress?.line2 ?? '',
   );
+  late final TextEditingController _districtController = TextEditingController(
+    text: widget.initial.newAddress?.district ?? '',
+  );
   late final TextEditingController _pincodeController = TextEditingController(
     text: widget.initial.newAddress?.pincode ?? '',
   );
@@ -94,6 +97,7 @@ class RejectedLotDestinationFieldState
     _contactController.dispose();
     _line1Controller.dispose();
     _line2Controller.dispose();
+    _districtController.dispose();
     _pincodeController.dispose();
     super.dispose();
   }
@@ -119,6 +123,7 @@ class RejectedLotDestinationFieldState
         address: ClientAddressModel(
           line1: line1,
           line2: _line2Controller.text.trim(),
+          district: _districtController.text.trim(),
           pincode: pincode,
           cityId: _city!.id,
           cityName: _city!.name,
@@ -139,7 +144,7 @@ class RejectedLotDestinationFieldState
       _villageError = villageValid
           ? null
           : AppStrings.VALIDATION_VILLAGE_NAME_REQUIRED;
-      _cityError = cityValid ? null : AppStrings.VALIDATION_CITY_REQUIRED;
+      _cityError = cityValid ? null : AppStrings.VALIDATION_TALUKA_REQUIRED;
     });
 
     return villageValid && cityValid;
@@ -184,6 +189,15 @@ class RejectedLotDestinationFieldState
         ),
         const SizedBox(height: AppSpacing.smd),
         AppTextField(
+          controller: _districtController,
+          label: AppStrings.CLIENT_ADDRESS_DISTRICT,
+          hint: AppStrings.CLIENT_ADDRESS_DISTRICT_HINT,
+          enabled: widget.enabled,
+          inputFormatters: [LengthLimitingTextInputFormatter(255)],
+          onChanged: (_) => _emit(),
+        ),
+        const SizedBox(height: AppSpacing.smd),
+        AppTextField(
           controller: _pincodeController,
           label: AppStrings.CLIENT_ADDRESS_PINCODE,
           enabled: widget.enabled,
@@ -199,6 +213,8 @@ class RejectedLotDestinationFieldState
         CityPickerField(
           value: _city,
           enabled: widget.enabled,
+          fieldLabel: AppStrings.FIELD_TALUKA,
+          fieldHint: AppStrings.FIELD_TALUKA_HINT,
           errorText: _cityError,
           onSelected: (selected) {
             setState(() {

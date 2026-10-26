@@ -18,6 +18,7 @@ class FarmersTable extends StatefulWidget {
   static const String COLUMN_FARMER = 'farmer_name';
   static const String COLUMN_CONTACT = 'contact_number';
   static const String COLUMN_VILLAGE = 'village';
+  static const String COLUMN_DISTRICT = 'district';
   static const String COLUMN_CITY = 'city';
   static const String COLUMN_LAND = 'land_area_bigha';
   static const String COLUMN_CROPS = 'crops';
@@ -88,8 +89,13 @@ class FarmersTableState extends State<FarmersTable> {
       width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
+      id: FarmersTable.COLUMN_DISTRICT,
+      label: AppStrings.COLUMN_DISTRICT,
+      width: AppSizes.tableColumnWidthCompact,
+    ),
+    AppDataColumn(
       id: FarmersTable.COLUMN_CITY,
-      label: AppStrings.COLUMN_CITY,
+      label: AppStrings.COLUMN_FARMER_TALUKA,
       width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
@@ -181,7 +187,12 @@ class FarmersTableState extends State<FarmersTable> {
     return _filterFor(key)?.labelForValue(value) ?? value;
   }
 
-  String _filterLabel(String key) => _filterFor(key)?.displayLabel ?? key;
+  /// The backend's own label for the farmer's city filter is "City"; this
+  /// app shows it as "Taluka" while the query param (`city_id`) stays what
+  /// the backend expects.
+  String _filterLabel(String key) => key == 'city_id'
+      ? AppStrings.COLUMN_FARMER_TALUKA
+      : (_filterFor(key)?.displayLabel ?? key);
 
   String _sortLabel(String key) {
     for (final sort in widget.availableSorts) {
@@ -244,6 +255,8 @@ class FarmersTableState extends State<FarmersTable> {
         return _textCell(farmer.contactNumber);
       case FarmersTable.COLUMN_VILLAGE:
         return _textCell(farmer.village);
+      case FarmersTable.COLUMN_DISTRICT:
+        return _textCell(farmer.district);
       case FarmersTable.COLUMN_CITY:
         return _textCell(farmer.cityName);
       case FarmersTable.COLUMN_LAND:

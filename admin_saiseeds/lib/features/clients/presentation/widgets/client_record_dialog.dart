@@ -59,6 +59,7 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _gstController;
+  late final TextEditingController _districtController;
   late final TextEditingController _createdByController;
 
   late List<ClientAddressModel> _addresses;
@@ -87,6 +88,7 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
     _nameController = TextEditingController(text: _client.companyName);
     _phoneController = TextEditingController(text: _client.companyPhone);
     _gstController = TextEditingController(text: _client.gstNumber);
+    _districtController = TextEditingController(text: _client.district);
     _createdByController = TextEditingController(text: _client.createdBy);
     _resetLists();
   }
@@ -106,6 +108,7 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
     _nameController.dispose();
     _phoneController.dispose();
     _gstController.dispose();
+    _districtController.dispose();
     _createdByController.dispose();
     super.dispose();
   }
@@ -116,6 +119,7 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
     _nameController.text = _client.companyName;
     _phoneController.text = _client.companyPhone;
     _gstController.text = _client.gstNumber;
+    _districtController.text = _client.district;
     setState(() {
       _resetLists();
       _expandedAddress = -1;
@@ -186,6 +190,7 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
       companyName: _nameController.text.trim(),
       companyPhone: _phoneController.text.trim(),
       gstNumber: _gstController.text.trim().toUpperCase(),
+      district: _districtController.text.trim(),
       addresses: _addresses,
       contacts: _contacts,
       transportAgencies: _agencies,
@@ -344,6 +349,16 @@ class _ClientRecordDialogState extends State<ClientRecordDialog> {
               label: AppStrings.CLIENT_CREATED_BY_LABEL,
               isEditable: _canEdit,
               isLocked: true,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          RecordFieldRow(
+            left: RecordField(
+              controller: _districtController,
+              label: AppStrings.CLIENT_DISTRICT_FIELD_LABEL,
+              hint: AppStrings.FIELD_DISTRICT_HINT,
+              isEditable: _canEdit,
+              inputFormatters: [LengthLimitingTextInputFormatter(255)],
             ),
           ),
         ],

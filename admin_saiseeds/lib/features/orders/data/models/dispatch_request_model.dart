@@ -15,6 +15,11 @@ class DispatchItemModel {
 
 class DispatchRequestModel {
   final int fromCityId;
+
+  /// Overrides the destination city the server would otherwise derive from
+  /// the order's own delivery address. Omitted (null) when the admin leaves
+  /// it as the order's own city -- only sent when they actually change it.
+  final int? toCityId;
   final String driverName;
   final String driverNumber;
   final String vehicleNumber;
@@ -22,6 +27,7 @@ class DispatchRequestModel {
 
   const DispatchRequestModel({
     required this.fromCityId,
+    this.toCityId,
     required this.driverName,
     required this.driverNumber,
     required this.vehicleNumber,
@@ -30,6 +36,7 @@ class DispatchRequestModel {
 
   Map<String, dynamic> toJson() => {
     'from_city_id': fromCityId,
+    if (toCityId != null) 'to_city_id': toCityId,
     'driver_name': driverName,
     'driver_number': driverNumber,
     'vehicle_number': vehicleNumber,
