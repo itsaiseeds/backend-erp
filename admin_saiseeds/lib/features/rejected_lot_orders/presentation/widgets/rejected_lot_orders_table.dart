@@ -191,7 +191,12 @@ class RejectedLotOrdersTableState extends State<RejectedLotOrdersTable> {
     return _filterFor(key)?.labelForValue(value) ?? value;
   }
 
-  String _filterLabel(String key) => _filterFor(key)?.displayLabel ?? key;
+  /// The backend's own label for the delivery city filter is "City"; this
+  /// app shows it as "Taluka" while the query param (`city_id`) stays what
+  /// the backend expects.
+  String _filterLabel(String key) => key == 'city_id'
+      ? AppStrings.FIELD_TALUKA
+      : (_filterFor(key)?.displayLabel ?? key);
 
   String _sortLabel(String key) {
     for (final ClientSortModel sort in widget.availableSorts) {

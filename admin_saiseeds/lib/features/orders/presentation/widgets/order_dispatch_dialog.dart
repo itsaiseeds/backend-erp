@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/models/city_model.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/services/metadata_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -75,6 +76,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
   bool _lotsUnavailable = false;
 
   CityModel? _fromCity;
+  CityModel? _toCity;
   String? _cityError;
   int _stepIndex = 0;
   bool _isSubmitting = false;
@@ -93,6 +95,10 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
     _lotValues = {
       for (final OrderPackagingModel line in _lines) line.publicId: null,
     };
+    final int? toCityId = _order.city?.id;
+    if (toCityId != null && toCityId > 0) {
+      _toCity = MetadataService.instance.cityById(toCityId);
+    }
     _loadLotNumbers();
   }
 
@@ -165,6 +171,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
       publicId: _order.publicId,
       request: DispatchRequestModel(
         fromCityId: _fromCity!.id,
+        toCityId: _toCity?.id,
         driverName: _driverNameController.text.trim(),
         driverNumber: _driverNumberController.text.trim(),
         vehicleNumber: _vehicleController.text.trim(),
@@ -258,10 +265,26 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
               _cityError = null;
             }),
           ),
-          right: AppTextField(
+          right: CityPickerField(
+            value: _toCity,
+            fieldLabel: AppStrings.FIELD_TO_CITY,
+            enabled: !_isSubmitting,
+            onSelected: (city) => setState(() => _toCity = city),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        RecordFieldRow(
+          left: AppTextField(
             controller: _vehicleController,
             label: AppStrings.FIELD_VEHICLE_NUMBER,
             hint: AppStrings.FIELD_VEHICLE_NUMBER_HINT,
+            enabled: !_isSubmitting,
+            validator: _isOwnVehicle ? FormValidators.requiredField : null,
+          ),
+          right: AppTextField(
+            controller: _driverNameController,
+            label: AppStrings.FIELD_DRIVER_NAME,
+            hint: AppStrings.FIELD_DRIVER_NAME_HINT,
             enabled: !_isSubmitting,
             validator: _isOwnVehicle ? FormValidators.requiredField : null,
           ),
@@ -269,13 +292,6 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
         const SizedBox(height: AppSpacing.md),
         RecordFieldRow(
           left: AppTextField(
-            controller: _driverNameController,
-            label: AppStrings.FIELD_DRIVER_NAME,
-            hint: AppStrings.FIELD_DRIVER_NAME_HINT,
-            enabled: !_isSubmitting,
-            validator: _isOwnVehicle ? FormValidators.requiredField : null,
-          ),
-          right: AppTextField(
             controller: _driverNumberController,
             label: AppStrings.FIELD_DRIVER_NUMBER,
             hint: AppStrings.LOGIN_PHONE_HINT,
@@ -344,6 +360,10 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
         _SummaryRow(
           label: AppStrings.FIELD_FROM_CITY,
           value: _fromCity?.name ?? '',
+        ),
+        _SummaryRow(
+          label: AppStrings.FIELD_TO_CITY,
+          value: _toCity?.name ?? '',
         ),
         _SummaryRow(
           label: AppStrings.FIELD_VEHICLE_NUMBER,

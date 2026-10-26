@@ -205,6 +205,7 @@ class _AddressStepCardState extends State<AddressStepCard> {
   late final TextEditingController _label;
   late final TextEditingController _line1;
   late final TextEditingController _line2;
+  late final TextEditingController _district;
   late final TextEditingController _pincode;
 
   @override
@@ -213,6 +214,7 @@ class _AddressStepCardState extends State<AddressStepCard> {
     _label = TextEditingController(text: widget.address.label);
     _line1 = TextEditingController(text: widget.address.line1);
     _line2 = TextEditingController(text: widget.address.line2);
+    _district = TextEditingController(text: widget.address.district);
     _pincode = TextEditingController(text: widget.address.pincode);
   }
 
@@ -221,6 +223,7 @@ class _AddressStepCardState extends State<AddressStepCard> {
     _label.dispose();
     _line1.dispose();
     _line2.dispose();
+    _district.dispose();
     _pincode.dispose();
     super.dispose();
   }
@@ -269,6 +272,16 @@ class _AddressStepCardState extends State<AddressStepCard> {
           ),
           const SizedBox(height: AppSpacing.smd),
           AppTextField(
+            controller: _district,
+            label: AppStrings.CLIENT_ADDRESS_DISTRICT,
+            hint: AppStrings.CLIENT_ADDRESS_DISTRICT_HINT,
+            enabled: widget.enabled,
+            inputFormatters: [LengthLimitingTextInputFormatter(255)],
+            onChanged: (value) =>
+                widget.onChanged(address.copyWith(district: value)),
+          ),
+          const SizedBox(height: AppSpacing.smd),
+          AppTextField(
             controller: _pincode,
             label: AppStrings.CLIENT_ADDRESS_PINCODE,
             enabled: widget.enabled,
@@ -285,8 +298,10 @@ class _AddressStepCardState extends State<AddressStepCard> {
           CityPickerField(
             value: city,
             enabled: widget.enabled,
+            fieldLabel: AppStrings.FIELD_TALUKA,
+            fieldHint: AppStrings.FIELD_TALUKA_HINT,
             errorText: address.cityId == 0
-                ? AppStrings.VALIDATION_CITY_REQUIRED
+                ? AppStrings.VALIDATION_TALUKA_REQUIRED
                 : null,
             onSelected: (selected) {
               final StateModel? state = MetadataService.instance.stateOfCity(

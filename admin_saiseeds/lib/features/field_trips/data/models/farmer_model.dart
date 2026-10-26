@@ -8,6 +8,9 @@ class FarmerVisitSummary {
   final String fieldTripPublicId;
   final String village;
   final String district;
+
+  /// Labelled "Taluka" in the UI; the key stays `city` on the wire.
+  final FieldTripCityRef? city;
   final String landAreaBigha;
   final List<CropModel> crops;
   final List<FarmerVisitProductRef> products;
@@ -19,6 +22,7 @@ class FarmerVisitSummary {
     this.fieldTripPublicId = '',
     this.village = '',
     this.district = '',
+    this.city,
     this.landAreaBigha = '',
     this.crops = const [],
     this.products = const [],
@@ -31,6 +35,7 @@ class FarmerVisitSummary {
   factory FarmerVisitSummary.fromJson(Map<String, dynamic> json) {
     final dynamic trip = json['field_trip'];
     final dynamic salesPerson = json['sales_person'] ?? json['created_by'];
+    final dynamic city = json['city'];
 
     return FarmerVisitSummary(
       publicId: FarmerModel.stringOf(json['public_id']),
@@ -39,6 +44,9 @@ class FarmerVisitSummary {
           : FarmerModel.stringOf(json['field_trip_public_id'] ?? trip),
       village: FarmerModel.stringOf(json['village']),
       district: FarmerModel.stringOf(json['district']),
+      city: city is Map
+          ? FieldTripCityRef.fromJson(Map<String, dynamic>.from(city))
+          : null,
       landAreaBigha: FarmerModel.decimalOf(json['land_area_bigha']),
       crops: FarmerModel.listOf(json['crops'], CropModel.fromJson),
       products: FarmerModel.listOf(
@@ -53,6 +61,8 @@ class FarmerVisitSummary {
   }
 
   String get salesPersonName => salesPerson?.name ?? '';
+
+  String get cityName => city?.name ?? '';
 
   DateTime? get visitedDateTime => DateTime.tryParse(visitedAt);
 }

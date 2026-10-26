@@ -5,6 +5,7 @@ class ClientAddressModel {
   final String label;
   final String line1;
   final String line2;
+  final String district;
   final String pincode;
   final String cityName;
   final String stateName;
@@ -19,6 +20,7 @@ class ClientAddressModel {
     String? label,
     String? line1,
     String? line2,
+    String? district,
     String? pincode,
     String? cityName,
     String? stateName,
@@ -33,6 +35,7 @@ class ClientAddressModel {
       label: label ?? this.label,
       line1: line1 ?? this.line1,
       line2: line2 ?? this.line2,
+      district: district ?? this.district,
       pincode: pincode ?? this.pincode,
       cityName: cityName ?? this.cityName,
       stateName: stateName ?? this.stateName,
@@ -49,6 +52,7 @@ class ClientAddressModel {
     this.label = '',
     this.line1 = '',
     this.line2 = '',
+    this.district = '',
     this.pincode = '',
     this.cityName = '',
     this.stateName = '',
@@ -65,6 +69,7 @@ class ClientAddressModel {
       label: json['label'] as String? ?? '',
       line1: json['line_1'] as String? ?? '',
       line2: json['line_2'] as String? ?? '',
+      district: json['district'] as String? ?? '',
       pincode: json['pincode'] as String? ?? '',
       cityName: _nameOf(json['city']),
       stateName: _nameOf(json['state']),
@@ -79,6 +84,7 @@ class ClientAddressModel {
   Map<String, dynamic> toWriteJson() => {
     'line_1': line1,
     'line_2': line2,
+    'district': district,
     'pincode': pincode,
     'city': cityId,
     'state': stateId,

@@ -95,7 +95,7 @@ class FarmersTableState extends State<FarmersTable> {
     ),
     AppDataColumn(
       id: FarmersTable.COLUMN_CITY,
-      label: AppStrings.COLUMN_CITY,
+      label: AppStrings.COLUMN_FARMER_TALUKA,
       width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
@@ -187,7 +187,12 @@ class FarmersTableState extends State<FarmersTable> {
     return _filterFor(key)?.labelForValue(value) ?? value;
   }
 
-  String _filterLabel(String key) => _filterFor(key)?.displayLabel ?? key;
+  /// The backend's own label for the farmer's city filter is "City"; this
+  /// app shows it as "Taluka" while the query param (`city_id`) stays what
+  /// the backend expects.
+  String _filterLabel(String key) => key == 'city_id'
+      ? AppStrings.COLUMN_FARMER_TALUKA
+      : (_filterFor(key)?.displayLabel ?? key);
 
   String _sortLabel(String key) {
     for (final sort in widget.availableSorts) {
