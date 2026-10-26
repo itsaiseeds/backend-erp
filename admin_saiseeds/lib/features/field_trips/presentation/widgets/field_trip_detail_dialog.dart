@@ -62,6 +62,7 @@ class _FieldTripDetailDialogState extends State<FieldTripDetailDialog> {
   static const String _COLUMN_FARMER = 'farmer_name';
   static const String _COLUMN_CONTACT = 'contact_number';
   static const String _COLUMN_VILLAGE = 'village';
+  static const String _COLUMN_DISTRICT = 'district';
   static const String _COLUMN_LAND = 'land_area_bigha';
   static const String _COLUMN_CROPS = 'crops';
   static const String _COLUMN_USES_PRODUCTS = 'uses_our_products';
@@ -81,6 +82,11 @@ class _FieldTripDetailDialogState extends State<FieldTripDetailDialog> {
     AppDataColumn(
       id: _COLUMN_VILLAGE,
       label: AppStrings.COLUMN_VILLAGE,
+      width: AppSizes.tableColumnWidthCompact,
+    ),
+    AppDataColumn(
+      id: _COLUMN_DISTRICT,
+      label: AppStrings.COLUMN_DISTRICT,
       width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
@@ -362,6 +368,8 @@ class _FieldTripDetailDialogState extends State<FieldTripDetailDialog> {
         return _textCell(visit.contactNumber);
       case _COLUMN_VILLAGE:
         return _textCell(visit.village);
+      case _COLUMN_DISTRICT:
+        return _textCell(visit.district);
       case _COLUMN_LAND:
         return _textCell(visit.landAreaBigha);
       case _COLUMN_CROPS:

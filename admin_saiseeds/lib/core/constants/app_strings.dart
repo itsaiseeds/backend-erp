@@ -272,6 +272,10 @@ class AppStrings {
   static const String CLIENT_GST_FIELD_LABEL = 'GST Number (optional)';
   static const String VALIDATION_GST_INVALID =
       'Enter a valid 15-character GST number.';
+  static const String COLUMN_DISTRICT = 'District';
+  static const String FIELD_DISTRICT = 'District';
+  static const String FIELD_DISTRICT_HINT = 'District (optional)';
+  static const String CLIENT_DISTRICT_FIELD_LABEL = 'District (optional)';
   static const String TABLE_SELECT_ALL_ON_PAGE = 'Select all on this page';
   static const String TABLE_SELECT_ROW = 'Select row';
   static const String TABLE_CLEAR_SELECTION = 'Clear selection';

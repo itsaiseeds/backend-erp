@@ -19,6 +19,7 @@ class FarmerVisitModel {
   final String farmerName;
   final String contactNumber;
   final String village;
+  final String district;
   final String landAreaBigha;
   final List<CropModel> crops;
   final bool usesOurProducts;
@@ -30,6 +31,7 @@ class FarmerVisitModel {
     this.farmerName = '',
     this.contactNumber = '',
     this.village = '',
+    this.district = '',
     this.landAreaBigha = '',
     this.crops = const [],
     this.usesOurProducts = false,
@@ -43,6 +45,7 @@ class FarmerVisitModel {
       farmerName: '${json['farmer_name'] ?? ''}',
       contactNumber: '${json['contact_number'] ?? ''}',
       village: '${json['village'] ?? ''}',
+      district: '${json['district'] ?? ''}',
       landAreaBigha: _decimalOf(json['land_area_bigha']),
       crops: _listOf(json['crops'], CropModel.fromJson),
       usesOurProducts: json['uses_our_products'] == true,

@@ -18,6 +18,7 @@ class FarmersTable extends StatefulWidget {
   static const String COLUMN_FARMER = 'farmer_name';
   static const String COLUMN_CONTACT = 'contact_number';
   static const String COLUMN_VILLAGE = 'village';
+  static const String COLUMN_DISTRICT = 'district';
   static const String COLUMN_CITY = 'city';
   static const String COLUMN_LAND = 'land_area_bigha';
   static const String COLUMN_CROPS = 'crops';
@@ -85,6 +86,11 @@ class FarmersTableState extends State<FarmersTable> {
     AppDataColumn(
       id: FarmersTable.COLUMN_VILLAGE,
       label: AppStrings.COLUMN_VILLAGE,
+      width: AppSizes.tableColumnWidthCompact,
+    ),
+    AppDataColumn(
+      id: FarmersTable.COLUMN_DISTRICT,
+      label: AppStrings.COLUMN_DISTRICT,
       width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
@@ -244,6 +250,8 @@ class FarmersTableState extends State<FarmersTable> {
         return _textCell(farmer.contactNumber);
       case FarmersTable.COLUMN_VILLAGE:
         return _textCell(farmer.village);
+      case FarmersTable.COLUMN_DISTRICT:
+        return _textCell(farmer.district);
       case FarmersTable.COLUMN_CITY:
         return _textCell(farmer.cityName);
       case FarmersTable.COLUMN_LAND:

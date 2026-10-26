@@ -7,6 +7,7 @@ class FarmerVisitSummary {
   final String publicId;
   final String fieldTripPublicId;
   final String village;
+  final String district;
   final String landAreaBigha;
   final List<CropModel> crops;
   final List<FarmerVisitProductRef> products;
@@ -17,6 +18,7 @@ class FarmerVisitSummary {
     this.publicId = '',
     this.fieldTripPublicId = '',
     this.village = '',
+    this.district = '',
     this.landAreaBigha = '',
     this.crops = const [],
     this.products = const [],
@@ -36,6 +38,7 @@ class FarmerVisitSummary {
           ? FarmerModel.stringOf(Map<String, dynamic>.from(trip)['public_id'])
           : FarmerModel.stringOf(json['field_trip_public_id'] ?? trip),
       village: FarmerModel.stringOf(json['village']),
+      district: FarmerModel.stringOf(json['district']),
       landAreaBigha: FarmerModel.decimalOf(json['land_area_bigha']),
       crops: FarmerModel.listOf(json['crops'], CropModel.fromJson),
       products: FarmerModel.listOf(
@@ -62,6 +65,7 @@ class FarmerModel {
   final String contactNumber;
   final String farmerName;
   final String village;
+  final String district;
   final FieldTripCityRef? city;
   final String landAreaBigha;
   final bool isLead;
@@ -77,6 +81,7 @@ class FarmerModel {
     required this.contactNumber,
     this.farmerName = '',
     this.village = '',
+    this.district = '',
     this.city,
     this.landAreaBigha = '',
     this.isLead = false,
@@ -96,6 +101,7 @@ class FarmerModel {
       contactNumber: stringOf(json['contact_number']),
       farmerName: stringOf(json['farmer_name']),
       village: stringOf(json['village']),
+      district: stringOf(json['district']),
       city: city is Map
           ? FieldTripCityRef.fromJson(Map<String, dynamic>.from(city))
           : null,
