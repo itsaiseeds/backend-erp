@@ -3,8 +3,9 @@
 
 The farmers recorded on one trip, latest first: name, contact, village, land
 held, the crops they grow and the products of ours they use. Paginated
-(``?all=true`` for the whole trip in one page), filterable by ``?crop=`` /
-``?product=`` / ``?uses_our_products=`` and sortable by ``created_at`` /
+(``?all=true`` for the whole trip in one page), filterable by ``?district=`` /
+``?city_id=`` / ``?crop=`` / ``?product=`` / ``?uses_our_products=`` and
+sortable by ``created_at`` /
 ``land_area`` / ``farmer_name`` -- see ``api.field_trip_lists``.
 
 An unknown trip is a 404, not an empty page.

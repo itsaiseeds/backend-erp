@@ -122,6 +122,7 @@ def _create_child(
             {
                 "line_1": str(address_data["line_1"]).strip(),
                 "line_2": str(address_data.get("line_2", "")).strip(),
+                "district": str(address_data.get("district", "")).strip(),
                 "pincode": resolve_pincode(
                     str(address_data["pincode"]).strip(), address_data["city"], actor
                 ),

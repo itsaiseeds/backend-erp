@@ -654,12 +654,12 @@ INSERT INTO public.aggregator_fieldtrip (id, created_at, updated_at, is_deleted,
 (4, now(), now(), false, 3, 'FT-DUMMY0000004', 4, 'Chomu', 15, (pg_temp.today_ist() - 5) + time '09:00', (pg_temp.today_ist() - 5) + time '17:00', (pg_temp.today_ist() - 5) + time '09:15', (pg_temp.today_ist() - 5) + time '16:40', 4, now()),
 (5, now(), now(), false, 3, 'FT-DUMMY0000005', 5, 'Pokaran', 15, (pg_temp.today_ist() - 9) + time '09:00', (pg_temp.today_ist() - 9) + time '17:00', (pg_temp.today_ist() - 9) + time '09:20', (pg_temp.today_ist() - 9) + time '17:05', NULL, NULL);
 
-INSERT INTO public.aggregator_farmervisit (id, created_at, updated_at, is_deleted, created_by_id, public_id, field_trip_id, farmer_name, contact_number, village, land_area_bigha) VALUES
-(1, now(), now(), false, 3, 'FV-DUMMY0000001', 3, 'Bhikhabhai Chaudhary', '9099000001', 'Bardoli', 12.5000),
-(2, now(), now(), false, 3, 'FV-DUMMY0000002', 3, 'Ramanbhai Patel', '9099000002', 'Bardoli', 8.0000),
-(3, now(), now(), false, 3, 'FV-DUMMY0000003', 4, 'Gopal Meena', '9099000003', 'Chomu', 20.0000),
-(4, now(), now(), false, 3, 'FV-DUMMY0000004', 4, 'Hanuman Jat', '9099000004', 'Chomu', 15.2500),
-(5, now(), now(), false, 3, 'FV-DUMMY0000005', 5, 'Mohan Singh', '9099000005', 'Pokaran', 30.0000);
+INSERT INTO public.aggregator_farmervisit (id, created_at, updated_at, is_deleted, created_by_id, public_id, field_trip_id, farmer_name, contact_number, village, city_id, land_area_bigha) VALUES
+(1, now(), now(), false, 3, 'FV-DUMMY0000001', 3, 'Bhikhabhai Chaudhary', '9099000001', 'Bardoli', 1, 12.5000),
+(2, now(), now(), false, 3, 'FV-DUMMY0000002', 3, 'Ramanbhai Patel', '9099000002', 'Bardoli', 1, 8.0000),
+(3, now(), now(), false, 3, 'FV-DUMMY0000003', 4, 'Gopal Meena', '9099000003', 'Chomu', 4, 20.0000),
+(4, now(), now(), false, 3, 'FV-DUMMY0000004', 4, 'Hanuman Jat', '9099000004', 'Chomu', 4, 15.2500),
+(5, now(), now(), false, 3, 'FV-DUMMY0000005', 5, 'Mohan Singh', '9099000005', 'Pokaran', 5, 30.0000);
 
 INSERT INTO public.aggregator_farmervisitcrop (id, created_at, updated_at, is_deleted, created_by_id, farmer_visit_id, crop_id) VALUES
 (1, now(), now(), false, 3, 1, 1),

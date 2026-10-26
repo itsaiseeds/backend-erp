@@ -54,6 +54,8 @@ UNAPPROVABLE_STATUS_CODES = frozenset({StatusIds.APPROVED.name})
 STARTABLE_STATUS_CODES = frozenset({StatusIds.APPROVED.name})
 ENDABLE_STATUS_CODES = frozenset({StatusIds.IN_PROGRESS.name})
 FARMER_VISIT_STATUS_CODES = frozenset({StatusIds.IN_PROGRESS.name})
+# ``update_farmer_visit``'s default for ``city``: None clears it, so "not sent" needs a marker.
+_KEEP = object()
 
 # The fields an edit may change. Status, approval and the actual start/end
 # times belong to their own verbs.
@@ -83,7 +85,7 @@ def field_trip_queryset() -> QuerySet[FieldTrip]:
 
 def farmer_visit_queryset() -> QuerySet[FarmerVisit]:
     """Every visit with the crops and products a visit payload reads."""
-    return FarmerVisit.objects.select_related("field_trip").prefetch_related(
+    return FarmerVisit.objects.select_related("field_trip", "city").prefetch_related(
         "visit_crops__crop", "visit_products__product"
     )
 
@@ -115,7 +117,7 @@ def farmer_queryset() -> QuerySet[FarmerVisit]:
             visit_count=visits_per_farmer,
         )
         .filter(visit_rank=1)
-        .select_related("field_trip__city", "created_by")
+        .select_related("field_trip__city", "city", "created_by")
     )
 
 
@@ -265,12 +267,13 @@ def create_farmer_visit(
     products: Iterable[Product] = (),
     village: str = "",
     district: str = "",
+    city: City | None = None,
     is_lead: bool = False,
 ) -> FarmerVisit:
     """Record a farmer met on ``trip``, with the crops they grow and our products they use.
 
-    Only while the trip is in progress. ``village`` defaults to the trip's
-    village. No ``products`` means the farmer does not use our products.
+    Only while the trip is in progress. ``village`` and ``city`` default to the
+    trip's. No ``products`` means the farmer does not use our products.
     """
     assert_field_trip_status(trip, FARMER_VISIT_STATUS_CODES, "record a farmer on")
     if FarmerVisit.all_objects.filter(field_trip=trip, contact_number=contact_number).exists():
@@ -284,6 +287,7 @@ def create_farmer_visit(
         contact_number=contact_number,
         village=village.strip() or trip.village,
         district=district.strip(),
+        city=city or trip.city,
         land_area_bigha=land_area_bigha,
         crops=crops,
         products=products,
@@ -302,6 +306,7 @@ def create_independent_farmer(
     crops: Iterable[Crop],
     products: Iterable[Product] = (),
     district: str = "",
+    city: City | None = None,
     is_lead: bool = False,
 ) -> FarmerVisit:
     """Record a farmer the sales person entered on their own, outside any field trip.
@@ -322,6 +327,7 @@ def create_independent_farmer(
         contact_number=contact_number,
         village=village.strip(),
         district=district.strip(),
+        city=city,
         land_area_bigha=land_area_bigha,
         crops=crops,
         products=products,
@@ -344,6 +350,7 @@ def _create_visit(
     contact_number: str,
     village: str,
     district: str,
+    city: City | None,
     land_area_bigha: Decimal,
     crops: Iterable[Crop],
     products: Iterable[Product],
@@ -361,6 +368,7 @@ def _create_visit(
         contact_number=contact_number,
         village=village,
         district=district,
+        city=city,
         land_area_bigha=land_area_bigha,
         is_lead=is_lead,
         created_by=actor,
@@ -411,6 +419,7 @@ def update_farmer_visit(
     contact_number: str | None = None,
     village: str | None = None,
     district: str | None = None,
+    city: City | None | object = _KEEP,
     land_area_bigha: Decimal | None = None,
     crops: Iterable[Crop] | None = None,
     products: Iterable[Product] | None = None,
@@ -421,20 +430,27 @@ def update_farmer_visit(
     Only while the trip is in progress (an independent farmer has no trip, so
     it is always editable). The name, contact number, village and
     crop list are required on a farmer, so none may be made blank or empty;
-    ``district=""`` clears the optional district, and ``products=[]`` is fine
-    and records that the farmer does not use our products.
+    ``district=""`` and ``city=None`` clear the optional district and city
+    (leave ``city`` out to keep it), and ``products=[]`` is fine and records
+    that the farmer does not use our products.
     """
     if not visit.is_independent:
         assert_field_trip_status(visit.field_trip, FARMER_VISIT_STATUS_CODES, "edit a farmer on")
-    fields = {
-        "farmer_name": farmer_name,
-        "contact_number": contact_number,
-        "village": village,
-        "district": district,
-        "land_area_bigha": land_area_bigha,
-        "is_lead": is_lead,
+    fields: dict[str, object] = {
+        name: value
+        for name, value in {
+            "farmer_name": farmer_name,
+            "contact_number": contact_number,
+            "village": village,
+            "district": district,
+            "land_area_bigha": land_area_bigha,
+            "is_lead": is_lead,
+        }.items()
+        if value is not None
     }
-    changed = [name for name, value in fields.items() if value is not None]
+    if city is not _KEEP:
+        fields["city"] = city
+    changed = list(fields)
     if changed:
         if contact_number is not None:
             if visit.is_independent:
@@ -512,6 +528,10 @@ def field_trip_payload(trip: FieldTrip) -> dict:
     }
 
 
+def _city_ref(visit: FarmerVisit) -> dict | None:
+    return {"id": visit.city_id, "name": visit.city.name} if visit.city_id else None
+
+
 def farmer_visit_payload(visit: FarmerVisit) -> dict:
     """Frontend-facing dict for one farmer visit, keyed by its public id."""
     products = [link.product for link in visit.visit_products.all()]
@@ -521,6 +541,7 @@ def farmer_visit_payload(visit: FarmerVisit) -> dict:
         "contact_number": visit.contact_number,
         "village": visit.village,
         "district": visit.district,
+        "city": _city_ref(visit),
         "land_area_bigha": str(visit.land_area_bigha),
         "is_lead": visit.is_lead,
         "field_trip_public_id": visit.field_trip.public_id if visit.field_trip_id else None,
@@ -595,11 +616,7 @@ def farmer_payload(latest: FarmerVisit, visits: Sequence[FarmerVisit]) -> dict:
         "farmer_name": latest.farmer_name,
         "village": latest.village,
         "district": latest.district,
-        "city": (
-            {"id": latest.field_trip.city_id, "name": latest.field_trip.city.name}
-            if latest.field_trip_id
-            else None
-        ),
+        "city": _city_ref(latest),
         "land_area_bigha": str(latest.land_area_bigha),
         "is_lead": latest.is_lead,
         "crops": _by_name(crops),

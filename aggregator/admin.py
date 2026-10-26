@@ -267,6 +267,7 @@ class AddressAdmin(SoftDeleteModelAdmin):
     list_display = (
         "address_line_1",
         "address_line_2",
+        "district",
         "pincode",
         "city",
         "state",
@@ -277,6 +278,7 @@ class AddressAdmin(SoftDeleteModelAdmin):
     search_fields = (
         "address_line_1",
         "address_line_2",
+        "district",
         "pincode__code",
         "city__name",
         "state__name",
@@ -348,7 +350,6 @@ class ClientAdmin(SoftDeleteParentAdmin):
         "company_name",
         "gst_number",
         "company_phone",
-        "district",
         "status",
         "verified_by",
         "created_by",
@@ -1342,14 +1343,15 @@ class FarmerVisitAdmin(SoftDeleteParentAdmin):
         "contact_number",
         "village",
         "district",
+        "city",
         "land_area_bigha",
         "is_lead",
         "created_at",
     )
-    search_fields = ("public_id", "farmer_name", "contact_number", "village")
+    search_fields = ("public_id", "farmer_name", "contact_number", "village", "district")
     list_filter = ("is_lead",)
-    autocomplete_fields = ("field_trip",)
-    list_select_related = ("field_trip",)
+    autocomplete_fields = ("field_trip", "city")
+    list_select_related = ("field_trip", "city")
     ordering = ("-created_at",)
     inlines = (FarmerVisitCropInline, FarmerVisitProductInline)
 

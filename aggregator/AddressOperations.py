@@ -50,6 +50,7 @@ def create_address(address_data: dict | None, actor: User) -> Address | None:
     address = Address(
         address_line_1=address_data["line_1"],
         address_line_2=address_data.get("line_2", ""),
+        district=address_data.get("district", ""),
         pincode=address_data["pincode"],
         city=address_data["city"],
         state=address_data["state"],
@@ -70,6 +71,7 @@ def address_payload(address: Address) -> dict:
     return {
         "line_1": address.address_line_1,
         "line_2": address.address_line_2,
+        "district": address.district,
         "pincode": address.pincode.code,
         "city": address.city.name,
         "state": address.state.name,

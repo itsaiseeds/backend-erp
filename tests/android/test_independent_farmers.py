@@ -180,6 +180,56 @@ class IndependentFarmerApiTest(FieldTripFixtures, AndroidApiTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
         self.assertEqual(FarmerVisit.objects.get(public_id=farmer["public_id"]).district, "")
 
+    def test_city_is_optional_and_can_be_changed_or_cleared(self):
+        """tests/android/test_independent_farmers.py::IndependentFarmerApiTest::test_city_is_optional_and_can_be_changed_or_cleared"""
+        self.assertIsNone(self._create()["city"])
+        self.assertIsNone(self._create(contact_number="9876500108", city_id=None)["city"])
+        farmer = self._create(contact_number="9876500107", city_id=self.city.id)
+        self.assertEqual(farmer["city"], {"id": self.city.id, "name": self.city.name})
+        url = FARMER_URL.format(public_id=farmer["public_id"])
+
+        response = self.client.patch(url, {"city_id": self.other_city.id}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual(response.json()["city"]["id"], self.other_city.id)
+        # Not sent: kept.
+        response = self.client.patch(url, {"district": "Surat"}, format="json")
+        self.assertEqual(response.json()["city"]["id"], self.other_city.id)
+        # Sent as null: cleared.
+        response = self.client.patch(url, {"city_id": None}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertIsNone(response.json()["city"])
+        self.assertIsNone(FarmerVisit.objects.get(public_id=farmer["public_id"]).city_id)
+
+        unknown = self.client.patch(url, {"city_id": 999999}, format="json")
+        self.assertEqual(unknown.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_filters_by_district_and_city(self):
+        """tests/android/test_independent_farmers.py::IndependentFarmerApiTest::test_list_filters_by_district_and_city"""
+        surat = self._create(district="Surat", city_id=self.city.id)
+        navsari = self._create(contact_number="9876500107", district="Navsari")
+
+        cases = {
+            "district=SUR": [surat["public_id"]],
+            "district=sari": [navsari["public_id"]],
+            f"city_id={self.city.id}": [surat["public_id"]],
+            f"city_id={self.other_city.id}": [],
+        }
+        for query, expected in cases.items():
+            with self.subTest(query=query):
+                response = self.client.get(f"{FARMERS_URL}?{query}")
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+                self.assertEqual([row["public_id"] for row in response.json()["results"]], expected)
+
+        filters = {
+            entry["filter"]: entry
+            for entry in self.client.get(FARMERS_URL).json()["available_filters"]
+        }
+        self.assertEqual(filters["district"]["kind"], "text")
+        # Only cities the caller's own farmers are in; a farmer with none adds no option.
+        self.assertEqual(
+            filters["city_id"]["options"], [{"value": self.city.id, "label": self.city.name}]
+        )
+
     def test_patch_refuses_a_contact_number_already_recorded(self):
         """tests/android/test_independent_farmers.py::IndependentFarmerApiTest::test_patch_refuses_a_contact_number_already_recorded"""
         self._create()
@@ -227,8 +277,8 @@ class IndependentFarmerApiTest(FieldTripFixtures, AndroidApiTestCase):
         self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.content)
         self.assertFalse(edited.json()["is_lead"])
 
-    def test_district_is_accepted_on_trip_visits_too(self):
-        """tests/android/test_independent_farmers.py::IndependentFarmerApiTest::test_district_is_accepted_on_trip_visits_too"""
+    def test_district_and_city_are_accepted_on_trip_visits_too(self):
+        """tests/android/test_independent_farmers.py::IndependentFarmerApiTest::test_district_and_city_are_accepted_on_trip_visits_too"""
         trip = self.make_trip(status=StatusIds.IN_PROGRESS)
         created = self.client.post(
             CREATE_VISIT_URL,
@@ -244,22 +294,66 @@ class IndependentFarmerApiTest(FieldTripFixtures, AndroidApiTestCase):
         )
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.content)
         self.assertEqual(created.json()["district"], "Navsari")
+        # No city sent: the visit takes the trip's.
+        self.assertEqual(created.json()["city"], {"id": trip.city_id, "name": trip.city.name})
         edited = self.client.patch(
             EDIT_VISIT_URL.format(public_id=created.json()["public_id"]),
-            {"district": "Valsad"},
+            {"district": "Valsad", "city_id": self.other_city.id},
             format="json",
         )
         self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.content)
         self.assertEqual(edited.json()["district"], "Valsad")
+        self.assertEqual(edited.json()["city"]["id"], self.other_city.id)
+
+        explicit = self.client.post(
+            CREATE_VISIT_URL,
+            {
+                "field_trip_public_id": trip.public_id,
+                "farmer_name": "Elsewhere",
+                "contact_number": "9876500109",
+                "city_id": self.other_city.id,
+                "land_area_bigha": "1",
+                "crop_ids": [self.castor.id],
+            },
+            format="json",
+        )
+        self.assertEqual(explicit.status_code, status.HTTP_201_CREATED, explicit.content)
+        self.assertEqual(explicit.json()["city"]["id"], self.other_city.id)
+
+        # A null city on create still falls back to the trip's; on edit it clears.
+        defaulted = self.client.post(
+            CREATE_VISIT_URL,
+            {
+                "field_trip_public_id": trip.public_id,
+                "farmer_name": "No City Sent",
+                "contact_number": "9876500110",
+                "city_id": None,
+                "land_area_bigha": "1",
+                "crop_ids": [self.castor.id],
+            },
+            format="json",
+        )
+        self.assertEqual(defaulted.status_code, status.HTTP_201_CREATED, defaulted.content)
+        self.assertEqual(defaulted.json()["city"]["id"], trip.city_id)
+        cleared = self.client.patch(
+            EDIT_VISIT_URL.format(public_id=defaulted.json()["public_id"]),
+            {"city_id": None},
+            format="json",
+        )
+        self.assertEqual(cleared.status_code, status.HTTP_200_OK, cleared.content)
+        self.assertIsNone(cleared.json()["city"])
 
     def test_the_admin_farmer_list_includes_a_farmer_without_a_trip(self):
         """tests/android/test_independent_farmers.py::IndependentFarmerApiTest::test_the_admin_farmer_list_includes_a_farmer_without_a_trip"""
         self._create(is_lead=True, district="Surat")
+        self._create(contact_number="9876500107", city_id=self.city.id)
         admin_client = APIClient()
         admin_client.force_login(self.admin_user)
         response = admin_client.get(ADMIN_FARMERS_URL)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
-        row = response.json()["results"][0]
+        rows = {row["contact_number"]: row for row in response.json()["results"]}
+        self.assertEqual(rows["9876500107"]["city"], {"id": self.city.id, "name": self.city.name})
+        row = rows["9876500101"]
         self.assertIsNone(row["city"])
         self.assertEqual(row["district"], "Surat")
         self.assertTrue(row["is_lead"])

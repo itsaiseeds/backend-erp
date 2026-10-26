@@ -164,6 +164,7 @@ class ChallanAddressSerializer(serializers.Serializer):
 
     line_1 = serializers.CharField()
     line_2 = serializers.CharField()
+    district = serializers.CharField(allow_blank=True)
     pincode = serializers.CharField()
     city = serializers.CharField()
     state = serializers.CharField()

@@ -54,6 +54,7 @@ class ClientAddressLinkSerializer(serializers.Serializer):
     is_primary = serializers.BooleanField()
     line_1 = serializers.CharField()
     line_2 = serializers.CharField(allow_blank=True)
+    district = serializers.CharField(allow_blank=True)
     pincode = serializers.CharField()
     city = serializers.CharField()
     state = serializers.CharField()

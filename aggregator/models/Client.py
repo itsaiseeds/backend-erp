@@ -45,13 +45,6 @@ class Client(
         validators=[validate_gst_number],
         help_text="Optional. A missing GST is stored as an empty string.",
     )
-    district = models.CharField(
-        "district",
-        max_length=255,
-        blank=True,
-        default="",
-        help_text="Optional free text. A missing district is stored as an empty string.",
-    )
     status = models.ForeignKey(
         "aggregator.Status",
         verbose_name="status",

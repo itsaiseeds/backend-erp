@@ -3,11 +3,13 @@
 A farmer the sales person records on their own, outside any field trip (a
 ``FarmerVisit`` with no trip, owned by the caller). ``GET`` lists the caller's
 own, latest first, filterable by ``contact_number`` / ``farmer_name`` /
-``village`` / ``is_lead`` / ``uses_our_products``; ``?all=true`` returns every
-one in a single page. Farmers met on a trip stay on the field-trip endpoints.
+``village`` / ``district`` / ``city_id`` / ``is_lead`` / ``uses_our_products``;
+``?all=true`` returns every one in a single page. Farmers met on a trip stay on
+the field-trip endpoints.
 
 ``POST`` records one: name, 10-digit contact number, village, an optional
-free-text district, land held in bigha, the crops they grow (at least one, ids
+free-text district, an optional city / taluka (an id from ``utilities/cities``),
+land held in bigha, the crops they grow (at least one, ids
 from ``utilities/crops``), our products they use (public ids from
 ``utilities/products``; none means they use none) and ``is_lead`` (default
 false). A contact number the caller already recorded is refused (400). 201 with
@@ -83,6 +85,7 @@ class FarmersView(AndroidPaginatedDateRangeListView):
             contact_number=data["contact_number"],
             village=data["village"],
             district=data["district"],
+            city=data.get("city"),
             land_area_bigha=data["land_area_bigha"],
             crops=data["crops"],
             products=data.get("products", []),
