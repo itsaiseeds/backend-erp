@@ -340,6 +340,7 @@ def dispatch_custom_order(
     driver_number: str,
     vehicle_number: str,
     lot_numbers: dict[tuple[str, Decimal], str],
+    to_city: City | None = None,
 ) -> CustomOrder:
     """Record a dispatch against a CONFIRMED custom order and move it to DISPATCHED.
 
@@ -348,9 +349,10 @@ def dispatch_custom_order(
     on our own vehicle and lands on ``PrivateDispatchDetails``. That is also
     why there is no LR number to record for one afterwards.
 
-    The dispatch date is today and the destination the city of the order's own
-    delivery address, as for an order. ``lot_numbers`` maps each line's
-    ``(product public id, packet_weight)`` to the batch those packets came from
+    The dispatch date is today and the destination defaults to the city of the
+    order's own delivery address, as for an order; ``to_city`` overrides it.
+    ``lot_numbers`` maps each line's ``(product public id, packet_weight)`` to
+    the batch those packets came from
     and must name every line exactly once -- the dispatch writes the custom
     order's challan (``DispatchOperations.sync_custom_dispatch_entry``).
 
@@ -374,7 +376,8 @@ def dispatch_custom_order(
     assert_driver_details(driver_name, driver_number, vehicle_number)
 
     dispatched_at = indian_now()
-    to_city = order.delivery_address.city
+    if to_city is None:
+        to_city = order.delivery_address.city
     with recording(
         StockEventType.ORDER_DISPATCHED,
         StockEventDetail.FULL,
@@ -712,11 +715,13 @@ def dispatch_waste_order(
     driver_number: str,
     vehicle_number: str,
     lot_numbers: dict[str, str] | None = None,
+    to_city: City | None = None,
 ) -> CustomOrder:
     """Record a dispatch against a CONFIRMED waste order and move it to DISPATCHED.
 
     The counterpart of :func:`dispatch_custom_order`: own vehicle only, today's
-    date, the delivery address's city as the destination, and a challan
+    date, the delivery address's city as the destination unless ``to_city``
+    overrides it, and a challan
     (``DispatchOperations.sync_waste_dispatch_entry``). ``lot_numbers`` (keyed
     by product public id) is optional. No waste is written: CONFIRMED to
     DISPATCHED moves the kg from reserved to consumed on its own.
@@ -741,7 +746,8 @@ def dispatch_waste_order(
     )
 
     dispatched_at = indian_now()
-    to_city = order.delivery_address.city
+    if to_city is None:
+        to_city = order.delivery_address.city
     attach_private_dispatch_details(
         order,
         dispatched_by=actor,
@@ -803,6 +809,7 @@ def create_rejected_order(
     expected_delivery_date=None,
     booked_for: ClientChildOrg | None = None,
     hsn_code: str = "",
+    to_city: City | None = None,
 ) -> CustomOrder:
     """Book a rejected order and dispatch it on our own vehicle, atomically.
 
@@ -887,7 +894,8 @@ def create_rejected_order(
         line.save()
 
     dispatched_at = indian_now()
-    to_city = delivery_address.city
+    if to_city is None:
+        to_city = delivery_address.city
     attach_private_dispatch_details(
         order,
         dispatched_by=actor,

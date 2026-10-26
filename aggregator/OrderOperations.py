@@ -468,6 +468,7 @@ def dispatch_order(
     vehicle_number: str,
     lot_numbers: dict[str, str],
     quantities: dict[str, int] | None = None,
+    to_city: City | None = None,
 ) -> Order:
     """Record a dispatch against a verified order and move it to DISPATCHED.
 
@@ -490,11 +491,12 @@ def dispatch_order(
     required (``assert_driver_details``), because our own vehicle always has a
     known driver.
 
-    Two things are **derived, not passed**: the dispatch date is today (the
-    dispatch is being recorded as it happens), and the destination is the city
-    of the order's own delivery address, which is where the goods are going by
-    definition. ``from_city`` stays an argument until there is a warehouse to
-    default it from.
+    The dispatch date is **derived, not passed**: it is today (the dispatch is
+    being recorded as it happens). The destination defaults to the city of the
+    order's own delivery address, which is where the goods are going by
+    definition; ``to_city`` overrides it when the goods are actually dropped
+    elsewhere (e.g. an agency's depot). ``from_city`` stays an argument until
+    there is a warehouse to default it from.
 
     The ``lr_number`` is not set here. It is the one field a transporter issues
     after collection, so a dispatch is always recorded without it -- it is
@@ -537,7 +539,8 @@ def dispatch_order(
         assert_driver_details(driver_name, driver_number, vehicle_number)
 
     dispatched_at = indian_now()
-    to_city = order.delivery_address.city
+    if to_city is None:
+        to_city = order.delivery_address.city
 
     attach = (
         attach_dispatch_details

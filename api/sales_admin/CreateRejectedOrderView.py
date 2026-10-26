@@ -94,6 +94,16 @@ class CreateRejectedOrderSerializer(CreateCustomOrderSerializer):
         error_messages={"required": "from_city_id is required."},
         help_text="Where the goods left from.",
     )
+    to_city_id = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text=(
+            "Where the goods are dropped, if not the delivery address's city. "
+            "Omit to use the delivery address's city."
+        ),
+    )
     driver_name = _own_vehicle_field("driver_name", max_length=255)
     driver_number = _own_vehicle_field("driver_number", max_length=10)
     vehicle_number = _own_vehicle_field("vehicle_number", max_length=32)
@@ -170,6 +180,7 @@ class CreateRejectedOrderView(AdminApiView):
                 actor=request.user,
                 items=data["resolved_items"],
                 from_city=data["from_city_id"],
+                to_city=data["to_city_id"],
                 driver_name=data["driver_name"],
                 driver_number=data["driver_number"],
                 vehicle_number=data["vehicle_number"],
