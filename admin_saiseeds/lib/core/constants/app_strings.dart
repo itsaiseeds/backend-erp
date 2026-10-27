@@ -269,6 +269,9 @@ class AppStrings {
   static const String VALIDATION_TALUKA_REQUIRED = 'Taluka is required.';
   static const String CLIENT_ADDRESS_DISTRICT = 'District';
   static const String CLIENT_ADDRESS_DISTRICT_HINT = 'District (optional)';
+  static const String FIELD_DELIVERY_TO = 'Delivery To';
+  static const String FIELD_DELIVERY_TO_HINT =
+      'Optional - defaults to the taluka name';
   static const String CLIENT_CREATED_BY_LABEL = 'Added by';
   static const String CLIENT_COMPANY_NAME_HINT = 'Registered business name';
   static const String CLIENT_GST_HINT = '15-character GSTIN';
@@ -1352,7 +1355,6 @@ class AppStrings {
   static const String DISPATCH_STEP_SUMMARY_CAPTION =
       'Check the details, then dispatch.';
   static const String FIELD_FROM_CITY = 'From City';
-  static const String FIELD_TO_CITY = 'To City';
   static const String FIELD_DRIVER_NAME = 'Driver name';
   static const String FIELD_DRIVER_NAME_HINT = 'Name of the driver';
   static const String FIELD_DRIVER_NUMBER = 'Driver number';

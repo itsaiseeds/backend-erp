@@ -14,6 +14,7 @@ class ClientAddressModel {
   final int stateId;
   final int countryId;
   final bool isPrimary;
+  final String deliveryTo;
 
   ClientAddressModel copyWith({
     int? id,
@@ -29,6 +30,7 @@ class ClientAddressModel {
     int? stateId,
     int? countryId,
     bool? isPrimary,
+    String? deliveryTo,
   }) {
     return ClientAddressModel(
       id: id ?? this.id,
@@ -44,6 +46,7 @@ class ClientAddressModel {
       stateId: stateId ?? this.stateId,
       countryId: countryId ?? this.countryId,
       isPrimary: isPrimary ?? this.isPrimary,
+      deliveryTo: deliveryTo ?? this.deliveryTo,
     );
   }
 
@@ -61,6 +64,7 @@ class ClientAddressModel {
     this.stateId = 0,
     this.countryId = 0,
     this.isPrimary = false,
+    this.deliveryTo = '',
   });
 
   factory ClientAddressModel.fromJson(Map<String, dynamic> json) {
@@ -78,6 +82,7 @@ class ClientAddressModel {
       stateId: _idOf(json['state_id'] ?? json['state']),
       countryId: _idOf(json['country_id'] ?? json['country']),
       isPrimary: json['is_primary'] == true,
+      deliveryTo: json['delivery_to'] as String? ?? '',
     );
   }
 
@@ -91,6 +96,7 @@ class ClientAddressModel {
     'country': countryId,
     'label': label,
     'is_primary': isPrimary,
+    'delivery_to': deliveryTo,
   };
 
   static String _nameOf(dynamic value) {

@@ -207,6 +207,7 @@ class _AddressStepCardState extends State<AddressStepCard> {
   late final TextEditingController _line2;
   late final TextEditingController _district;
   late final TextEditingController _pincode;
+  late final TextEditingController _deliveryTo;
 
   @override
   void initState() {
@@ -216,6 +217,7 @@ class _AddressStepCardState extends State<AddressStepCard> {
     _line2 = TextEditingController(text: widget.address.line2);
     _district = TextEditingController(text: widget.address.district);
     _pincode = TextEditingController(text: widget.address.pincode);
+    _deliveryTo = TextEditingController(text: widget.address.deliveryTo);
   }
 
   @override
@@ -225,6 +227,7 @@ class _AddressStepCardState extends State<AddressStepCard> {
     _line2.dispose();
     _district.dispose();
     _pincode.dispose();
+    _deliveryTo.dispose();
     super.dispose();
   }
 
@@ -319,6 +322,16 @@ class _AddressStepCardState extends State<AddressStepCard> {
                 ),
               );
             },
+          ),
+          const SizedBox(height: AppSpacing.smd),
+          AppTextField(
+            controller: _deliveryTo,
+            label: AppStrings.FIELD_DELIVERY_TO,
+            hint: AppStrings.FIELD_DELIVERY_TO_HINT,
+            enabled: widget.enabled,
+            inputFormatters: [LengthLimitingTextInputFormatter(255)],
+            onChanged: (value) =>
+                widget.onChanged(address.copyWith(deliveryTo: value)),
           ),
           const SizedBox(height: AppSpacing.smd),
           _PrimaryToggle(

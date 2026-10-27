@@ -317,8 +317,7 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
       case DispatchChallansTable.COLUMN_DATE:
         return _textCell(DateFormatter.dayLabel(dispatch?.dispatchDateTime));
       case DispatchChallansTable.COLUMN_TRANSPORT:
-        if (dispatch == null) return _textCell('');
-        return _textCell(dispatch.transportLabel);
+        return _textCell(challan.transportLabel);
       case DispatchChallansTable.COLUMN_VEHICLE:
         return _textCell(dispatch?.vehicleNumber ?? '');
       case DispatchChallansTable.COLUMN_DRIVER:
@@ -326,11 +325,7 @@ class DispatchChallansTableState extends State<DispatchChallansTable> {
       case DispatchChallansTable.COLUMN_FROM_CITY:
         return _textCell(dispatch?.fromCity ?? '');
       case DispatchChallansTable.COLUMN_TO_CITY:
-        return _textCell(
-          challan.bookedFor != null
-              ? challan.deliveryToPlace
-              : (dispatch?.toCity ?? ''),
-        );
+        return _textCell(challan.deliveryTo);
       case DispatchChallansTable.COLUMN_RECEIVER:
         return _textCell(challan.deliveryToTableName, isStrong: true);
       case DispatchChallansTable.COLUMN_GST:

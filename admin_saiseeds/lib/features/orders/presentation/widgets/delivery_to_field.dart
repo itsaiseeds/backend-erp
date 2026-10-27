@@ -28,6 +28,7 @@ Map<String, dynamic> _childAddressJson(ClientAddressModel address) => {
   'city': address.cityId,
   'state': address.stateId,
   'country': address.countryId,
+  'delivery_to': address.deliveryTo,
 };
 
 /// What the "Delivery To" section currently describes, as something a caller
@@ -155,6 +156,8 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
   late final TextEditingController _pincodeController = TextEditingController(
     text: widget.initial.newAddress?.pincode ?? '',
   );
+  late final TextEditingController _deliveryToController =
+      TextEditingController(text: widget.initial.newAddress?.deliveryTo ?? '');
   CityModel? _city;
   String? _cityError;
   String? _partyError;
@@ -195,6 +198,7 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
     _line2Controller.dispose();
     _districtController.dispose();
     _pincodeController.dispose();
+    _deliveryToController.dispose();
     super.dispose();
   }
 
@@ -266,6 +270,7 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
             // country in this deployment), matching AddressStepCard's
             // identical hardcode for a client's own address.
             countryId: _defaultCountryId,
+            deliveryTo: _deliveryToController.text.trim(),
           ),
         ),
       );
@@ -442,6 +447,15 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
                 });
                 _emit();
               },
+            ),
+            const SizedBox(height: AppSpacing.smd),
+            AppTextField(
+              controller: _deliveryToController,
+              label: AppStrings.FIELD_DELIVERY_TO,
+              hint: AppStrings.FIELD_DELIVERY_TO_HINT,
+              enabled: widget.enabled,
+              inputFormatters: [LengthLimitingTextInputFormatter(255)],
+              onChanged: (_) => _emit(),
             ),
             const SizedBox(height: AppSpacing.smd),
             AppTextField(
