@@ -398,6 +398,7 @@ erDiagram
     ADDRESS {
         char address_line_1
         char address_line_2 "optional"
+        char delivery_to "optional, defaults to city name"
         fk pincode "PROTECT"
         fk city "PROTECT"
         fk state "PROTECT"
