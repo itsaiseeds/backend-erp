@@ -21,6 +21,13 @@ class Address(TimeStampedModel, SoftDeletedModel, CreatedByModel):
         default="",
         help_text="Optional free text. A missing district is stored as an empty string.",
     )
+    delivery_to = models.CharField(
+        "delivery to",
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional. A missing one defaults to the city's name on save.",
+    )
     pincode = models.ForeignKey(
         "aggregator.Pincode",
         verbose_name="pincode",
@@ -53,6 +60,12 @@ class Address(TimeStampedModel, SoftDeletedModel, CreatedByModel):
 
     def __str__(self):
         return f"{self.address_line_1}, {self.city}" if self.city_id else self.address_line_1
+
+    def save(self, *args, **kwargs):
+        self.delivery_to = (self.delivery_to or "").strip()
+        if not self.delivery_to and self.city_id:
+            self.delivery_to = self.city.name
+        super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()

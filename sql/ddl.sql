@@ -285,6 +285,7 @@ CREATE TABLE public.aggregator_address (
 	address_line_1 varchar(255) NOT NULL,
 	address_line_2 varchar(255) NOT NULL,
 	district varchar(255) NOT NULL DEFAULT '',
+	delivery_to varchar(255) NOT NULL DEFAULT '',
 	created_by_id int8 NULL,
 	deleted_by_id int8 NULL,
 	city_id int8 NOT NULL,

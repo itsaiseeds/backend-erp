@@ -634,6 +634,7 @@ class DispatchChallansApiTest(WebApiTestCase):
         self.assertEqual(receiver["gst_number"], "27AAPFU0939F1ZV")
         self.assertEqual(receiver["address"]["line_1"], "1 Ring Road")
         self.assertEqual(receiver["address"]["city"], "Surat")
+        self.assertEqual(receiver["address"]["delivery_to"], "Surat")
         self.assertEqual(receiver["contact_person_name"], "Ramesh")
         self.assertEqual(receiver["contact_person_number"], "9876500001")
 
