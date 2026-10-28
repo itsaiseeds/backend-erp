@@ -1,17 +1,17 @@
 name: Deploy AWS
 
-# Runs alongside Render, which keeps auto-deploying master on its own; this
-# workflow does not touch that. Until the EC2 host is set up (repository
-# variable AWS_API_HOST unset) the job is skipped, so master stays green.
+# Manual only: run it from the Actions tab ("Run workflow"). It always deploys
+# the current origin/master, whichever branch is picked in that dialog. Render
+# keeps auto-deploying master on its own; this workflow does not touch that.
+# Until the EC2 host is set up (repository variable AWS_API_HOST unset) the job
+# is skipped.
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Never run two deploys at once; a newer push waits for the running one.
+# Never run two deploys at once; a newer run waits for the running one.
 concurrency:
   group: deploy-aws
   cancel-in-progress: false
@@ -23,11 +23,16 @@ jobs:
     if: vars.AWS_API_HOST != ''
     env:
       API_HOST: ${{ vars.AWS_API_HOST }}
-      TAG: ${{ github.sha }}
 
     steps:
-      - name: Checkout code
+      # Pinned to master: github.sha would be the branch picked in the dialog.
+      - name: Checkout master
         uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Tag the image with the master commit
+        run: echo "TAG=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
