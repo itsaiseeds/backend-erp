@@ -1,0 +1,20 @@
+# Production stack on the EC2 host (copied to /opt/saiseeds by the deploy
+# workflow). Only gunicorn runs in Docker; nginx + certbot run on the host and
+# proxy to 127.0.0.1:8000. Postgres is Neon and images are Supabase, so there
+# is no db service and no volume here.
+
+services:
+  web:
+    # Loaded by deploy.sh from the tarball the deploy workflow ships; never
+    # built on the host.
+    image: saiseeds-web:latest
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      # Bound to loopback: reachable by host nginx only, never the internet.
+      - "127.0.0.1:8000:8000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -151,8 +151,54 @@ See [skills/database.md](skills/database.md) for the full workflow.
   `Tests / test` status check passes (and requires a PR approval).
 - **Deploy** — push to `master` → Render auto-deploys the Docker image
   (gunicorn). A keep-alive cron pings the app every 10 minutes to avoid cold starts.
+- **Deploy (AWS)** — push to `master` also runs `.github/workflows/deploy-aws.yml`,
+  independent of Render: it rebuilds the Flutter app for the AWS API host, builds
+  the image on the runner, ships it over SSH and swaps the container on the EC2 host
+  (rolls back if Django doesn't come up). Skipped while the `AWS_API_HOST`
+  repository variable is unset. See **AWS (EC2 + nginx)** below.
 - **Flutter** — the build in `admin_saiseeds/build/web/` is committed; always rebuild it
   before pushing Flutter changes.
+
+### AWS (EC2 + nginx)
+
+One EC2 instance (Ubuntu 24.04, x86_64) runs gunicorn in Docker behind host nginx.
+Postgres stays on Neon and images on Supabase. Files live in `deploy/aws/`; the
+instance, volume and Elastic IP are set up by hand (no IaC).
+
+There is no domain yet, so the API is served at `https://<elastic-ip>` with a Let's
+Encrypt **IP certificate**. These last only 6 days; the certbot timer renews them
+over port 80, so port 80 must stay open and the Elastic IP must never be released
+(the apps have it baked in). When a domain exists, point its A record at the IP,
+re-run `bootstrap.sh <domain> <email>`, and update `AWS_API_HOST`, `ALLOWED_HOSTS`
+and `CSRF_TRUSTED_ORIGINS`.
+
+1. Launch the instance and attach the Elastic IP. Security group: 80 and 443 from
+   anywhere, 22 from your IP only.
+2. Copy `deploy/aws/` to the box and run `bootstrap.sh` once (installs Docker,
+   nginx, certbot, swap and log caps; gets the certificate):
+
+   ```bash
+   scp -r deploy/aws ubuntu@<ip>:~/aws-setup
+   ssh ubuntu@<ip> 'sudo bash ~/aws-setup/bootstrap.sh <elastic-ip> <email>'
+   ```
+
+3. Fill in `/opt/saiseeds/.env` on the box (template: `deploy/aws/env.example`).
+4. Create an SSH key pair for CI, add its public key to `~ubuntu/.ssh/authorized_keys`,
+   and set in GitHub → Settings → Secrets and variables → Actions:
+
+   | Name | Kind | Value |
+   |---|---|---|
+   | `AWS_API_HOST` | variable | Elastic IP (or the domain, later) |
+   | `EC2_HOST` | secret | Elastic IP |
+   | `EC2_USER` | secret | `ubuntu` |
+   | `EC2_SSH_KEY` | secret | the CI private key |
+   | `EC2_KNOWN_HOSTS` | secret | output of `ssh-keyscan <EC2_HOST>` |
+
+5. Run **Deploy AWS** from the Actions tab (or push to `master`).
+
+On the box: `docker compose -f /opt/saiseeds/docker-compose.prod.yml logs -f web`
+for logs; `.env` changes need `... up -d --force-recreate web`;
+`sudo certbot renew --dry-run` checks certificate renewal.
 
 ## Environment variables
 
