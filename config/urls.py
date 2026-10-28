@@ -11,6 +11,10 @@ from api.execute_code import execute_code_page
 from api.permissions import IsSuperUser
 from config.views import flutter_catch_all
 
+# Django admin branding; the defaults read "Django administration".
+admin.site.site_header = "Sai Seeds ERP Administration"
+admin.site.site_title = "Sai Seeds ERP Admin"
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("api.urls")),
