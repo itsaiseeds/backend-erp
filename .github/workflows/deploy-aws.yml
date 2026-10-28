@@ -1,0 +1,77 @@
+name: Deploy AWS
+
+# Runs alongside Render, which keeps auto-deploying master on its own; this
+# workflow does not touch that. Until the EC2 host is set up (repository
+# variable AWS_API_HOST unset) the job is skipped, so master stays green.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never run two deploys at once; a newer push waits for the running one.
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: build and deploy to EC2
+    runs-on: ubuntu-latest
+    if: vars.AWS_API_HOST != ''
+    env:
+      API_HOST: ${{ vars.AWS_API_HOST }}
+      TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      # The committed build bakes in the Render API URL. Rebuild it for the AWS
+      # host inside this runner only; nothing is committed back.
+      - name: Build Flutter web app for the AWS API
+        working-directory: admin_saiseeds
+        run: |
+          flutter pub get
+          flutter build web --release \
+            --base-href /sales-admin/ \
+            --dart-define=API_BASE_URL=https://$API_HOST
+
+      - name: Build Docker image
+        run: |
+          docker build -t saiseeds-web:$TAG .
+          docker save saiseeds-web:$TAG | gzip > image.tar.gz
+          ls -lh image.tar.gz
+
+      # EC2_KNOWN_HOSTS is the output of `ssh-keyscan <host>`, stored once so a
+      # swapped host key fails the deploy instead of being trusted silently.
+      - name: Configure SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host ec2\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n' \
+            "${{ secrets.EC2_HOST }}" "${{ secrets.EC2_USER }}" > ~/.ssh/config
+
+      - name: Upload image and deploy files
+        run: |
+          scp image.tar.gz deploy/aws/docker-compose.prod.yml deploy/aws/deploy.sh \
+            ec2:/opt/saiseeds/
+
+      - name: Deploy
+        run: ssh ec2 "bash /opt/saiseeds/deploy.sh /opt/saiseeds/image.tar.gz $API_HOST $TAG"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_deploy
