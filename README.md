@@ -161,7 +161,7 @@ See [skills/database.md](skills/database.md) for the full workflow.
 
 ### AWS (EC2 + nginx)
 
-One EC2 instance (Ubuntu 24.04, x86_64) runs gunicorn in Docker behind host nginx.
+One EC2 instance (Amazon Linux 2023, x86_64) runs gunicorn in Docker behind host nginx.
 Postgres stays on Neon and images on Supabase. Files live in `deploy/aws/`; the
 instance, volume and Elastic IP are set up by hand (no IaC).
 
@@ -178,19 +178,19 @@ and `CSRF_TRUSTED_ORIGINS`.
    nginx, certbot, swap and log caps; gets the certificate):
 
    ```bash
-   scp -r deploy/aws ubuntu@<ip>:~/aws-setup
-   ssh ubuntu@<ip> 'sudo bash ~/aws-setup/bootstrap.sh <elastic-ip> <email>'
+   scp -r deploy/aws ec2-user@<ip>:~/aws-setup
+   ssh ec2-user@<ip> 'sudo bash ~/aws-setup/bootstrap.sh <elastic-ip> <email>'
    ```
 
 3. Fill in `/opt/saiseeds/.env` on the box (template: `deploy/aws/env.example`).
-4. Create an SSH key pair for CI, add its public key to `~ubuntu/.ssh/authorized_keys`,
+4. Create an SSH key pair for CI, add its public key to `~ec2-user/.ssh/authorized_keys`,
    and set in GitHub → Settings → Secrets and variables → Actions:
 
    | Name | Kind | Value |
    |---|---|---|
    | `AWS_API_HOST` | variable | Elastic IP (or the domain, later) |
    | `EC2_HOST` | secret | Elastic IP |
-   | `EC2_USER` | secret | `ubuntu` |
+   | `EC2_USER` | secret | `ec2-user` |
    | `EC2_SSH_KEY` | secret | the CI private key |
    | `EC2_KNOWN_HOSTS` | secret | output of `ssh-keyscan <EC2_HOST>` |
 

@@ -1,5 +1,5 @@
 # Host nginx site for the EC2 deploy. bootstrap.sh installs it as
-# /etc/nginx/sites-available/saiseeds with __HOST__ replaced by the Elastic IP
+# /etc/nginx/conf.d/saiseeds.conf with __HOST__ replaced by the Elastic IP
 # (or a domain later). The certificate comes from certbot's webroot flow and
 # lives under the fixed cert name "saiseeds", whichever kind of host it covers.
 
