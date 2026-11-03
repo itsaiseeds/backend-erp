@@ -56,5 +56,3 @@ No request change: Android does not dispatch. Print the challan's "To" from `dis
 ## Rollout
 
 The change is additive and backward compatible. Old clients keep working, and the backend can ship first.
-
-The database needs `sql/migrations/2026-11-03_dispatch_delivery_to.sql` run once before the backend is deployed.
