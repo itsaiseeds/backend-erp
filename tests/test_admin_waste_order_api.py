@@ -386,6 +386,28 @@ class SalesAdminWasteOrderApiTest(WebApiTestCase):
         self.assertIsNone(row["items"][0]["packets"])
         self.assertIsNone(row["items"][0]["packet_weight"])
 
+    def test_dispatch_stores_delivery_to_on_the_private_dispatch_and_the_challan(self):
+        """tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_dispatch_stores_delivery_to_on_the_private_dispatch_and_the_challan"""
+        order = self._book((self.cotton, "30"))
+
+        response = self._dispatch(order, delivery_to="Waste Consignee")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        self.assertEqual(order.private_dispatch_details.delivery_to, "Waste Consignee")
+        self.assertEqual(order.dispatch_entry.delivery_to, "Waste Consignee")
+
+    def test_dispatch_defaults_delivery_to_to_the_delivery_address(self):
+        """tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_dispatch_defaults_delivery_to_to_the_delivery_address"""
+        order = self._book((self.cotton, "30"))
+
+        self._dispatch(order)
+
+        order.refresh_from_db()
+        self.assertEqual(
+            order.dispatch_entry.delivery_to, order.delivery_address.delivery_to
+        )
+
     def test_dispatch_records_optional_lot_numbers(self):
         """tests/test_admin_waste_order_api.py::SalesAdminWasteOrderApiTest::test_dispatch_records_optional_lot_numbers"""
         order = self._book((self.cotton, "30"), (self.wheat, "5"))

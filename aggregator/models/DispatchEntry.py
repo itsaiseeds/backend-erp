@@ -222,6 +222,16 @@ class DispatchEntry(PrefixedPublicIdModel, TimeStampedModel, SoftDeletedModel):
         blank=True,
         validators=[validate_phone_number],
     )
+    # Snapshot of the dispatch's ``delivery_to``. Null only on challans written
+    # before the column existed; ``dispatch_entry_payload`` then falls back to the
+    # order's address, which is what those challans printed.
+    delivery_to = models.CharField(
+        "delivery to",
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="The 'To' printed on the challan, as it stood at dispatch time.",
+    )
 
     class Meta:
         verbose_name = "dispatch entry"

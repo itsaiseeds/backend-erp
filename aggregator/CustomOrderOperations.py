@@ -265,6 +265,7 @@ def attach_dispatch_details(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    delivery_to: str,
     lr_number: str = "",
 ) -> DispatchDetails:
     """Record a third-party dispatch and link it to the custom order.
@@ -282,6 +283,7 @@ def attach_dispatch_details(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
         lr_number=lr_number,
     )
     dispatch.full_clean()
@@ -305,6 +307,7 @@ def attach_private_dispatch_details(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    delivery_to: str,
 ) -> PrivateDispatchDetails:
     """Record an own-vehicle dispatch and link it to the custom order."""
     dispatch = PrivateDispatchDetails(
@@ -316,6 +319,7 @@ def attach_private_dispatch_details(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
     )
     dispatch.full_clean()
     dispatch.save()
@@ -341,6 +345,7 @@ def dispatch_custom_order(
     vehicle_number: str,
     lot_numbers: dict[tuple[str, Decimal], str],
     to_city: City | None = None,
+    delivery_to: str | None = None,
 ) -> CustomOrder:
     """Record a dispatch against a CONFIRMED custom order and move it to DISPATCHED.
 
@@ -351,6 +356,8 @@ def dispatch_custom_order(
 
     The dispatch date is today and the destination defaults to the city of the
     order's own delivery address, as for an order; ``to_city`` overrides it.
+    ``delivery_to`` is the challan's "To", resolved and stored exactly as in
+    ``OrderOperations.dispatch_order``.
     ``lot_numbers`` maps each line's ``(product public id, packet_weight)`` to
     the batch those packets came from
     and must name every line exactly once -- the dispatch writes the custom
@@ -360,6 +367,7 @@ def dispatch_custom_order(
     to consumed on its own.
     """
     from .DispatchOperations import (
+        resolve_delivery_to,
         sync_custom_dispatch_entry,
         validated_loose_lot_numbers,
     )
@@ -378,6 +386,7 @@ def dispatch_custom_order(
     dispatched_at = indian_now()
     if to_city is None:
         to_city = order.delivery_address.city
+    delivery_to = resolve_delivery_to(order, delivery_to)
     with recording(
         StockEventType.ORDER_DISPATCHED,
         StockEventDetail.FULL,
@@ -400,6 +409,7 @@ def dispatch_custom_order(
             driver_name=driver_name,
             driver_number=driver_number,
             vehicle_number=vehicle_number,
+            delivery_to=delivery_to,
         )
         sync_custom_dispatch_entry(
             order,
@@ -410,6 +420,7 @@ def dispatch_custom_order(
             driver_name=driver_name,
             driver_number=driver_number,
             vehicle_number=vehicle_number,
+            delivery_to=delivery_to,
             lot_numbers=lot_numbers,
         )
         update_custom_order_status(order, StatusIds.DISPATCHED)
@@ -716,18 +727,23 @@ def dispatch_waste_order(
     vehicle_number: str,
     lot_numbers: dict[str, str] | None = None,
     to_city: City | None = None,
+    delivery_to: str | None = None,
 ) -> CustomOrder:
     """Record a dispatch against a CONFIRMED waste order and move it to DISPATCHED.
 
     The counterpart of :func:`dispatch_custom_order`: own vehicle only, today's
     date, the delivery address's city as the destination unless ``to_city``
-    overrides it, and a challan
+    overrides it, ``delivery_to`` resolved as for a custom order, and a challan
     (``DispatchOperations.sync_waste_dispatch_entry``). ``lot_numbers`` (keyed
     by product public id) is optional. No waste is written: CONFIRMED to
     DISPATCHED moves the kg from reserved to consumed on its own.
     """
     from . import InventoryOperations
-    from .DispatchOperations import sync_waste_dispatch_entry, validated_waste_lot_numbers
+    from .DispatchOperations import (
+        resolve_delivery_to,
+        sync_waste_dispatch_entry,
+        validated_waste_lot_numbers,
+    )
     from .OrderOperations import assert_driver_details
 
     lot_numbers = lot_numbers or {}
@@ -748,6 +764,7 @@ def dispatch_waste_order(
     dispatched_at = indian_now()
     if to_city is None:
         to_city = order.delivery_address.city
+    delivery_to = resolve_delivery_to(order, delivery_to)
     attach_private_dispatch_details(
         order,
         dispatched_by=actor,
@@ -757,6 +774,7 @@ def dispatch_waste_order(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
     )
     sync_waste_dispatch_entry(
         order,
@@ -767,6 +785,7 @@ def dispatch_waste_order(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
         lot_numbers=lot_numbers,
     )
     update_custom_order_status(order, StatusIds.DISPATCHED)
@@ -810,19 +829,21 @@ def create_rejected_order(
     booked_for: ClientChildOrg | None = None,
     hsn_code: str = "",
     to_city: City | None = None,
+    delivery_to: str | None = None,
 ) -> CustomOrder:
     """Book a rejected order and dispatch it on our own vehicle, atomically.
 
     Each entry in ``items`` is ``{"lot", "quantity_kg", "negotiated_selling_price"}``
     plus an optional ``"lot_number"`` (price per kg, required; ``lot`` an
     ``InwardRawMaterial``). ``lot_number`` is the lot number printed on that
-    line's challan; left out, it is the lot's own ``lot_no``. Every lot must be
+    line's challan; left out, it is the lot's own ``lot_no``. ``delivery_to`` is the
+    challan's "To", resolved against the new order as for a custom order. Every lot must be
     a bookable rejected lot with enough kg left; the lots are locked first so
     two bookings cannot spend the same kilograms. The order ends DISPATCHED with
     its challan written.
     """
     from . import InventoryOperations
-    from .DispatchOperations import sync_waste_dispatch_entry
+    from .DispatchOperations import resolve_delivery_to, sync_waste_dispatch_entry
     from .OrderOperations import assert_driver_details
 
     items = list(items)
@@ -896,6 +917,7 @@ def create_rejected_order(
     dispatched_at = indian_now()
     if to_city is None:
         to_city = delivery_address.city
+    delivery_to = resolve_delivery_to(order, delivery_to)
     attach_private_dispatch_details(
         order,
         dispatched_by=actor,
@@ -905,6 +927,7 @@ def create_rejected_order(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
     )
     sync_waste_dispatch_entry(
         order,
@@ -915,6 +938,7 @@ def create_rejected_order(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
         lot_numbers={
             item["lot"].public_id: item["lot_number"]
             for item in items

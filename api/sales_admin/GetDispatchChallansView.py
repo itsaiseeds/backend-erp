@@ -200,6 +200,12 @@ class ChallanDispatchSerializer(serializers.Serializer):
     driver_number = serializers.CharField()
     from_city = serializers.CharField()
     to_city = serializers.CharField()
+    delivery_to = serializers.CharField(
+        help_text=(
+            "The 'To' printed on the challan, snapshotted at dispatch. Read this, "
+            "not the receiver address's delivery_to, which is the address's own."
+        )
+    )
     transport_agency = TransportAgencyRefSerializer(
         allow_null=True, help_text="The carrier; null on a private dispatch."
     )

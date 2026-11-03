@@ -29,8 +29,11 @@ from aggregator.ClientOperations import (
 )
 from aggregator.CompanyDetails import COMPANY_DETAILS, DEFAULT_HSN_CODE
 from aggregator.models import (
+    Address,
     City,
+    ClientChildOrg,
     Country,
+    DispatchEntry,
     Product,
     ProductPackaging,
     Stage,
@@ -136,8 +139,19 @@ class DispatchChallansApiTest(WebApiTestCase):
 
     # -- helpers --------------------------------------------------------------
 
-    def _dispatched_order(self, *, by_agency=True, lot_number="LOT-2026-01"):
-        """Book, verify and dispatch one order; return it at DISPATCHED."""
+    def _dispatched_order(
+        self,
+        *,
+        by_agency=True,
+        lot_number="LOT-2026-01",
+        delivery_to=None,
+        booked_for=None,
+    ):
+        """Book, verify and dispatch one order; return it at DISPATCHED.
+
+        ``delivery_to`` is sent only when given, so the default can be tested by
+        omitting it; ``booked_for`` is a ``ClientChildOrg`` to book the order for.
+        """
         agency = (
             self.acme.client_transport_agencies.first().transport_agency
             if by_agency
@@ -149,6 +163,7 @@ class DispatchChallansApiTest(WebApiTestCase):
             actor=self.sales_person,
             items=[{"product_packaging": self.bag, "quantity": 2}],
             transport_agency=agency,
+            booked_for=booked_for,
         )
         inv.record_stock_counts(
             counts=dict.fromkeys(ProductPackaging.objects.all(), 400),
@@ -169,8 +184,56 @@ class DispatchChallansApiTest(WebApiTestCase):
                         "lot_number": lot_number,
                     }
                 ],
+                **({} if delivery_to is None else {"delivery_to": delivery_to}),
             },
         )
+        order.refresh_from_db()
+        return order
+
+    def _child_org(self, delivery_to="Kamrej Depot"):
+        """A booked-for party whose address carries its own ``delivery_to``."""
+        address = Address.objects.create(
+            address_line_1="9 Mill Road",
+            address_line_2="",
+            pincode=self.acme.client_addresses.first().address.pincode,
+            city=self.city,
+            state=self.state,
+            country=self.country,
+            delivery_to=delivery_to,
+        )
+        return ClientChildOrg.objects.create(
+            client=self.acme,
+            party_name="Shree Krishna Traders",
+            village_name="Kamrej",
+            address=address,
+            created_by=self.sales_person,
+        )
+
+    def _only_challan(self):
+        return self._challans().data["results"][0]["dispatch"]
+
+    def _redispatch(self, order, **extra):
+        """Revert ``order`` and dispatch it again with ``extra`` in the body."""
+        self._post(REVERT_URL, order)
+        order.refresh_from_db()
+        response = self._post(
+            DISPATCH_URL,
+            order,
+            {
+                "from_city_id": self.city.id,
+                "driver_name": "Ramesh Driver",
+                "driver_number": "9876500002",
+                "vehicle_number": "GJ05AB1234",
+                "items": [
+                    {
+                        "product_packaging_public_id": self.bag.public_id,
+                        "lot_number": "LOT-2026-02",
+                    }
+                ],
+                **extra,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         order.refresh_from_db()
         return order
 
@@ -645,6 +708,7 @@ class DispatchChallansApiTest(WebApiTestCase):
         self.assertEqual(dispatch["driver_name"], "Ramesh Driver")
         self.assertEqual(dispatch["from_city"], "Surat")
         self.assertEqual(dispatch["to_city"], "Surat")
+        self.assertEqual(dispatch["delivery_to"], "Surat")
         self.assertFalse(dispatch["is_private"])
         self.assertEqual(
             dispatch["transport_agency"],
@@ -734,3 +798,67 @@ class DispatchChallansApiTest(WebApiTestCase):
             filters["city_id"]["options"],
             [{"value": self.city.pk, "label": "Surat"}],
         )
+
+    # -- delivery_to ----------------------------------------------------------
+
+    def test_an_omitted_delivery_to_defaults_to_the_delivery_address(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_an_omitted_delivery_to_defaults_to_the_delivery_address"""
+        order = self._dispatched_order()
+
+        self.assertEqual(order.dispatch_details.delivery_to, "Surat")
+        self.assertEqual(order.dispatch_entry.delivery_to, "Surat")
+        self.assertEqual(self._only_challan()["delivery_to"], "Surat")
+
+    def test_a_booked_for_order_defaults_to_the_child_orgs_address(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_booked_for_order_defaults_to_the_child_orgs_address"""
+        order = self._dispatched_order(booked_for=self._child_org("Kamrej Depot"))
+
+        self.assertEqual(order.dispatch_entry.delivery_to, "Kamrej Depot")
+        self.assertEqual(self._only_challan()["delivery_to"], "Kamrej Depot")
+
+    def test_an_explicit_delivery_to_is_stored_and_returned(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_an_explicit_delivery_to_is_stored_and_returned"""
+        order = self._dispatched_order(delivery_to="  Navkar Roadlines, Surat ")
+
+        self.assertEqual(order.dispatch_details.delivery_to, "Navkar Roadlines, Surat")
+        self.assertEqual(order.dispatch_entry.delivery_to, "Navkar Roadlines, Surat")
+        self.assertEqual(self._only_challan()["delivery_to"], "Navkar Roadlines, Surat")
+        # The address's own value is untouched.
+        address = self._challans().data["results"][0]["receiver_details"]["address"]
+        self.assertEqual(address["delivery_to"], "Surat")
+
+    def test_an_explicit_delivery_to_lands_on_a_private_dispatch_too(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_an_explicit_delivery_to_lands_on_a_private_dispatch_too"""
+        order = self._dispatched_order(by_agency=False, delivery_to="Own Truck Drop")
+
+        self.assertEqual(order.private_dispatch_details.delivery_to, "Own Truck Drop")
+        self.assertEqual(order.dispatch_entry.delivery_to, "Own Truck Drop")
+
+    def test_a_blank_delivery_to_falls_back_to_the_default(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_blank_delivery_to_falls_back_to_the_default"""
+        order = self._dispatched_order(delivery_to="   ")
+
+        self.assertEqual(order.dispatch_entry.delivery_to, "Surat")
+
+    def test_a_null_delivery_to_falls_back_to_the_default(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_null_delivery_to_falls_back_to_the_default"""
+        order = self._dispatched_order(delivery_to="Before")
+        order = self._redispatch(order, delivery_to=None)
+
+        self.assertEqual(order.dispatch_entry.delivery_to, "Surat")
+
+    def test_re_dispatching_overwrites_the_delivery_to(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_re_dispatching_overwrites_the_delivery_to"""
+        order = self._dispatched_order(delivery_to="First Consignee")
+        order = self._redispatch(order, delivery_to="Second Consignee")
+
+        self.assertEqual(order.dispatch_entry.delivery_to, "Second Consignee")
+        self.assertEqual(order.dispatch_details.delivery_to, "Second Consignee")
+        self.assertEqual(self._only_challan()["delivery_to"], "Second Consignee")
+
+    def test_a_legacy_challan_with_a_null_delivery_to_falls_back_in_the_payload(self):
+        """tests/test_dispatch_challans_api.py::DispatchChallansApiTest::test_a_legacy_challan_with_a_null_delivery_to_falls_back_in_the_payload"""
+        order = self._dispatched_order(booked_for=self._child_org("Kamrej Depot"))
+        DispatchEntry.objects.filter(pk=order.dispatch_entry.pk).update(delivery_to=None)
+
+        self.assertEqual(self._only_challan()["delivery_to"], "Kamrej Depot")

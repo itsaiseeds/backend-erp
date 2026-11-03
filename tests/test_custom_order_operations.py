@@ -194,12 +194,14 @@ class CustomOrderOperationsTest(DMLTestCase):
             from_city=self.city, to_city=self.city2, lr_number="LR-CO",
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
         )
         sync_custom_dispatch_entry(
             order, actor=self.stock_admin, dispatched_at=dispatched_at,
             from_city=self.city, to_city=self.city2,
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
             lot_numbers={
                 (item.product.public_id, item.packet_weight): "LOT-CO"
                 for item in order.items.select_related("product")
