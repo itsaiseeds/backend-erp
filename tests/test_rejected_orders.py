@@ -243,6 +243,29 @@ class RejectedOrderApiTest(WebApiTestCase):
         self.assertEqual(lines["SUP-A"].quantity_kg, Decimal("10.000"))
         self._assert_ledger()
 
+    def test_delivery_to_is_stored_on_the_private_dispatch_and_the_challan(self):
+        """tests/test_rejected_orders.py::RejectedOrderApiTest::test_delivery_to_is_stored_on_the_private_dispatch_and_the_challan"""
+        lot = self._lot("50")
+
+        order = self._book(self._line(lot, "10"), delivery_to="Rejected Consignee")
+
+        self.assertEqual(order.private_dispatch_details.delivery_to, "Rejected Consignee")
+        self.assertEqual(order.dispatch_entry.delivery_to, "Rejected Consignee")
+
+    def test_delivery_to_defaults_to_the_delivery_address(self):
+        """tests/test_rejected_orders.py::RejectedOrderApiTest::test_delivery_to_defaults_to_the_delivery_address"""
+        lot = self._lot("50")
+
+        order = self._book(self._line(lot, "10"))
+
+        self.assertEqual(
+            order.private_dispatch_details.delivery_to,
+            order.delivery_address.delivery_to,
+        )
+        self.assertEqual(
+            order.dispatch_entry.delivery_to, order.delivery_address.delivery_to
+        )
+
     def test_two_lots_of_one_product_share_an_order_and_a_challan(self):
         """tests/test_rejected_orders.py::RejectedOrderApiTest::test_two_lots_of_one_product_share_an_order_and_a_challan"""
         first = self._lot("50", lot_no="SUP-A")

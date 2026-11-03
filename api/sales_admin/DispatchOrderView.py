@@ -24,6 +24,12 @@ the order's own delivery address, which is where the goods are going by
 definition, but an optional ``to_city_id`` overrides it. ``from_city_id`` is
 still an input until there is a warehouse to default it from.
 
+An optional ``delivery_to`` sets the "To" printed on this dispatch's challan. It
+is per dispatch, not per address, so the same client can be sent to different
+consignees. Omitted or blank, it defaults to the booked-for party's address when
+the order has one, else the delivery address -- what the challan always printed.
+The custom and waste dispatch endpoints take it identically.
+
 The transporter's ``lr_number`` is not accepted here -- it is issued after
 collection, so every agency dispatch starts with it blank. It is recorded later
 by ``POST /api/sales-admin/upload-lr-number/<public_id>``.
@@ -115,6 +121,18 @@ class DispatchOrderSerializer(serializers.Serializer):
             "Omit to use the delivery address's city."
         ),
     )
+    delivery_to = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        default=None,
+        help_text=(
+            "The 'To' printed on this dispatch's delivery challan. Omit (or send "
+            "blank) to use the booked-for party's address delivery_to when the "
+            "order has one, else the delivery address's."
+        ),
+    )
     driver_name = serializers.CharField(
         max_length=255,
         required=False,
@@ -192,6 +210,7 @@ class DispatchOrderView(OrderTransitionView):
             actor=request.user,
             from_city=data["from_city_id"],
             to_city=data["to_city_id"],
+            delivery_to=data["delivery_to"],
             driver_name=data["driver_name"],
             driver_number=data["driver_number"],
             vehicle_number=data["vehicle_number"],

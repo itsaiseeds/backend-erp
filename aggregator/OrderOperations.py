@@ -142,6 +142,7 @@ def attach_dispatch_details(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    delivery_to: str,
     lr_number: str = "",
 ) -> DispatchDetails:
     """Record a third-party dispatch and link it to the order (clears private).
@@ -161,6 +162,7 @@ def attach_dispatch_details(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
         lr_number=lr_number,
     )
     dispatch.full_clean()
@@ -184,6 +186,7 @@ def attach_private_dispatch_details(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    delivery_to: str,
 ) -> PrivateDispatchDetails:
     """Record an own-vehicle dispatch and link it to the order (clears third-party)."""
     dispatch = PrivateDispatchDetails(
@@ -195,6 +198,7 @@ def attach_private_dispatch_details(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
     )
     dispatch.full_clean()
     dispatch.save()
@@ -469,6 +473,7 @@ def dispatch_order(
     lot_numbers: dict[str, str],
     quantities: dict[str, int] | None = None,
     to_city: City | None = None,
+    delivery_to: str | None = None,
 ) -> Order:
     """Record a dispatch against a verified order and move it to DISPATCHED.
 
@@ -498,6 +503,12 @@ def dispatch_order(
     elsewhere (e.g. an agency's depot). ``from_city`` stays an argument until
     there is a warehouse to default it from.
 
+    ``delivery_to`` is the "To" printed on this dispatch's challan. It belongs to
+    the dispatch, not the address, so the same client can be sent to different
+    consignees. Left out (or blank) it resolves to what the challan printed before
+    the field existed (``DispatchOperations.resolve_delivery_to``), and the
+    resolved value is stored on the dispatch row and snapshotted on the challan.
+
     The ``lr_number`` is not set here. It is the one field a transporter issues
     after collection, so a dispatch is always recorded without it -- it is
     recorded later by ``DispatchOperations.set_lr_number``. Re-dispatching
@@ -522,6 +533,7 @@ def dispatch_order(
     bags from reserved to consumed on its own.
     """
     from .DispatchOperations import (
+        resolve_delivery_to,
         sync_dispatch_entry,
         validated_lot_numbers,
         validated_quantities,
@@ -541,6 +553,7 @@ def dispatch_order(
     dispatched_at = indian_now()
     if to_city is None:
         to_city = order.delivery_address.city
+    delivery_to = resolve_delivery_to(order, delivery_to)
 
     attach = (
         attach_dispatch_details
@@ -569,6 +582,7 @@ def dispatch_order(
             driver_name=driver_name,
             driver_number=driver_number,
             vehicle_number=vehicle_number,
+            delivery_to=delivery_to,
         )
         sync_dispatch_entry(
             order,
@@ -579,6 +593,7 @@ def dispatch_order(
             driver_name=driver_name,
             driver_number=driver_number,
             vehicle_number=vehicle_number,
+            delivery_to=delivery_to,
             lot_numbers=lot_numbers,
             quantities=quantities,
         )

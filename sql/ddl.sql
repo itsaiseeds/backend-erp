@@ -886,6 +886,9 @@ CREATE INDEX IF NOT EXISTS aggregator_productdescriptionitem_deleted_by_id_idx O
 -- aggregator/models/DispatchDetails.py). Do not add a CHECK (... <> '') here --
 -- they are required only on aggregator_privatedispatchdetails, enforced in
 -- OrderOperations.assert_driver_details.
+-- delivery_to is the "To" printed on this dispatch's challan. NULL only on rows
+-- recorded before the column existed (the live-DB script backfills what it can);
+-- the challan then falls back to the order's address.
 CREATE TABLE IF NOT EXISTS public.aggregator_dispatchdetails (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -902,6 +905,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchdetails (
 	driver_name varchar(255) NOT NULL,
 	driver_number varchar(10) NOT NULL,
 	vehicle_number varchar(32) NOT NULL,
+	delivery_to varchar(255) NULL,
 	CONSTRAINT aggregator_dispatchdetails_pkey PRIMARY KEY (id)
 );
 CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_client_id_idx ON public.aggregator_dispatchdetails USING btree (client_id);
@@ -912,6 +916,8 @@ CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_is_deleted_idx ON public.a
 CREATE INDEX IF NOT EXISTS aggregator_dispatchdetails_deleted_by_id_idx ON public.aggregator_dispatchdetails USING btree (deleted_by_id);
 
 -- aggregator_privatedispatchdetails -------------------------------------------
+-- delivery_to: as on aggregator_dispatchdetails. Own-vehicle orders and every
+-- custom, waste and rejected order land here.
 CREATE TABLE IF NOT EXISTS public.aggregator_privatedispatchdetails (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -927,6 +933,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_privatedispatchdetails (
 	vehicle_number varchar(32) NOT NULL,
 	driver_number varchar(10) NOT NULL,
 	driver_name varchar(255) NOT NULL,
+	delivery_to varchar(255) NULL,
 	CONSTRAINT aggregator_privatedispatchdetails_pkey PRIMARY KEY (id)
 );
 CREATE INDEX IF NOT EXISTS aggregator_privatedispatchdetails_client_id_idx ON public.aggregator_privatedispatchdetails USING btree (client_id);
@@ -1014,6 +1021,8 @@ CREATE INDEX IF NOT EXISTS aggregator_orderitem_deleted_by_id_idx ON public.aggr
 -- driver_name, driver_number and vehicle_number are NOT NULL but may be empty:
 -- they are snapshotted from the dispatch, and an agency dispatch may leave them
 -- blank.
+-- delivery_to is a snapshot of the dispatch's "To". NULL only on challans written
+-- before the column existed; the payload then falls back to the order's address.
 CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	id bigserial NOT NULL,
 	created_at timestamptz NOT NULL,
@@ -1041,6 +1050,7 @@ CREATE TABLE IF NOT EXISTS public.aggregator_dispatchentry (
 	vehicle_number varchar(32) NOT NULL,
 	driver_name varchar(255) NOT NULL,
 	driver_number varchar(10) NOT NULL,
+	delivery_to varchar(255) NULL,
 	CONSTRAINT aggregator_dispatchentry_pkey PRIMARY KEY (id),
 	CONSTRAINT aggregator_dispatchentry_public_id_key UNIQUE (public_id),
 	CONSTRAINT aggregator_dispatchentry_challan_number_key UNIQUE (challan_number),

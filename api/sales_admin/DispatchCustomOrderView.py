@@ -16,7 +16,8 @@ agency dispatch, and a custom order never is. The rule is enforced by
 ``dispatch_custom_order``.
 
 The date is today and the destination the custom order's own delivery city,
-exactly as for an order.
+exactly as for an order. So is the optional ``delivery_to`` (the challan's "To"),
+inherited from ``DispatchOrderSerializer``.
 
 ``items`` names every line once, keyed by ``product_public_id`` plus
 ``packet_weight`` -- the pair ``GET /custom-order/<public_id>`` hands back for
@@ -134,6 +135,7 @@ class DispatchCustomOrderView(CustomOrderTransitionView):
             actor=request.user,
             from_city=data["from_city_id"],
             to_city=data["to_city_id"],
+            delivery_to=data["delivery_to"],
             driver_name=data["driver_name"],
             driver_number=data["driver_number"],
             vehicle_number=data["vehicle_number"],

@@ -49,6 +49,7 @@ _ENTRY_FIELDS = (
     "vehicle_number",
     "driver_name",
     "driver_number",
+    "delivery_to",
 )
 
 
@@ -111,6 +112,28 @@ def validated_quantities(
     return quantities
 
 
+def default_delivery_to(order: Order | CustomOrder) -> str:
+    """The "To" a challan prints when the dispatcher did not name one.
+
+    The booked-for party's address when the order was booked on someone else's
+    behalf, else the order's own delivery address -- the value the challan
+    printed before ``delivery_to`` became a per-dispatch field, so a dispatch
+    that says nothing (and a legacy challan with a null snapshot) reads exactly
+    as it always did.
+    """
+    address = order.booked_for.address if order.booked_for_id else order.delivery_address
+    return address.delivery_to
+
+
+def resolve_delivery_to(order: Order | CustomOrder, delivery_to: str | None) -> str:
+    """The value to store for a dispatch: ``delivery_to`` trimmed, else the default.
+
+    ``None`` and a blank (or whitespace-only) string both mean "not specified",
+    so a form that sends an empty field behaves like one that omits it.
+    """
+    return (delivery_to or "").strip() or default_delivery_to(order)
+
+
 @transaction.atomic
 def sync_dispatch_entry(
     order: Order,
@@ -122,6 +145,7 @@ def sync_dispatch_entry(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    delivery_to: str,
     lot_numbers: dict[str, str],
     quantities: dict[str, int] | None = None,
 ) -> DispatchEntry:
@@ -151,6 +175,7 @@ def sync_dispatch_entry(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
     )
     _sync_entry_items(entry, order, lot_numbers, quantities, actor)
     return entry
@@ -166,6 +191,7 @@ def _upsert_entry(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    delivery_to: str,
 ) -> DispatchEntry:
     """Write (or rewrite in place) the challan header for ``order``.
 
@@ -187,6 +213,7 @@ def _upsert_entry(
         "vehicle_number": vehicle_number,
         "driver_name": driver_name,
         "driver_number": driver_number,
+        "delivery_to": delivery_to,
     }
 
     entry = DispatchEntry.all_objects.filter(**lookup).first()
@@ -288,6 +315,7 @@ def sync_custom_dispatch_entry(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    delivery_to: str,
     lot_numbers: dict[LooseLotKey, str],
 ) -> DispatchEntry:
     """Write (or rewrite) custom ``order``'s challan and its lot-numbered loose lines.
@@ -307,6 +335,7 @@ def sync_custom_dispatch_entry(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
     )
 
     existing = {
@@ -373,6 +402,7 @@ def sync_waste_dispatch_entry(
     driver_name: str,
     driver_number: str,
     vehicle_number: str,
+    delivery_to: str,
     lot_numbers: dict[str, str],
 ) -> DispatchEntry:
     """Write (or rewrite) a kg order's challan and its kg lines.
@@ -398,6 +428,7 @@ def sync_waste_dispatch_entry(
         driver_name=driver_name,
         driver_number=driver_number,
         vehicle_number=vehicle_number,
+        delivery_to=delivery_to,
     )
 
     existing = {
@@ -554,6 +585,7 @@ def dispatch_entry_payload(entry: DispatchEntry) -> dict:
         "driver_number": entry.driver_number,
         "from_city": entry.from_city.name,
         "to_city": entry.to_city.name,
+        "delivery_to": entry.delivery_to or default_delivery_to(entry.source_order),
     }
 
 

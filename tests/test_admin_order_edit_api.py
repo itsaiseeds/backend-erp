@@ -725,5 +725,6 @@ class SalesAdminOrderEditApiTest(WebApiTestCase):
             driver_name="Ramesh Driver",
             driver_number="9876500002",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
         )
         update_order_status(order, StatusIds.DISPATCHED)

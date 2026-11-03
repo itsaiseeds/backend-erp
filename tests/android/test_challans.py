@@ -149,6 +149,8 @@ class AndroidChallanTest(ReturnWorldTestCase):
         self.assertEqual(list(row), list(expected))
         self.assertEqual(row["dispatch"]["challan_number"], expected["dispatch"]["challan_number"])
         self.assertEqual(row["items"][0]["lot_number"], "LOT-1")
+        self.assertEqual(row["dispatch"]["delivery_to"], expected["dispatch"]["delivery_to"])
+        self.assertTrue(row["dispatch"]["delivery_to"])
         self.assertEqual(row["order_public_id"], order.public_id)
 
     def test_the_window_is_required_and_the_status_filter_splits_the_list(self):

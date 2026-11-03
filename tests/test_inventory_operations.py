@@ -160,6 +160,7 @@ class InventoryOperationsTest(DMLTestCase):
             from_city=self.city, to_city=self.city2, lr_number=lr_number,
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
         )
         sync_dispatch_entry(
             order, actor=self.stock_admin,
@@ -167,6 +168,7 @@ class InventoryOperationsTest(DMLTestCase):
             from_city=self.city, to_city=self.city2,
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
             lot_numbers={packaging.public_id: "LOT-1"},
             quantities=quantities,
         )
