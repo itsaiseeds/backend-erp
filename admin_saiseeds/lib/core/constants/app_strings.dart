@@ -272,6 +272,8 @@ class AppStrings {
   static const String FIELD_DELIVERY_TO = 'Delivery To';
   static const String FIELD_DELIVERY_TO_HINT =
       'Optional - defaults to the taluka name';
+  static const String FIELD_DISPATCH_DELIVERY_TO_HINT =
+      'Optional - the challan prints this as "To"';
   static const String CLIENT_CREATED_BY_LABEL = 'Added by';
   static const String CLIENT_COMPANY_NAME_HINT = 'Registered business name';
   static const String CLIENT_GST_HINT = '15-character GSTIN';

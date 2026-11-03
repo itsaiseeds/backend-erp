@@ -73,6 +73,7 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
   final TextEditingController _vehicleController = TextEditingController();
   final TextEditingController _driverNameController = TextEditingController();
   final TextEditingController _driverNumberController = TextEditingController();
+  late final TextEditingController _deliveryToController;
   final Map<String, DispatchLotNumberModel?> _lotValues = {};
   List<DispatchLotNumberModel> _lotNumbers = const [];
   bool _isLoadingLots = true;
@@ -97,6 +98,9 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
     for (final CustomOrderItemModel item in _lines) {
       _lotValues[_keyOf(item)] = null;
     }
+    _deliveryToController = TextEditingController(
+      text: _order.bookedFor?.address?.deliveryTo ?? '',
+    );
     _loadLotNumbers();
   }
 
@@ -129,6 +133,7 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
     _vehicleController.dispose();
     _driverNameController.dispose();
     _driverNumberController.dispose();
+    _deliveryToController.dispose();
     super.dispose();
   }
 
@@ -171,6 +176,7 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
       publicId: _order.publicId,
       body: {
         'from_city_id': _fromCity!.id,
+        'delivery_to': _deliveryToController.text.trim(),
         'driver_name': _driverNameController.text.trim(),
         'driver_number': _driverNumberController.text.trim(),
         'vehicle_number': _vehicleController.text.trim(),
@@ -297,6 +303,14 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
             validator: FormValidators.phoneNumber,
           ),
         ),
+        const SizedBox(height: AppSpacing.md),
+        AppTextField(
+          controller: _deliveryToController,
+          label: AppStrings.FIELD_DELIVERY_TO,
+          hint: AppStrings.FIELD_DISPATCH_DELIVERY_TO_HINT,
+          enabled: !_isSubmitting,
+          inputFormatters: [LengthLimitingTextInputFormatter(255)],
+        ),
       ],
     );
   }
@@ -349,6 +363,10 @@ class _CustomOrderDispatchDialogState extends State<CustomOrderDispatchDialog> {
         _SummaryRow(
           label: AppStrings.FIELD_FROM_CITY,
           value: _fromCity?.name ?? '',
+        ),
+        _SummaryRow(
+          label: AppStrings.FIELD_DELIVERY_TO,
+          value: _deliveryToController.text.trim(),
         ),
         _SummaryRow(
           label: AppStrings.FIELD_VEHICLE_NUMBER,

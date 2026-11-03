@@ -211,6 +211,7 @@ class ChallanDispatchModel {
   final String driverNumber;
   final String fromCity;
   final String toCity;
+  final String deliveryTo;
   final ChallanAgencyRef? transportAgency;
 
   const ChallanDispatchModel({
@@ -224,6 +225,7 @@ class ChallanDispatchModel {
     this.driverNumber = '',
     this.fromCity = '',
     this.toCity = '',
+    this.deliveryTo = '',
     this.transportAgency,
   });
 
@@ -241,6 +243,7 @@ class ChallanDispatchModel {
       driverNumber: '${json['driver_number'] ?? ''}',
       fromCity: json['from_city'] as String? ?? '',
       toCity: json['to_city'] as String? ?? '',
+      deliveryTo: json['delivery_to'] as String? ?? '',
       transportAgency: agency is Map
           ? ChallanAgencyRef.fromJson(Map<String, dynamic>.from(agency))
           : null,
@@ -491,15 +494,18 @@ class DispatchChallanModel {
   String get deliveryToPlace =>
       bookedFor != null ? bookedFor!.villageName : (dispatch?.toCity ?? '');
 
-  /// The "To" column's value: the address-level `delivery_to` (booked-for's
-  /// own address when set, else the consignee's) -- falls back to
-  /// [deliveryToPlace] for any record predating the field so the cell is
-  /// never blank.
+  /// The "To" column's value: the dispatch's own `delivery_to` -- a snapshot
+  /// taken at dispatch time, server-defaulted so it's always non-empty on
+  /// any challan created after the column existed. Falls back to the
+  /// address-level `delivery_to` (booked-for's own when set, else the
+  /// consignee's), then [deliveryToPlace], for any challan predating it.
   String get deliveryTo {
-    final String value = bookedFor != null
+    final String snapshot = dispatch?.deliveryTo.trim() ?? '';
+    if (snapshot.isNotEmpty) return snapshot;
+    final String addressLevel = bookedFor != null
         ? bookedFor!.address?.deliveryTo ?? ''
         : receiver?.address?.deliveryTo ?? '';
-    return value.trim().isNotEmpty ? value : deliveryToPlace;
+    return addressLevel.trim().isNotEmpty ? addressLevel : deliveryToPlace;
   }
 
   /// The Transport column's value: the booked-for party's own courier when

@@ -68,6 +68,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
   final TextEditingController _driverNameController = TextEditingController();
   final TextEditingController _driverNumberController = TextEditingController();
   final TextEditingController _vehicleController = TextEditingController();
+  late final TextEditingController _deliveryToController;
 
   late final Map<String, DispatchLotNumberModel?> _lotValues;
   List<DispatchLotNumberModel> _lotNumbers = const [];
@@ -93,12 +94,15 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
     _lotValues = {
       for (final OrderPackagingModel line in _lines) line.publicId: null,
     };
+    // Pre-filled with what the server would default to anyway (the
+    // booked-for address's own delivery_to, else the delivery address's) --
+    // left blank, the backend resolves the same value; typing over it
+    // overrides just this one dispatch's challan.
+    _deliveryToController = TextEditingController(
+      text: _order.bookedFor?.address?.deliveryTo ?? '',
+    );
     _loadLotNumbers();
   }
-
-  /// Read-only -- the dispatch endpoint has no `delivery_to` field to submit
-  /// an edit to, so this just surfaces what's already on the order.
-  String get _deliveryTo => _order.bookedFor?.address?.deliveryTo ?? '';
 
   Future<void> _loadLotNumbers() async {
     final List<DispatchLotNumberModel> lots =
@@ -132,6 +136,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
     _driverNameController.dispose();
     _driverNumberController.dispose();
     _vehicleController.dispose();
+    _deliveryToController.dispose();
     super.dispose();
   }
 
@@ -169,6 +174,7 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
       publicId: _order.publicId,
       request: DispatchRequestModel(
         fromCityId: _fromCity!.id,
+        deliveryTo: _deliveryToController.text.trim(),
         driverName: _driverNameController.text.trim(),
         driverNumber: _driverNumberController.text.trim(),
         vehicleNumber: _vehicleController.text.trim(),
@@ -263,14 +269,14 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
             }),
           ),
         ),
-        if (_deliveryTo.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.md),
-          AppTextField(
-            controller: TextEditingController(text: _deliveryTo),
-            label: AppStrings.FIELD_DELIVERY_TO,
-            enabled: false,
-          ),
-        ],
+        const SizedBox(height: AppSpacing.md),
+        AppTextField(
+          controller: _deliveryToController,
+          label: AppStrings.FIELD_DELIVERY_TO,
+          hint: AppStrings.FIELD_DISPATCH_DELIVERY_TO_HINT,
+          enabled: !_isSubmitting,
+          inputFormatters: [LengthLimitingTextInputFormatter(255)],
+        ),
         const SizedBox(height: AppSpacing.md),
         RecordFieldRow(
           left: AppTextField(
@@ -360,11 +366,10 @@ class _OrderDispatchDialogState extends State<OrderDispatchDialog> {
           label: AppStrings.FIELD_FROM_CITY,
           value: _fromCity?.name ?? '',
         ),
-        if (_deliveryTo.isNotEmpty)
-          _SummaryRow(
-            label: AppStrings.FIELD_DELIVERY_TO,
-            value: _deliveryTo,
-          ),
+        _SummaryRow(
+          label: AppStrings.FIELD_DELIVERY_TO,
+          value: _deliveryToController.text.trim(),
+        ),
         _SummaryRow(
           label: AppStrings.FIELD_VEHICLE_NUMBER,
           value: _vehicleController.text.trim(),
