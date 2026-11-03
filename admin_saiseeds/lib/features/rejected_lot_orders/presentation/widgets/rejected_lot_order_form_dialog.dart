@@ -95,6 +95,8 @@ class _RejectedLotOrderFormDialogState
   final TextEditingController _vehicleController = TextEditingController();
   final TextEditingController _driverNameController = TextEditingController();
   final TextEditingController _driverNumberController = TextEditingController();
+  final TextEditingController _dispatchDeliveryToController =
+      TextEditingController();
 
   int _stepIndex = 0;
   bool _isSubmitting = false;
@@ -150,6 +152,7 @@ class _RejectedLotOrderFormDialogState
     _vehicleController.dispose();
     _driverNameController.dispose();
     _driverNumberController.dispose();
+    _dispatchDeliveryToController.dispose();
     for (final RejectedLotOrderLine line in _lines) {
       line.dispose();
     }
@@ -395,6 +398,7 @@ class _RejectedLotOrderFormDialogState
       if (_deliveryTo.isSet) 'booked_for': _deliveryTo.toRequestValue(),
       'hsn_code': _hsnController.text.trim(),
       'from_city_id': _fromCity!.id,
+      'delivery_to': _dispatchDeliveryToController.text.trim(),
       'driver_name': _driverNameController.text.trim(),
       'driver_number': _driverNumberController.text.trim(),
       'vehicle_number': _vehicleController.text.trim(),
@@ -675,6 +679,14 @@ class _RejectedLotOrderFormDialogState
           hint: AppStrings.FIELD_SPECIAL_COMMENTS_HINT,
           enabled: _canEdit,
         ),
+        const SizedBox(height: AppSpacing.md),
+        AppTextField(
+          controller: _dispatchDeliveryToController,
+          label: AppStrings.FIELD_DELIVERY_TO,
+          hint: AppStrings.FIELD_DISPATCH_DELIVERY_TO_HINT,
+          enabled: _canEdit,
+          inputFormatters: [LengthLimitingTextInputFormatter(255)],
+        ),
       ],
     );
   }
@@ -729,6 +741,10 @@ class _RejectedLotOrderFormDialogState
         ),
         const SizedBox(height: AppSpacing.sm),
         _SummaryRow(label: AppStrings.FIELD_FROM_CITY, value: _fromCity?.name ?? ''),
+        _SummaryRow(
+          label: AppStrings.FIELD_DELIVERY_TO,
+          value: _dispatchDeliveryToController.text.trim(),
+        ),
         _SummaryRow(
           label: AppStrings.FIELD_VEHICLE_NUMBER,
           value: _vehicleController.text.trim(),
