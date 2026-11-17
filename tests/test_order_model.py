@@ -189,6 +189,7 @@ class OrderModelTest(DMLTestCase):
             from_city=self.city, to_city=self.city2, lr_number="LR100",
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
         )
         update_order_status(order, StatusIds.DISPATCHED)
         assert order.status.code == "DISPATCHED"
@@ -203,7 +204,7 @@ class OrderModelTest(DMLTestCase):
         dispatch = attach_dispatch_details(
             order, dispatched_by=self.adm_user, dispatch_date=datetime.date.today(),
             from_city=self.city, to_city=self.city2,
-            driver_name="", driver_number="", vehicle_number="",
+            driver_name="", driver_number="", vehicle_number="", delivery_to="Test Consignee",
         )
         # attach_dispatch_details full_cleans the row, so this passing is the
         # model accepting the blanks -- including the phone validator, which
@@ -222,7 +223,7 @@ class OrderModelTest(DMLTestCase):
                 order, dispatched_by=self.adm_user,
                 dispatch_date=datetime.date.today(),
                 from_city=self.city, to_city=self.city2,
-                driver_name="", driver_number="", vehicle_number="",
+                driver_name="", driver_number="", vehicle_number="", delivery_to="Test Consignee",
             )
 
     def test_dispatch_by_non_admin_rejected(self):
@@ -234,6 +235,7 @@ class OrderModelTest(DMLTestCase):
                 from_city=self.city, to_city=self.city2, lr_number="LRX",
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
             )
 
     def test_order_payload_has_no_pk(self):

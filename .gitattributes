@@ -1,3 +1,6 @@
 # Force LF line endings for shell scripts so they run inside the Linux web
 # container even when the repo is checked out on Windows (core.autocrlf=true).
 *.sh text eol=lf
+# deploy/aws is scp-ed to the Linux EC2 host as-is (env file, nginx config):
+# CRLF there would leave a stray carriage return on every .env value.
+deploy/aws/** text eol=lf

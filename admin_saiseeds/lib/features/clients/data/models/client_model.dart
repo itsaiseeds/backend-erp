@@ -8,6 +8,7 @@ class ClientModel {
   final String companyName;
   final String companyPhone;
   final String gstNumber;
+  final String district;
   final ClientStatus status;
   final bool isVerified;
   final String verifiedAt;
@@ -25,6 +26,7 @@ class ClientModel {
     required this.companyName,
     this.companyPhone = '',
     this.gstNumber = '',
+    this.district = '',
     this.status = ClientStatus.unknown,
     this.isVerified = false,
     this.verifiedAt = '',
@@ -53,6 +55,7 @@ class ClientModel {
       companyName: json['company_name'] as String? ?? '',
       companyPhone: json['company_phone'] as String? ?? '',
       gstNumber: json['gst_number'] as String? ?? '',
+      district: json['district'] as String? ?? '',
       status: ClientStatusX.fromRaw(json['status'] as String? ?? ''),
       isVerified: json['is_verified'] == true,
       verifiedAt: json['verified_at'] as String? ?? '',
@@ -82,6 +85,7 @@ class ClientModel {
     String? companyName,
     String? companyPhone,
     String? gstNumber,
+    String? district,
     List<ClientAddressModel>? addresses,
     List<ClientContactModel>? contacts,
     List<TransportAgencyModel>? transportAgencies,
@@ -91,6 +95,7 @@ class ClientModel {
       companyName: companyName ?? this.companyName,
       companyPhone: companyPhone ?? this.companyPhone,
       gstNumber: gstNumber ?? this.gstNumber,
+      district: district ?? this.district,
       status: status,
       isVerified: isVerified,
       verifiedAt: verifiedAt,
@@ -110,6 +115,7 @@ class ClientModel {
     'company_name': companyName,
     'company_phone': companyPhone,
     'gst_number': gstNumber,
+    'district': district,
     'addresses': addresses.map((a) => a.toWriteJson()).toList(),
     'contacts': contacts.map((c) => c.toWriteJson()).toList(),
     'transport_agencies': transportAgencies

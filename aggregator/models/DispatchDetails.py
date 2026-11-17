@@ -71,6 +71,19 @@ class DispatchDetails(TimeStampedModel, SoftDeletedModel):
         validators=[validate_phone_number],
     )
     vehicle_number = models.CharField("vehicle number", max_length=32, blank=True)
+    # Null only on rows recorded before the column existed; every dispatch since
+    # stores a resolved value (``DispatchOperations.resolve_delivery_to``). A
+    # null reads back as the address's own ``delivery_to`` on the challan.
+    delivery_to = models.CharField(
+        "delivery to",
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text=(
+            "The 'To' printed on this dispatch's delivery challan. Per dispatch, "
+            "not per address: the same client can be sent to different consignees."
+        ),
+    )
 
     class Meta:
         verbose_name = "dispatch details"

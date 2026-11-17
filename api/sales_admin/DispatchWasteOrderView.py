@@ -89,6 +89,8 @@ class DispatchWasteOrderView(CustomOrderTransitionView):
             order,
             actor=request.user,
             from_city=data["from_city_id"],
+            to_city=data["to_city_id"],
+            delivery_to=data["delivery_to"],
             driver_name=data["driver_name"],
             driver_number=data["driver_number"],
             vehicle_number=data["vehicle_number"],

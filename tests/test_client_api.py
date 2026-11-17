@@ -357,6 +357,26 @@ class SalesAdminClientApiTest(WebApiTestCase):
                 address.refresh_from_db()
                 self.assertEqual(address.district, district)
 
+    def test_an_address_delivery_to_defaults_to_the_city_name(self):
+        """tests/test_client_api.py::SalesAdminClientApiTest::test_an_address_delivery_to_defaults_to_the_city_name"""
+        self.login_as(self.admin_user)
+        address = self.pending.client_addresses.get().address
+        detail = self.client.get(CLIENT_URL.format(public_id=self.pending.public_id)).data
+        self.assertEqual(detail["addresses"][0]["delivery_to"], self.city.name)
+
+        for sent, expected in (
+            ("Ramesh Traders", "Ramesh Traders"),
+            (None, self.city.name),
+            ("  ", self.city.name),
+        ):
+            with self.subTest(delivery_to=sent):
+                data = self._update_lists(
+                    addresses=[{**self._address_item("1 Ring Road"), "delivery_to": sent}]
+                )
+                self.assertEqual(data["addresses"][0]["delivery_to"], expected)
+                address.refresh_from_db()
+                self.assertEqual(address.delivery_to, expected)
+
     def test_a_named_list_is_replaced_wholesale_and_may_not_be_emptied(self):
         """tests/test_client_api.py::SalesAdminClientApiTest::test_a_named_list_is_replaced_wholesale_and_may_not_be_emptied"""
         self.login_as(self.admin_user)

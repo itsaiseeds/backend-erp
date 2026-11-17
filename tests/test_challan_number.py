@@ -111,12 +111,14 @@ class ChallanNumberTest(DMLTestCase):
             from_city=self.city, to_city=self.city2,
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
         )
         return sync_dispatch_entry(
             order, actor=self.adm_user, dispatched_at=dispatched_at,
             from_city=self.city, to_city=self.city2,
             driver_name="Ramesh Driver", driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
             lot_numbers={self.pack.public_id: "LOT-1"},
         )
 

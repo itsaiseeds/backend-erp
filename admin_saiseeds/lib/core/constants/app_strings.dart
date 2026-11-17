@@ -266,12 +266,24 @@ class AppStrings {
   static const String VALIDATION_AT_LEAST_ONE =
       'At least one entry is required.';
   static const String VALIDATION_CITY_REQUIRED = 'City is required.';
+  static const String VALIDATION_TALUKA_REQUIRED = 'Taluka is required.';
+  static const String CLIENT_ADDRESS_DISTRICT = 'District';
+  static const String CLIENT_ADDRESS_DISTRICT_HINT = 'District (optional)';
+  static const String FIELD_DELIVERY_TO = 'Delivery To';
+  static const String FIELD_DELIVERY_TO_HINT =
+      'Optional - defaults to the taluka name';
+  static const String FIELD_DISPATCH_DELIVERY_TO_HINT =
+      'Optional - the challan prints this as "To"';
   static const String CLIENT_CREATED_BY_LABEL = 'Added by';
   static const String CLIENT_COMPANY_NAME_HINT = 'Registered business name';
   static const String CLIENT_GST_HINT = '15-character GSTIN';
   static const String CLIENT_GST_FIELD_LABEL = 'GST Number (optional)';
   static const String VALIDATION_GST_INVALID =
       'Enter a valid 15-character GST number.';
+  static const String COLUMN_DISTRICT = 'District';
+  static const String FIELD_DISTRICT = 'District';
+  static const String FIELD_DISTRICT_HINT = 'District (optional)';
+  static const String CLIENT_DISTRICT_FIELD_LABEL = 'District (optional)';
   static const String TABLE_SELECT_ALL_ON_PAGE = 'Select all on this page';
   static const String TABLE_SELECT_ROW = 'Select row';
   static const String TABLE_CLEAR_SELECTION = 'Clear selection';
@@ -355,6 +367,11 @@ class AppStrings {
   static const String FIELD_PHONE_HINT = '10-digit mobile number';
   static const String FIELD_CITY = 'City';
   static const String FIELD_CITY_HINT = 'Select a city';
+
+  /// What a client/order address's `city`/`city_id` field shows as in the
+  /// UI -- the key and value sent to the backend are unchanged.
+  static const String FIELD_TALUKA = 'Taluka';
+  static const String FIELD_TALUKA_HINT = 'Select a taluka';
   static const String FIELD_STOCK_PERMISSION = 'Can update stock count';
   static const String FIELD_STOCK_PERMISSION_HINT =
       'Allows this administrator to adjust inventory counts.';
@@ -448,6 +465,10 @@ class AppStrings {
 
   static const String COLUMN_EMAIL = 'Email';
   static const String COLUMN_CITY = 'City';
+
+  /// What a farmer's `city`/`city_id` shows as -- the field trip's own city
+  /// stays "City" (COLUMN_CITY); only farmer-facing screens use this.
+  static const String COLUMN_FARMER_TALUKA = 'Taluka';
   static const String COLUMN_CREATED_BY = 'Created By';
   static const String COLUMN_VERIFIED_BY = 'Verified By';
   static const String COLUMN_CREATED_AT = 'Created At';
@@ -976,7 +997,7 @@ class AppStrings {
   static const String ORDER_ITEM_COUNT_LABEL = 'Items';
   static const String ORDER_BAG_COUNT_LABEL = 'Bags';
   static const String ORDER_DELIVERY_ADDRESS_LABEL = 'Delivery address';
-  static const String ORDER_CITY_LABEL = 'City';
+  static const String ORDER_CITY_LABEL = 'Taluka';
   static const String ORDER_DISPATCH_MODE_LABEL = 'Dispatch';
   static const String ORDER_TRANSPORT_AGENCY_LABEL = 'Transport agency';
   static const String ORDER_EXPECTED_DELIVERY_LABEL = 'Expected delivery';
@@ -1127,7 +1148,7 @@ class AppStrings {
       'Frozen: nothing new can be created against it. Its history stays.';
   static const String PRINT = 'Print';
   static const String CUSTOM_ORDERS = 'Custom Orders';
-  static const String COLUMN_CUSTOM_ORDER_CITY = 'City';
+  static const String COLUMN_CUSTOM_ORDER_CITY = 'Taluka';
   static const String COLUMN_CUSTOM_ORDER_ITEMS = 'Items';
   static const String COLUMN_CUSTOM_ORDER_PACKETS = 'Packets';
   static const String COLUMN_CUSTOM_ORDER_EXPECTED = 'Expected Delivery';

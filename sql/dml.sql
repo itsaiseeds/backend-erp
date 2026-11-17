@@ -459,6 +459,8 @@ INSERT INTO public.aggregator_address (id, created_at, updated_at, is_deleted, c
 (4, now(), now(), false, 1, '21 MI Road', 'Near Sindhi Camp', 4, 2, 1, 4),
 (5, now(), now(), false, 1, '5 Gadisar Marg', 'Fort Area', 5, 2, 1, 5);
 
+UPDATE public.aggregator_address a SET delivery_to = c.name FROM public.aggregator_city c WHERE c.id = a.city_id AND a.delivery_to = '';
+
 -- -------------------------------------------------------------------------
 -- Master data: transport agencies, contacts, parties, product descriptions
 -- -------------------------------------------------------------------------

@@ -401,6 +401,7 @@ def sync_client_addresses(client: Client, items: list[dict], actor: User) -> lis
                 "line_1": item["line_1"].strip(),
                 "line_2": item.get("line_2", "").strip(),
                 "district": item.get("district", "").strip(),
+                "delivery_to": item.get("delivery_to"),
                 "pincode": resolve_pincode(item["pincode"].strip(), item["city"], actor),
                 "city": item["city"],
                 "state": item["state"],
@@ -422,6 +423,12 @@ def sync_client_addresses(client: Client, items: list[dict], actor: User) -> lis
         if link.address.district != district:
             link.address.district = district
             link.address.save(update_fields=["district", "updated_at"])
+        # Likewise delivery_to; a missing one falls back to the city's name in save().
+        address = link.address
+        delivery_to = (item.get("delivery_to") or "").strip() or address.city.name
+        if address.delivery_to != delivery_to:
+            address.delivery_to = delivery_to
+            address.save(update_fields=["delivery_to", "updated_at"])
 
     return _sync_links(
         items,

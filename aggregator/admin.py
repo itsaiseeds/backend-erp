@@ -268,6 +268,7 @@ class AddressAdmin(SoftDeleteModelAdmin):
         "address_line_1",
         "address_line_2",
         "district",
+        "delivery_to",
         "pincode",
         "city",
         "state",
@@ -279,6 +280,7 @@ class AddressAdmin(SoftDeleteModelAdmin):
         "address_line_1",
         "address_line_2",
         "district",
+        "delivery_to",
         "pincode__code",
         "city__name",
         "state__name",
@@ -606,6 +608,7 @@ class DispatchDetailsAdmin(SoftDeleteModelAdmin):
         "dispatch_date",
         "from_city",
         "to_city",
+        "delivery_to",
         "dispatched_by",
     )
     search_fields = ("client__company_name", "lr_number")
@@ -622,6 +625,7 @@ class PrivateDispatchDetailsAdmin(SoftDeleteModelAdmin):
         "dispatch_date",
         "from_city",
         "to_city",
+        "delivery_to",
         "dispatched_by",
     )
     search_fields = ("client__company_name", "vehicle_number", "driver_number")
@@ -646,6 +650,7 @@ class DispatchEntryAdmin(SoftDeleteParentAdmin):
         "dispatch_date",
         "from_city",
         "to_city",
+        "delivery_to",
         "vehicle_number",
     )
     search_fields = (

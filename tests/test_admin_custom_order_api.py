@@ -245,6 +245,7 @@ class SalesAdminCustomOrderApiTest(WebApiTestCase):
             driver_name="Ramesh Driver",
             driver_number="9876500009",
             vehicle_number="GJ05AB1234",
+            delivery_to="Test Consignee",
         )
         update_custom_order_status(order, StatusIds.DISPATCHED)
 
@@ -706,6 +707,25 @@ class SalesAdminCustomOrderApiTest(WebApiTestCase):
         )
         self.assertEqual(row["total_packets"], 14)
         self.assertEqual(row["total_amount"], "1200.00")
+
+    def test_dispatch_stores_delivery_to_on_the_private_dispatch_and_the_challan(self):
+        """tests/test_admin_custom_order_api.py::SalesAdminCustomOrderApiTest::test_dispatch_stores_delivery_to_on_the_private_dispatch_and_the_challan"""
+        order = self._book([(self.cotton, W1, 10)])
+        body = {
+            **self._dispatch_body([(self.cotton, W1, "LOT-1KG")]),
+            "delivery_to": "Custom Consignee",
+        }
+
+        response = self.client.post(
+            DISPATCH_URL.format(public_id=order.public_id), body, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        self.assertEqual(order.private_dispatch_details.delivery_to, "Custom Consignee")
+        self.assertEqual(order.dispatch_entry.delivery_to, "Custom Consignee")
+        [row] = self._challans().data["results"]
+        self.assertEqual(row["dispatch"]["delivery_to"], "Custom Consignee")
 
     def test_dispatch_needs_a_lot_for_every_line(self):
         """tests/test_admin_custom_order_api.py::SalesAdminCustomOrderApiTest::test_dispatch_needs_a_lot_for_every_line"""

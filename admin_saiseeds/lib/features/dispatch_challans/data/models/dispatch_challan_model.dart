@@ -8,6 +8,7 @@ class ChallanAddressModel {
   final String state;
   final String country;
   final int? cityId;
+  final String deliveryTo;
 
   const ChallanAddressModel({
     this.line1 = '',
@@ -17,6 +18,7 @@ class ChallanAddressModel {
     this.state = '',
     this.country = '',
     this.cityId,
+    this.deliveryTo = '',
   });
 
   factory ChallanAddressModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +30,7 @@ class ChallanAddressModel {
       state: json['state'] as String? ?? '',
       country: json['country'] as String? ?? '',
       cityId: _asNullableInt(json['city_id']),
+      deliveryTo: json['delivery_to'] as String? ?? '',
     );
   }
 
@@ -208,6 +211,7 @@ class ChallanDispatchModel {
   final String driverNumber;
   final String fromCity;
   final String toCity;
+  final String deliveryTo;
   final ChallanAgencyRef? transportAgency;
 
   const ChallanDispatchModel({
@@ -221,6 +225,7 @@ class ChallanDispatchModel {
     this.driverNumber = '',
     this.fromCity = '',
     this.toCity = '',
+    this.deliveryTo = '',
     this.transportAgency,
   });
 
@@ -238,6 +243,7 @@ class ChallanDispatchModel {
       driverNumber: '${json['driver_number'] ?? ''}',
       fromCity: json['from_city'] as String? ?? '',
       toCity: json['to_city'] as String? ?? '',
+      deliveryTo: json['delivery_to'] as String? ?? '',
       transportAgency: agency is Map
           ? ChallanAgencyRef.fromJson(Map<String, dynamic>.from(agency))
           : null,
@@ -487,6 +493,32 @@ class DispatchChallanModel {
   /// set, else the dispatch's own destination city as before.
   String get deliveryToPlace =>
       bookedFor != null ? bookedFor!.villageName : (dispatch?.toCity ?? '');
+
+  /// The "To" column's value: the dispatch's own `delivery_to` -- a snapshot
+  /// taken at dispatch time, server-defaulted so it's always non-empty on
+  /// any challan created after the column existed. Falls back to the
+  /// address-level `delivery_to` (booked-for's own when set, else the
+  /// consignee's), then [deliveryToPlace], for any challan predating it.
+  String get deliveryTo {
+    final String snapshot = dispatch?.deliveryTo.trim() ?? '';
+    if (snapshot.isNotEmpty) return snapshot;
+    final String addressLevel = bookedFor != null
+        ? bookedFor!.address?.deliveryTo ?? ''
+        : receiver?.address?.deliveryTo ?? '';
+    return addressLevel.trim().isNotEmpty ? addressLevel : deliveryToPlace;
+  }
+
+  /// The Transport column's value: the booked-for party's own courier when
+  /// the order was placed for someone else (e.g. "Navkar Roadlines"), else
+  /// the dispatch's own transport agency -- same priority [deliveryToContact]
+  /// already uses, so the two never disagree about whose transport this is.
+  String get transportLabel {
+    if (bookedFor != null) {
+      final String transport = bookedFor!.transportName.trim();
+      if (transport.isNotEmpty) return transport;
+    }
+    return dispatch?.transportLabel ?? '';
+  }
 
   /// "Parent (Child)" for a table row -- the client the order actually
   /// belongs to stays visible even once a delivery-to party replaces every

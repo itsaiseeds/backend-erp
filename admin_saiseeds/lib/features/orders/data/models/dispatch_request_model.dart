@@ -15,6 +15,10 @@ class DispatchItemModel {
 
 class DispatchRequestModel {
   final int fromCityId;
+
+  /// The challan's "To". Blank is valid -- the server then defaults it from
+  /// the booked-for address, else the delivery address.
+  final String deliveryTo;
   final String driverName;
   final String driverNumber;
   final String vehicleNumber;
@@ -22,6 +26,7 @@ class DispatchRequestModel {
 
   const DispatchRequestModel({
     required this.fromCityId,
+    this.deliveryTo = '',
     required this.driverName,
     required this.driverNumber,
     required this.vehicleNumber,
@@ -30,6 +35,7 @@ class DispatchRequestModel {
 
   Map<String, dynamic> toJson() => {
     'from_city_id': fromCityId,
+    'delivery_to': deliveryTo,
     'driver_name': driverName,
     'driver_number': driverNumber,
     'vehicle_number': vehicleNumber,

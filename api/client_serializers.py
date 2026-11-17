@@ -42,6 +42,14 @@ class ClientAddressSerializer(serializers.Serializer):
         default="",
         help_text="Optional free text; a blank one clears it.",
     )
+    delivery_to = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        default=None,
+        help_text="Optional. When null or blank, the city's name is stored.",
+    )
     pincode = serializers.CharField(
         max_length=10,
         error_messages={
@@ -80,6 +88,13 @@ class ChildOrgAddressSerializer(serializers.Serializer):
     line_2 = serializers.CharField(max_length=255, required=False, allow_blank=True)
     district = serializers.CharField(
         max_length=255, required=False, allow_blank=True, help_text="Optional free text."
+    )
+    delivery_to = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Optional. When null or blank, the city's name is stored.",
     )
     pincode = serializers.CharField(
         max_length=10,
@@ -232,6 +247,7 @@ class ClientAddressPayloadSerializer(serializers.Serializer):
     line_1 = serializers.CharField()
     line_2 = serializers.CharField()
     district = serializers.CharField(allow_blank=True)
+    delivery_to = serializers.CharField()
     pincode = serializers.CharField()
     city = serializers.CharField()
     state = serializers.CharField()
@@ -286,6 +302,7 @@ class ChildOrgAddressPayloadSerializer(serializers.Serializer):
     line_1 = serializers.CharField()
     line_2 = serializers.CharField()
     district = serializers.CharField(allow_blank=True)
+    delivery_to = serializers.CharField()
     pincode = serializers.CharField()
     city = serializers.CharField()
     state = serializers.CharField()

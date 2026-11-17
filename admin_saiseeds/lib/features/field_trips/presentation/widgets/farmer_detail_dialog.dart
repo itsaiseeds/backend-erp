@@ -15,6 +15,8 @@ import '../../data/models/farmer_model.dart';
 class FarmerDetailDialog extends StatelessWidget {
   static const String _COLUMN_TRIP = 'field_trip';
   static const String _COLUMN_VILLAGE = 'village';
+  static const String _COLUMN_DISTRICT = 'district';
+  static const String _COLUMN_CITY = 'city';
   static const String _COLUMN_LAND = 'land_area_bigha';
   static const String _COLUMN_CROPS = 'crops';
   static const String _COLUMN_PRODUCTS = 'products';
@@ -30,6 +32,16 @@ class FarmerDetailDialog extends StatelessWidget {
     AppDataColumn(
       id: _COLUMN_VILLAGE,
       label: AppStrings.COLUMN_VILLAGE,
+      width: AppSizes.tableColumnWidthCompact,
+    ),
+    AppDataColumn(
+      id: _COLUMN_DISTRICT,
+      label: AppStrings.COLUMN_DISTRICT,
+      width: AppSizes.tableColumnWidthCompact,
+    ),
+    AppDataColumn(
+      id: _COLUMN_CITY,
+      label: AppStrings.COLUMN_FARMER_TALUKA,
       width: AppSizes.tableColumnWidthCompact,
     ),
     AppDataColumn(
@@ -159,7 +171,14 @@ class FarmerDetailDialog extends StatelessWidget {
           value: farmer.contactNumber,
         ),
         DetailField(label: AppStrings.COLUMN_VILLAGE, value: farmer.village),
-        DetailField(label: AppStrings.COLUMN_CITY, value: farmer.cityName),
+        DetailField(
+          label: AppStrings.COLUMN_DISTRICT,
+          value: farmer.district,
+        ),
+        DetailField(
+          label: AppStrings.COLUMN_FARMER_TALUKA,
+          value: farmer.cityName,
+        ),
         DetailField(
           label: AppStrings.COLUMN_LAND_AREA,
           value: farmer.landAreaBigha,
@@ -226,6 +245,10 @@ class FarmerDetailDialog extends StatelessWidget {
         return _textCell(visit.fieldTripPublicId, isStrong: true);
       case _COLUMN_VILLAGE:
         return _textCell(visit.village);
+      case _COLUMN_DISTRICT:
+        return _textCell(visit.district);
+      case _COLUMN_CITY:
+        return _textCell(visit.cityName);
       case _COLUMN_LAND:
         return _textCell(visit.landAreaBigha);
       case _COLUMN_CROPS:

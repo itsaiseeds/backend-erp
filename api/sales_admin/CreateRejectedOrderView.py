@@ -11,6 +11,9 @@ so the driver and vehicle are required, the date is today and the destination th
 delivery address's city. The order is stored as a ``CustomOrder`` with
 ``made_from_rejected`` set and ends DISPATCHED, its challan written; each line
 takes an optional ``lot_number`` (default: the lot's own ``lot_no``). No stock-ledger figure moves.
+
+An optional ``delivery_to`` sets the "To" printed on the challan; omitted or blank
+it defaults to the booked-for party's address, else the delivery address.
 """
 
 from __future__ import annotations
@@ -94,6 +97,28 @@ class CreateRejectedOrderSerializer(CreateCustomOrderSerializer):
         error_messages={"required": "from_city_id is required."},
         help_text="Where the goods left from.",
     )
+    to_city_id = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(),
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text=(
+            "Where the goods are dropped, if not the delivery address's city. "
+            "Omit to use the delivery address's city."
+        ),
+    )
+    delivery_to = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        default=None,
+        help_text=(
+            "The 'To' printed on this dispatch's delivery challan. Omit (or send "
+            "blank) to use the booked-for party's address delivery_to when the "
+            "order has one, else the delivery address's."
+        ),
+    )
     driver_name = _own_vehicle_field("driver_name", max_length=255)
     driver_number = _own_vehicle_field("driver_number", max_length=10)
     vehicle_number = _own_vehicle_field("vehicle_number", max_length=32)
@@ -170,6 +195,8 @@ class CreateRejectedOrderView(AdminApiView):
                 actor=request.user,
                 items=data["resolved_items"],
                 from_city=data["from_city_id"],
+                to_city=data["to_city_id"],
+                delivery_to=data["delivery_to"],
                 driver_name=data["driver_name"],
                 driver_number=data["driver_number"],
                 vehicle_number=data["vehicle_number"],

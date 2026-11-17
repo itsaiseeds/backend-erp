@@ -11012,6 +11012,8 @@ components:
           type: string
         district:
           type: string
+        delivery_to:
+          type: string
         pincode:
           type: string
         city:
@@ -11031,6 +11033,7 @@ components:
       - city_id
       - country
       - country_id
+      - delivery_to
       - district
       - line_1
       - line_2
@@ -11063,6 +11066,10 @@ components:
           type: string
         to_city:
           type: string
+        delivery_to:
+          type: string
+          description: The 'To' printed on the challan, snapshotted at dispatch. Read
+            this, not the receiver address's delivery_to, which is the address's own.
         transport_agency:
           allOf:
           - $ref: '#/components/schemas/TransportAgencyRef'
@@ -11070,6 +11077,7 @@ components:
           description: The carrier; null on a private dispatch.
       required:
       - challan_number
+      - delivery_to
       - dispatch_date
       - driver_name
       - driver_number
@@ -11211,6 +11219,8 @@ components:
           type: string
         district:
           type: string
+        delivery_to:
+          type: string
         pincode:
           type: string
         city:
@@ -11230,6 +11240,7 @@ components:
       - city_id
       - country
       - country_id
+      - delivery_to
       - district
       - line_1
       - line_2
@@ -11251,6 +11262,11 @@ components:
         district:
           type: string
           description: Optional free text.
+          maxLength: 255
+        delivery_to:
+          type: string
+          nullable: true
+          description: Optional. When null or blank, the city's name is stored.
           maxLength: 255
         pincode:
           type: string
@@ -11349,6 +11365,8 @@ components:
           type: string
         district:
           type: string
+        delivery_to:
+          type: string
         pincode:
           type: string
         city:
@@ -11368,6 +11386,7 @@ components:
       - city_id
       - country
       - country_id
+      - delivery_to
       - district
       - id
       - is_primary
@@ -11395,6 +11414,8 @@ components:
           type: string
         district:
           type: string
+        delivery_to:
+          type: string
         pincode:
           type: string
         city:
@@ -11414,6 +11435,7 @@ components:
       - city_id
       - country
       - country_id
+      - delivery_to
       - district
       - id
       - is_primary
@@ -11445,6 +11467,11 @@ components:
           type: string
           default: ''
           description: Optional free text; a blank one clears it.
+          maxLength: 255
+        delivery_to:
+          type: string
+          nullable: true
+          description: Optional. When null or blank, the city's name is stored.
           maxLength: 255
         pincode:
           type: string
@@ -12322,6 +12349,18 @@ components:
         from_city_id:
           type: integer
           description: Where the goods left from.
+        to_city_id:
+          type: integer
+          nullable: true
+          description: Where the goods are dropped, if not the delivery address's
+            city. Omit to use the delivery address's city.
+        delivery_to:
+          type: string
+          nullable: true
+          description: The 'To' printed on this dispatch's delivery challan. Omit
+            (or send blank) to use the booked-for party's address delivery_to when
+            the order has one, else the delivery address's.
+          maxLength: 255
         driver_name:
           type: string
           minLength: 1
@@ -12938,6 +12977,18 @@ components:
           type: integer
           description: Where the goods left from. An input until a warehouse can default
             it.
+        to_city_id:
+          type: integer
+          nullable: true
+          description: Where the goods are dropped, if not the order's delivery city.
+            Omit to use the delivery address's city.
+        delivery_to:
+          type: string
+          nullable: true
+          description: The 'To' printed on this dispatch's delivery challan. Omit
+            (or send blank) to use the booked-for party's address delivery_to when
+            the order has one, else the delivery address's.
+          maxLength: 255
         driver_name:
           type: string
           minLength: 1
@@ -13040,6 +13091,18 @@ components:
           type: integer
           description: Where the goods left from. An input until a warehouse can default
             it.
+        to_city_id:
+          type: integer
+          nullable: true
+          description: Where the goods are dropped, if not the order's delivery city.
+            Omit to use the delivery address's city.
+        delivery_to:
+          type: string
+          nullable: true
+          description: The 'To' printed on this dispatch's delivery challan. Omit
+            (or send blank) to use the booked-for party's address delivery_to when
+            the order has one, else the delivery address's.
+          maxLength: 255
         driver_name:
           type: string
           default: ''
@@ -13075,6 +13138,18 @@ components:
           type: integer
           description: Where the goods left from. An input until a warehouse can default
             it.
+        to_city_id:
+          type: integer
+          nullable: true
+          description: Where the goods are dropped, if not the order's delivery city.
+            Omit to use the delivery address's city.
+        delivery_to:
+          type: string
+          nullable: true
+          description: The 'To' printed on this dispatch's delivery challan. Omit
+            (or send blank) to use the booked-for party's address delivery_to when
+            the order has one, else the delivery address's.
+          maxLength: 255
         driver_name:
           type: string
           minLength: 1

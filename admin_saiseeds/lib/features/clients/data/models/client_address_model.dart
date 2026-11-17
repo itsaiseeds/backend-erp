@@ -5,6 +5,7 @@ class ClientAddressModel {
   final String label;
   final String line1;
   final String line2;
+  final String district;
   final String pincode;
   final String cityName;
   final String stateName;
@@ -13,12 +14,14 @@ class ClientAddressModel {
   final int stateId;
   final int countryId;
   final bool isPrimary;
+  final String deliveryTo;
 
   ClientAddressModel copyWith({
     int? id,
     String? label,
     String? line1,
     String? line2,
+    String? district,
     String? pincode,
     String? cityName,
     String? stateName,
@@ -27,12 +30,14 @@ class ClientAddressModel {
     int? stateId,
     int? countryId,
     bool? isPrimary,
+    String? deliveryTo,
   }) {
     return ClientAddressModel(
       id: id ?? this.id,
       label: label ?? this.label,
       line1: line1 ?? this.line1,
       line2: line2 ?? this.line2,
+      district: district ?? this.district,
       pincode: pincode ?? this.pincode,
       cityName: cityName ?? this.cityName,
       stateName: stateName ?? this.stateName,
@@ -41,6 +46,7 @@ class ClientAddressModel {
       stateId: stateId ?? this.stateId,
       countryId: countryId ?? this.countryId,
       isPrimary: isPrimary ?? this.isPrimary,
+      deliveryTo: deliveryTo ?? this.deliveryTo,
     );
   }
 
@@ -49,6 +55,7 @@ class ClientAddressModel {
     this.label = '',
     this.line1 = '',
     this.line2 = '',
+    this.district = '',
     this.pincode = '',
     this.cityName = '',
     this.stateName = '',
@@ -57,6 +64,7 @@ class ClientAddressModel {
     this.stateId = 0,
     this.countryId = 0,
     this.isPrimary = false,
+    this.deliveryTo = '',
   });
 
   factory ClientAddressModel.fromJson(Map<String, dynamic> json) {
@@ -65,6 +73,7 @@ class ClientAddressModel {
       label: json['label'] as String? ?? '',
       line1: json['line_1'] as String? ?? '',
       line2: json['line_2'] as String? ?? '',
+      district: json['district'] as String? ?? '',
       pincode: json['pincode'] as String? ?? '',
       cityName: _nameOf(json['city']),
       stateName: _nameOf(json['state']),
@@ -73,18 +82,21 @@ class ClientAddressModel {
       stateId: _idOf(json['state_id'] ?? json['state']),
       countryId: _idOf(json['country_id'] ?? json['country']),
       isPrimary: json['is_primary'] == true,
+      deliveryTo: json['delivery_to'] as String? ?? '',
     );
   }
 
   Map<String, dynamic> toWriteJson() => {
     'line_1': line1,
     'line_2': line2,
+    'district': district,
     'pincode': pincode,
     'city': cityId,
     'state': stateId,
     'country': countryId,
     'label': label,
     'is_primary': isPrimary,
+    'delivery_to': deliveryTo,
   };
 
   static String _nameOf(dynamic value) {

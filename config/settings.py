@@ -295,6 +295,10 @@ REST_FRAMEWORK = {
         # ),
     ],
     "DEFAULT_SCHEMA_CLASS": "common.openapi.GroupedAutoSchema",
+    # Reverse proxies in front of gunicorn whose X-Forwarded-For entries are
+    # trusted for the client IP that throttling keys on. Set NUM_PROXIES=1 on
+    # the EC2 host (one nginx); unset keeps DRF's default, as on Render.
+    "NUM_PROXIES": int(os.environ["NUM_PROXIES"]) if os.environ.get("NUM_PROXIES") else None,
     # Per-scope throttle rates. ``verify_otp`` (web) and ``android_login``
     # (Android) each cap a single IP's login attempts per hour so an attacker
     # cannot cheaply burn through every account's lockout budget from one origin.

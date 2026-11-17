@@ -23,10 +23,12 @@ import '../../data/models/child_org_model.dart';
 Map<String, dynamic> _childAddressJson(ClientAddressModel address) => {
   'line_1': address.line1,
   'line_2': address.line2,
+  'district': address.district,
   'pincode': address.pincode,
   'city': address.cityId,
   'state': address.stateId,
   'country': address.countryId,
+  'delivery_to': address.deliveryTo,
 };
 
 /// What the "Delivery To" section currently describes, as something a caller
@@ -148,9 +150,14 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
   late final TextEditingController _line2Controller = TextEditingController(
     text: widget.initial.newAddress?.line2 ?? '',
   );
+  late final TextEditingController _districtController = TextEditingController(
+    text: widget.initial.newAddress?.district ?? '',
+  );
   late final TextEditingController _pincodeController = TextEditingController(
     text: widget.initial.newAddress?.pincode ?? '',
   );
+  late final TextEditingController _deliveryToController =
+      TextEditingController(text: widget.initial.newAddress?.deliveryTo ?? '');
   CityModel? _city;
   String? _cityError;
   String? _partyError;
@@ -189,7 +196,9 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
     _contactController.dispose();
     _line1Controller.dispose();
     _line2Controller.dispose();
+    _districtController.dispose();
     _pincodeController.dispose();
+    _deliveryToController.dispose();
     super.dispose();
   }
 
@@ -250,6 +259,7 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
           address: ClientAddressModel(
             line1: line1,
             line2: _line2Controller.text.trim(),
+            district: _districtController.text.trim(),
             pincode: pincode,
             cityId: _city!.id,
             cityName: _city!.name,
@@ -260,6 +270,7 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
             // country in this deployment), matching AddressStepCard's
             // identical hardcode for a client's own address.
             countryId: _defaultCountryId,
+            deliveryTo: _deliveryToController.text.trim(),
           ),
         ),
       );
@@ -312,7 +323,7 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
       _villageError = villageValid
           ? null
           : AppStrings.VALIDATION_VILLAGE_NAME_REQUIRED;
-      _cityError = cityValid ? null : AppStrings.VALIDATION_CITY_REQUIRED;
+      _cityError = cityValid ? null : AppStrings.VALIDATION_TALUKA_REQUIRED;
     });
 
     return partyValid && villageValid && cityValid;
@@ -402,6 +413,15 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
             ),
             const SizedBox(height: AppSpacing.smd),
             AppTextField(
+              controller: _districtController,
+              label: AppStrings.CLIENT_ADDRESS_DISTRICT,
+              hint: AppStrings.CLIENT_ADDRESS_DISTRICT_HINT,
+              enabled: widget.enabled,
+              inputFormatters: [LengthLimitingTextInputFormatter(255)],
+              onChanged: (_) => _emit(),
+            ),
+            const SizedBox(height: AppSpacing.smd),
+            AppTextField(
               controller: _pincodeController,
               label: AppStrings.CLIENT_ADDRESS_PINCODE,
               enabled: widget.enabled,
@@ -417,6 +437,8 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
             CityPickerField(
               value: _city,
               enabled: widget.enabled,
+              fieldLabel: AppStrings.FIELD_TALUKA,
+              fieldHint: AppStrings.FIELD_TALUKA_HINT,
               errorText: _cityError,
               onSelected: (selected) {
                 setState(() {
@@ -425,6 +447,15 @@ class _DeliveryToFieldState extends State<DeliveryToField> {
                 });
                 _emit();
               },
+            ),
+            const SizedBox(height: AppSpacing.smd),
+            AppTextField(
+              controller: _deliveryToController,
+              label: AppStrings.FIELD_DELIVERY_TO,
+              hint: AppStrings.FIELD_DELIVERY_TO_HINT,
+              enabled: widget.enabled,
+              inputFormatters: [LengthLimitingTextInputFormatter(255)],
+              onChanged: (_) => _emit(),
             ),
             const SizedBox(height: AppSpacing.smd),
             AppTextField(
