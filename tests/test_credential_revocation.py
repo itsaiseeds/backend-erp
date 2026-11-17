@@ -29,7 +29,7 @@ from authentication.models import Admin, SalesPerson, User
 from tests.common import WebApiTestCase
 
 SUPERUSER_PHONE = "9999999999"
-TOTP_SECRET = "KRSXG5DSNFXGOIDB"
+TOTP_SECRET = "KRSXG5DSNFXGOIDBKRSXG5DSNFXGOIDB"
 
 ADMIN_URL = "/api/sales-admin/admins/{id}"
 SALESPERSON_URL = "/api/sales-admin/sales-people/{id}"

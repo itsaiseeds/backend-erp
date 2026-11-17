@@ -32,7 +32,7 @@ from tests.common import lab_verdict
 BASE = "/android/api/v1/"
 LOGIN_URL = BASE + "auth/login"
 REAUTH_URL = BASE + "auth/reauthenticate"
-TOTP_SECRET = "KRSXG5DSNFXGOIDB"
+TOTP_SECRET = "KRSXG5DSNFXGOIDBKRSXG5DSNFXGOIDB"
 
 
 class GodownManagerApiTest(AndroidApiTestCase):
