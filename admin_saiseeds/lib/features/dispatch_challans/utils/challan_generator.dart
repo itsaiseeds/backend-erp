@@ -298,9 +298,6 @@ class ChallanGenerator {
     );
   }
 
-  static String _transportLabel(ChallanDispatchModel? dispatch) =>
-      dispatch?.transportLabel ?? '';
-
   static pw.Widget _partyCard({
     required String title,
     required String name,
@@ -428,7 +425,7 @@ class ChallanGenerator {
             children: [
               _journeyCell('LR NO.', dispatch?.lrNumber ?? ''),
               pw.Container(width: 1, height: 18, color: _divider),
-              _journeyCell('TRANSPORT', _transportLabel(dispatch)),
+              _journeyCell('TRANSPORT', challan.transportLabel),
               pw.Container(width: 1, height: 18, color: _divider),
               _journeyCell('VEHICLE', dispatch?.vehicleNumber ?? ''),
               pw.Container(width: 1, height: 18, color: _divider),

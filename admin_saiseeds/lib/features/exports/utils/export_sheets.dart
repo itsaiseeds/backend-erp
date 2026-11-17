@@ -289,6 +289,7 @@ class ExportSheets {
       final Map<String, dynamic> dispatch = _mapOf(challan['dispatch']);
       final Map<String, dynamic> receiver = _mapOf(challan['receiver_details']);
       final Map<String, dynamic> address = _mapOf(receiver['address']);
+      final Map<String, dynamic> bookedFor = _mapOf(challan['booked_for']);
 
       final List<String> head = [
         _text(challan['order_public_id']),
@@ -298,7 +299,7 @@ class ExportSheets {
         _text(dispatch['public_id']),
         _text(dispatch['lr_number']),
         _text(dispatch['dispatch_date']),
-        _transport(dispatch),
+        _transport(dispatch, bookedFor),
         _text(dispatch['vehicle_number']),
         _text(dispatch['driver_name']),
         _text(dispatch['driver_number']),
@@ -595,7 +596,16 @@ class ExportSheets {
 
   // ───────────────────────────── helpers ────────────────────────
 
-  static String _transport(Map<String, dynamic> dispatch) {
+  /// The booked-for party's own courier when the order was placed for
+  /// someone else, else the dispatch's own transport agency -- same
+  /// priority the dispatch-challans table/PDF use via
+  /// `DispatchChallanModel.transportLabel`.
+  static String _transport(
+    Map<String, dynamic> dispatch,
+    Map<String, dynamic> bookedFor,
+  ) {
+    final String bookedForTransport = _text(bookedFor['transport_name']);
+    if (bookedForTransport.isNotEmpty) return bookedForTransport;
     if (dispatch['is_private'] == true) return 'Private';
     final String agency = _text(_mapOf(dispatch['transport_agency'])['name']);
     return agency.isEmpty ? 'Agency' : agency;
