@@ -108,7 +108,7 @@ that would fail against existing data), apply it in phases to cause **minimum do
 | File | Purpose |
 |---|---|
 | `sql/ddl.sql` | `CREATE TABLE` for **every** app — Django built-ins (`django_migrations`, `django_content_type`, `auth_*`, `django_session`, `django_admin_log`), `authentication_user`, `authentication_user_groups/…_user_permissions`, `authentication_admin`, `authentication_salesperson`, `aggregator_*` (address/city/country/pincode/state), `authtoken_token` |
-| `sql/dml.sql` | Seeds content types (45) + permissions (180: add/change/delete/view × 45 models, plus the custom `authentication.execute_python_code`), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXP`), a no-TOTP user (`8888888888`), and the `aggregator_status` rows (ids 1–13) mirrored by `StatusIds` — used by the DML-seeded tests |
+| `sql/dml.sql` | Seeds content types (45) + permissions (180: add/change/delete/view × 45 models, plus the custom `authentication.execute_python_code`), a reconciliation superuser (`9999999999` with TOTP secret `JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP`), a no-TOTP user (`8888888888`), and the `aggregator_status` rows (ids 1–13) mirrored by `StatusIds` — used by the DML-seeded tests |
 | `sql/admin_perf.sql` | Prod DDL: `pg_trgm` extension + GIN indexes on `authentication_user(name, email)` for Django-admin `ILIKE` search (idempotent) |
 | `sql/session_auth_24h.sql` | Prod DDL: `authtoken_token.user_id` FK (DRF adds it only via migrate) + `created` index for the 24h TTL sweep (idempotent) |
 

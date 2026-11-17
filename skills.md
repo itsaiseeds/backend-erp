@@ -46,7 +46,7 @@ docker compose up -d                              # start PostgreSQL + Django
 bash scripts/reload_db.sh --step all              # create tables + seed data
 # Django is now running at http://localhost:8000/admin/
 # Flutter app at http://localhost:8000/sales-admin/
-# TOTP login: superuser 9999999999 (secret JBSWY3DPEHPK3PXP), no-password users OTP via authenticator app
+# TOTP login: superuser 9999999999 (secret JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP), no-password users OTP via authenticator app
 ```
 
 ### Build Flutter app

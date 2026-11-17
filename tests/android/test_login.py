@@ -41,7 +41,7 @@ class AndroidLoginTest(AndroidApiTestCase):
         salesperson_user = User.objects.create_user(
             phone_number="7777777777",
             name="salesperson",
-            totp_secret="KRSXG5DSNFXGOIDB",
+            totp_secret="KRSXG5DSNFXGOIDBKRSXG5DSNFXGOIDB",
             totp_enabled=True,
             is_verified=True,
             created_by=cls.superuser,

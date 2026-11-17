@@ -38,7 +38,7 @@ REAUTH_URL = BASE + "auth/reauthenticate"
 PENDING_URL = BASE + "lab/pending-lots"
 TESTS_URL = BASE + "lab/lab-testings"
 GODOWN_LOTS_URL = BASE + "godown/inward-raw-materials"
-TOTP_SECRET = "KRSXG5DSNFXGOIDB"
+TOTP_SECRET = "KRSXG5DSNFXGOIDBKRSXG5DSNFXGOIDB"
 
 
 def _test_url(public_id: str) -> str:

@@ -86,7 +86,7 @@ class AdminBookingApiTest(AndroidApiTestCase):
 
     @classmethod
     def _user(cls, phone, name, totp=False):
-        extra = {"totp_secret": "KRSXG5DSNFXGOIDB", "totp_enabled": True} if totp else {}
+        extra = {"totp_secret": "KRSXG5DSNFXGOIDBKRSXG5DSNFXGOIDB", "totp_enabled": True} if totp else {}
         return User.objects.create_user(
             phone_number=phone,
             name=name,
